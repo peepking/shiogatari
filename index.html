@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>潮語り航海録（β版）</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+  <header>
+    <div class="wrap">
+      <h1>潮語り航海録（β版）</h1>
+      <div class="sub">
+        海を信仰をする者「潮語り」が旅をする神託 &amp; 航海TRPG</div>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <div class="grid">
+        <!-- LEFT: navigator -->
+        <section class="card" aria-label="navigator">
+          <div class="hd">
+            <div class="row flex-wrap">
+              <span class="pill"><span id="gameTime">神歴1000年 / 春 / 1日</span></span>
+              <button class="btn ghost" id="manualModalBtn">状態手動上書き</button>
+              <button class="btn bad" id="resetBtn">リセット</button>
+            </div>
+          </div>
+
+          <div class="bd">
+            <div class="asset-grid mb-12">
+              <div class="asset-card" id="asset-ships">
+                <div class="asset-thumb">
+                  <img id="assetShipsImg" alt="船" />
+                </div>
+                <div class="asset-body">
+                  <div class="label">船</div>
+                  <div class="asset-value">
+                    <span class="sub">聖船+</span><b id="ships">0</b>
+                  </div>
+                  <div class="asset-note">沈まぬ象徴</div>
+                </div>
+              </div>
+              <div class="asset-card" id="asset-companions">
+                <div class="asset-thumb">
+                  <img id="assetTroopsImg" alt="部隊" />
+                </div>
+                <div class="asset-body">
+                  <div class="label">部隊</div>
+                  <div class="asset-value">
+                    <b id="troops">0/0</b>
+                  </div>
+                  <div class="asset-note">部隊数/上限</div>
+                </div>
+              </div>
+              <div class="asset-card" id="asset-faith">
+                <div class="asset-thumb">
+                  <img id="assetFaithImg" alt="信仰" />
+                </div>
+                <div class="asset-body">
+                  <div class="label">信仰</div>
+                  <div class="asset-value">
+                    <span class="sub"></span><b id="faith">0</b>
+                  </div>
+                  <div class="asset-note">海への貢</div>
+                </div>
+              </div>
+              <div class="asset-card" id="asset-supplies">
+                <div class="asset-thumb">
+                  <img id="assetSuppliesImg" alt="物資" />
+                </div>
+                <div class="asset-body">
+                  <div class="label">物資</div>
+                  <div class="asset-value">
+                    <b id="supplies">0/0</b>
+                  </div>
+                  <div class="asset-note">総数/上限</div>
+                </div>
+              </div>
+              <div class="asset-card" id="asset-funds">
+                <div class="asset-thumb">
+                  <img id="assetFundsImg" alt="資金" />
+                </div>
+                <div class="asset-body">
+                  <div class="label">資金</div>
+                  <div class="asset-value">
+                    <span class="sub"></span><b id="funds">0</b>
+                  </div>
+                  <div class="asset-note">たぶんデナール</div>
+                </div>
+              </div>
+              <div class="asset-card" id="asset-fame">
+                <div class="asset-thumb">
+                  <img id="assetFameImg" alt="名声" />
+                </div>
+                <div class="asset-body">
+                  <div class="label">名声</div>
+                  <div class="asset-value">
+                    <span class="sub"></span><b id="fame">0</b>
+                  </div>
+                  <div class="asset-note">評判・名誉</div>
+                </div>
+              </div>
+            </div>
+            <div class="sep"></div>
+
+            <div class="out">
+              <h3>ログ</h3>
+              <div class="log max-h-320" id="log"></div>
+            </div>
+
+            <div class="sep"></div>
+
+            <div class="row">
+              <button class="btn good" id="logMark">ログにメモ</button>
+              <button class="btn" id="exportBtn">ログを書き出す</button>
+              <button class="btn bad" id="clearLog">ログ消去</button>
+            </div>
+
+            <div id="memoBox" class="mt-10" hidden>
+              <textarea id="memo" placeholder="航海日誌／一時メモ（任意）"></textarea>
+              <div class="row mt-10">
+                <button class="btn good" id="saveMemo">保存</button>
+                <button class="btn" id="cancelMemo">キャンセル</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- CENTER STACK: guides + map/log -->
+        <div class="col-stack">
+          <aside class="card" aria-label="log">
+            <div class="bd">
+              <div class="map-block mb-12">
+                <div class="map-header">
+                  <span class="tiny">現在地: <span id="mapPosLabel">(11, 11)</span></span>
+                  <button class="btn ghost" id="mapToggle">全体 / 拡大 切替</button>
+                </div>
+                <canvas id="mapCanvas" width="640" height="640" aria-label="航路マップ"></canvas>
+                <div id="mapInfo"></div>
+              </div>
+
+              <div class="footer">
+              </div>
+            </div>
+          </aside>
+
+          <section class="card" aria-label="mode">
+            <div class="hd">
+              <div class="row flex-wrap">
+                <span class="pill">モード: <b id="modeLabel">通常</b></span>
+                <span class="pill">場所: <b id="locationLabel">-</b></span>
+              </div>
+            </div>
+            <div class="bd">
+              <div class="mode-actions">
+                <button class="btn good" id="tradeBtn" hidden>物資取引</button>
+                <button class="btn good" id="shipTradeBtn" hidden>船取引</button>
+                <button class="btn good" id="questOpenBtn" hidden>依頼受注</button>
+                <button class="btn good" id="hireBtn" hidden>部隊員雇用</button>
+                <button class="btn primary" id="oracleBtn">神託を授かる</button>
+                <button class="btn" id="modeWaitBtn">1日待機</button>
+                <button class="btn" id="modePrayBtn">海に祈る</button>
+                <button class="btn ghost" id="enterVillageBtn" hidden>村に入る</button>
+                <button class="btn ghost" id="enterTownBtn" hidden>街に入る</button>
+                <button class="btn ghost" id="exitVillageBtn" hidden>村を出る</button>
+                <button class="btn ghost" id="exitTownBtn" hidden>街を出る</button>
+              </div>
+            </div>
+          </section>
+
+          <section class="card" aria-label="guides">
+            <div class="hd">
+              <div class="row">
+                <span class="pill">ガイド</span>
+                <span class="pill">ヘルプ</span>
+              </div>
+            </div>
+            <div class="bd">
+              <div class="row flex-wrap">
+                <button class="btn ghost" id="helpBtn">ルール要約</button>
+                <button class="btn ghost" id="loreBtn">世界観</button>
+                <button class="btn ghost" id="endingsBtn">最終航海</button>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- THIRD: quests + factions -->
+        <div class="col-stack">
+          <section class="card" aria-label="quests" id="questCard">
+            <div class="hd cursor-pointer" id="questToggle">
+              <div class="row">
+                <span class="pill">依頼</span>
+                <span class="tiny">クリックで折りたたみ</span>
+              </div>
+            </div>
+            <div class="bd max-h-240 overflow-auto" id="questBody">
+              <div class="quest-list" id="questList"></div>
+            </div>
+          </section>
+
+          <section class="card" aria-label="factions">
+            <div class="hd">
+              <div class="row">
+                <span class="pill">勢力シート</span>
+                <span class="pill">貴族一覧</span>
+              </div>
+              <div class="row">
+                <span class="tiny">カードをクリックで貴族表示</span>
+              </div>
+            </div>
+            <div class="bd">
+              <div class="sideBlock mb-0" id="factions">
+                <div class="sbTitle">
+                  <b>勢力シート</b><span class="tiny">クリックで貴族表示</span>
+                </div>
+                <div class="faction-grid" id="factionList"></div>
+                <div class="noble-panel" id="noblePanel" hidden>
+                  <div class="noble-header">
+                    <div class="noble-title" id="nobleFactionName"></div>
+                    <button class="btn ghost" id="closeNobles">閉じる</button>
+                  </div>
+                  <div class="noble-list" id="nobleList"></div>
+                  <div class="noble-detail" id="nobleDetail"></div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+  </main>
+
+  <div id="toastContainer" aria-live="polite"></div>
+
+  <div class="modal-backdrop" id="confirmModal" hidden>
+    <div class="modal modal-sm">
+      <div class="modal-hd">
+        <div id="confirmTitle">確認</div>
+        <button class="modal-close" id="confirmClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="sbBody" id="confirmBody"></div>
+        <div class="row mt-12 justify-end">
+          <button class="btn" id="confirmCancel">キャンセル</button>
+          <button class="btn bad" id="confirmOk">実行</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="manualModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>状態の手動上書き</div>
+        <button class="modal-close" id="manualModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="muted">
+          ※デバッグ用
+        </div>
+
+        <div class="two mt-10">
+          <div>
+            <div class="tiny">船（聖船は別枠）</div>
+            <input type="number" id="shipsIn" min="0" value="0" />
+          </div>
+          <div>
+            <div class="tiny">信仰</div>
+            <input type="number" id="faithIn" min="0" value="0" />
+          </div>
+        </div>
+
+        <div class="two mt-10">
+          <div>
+            <div class="tiny">資金</div>
+            <input type="number" id="fundsIn" min="0" value="0" />
+          </div>
+          <div>
+            <div class="tiny">名声</div>
+            <input type="number" id="fameIn" min="0" value="0" />
+          </div>
+        </div>
+
+        <div class="row mt-12">
+          <button class="btn" id="syncBtn">入力した数値で状態を上書き</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="troopsModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>部隊詳細</div>
+        <button class="modal-close" id="troopsModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="sbBody" id="troopsDetail"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="helpModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>ルール要約</div>
+        <button class="modal-close" id="helpModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="sbBody">
+          <ul class="sbList">
+            <li>マップ：現在地は白枠、移動可能範囲は赤枠で強調されている。マップ上のアイコンはマウスホバーまたはクリックによる選択で詳細を確認可能。</li>
+            <li>移動：マップクリックで上下左右1マスに移動し1日経過。村/街の中では外に出てから移動。</li>
+            <li>村/街：マップ上で村は●、街は◆のアイコン。現在地にある村・街へ入る/出るボタンで入出する。物資取引と依頼受注が可能。</li>
+            <li>物資取引：村/街のと売買ができる。物資の相場は季節ごとに変化する。</li>
+            <li>船取引：街でのみ売買ができる。船の数を増やすと部隊数、物資の所持上限が増える。</li>
+            <li>依頼：季節ごとに依頼が更新。依頼は依頼一覧から確認/完了が可能。</li>
+            <li>部隊員雇用：村/街で部隊員を雇用できる。雇用枠は季節ごとに補充される。</li>
+            <li>神託：季節ごとに神託を授かることができる。受注中の神託があると新規神託は不可。神託は依頼一覧から確認/完了が可能。</li>
+            <li>海に祈る：季節毎に1回、信仰10以上の場合海に祈ることができる。信仰10%を捧げ、資金と食料を得る。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="loreModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>世界観</div>
+        <button class="modal-close" id="loreModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="sbBody">
+          <ul class="sbList">
+            <li>潮語り＝主人公。偉大なる海の意思を「命令」でなく「兆し」と読む。</li>
+            <li>神託＝海の意思そのもの。「兆し」として過酷に挑み、時には拒絶する。</li>
+            <li>供物＝潮が求める代償。宝物あるいは人身を捧げる。</li>
+            <li>聖船＝沈まぬ象徴。決して失われることはない。</li>
+            <li>最終航海＝潮語りの終着点。成し遂げたもの、軌跡が神話となる。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="endingsModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>最終航海</div>
+        <button class="modal-close" id="endingsModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="sbBody">
+          <ul class="sbList">
+            <li>海没神話＝越えるべき試練で倒れ、嵐に呑まれ消える。</li>
+            <li>討伐神話＝奪うべく格上へ挑み、敗れ海の残響となる。</li>
+            <li>解体神話＝最終航海後に港到達。船を解き、旗を畳んで終わる。</li>
+            <li>立身神話＝名声を高めた潮語りが民草から尊敬される。</li>
+            <li>溶合神話＝海の意思を理解し、海そのものとなる。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="tradeModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>物資取引</div>
+        <button class="modal-close" id="tradeModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="table mt-10">
+          <table class="trade-table">
+            <thead>
+              <tr>
+                <th class="ta-left"> </th>
+                <th class="ta-left">品目</th>
+                <th class="ta-center">単価</th>
+                <th class="ta-center">在庫</th>
+                <th class="ta-center">所持数</th>
+                <th class="ta-center">購入</th>
+                <th class="ta-center">売却</th>
+              </tr>
+            </thead>
+            <tbody id="tradeTableBody"></tbody>
+          </table>
+        </div>
+        <div id="tradeError" class="msg error mt-10" hidden></div>
+        <div class="row mt-12 gap-12 w-100">
+          <button class="btn primary" id="tradeConfirm">取引を確定</button>
+          <div class="modal-summary">
+            <span class="pill">現在の資金: <b id="tradeFunds">0</b></span>
+            <div id="tradeDelta" class="pill" hidden></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="shipTradeModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>船取引</div>
+        <button class="modal-close" id="shipTradeModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="table mt-10">
+          <table class="trade-table">
+            <thead>
+              <tr>
+                <th class="ta-left">品目</th>
+                <th class="ta-center">単価</th>
+                <th class="ta-center">所持数</th>
+                <th class="ta-center">購入</th>
+                <th class="ta-center">売却</th>
+              </tr>
+            </thead>
+            <tbody id="shipTradeTableBody"></tbody>
+          </table>
+        </div>
+        <div id="shipTradeError" class="msg error mt-10" hidden></div>
+        <div class="row mt-12 gap-12 w-100">
+          <button class="btn primary" id="shipTradeConfirm">取引を確定</button>
+          <div class="modal-summary">
+            <span class="pill">現在の資金: <b id="shipTradeFunds">0</b></span>
+            <div id="shipTradeDelta" class="pill" hidden></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="questModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>依頼受注</div>
+        <button class="modal-close" id="questModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="table mt-10">
+          <table class="trade-table">
+            <thead>
+              <tr>
+                <th class="ta-left">依頼</th>
+                <th class="ta-center">報酬</th>
+                <th class="ta-center">期限</th>
+                <th class="ta-center">操作</th>
+              </tr>
+            </thead>
+            <tbody id="questModalBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="hireModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>部隊員雇用</div>
+        <button class="modal-close" id="hireModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="table mt-10">
+          <table class="trade-table">
+            <thead>
+              <tr>
+                <th class="ta-left">兵種</th>
+                <th class="ta-center">雇用費</th>
+                <th class="ta-center">残り</th>
+                <th class="ta-center">人数</th>
+              </tr>
+            </thead>
+            <tbody id="hireTableBody"></tbody>
+          </table>
+        </div>
+        <div id="hireError" class="msg error mt-10" hidden></div>
+        <div class="row mt-12 gap-12 w-100">
+          <button class="btn primary" id="hireConfirm">雇用する</button>
+          <div class="modal-summary">
+            <span class="pill">現在の資金: <b id="hireFunds">0</b></span>
+            <div id="hireDelta" class="pill" hidden></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="suppliesModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>物資詳細</div>
+        <button class="modal-close" id="suppliesModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="sbBody" id="suppliesDetail"></div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+
+</html>

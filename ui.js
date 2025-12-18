@@ -1,0 +1,543 @@
+import { state, resetState } from "./state.js";
+import { nowStr, formatGameTime } from "./util.js";
+import { elements, setOutput, pushLog, pushToast } from "./dom.js";
+import { renderMap, wireMapHover, getLocationStatus } from "./map.js";
+import {
+  formatTroopDisplay,
+  renderTroopModal,
+  wireTroopDismiss,
+} from "./troops.js";
+import {
+  formatSupplyDisplay,
+  syncSuppliesUI,
+  wireSupplyModal,
+  wireSupplyDiscard,
+} from "./supplies.js";
+import {
+  moveToSelected,
+  attemptEnter,
+  attemptExit,
+  waitOneDay,
+  getCurrentSettlement,
+} from "./actions.js";
+import { wireMarketModals } from "./marketUI.js";
+import { wireHireModal } from "./hireUI.js";
+import { renderAssets, renderFactions, wireFactionPanel, wireMapToggle } from "./panelUI.js";
+import { renderQuestUI, renderQuestModal } from "./questUI.js";
+import {
+  ensureSeasonalQuests,
+  seedInitialQuests,
+  receiveOracle,
+  canReceiveOracle,
+} from "./quests.js";
+
+/**
+ * モード表示用のラベルを組み立てる。
+ * @returns {string}
+ */
+const formatModeLabel = () => {
+  const base = state.modeLabel;
+  const loc = getLocationStatus();
+  const parts = [base];
+  if (loc?.place) parts.push(loc.place);
+  if (loc?.faction) parts.push(loc.faction);
+  return parts.join("/");
+};
+
+
+
+
+
+
+
+
+
+/**
+ * 行動メッセージをトーストで表示する。
+ * @param {string} msg
+ * @param {"error"|"warn"|"info"} kind
+ */
+function showActionMessage(msg, kind = "error") {
+  if (!msg) {
+    clearActionMessage();
+    return;
+  }
+  const toastKind = kind === "error" ? "bad" : kind === "warn" ? "warn" : "info";
+  const title = kind === "error" ? "移動不可" : kind === "warn" ? "注意" : "情報";
+  pushToast(title, msg, toastKind);
+  clearActionMessage();
+}
+/**
+ * 行動メッセージ表示をクリアする。
+ */
+function clearActionMessage() {
+  const el = elements.actionMsg;
+  if (!el) return;
+  el.textContent = "";
+  el.className = "msg";
+  el.hidden = true;
+}
+
+/**
+ * インラインメッセージ表示を更新する。
+ * @param {HTMLElement|null} el
+ * @param {string} msg
+ */
+function setInlineMessage(el, msg) {
+  if (!el) return;
+  if (!msg) {
+    el.hidden = true;
+    el.textContent = "";
+    return;
+  }
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+/**
+ * 物資取引のエラーメッセージを更新する。
+ * @param {string} msg
+ */
+function setTradeError(msg) {
+  setInlineMessage(elements.tradeError, msg);
+}
+
+/**
+ * 指定面数でダイスを振る。
+ * @param {number} sides
+ * @param {number} count
+ * @returns {number}
+ */
+const rollDice = (sides, count) =>
+  Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1).reduce((a, b) => a + b, 0);
+
+/**
+ * 海に祈る行動が可能か判定する。
+ * @returns {boolean}
+ */
+function canPray() {
+  if (state.faith < 10) return false;
+  const last = state.lastPrayerSeason;
+  if (last && last.year === state.year && last.season === state.season) return false;
+  return Math.floor(state.faith * 0.1) > 0;
+}
+
+/**
+ * 海に祈る処理を実行する。
+ * @returns {boolean}
+ */
+function performPrayer() {
+  if (state.faith < 10) {
+    setOutput("祈れません", "信仰が不足しています（10以上必要）。", [
+      { text: "祈り", kind: "warn" },
+      { text: "信仰10+", kind: "warn" },
+    ]);
+    return false;
+  }
+  const last = state.lastPrayerSeason;
+  if (last && last.year === state.year && last.season === state.season) {
+    setOutput("祈れません", "この季節はすでに祈りました。", [
+      { text: "祈り", kind: "warn" },
+      { text: "季節ごと1回", kind: "warn" },
+    ]);
+    return false;
+  }
+  const consume = Math.floor(state.faith * 0.1);
+  if (consume <= 0) {
+    setOutput("祈れません", "消費できる信仰がありません。", [
+      { text: "祈り", kind: "warn" },
+      { text: "信仰10+", kind: "warn" },
+    ]);
+    return false;
+  }
+  state.faith = Math.max(0, state.faith - consume);
+  const fundsGain = consume * rollDice(50, 10);
+  const foodGain = consume * 2;
+  state.funds += fundsGain;
+  state.supplies.food = (state.supplies.food ?? 0) + foodGain;
+  state.lastPrayerSeason = { year: state.year, season: state.season };
+  const text = `信仰を${consume}捧げ、資金+${fundsGain} / 食料+${foodGain}を得ました。`;
+  setOutput("祈り", text, [
+    { text: "祈り", kind: "" },
+  ]);
+  pushLog("祈り", text, state.lastRoll ?? "-");
+  pushToast("祈りの結果", text, "good");
+  clearActionMessage();
+  if (elements.ctxEl) elements.ctxEl.value = "move";
+  syncUI();
+  return true;
+}
+
+// 移動/待機/入退場の処理は actions.js に集約。
+
+/**
+ * モードカードのボタン表示を更新する。
+ * @param {object|null} loc
+ */
+function updateModeControls(loc) {
+  const visible = state.modeLabel === "街の中" || state.modeLabel === "村の中";
+  if (elements.tradeBtn) elements.tradeBtn.hidden = !visible;
+  if (elements.shipTradeBtn)
+    elements.shipTradeBtn.hidden = state.modeLabel !== "街の中";
+  if (elements.questOpenBtn) elements.questOpenBtn.hidden = !visible;
+  if (elements.hireBtn) elements.hireBtn.hidden = !visible;
+  if (elements.oracleBtn) {
+    elements.oracleBtn.hidden = false;
+    elements.oracleBtn.disabled = !canReceiveOracle();
+  }
+  if (elements.modePrayBtn) {
+    elements.modePrayBtn.disabled = !canPray();
+  }
+  if (elements.enterVillageBtn)
+    elements.enterVillageBtn.hidden = !(loc?.place === "村" && state.modeLabel !== "村の中");
+  if (elements.enterTownBtn)
+    elements.enterTownBtn.hidden = !(loc?.place === "街" && state.modeLabel !== "街の中");
+  if (elements.exitVillageBtn)
+    elements.exitVillageBtn.hidden = state.modeLabel !== "村の中";
+  if (elements.exitTownBtn)
+    elements.exitTownBtn.hidden = state.modeLabel !== "街の中";
+}
+
+/**
+ * 画面全体の状態表示を同期する。
+ */
+function syncUI() {
+  const {
+    shipsEl,
+    troopsEl,
+    faithEl,
+    suppliesEl,
+    fundsEl,
+    fameEl,
+    modeLabelEl,
+    locationLabelEl,
+    gameTimeEl,
+    shipsIn,
+    troopsIn,
+    faithIn,
+    suppliesIn,
+    fundsIn,
+    fameIn,
+  } = elements;
+
+  const loc = getLocationStatus();
+  const troopDisplay = formatTroopDisplay();
+  syncSuppliesUI(elements);
+
+  if (shipsEl) shipsEl.textContent = String(state.ships);
+  if (troopsEl) troopsEl.innerHTML = troopDisplay.html;
+  if (faithEl) faithEl.textContent = String(state.faith);
+  if (fundsEl) fundsEl.textContent = String(state.funds);
+  if (fameEl) fameEl.textContent = String(state.fame);
+  if (modeLabelEl) modeLabelEl.textContent = formatModeLabel();
+  if (locationLabelEl) {
+    const here = loc?.place || "フィールド";
+    const settlement = getCurrentSettlement();
+    const name = settlement?.name;
+    locationLabelEl.textContent = name ? `${here} / ${name}` : here;
+  }
+  if (gameTimeEl) gameTimeEl.textContent = formatGameTime(state);
+
+  if (shipsIn) shipsIn.value = String(state.ships);
+  if (troopsIn) troopsIn.value = String(troopDisplay.total);
+  if (faithIn) faithIn.value = String(state.faith);
+  if (fundsIn) fundsIn.value = String(state.funds);
+  if (fameIn) fameIn.value = String(state.fame);
+
+  renderAssets();
+  renderFactions();
+  renderMap();
+  renderTroopModal(elements.troopsDetail);
+  updateModeControls(loc);
+  renderQuestUI(syncUI);
+
+  // 行動選択の有効/無効切替
+  if (elements.ctxEl) {
+    const vOpt = elements.ctxEl.querySelector('option[value="enterVillage"]');
+    const tOpt = elements.ctxEl.querySelector('option[value="enterTown"]');
+    const vExit = elements.ctxEl.querySelector('option[value="exitVillage"]');
+    const tExit = elements.ctxEl.querySelector('option[value="exitTown"]');
+    if (vOpt) vOpt.disabled = loc?.place !== "村";
+    if (tOpt) tOpt.disabled = loc?.place !== "街";
+    if (vExit) vExit.disabled = state.modeLabel !== "村の中";
+    if (tExit) tExit.disabled = state.modeLabel !== "街の中";
+    if (elements.ctxEl.value === "enterVillage" && vOpt?.disabled) {
+      elements.ctxEl.value = "move";
+    }
+    if (elements.ctxEl.value === "enterTown" && tOpt?.disabled) {
+      elements.ctxEl.value = "move";
+    }
+    if (elements.ctxEl.value === "exitVillage" && vExit?.disabled) {
+      elements.ctxEl.value = "move";
+    }
+    if (elements.ctxEl.value === "exitTown" && tExit?.disabled) {
+      elements.ctxEl.value = "move";
+    }
+  }
+}
+
+/**
+ * モーダルを開く。
+ * @param {HTMLElement|null} el
+ */
+function openModal(el) {
+  if (el) el.hidden = false;
+}
+
+/**
+ * モーダルを閉じる。
+ * @param {HTMLElement|null} el
+ */
+function closeModal(el) {
+  if (el) el.hidden = true;
+}
+
+/**
+ * モーダルの閉じる挙動を紐づける。
+ * @param {HTMLElement|null} modal
+ * @param {HTMLElement|null} closeBtn
+ */
+function bindModal(modal, closeBtn) {
+  if (!modal) return;
+  if (modal.dataset.bound === "true") return;
+  if (closeBtn) {
+    closeBtn.addEventListener("click", () => closeModal(modal));
+  }
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal(modal);
+  });
+  if (closeBtn) modal.dataset.bound = "true";
+}
+
+/**
+ * UIボタンのイベントを設定する。
+ */
+function wireButtons() {
+  const openManualModal = () => openModal(elements.manualModal);
+  elements.manualModalBtn?.addEventListener("click", openManualModal);
+  bindModal(elements.manualModal, elements.manualModalClose);
+
+  const openHelpModal = () => openModal(elements.helpModal);
+  const openLoreModal = () => openModal(elements.loreModal);
+  const openEndingsModal = () => openModal(elements.endingsModal);
+  bindModal(elements.helpModal, elements.helpModalClose);
+  bindModal(elements.loreModal, elements.loreModalClose);
+  bindModal(elements.endingsModal, elements.endingsModalClose);
+
+  document.getElementById("modeBattleAlert")?.addEventListener("click", () => {
+    state.modeLabel = "戦闘警戒";
+    syncUI();
+  });
+  document.getElementById("modeBattle")?.addEventListener("click", () => {
+    state.modeLabel = "戦闘中";
+    syncUI();
+  });
+  elements.modeWaitBtn?.addEventListener("click", () => {
+    waitOneDay(elements, clearActionMessage, syncUI);
+  });
+  elements.modePrayBtn?.addEventListener("click", () => {
+    performPrayer();
+  });
+  elements.enterVillageBtn?.addEventListener("click", () => {
+    attemptEnter("village", clearActionMessage, syncUI);
+  });
+  elements.enterTownBtn?.addEventListener("click", () => {
+    attemptEnter("town", clearActionMessage, syncUI);
+  });
+  elements.exitVillageBtn?.addEventListener("click", () => {
+    attemptExit("village", elements, clearActionMessage, setTradeError, syncUI);
+  });
+  elements.exitTownBtn?.addEventListener("click", () => {
+    attemptExit("town", elements, clearActionMessage, setTradeError, syncUI);
+  });
+  document.addEventListener("map-move-request", () => {
+    moveToSelected(showActionMessage, syncUI);
+  });
+  document.addEventListener("map-wait-request", () => {
+    waitOneDay(elements, clearActionMessage, syncUI);
+  });
+  document.addEventListener("map-move-invalid", () => {
+    showActionMessage("移動できるのは上下左右1マス以内です。", "error");
+  });
+
+  document.getElementById("syncBtn")?.addEventListener("click", () => {
+    state.ships = Math.max(0, Number(elements.shipsIn?.value) || 0);
+    state.faith = Math.max(0, Number(elements.faithIn?.value) || 0);
+    state.funds = Math.max(0, Number(elements.fundsIn?.value) || 0);
+    state.fame = Math.max(0, Number(elements.fameIn?.value) || 0);
+    syncUI();
+    const troopDisplay = formatTroopDisplay();
+    const supplyDisplay = formatSupplyDisplay();
+    pushLog(
+      "手動更新",
+      `従船=${state.ships} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame}`,
+      state.lastRoll ?? "-"
+    );
+  });
+
+  document.getElementById("helpBtn")?.addEventListener("click", () => {
+    openHelpModal();
+  });
+  document.getElementById("loreBtn")?.addEventListener("click", () => {
+    openLoreModal();
+  });
+  document.getElementById("endingsBtn")?.addEventListener("click", () => {
+    openEndingsModal();
+  });
+
+  document.getElementById("clearLog")?.addEventListener("click", () => {
+    if (!confirm("ログを消去しますか？")) return;
+    if (elements.logEl) elements.logEl.innerHTML = "";
+  });
+
+  document.getElementById("resetBtn")?.addEventListener("click", () => {
+    if (!confirm("状態とログをリセットしますか？")) return;
+    resetState();
+    if (elements.logEl) elements.logEl.innerHTML = "";
+    setOutput("次の操作", "状況を選んで、1D6を振ってください", [
+      { text: "-", kind: "" },
+      { text: "-", kind: "" },
+    ]);
+    syncUI();
+    pushLog("起動", "潮語り航海録を開始。");
+  });
+
+  document.getElementById("logMark")?.addEventListener("click", () => {
+    if (elements.memoBox) elements.memoBox.hidden = false;
+    elements.memo?.focus();
+  });
+  document.getElementById("cancelMemo")?.addEventListener("click", () => {
+    if (elements.memoBox) elements.memoBox.hidden = true;
+    if (elements.memo) elements.memo.value = "";
+  });
+  document.getElementById("saveMemo")?.addEventListener("click", () => {
+    if (!elements.memo) return;
+    const t = elements.memo.value.trim();
+    if (!t) {
+      alert("メモが空です。");
+      return;
+    }
+    pushLog("航海日誌メモ", t, state.lastRoll ?? "-");
+    elements.memo.value = "";
+    if (elements.memoBox) elements.memoBox.hidden = true;
+  });
+
+  document.getElementById("journalBtn")?.addEventListener("click", () => {
+    const ctxText = elements.ctxEl?.selectedOptions?.[0]?.textContent ?? "";
+    const rollText = state.lastRoll == null ? "-" : String(state.lastRoll);
+    const troopDisplay = formatTroopDisplay();
+    const supplyDisplay = formatSupplyDisplay();
+    const base = [
+      "【航海日誌】",
+      `日時：${nowStr()}`,
+      `状況：${ctxText}`,
+      `直近の出目：${rollText}`,
+      `状態：従船=${state.ships} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame} / 沈黙=${state.silence}日`,
+      "",
+      "所感：",
+      "",
+      "次の方針：",
+      "",
+    ].join("\n");
+    if (elements.memoBox) elements.memoBox.hidden = false;
+    if (elements.memo) {
+      elements.memo.value = base;
+      elements.memo.focus();
+    }
+  });
+
+  document.getElementById("exportBtn")?.addEventListener("click", () => {
+    const txt = [...(elements.logEl?.querySelectorAll(".logitem") ?? [])]
+      .reverse()
+      .map((li) => {
+        const what = li.querySelector(".what")?.textContent ?? "";
+        const when = li.querySelector(".when")?.textContent ?? "";
+        const body = li.querySelector(".txt")?.textContent ?? "";
+        return `# ${what}\n${when}\n${body}\n`;
+      })
+      .join("\n");
+
+    const blob = new Blob([txt || "(log empty)"], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "shiogatari-log.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById("copyBtn")?.addEventListener("click", async () => {
+    const text =
+      state.lastResultText ||
+      `${elements.outTitle?.textContent ?? ""}\n${elements.outText?.textContent ?? ""}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      pushLog("コピー", "直近の結果をクリップボードにコピーしました", state.lastRoll ?? "-");
+    } catch {
+      alert("コピーに失敗しました。ブラウザの許可設定をご確認ください。");
+    }
+  });
+
+  wireFactionPanel();
+  wireMapToggle(renderMap);
+
+  wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage });
+  wireHireModal({ openModal, bindModal, syncUI });
+
+  const troopCard = document.getElementById("asset-companions") || document.getElementById("asset-troops");
+  troopCard?.addEventListener("click", () => {
+    renderTroopModal(elements.troopsDetail);
+    openModal(elements.troopsModal);
+  });
+  wireSupplyModal(elements, openModal, closeModal);
+  bindModal(elements.questModal, elements.questModalClose);
+  elements.troopsModalClose?.addEventListener("click", () => closeModal(elements.troopsModal));
+  elements.troopsModal?.addEventListener("click", (e) => {
+    if (e.target === elements.troopsModal) closeModal(elements.troopsModal);
+  });
+  const openQuestModal = () => {
+    const settlement = getCurrentSettlement();
+    if (!settlement) {
+      setOutput("依頼受注不可", "街・村の中でのみ受注できます。", [
+        { text: "依頼", kind: "warn" },
+        { text: "入場時に利用可", kind: "warn" },
+      ]);
+      return;
+    }
+    ensureSeasonalQuests(settlement);
+    renderQuestModal(settlement, syncUI);
+    bindModal(elements.questModal, elements.questModalClose);
+    openModal(elements.questModal);
+  };
+  elements.questOpenBtn?.addEventListener("click", openQuestModal);
+  elements.oracleBtn?.addEventListener("click", () => {
+    const res = receiveOracle();
+    if (!res) {
+      setOutput("神託を授かれません", "この季節はすでに神託を受けています。", [
+        { text: "神託", kind: "warn" },
+        { text: "季節ごと1回", kind: "warn" },
+      ]);
+      return;
+    }
+    renderQuestUI(syncUI);
+    syncUI();
+  });
+}
+
+/**
+ * UIの初期化処理。
+ */
+export function initUI() {
+  seedInitialQuests();
+  ensureSeasonalQuests(getCurrentSettlement());
+  wireButtons();
+  wireTroopDismiss(elements.troopsDetail, syncUI);
+  wireSupplyDiscard(elements.suppliesDetail, syncUI);
+  wireMapHover();
+  syncUI();
+  setOutput("次の操作", "状況を選んで、1D6を振ってください", [
+    { text: "-", kind: "" },
+    { text: "-", kind: "" },
+  ]);
+  pushLog("起動", "潮語り航海録を開始。");
+}
