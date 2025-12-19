@@ -9,6 +9,7 @@ import {
   applyTroopLosses,
   addTroops,
   levelUpTroopsRandom,
+  TROOP_STATS,
 } from "./troops.js";
 import {
   formatSupplyDisplay,
@@ -334,7 +335,13 @@ function processBattleOutcome(result, meta) {
   const { losses, lossProb } = calcLosses(meta);
   applyTroopLosses(losses);
   const lossEntries = Object.entries(losses || {}).map(([t, n]) => `${t} -${n}`);
-  const lossText = lossEntries.length ? lossEntries.join(" / ") : "なし";
+  const lossText = lossEntries
+    .map((txt) => {
+      const [type, rest] = txt.split(" ");
+      const name = TROOP_STATS[type]?.name || type;
+      return `${name} ${rest || ""}`.trim();
+    })
+    .join(" / ") || "なし";
   summary.push(`損耗:${lossText === "なし" ? lossText : " " + lossText}`);
 
   const captured = calcCaptures(meta);
@@ -345,7 +352,8 @@ function processBattleOutcome(result, meta) {
   const capEntries =
     Object.entries(captured || {}).map(([key, n]) => {
       const [type, lvl] = key.split("|");
-      return `${type} Lv${lvl} +${n}`;
+      const name = TROOP_STATS[type]?.name || type;
+      return `${name} Lv${lvl} +${n}`;
     }) || [];
   const capText = capEntries.length ? capEntries.join(" / ") : "なし";
   summary.push(`拿捕:${capText === "なし" ? capText : " " + capText}`);

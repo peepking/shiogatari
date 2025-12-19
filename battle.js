@@ -318,6 +318,7 @@ function autoWeight(type) {
  * 自動配備を行う。
  */
 function autoDeployRoster() {
+  resetRoster();
   const totals = standbyTotals();
   const entries = Object.entries(totals)
     .filter(([, cnt]) => cnt > 0)
@@ -357,10 +358,11 @@ function renderRosterUI() {
   const standbyEl = elements.rosterStandby;
   const sortieEl = elements.rosterSortie;
   const countEl = elements.rosterCount;
+  const disableAll = battleState.running;
   const sortieCount = battleRoster.sortie.length;
   if (countEl) countEl.textContent = `${sortieCount}/10`;
   const sortieFull = sortieCount >= 10;
-  if (elements.rosterApply) elements.rosterApply.disabled = sortieCount === 0;
+  if (elements.rosterApply) elements.rosterApply.disabled = sortieCount === 0 || disableAll;
 
   // 合計人数を先に算出
   const totals = standbyTotals();
@@ -381,10 +383,10 @@ function renderRosterUI() {
             </div>
             <div class="roster-right">
               <div class="roster-controls">
-                <input type="range" min="0" max="${maxSend}" value="${maxSend}" class="roster-slider" data-type="${type}">
-                <input type="number" min="0" max="${maxSend}" value="${maxSend}" class="roster-number" data-type="${type}">
+                <input type="range" min="0" max="${maxSend}" value="${maxSend}" class="roster-slider" data-type="${type}" ${disableAll ? "disabled" : ""}>
+                <input type="number" min="0" max="${maxSend}" value="${maxSend}" class="roster-number" data-type="${type}" ${disableAll ? "disabled" : ""}>
               </div>
-              <button class="btn" data-action="to-sortie" ${sortieFull ? "disabled" : ""}>出撃</button>
+              <button class="btn" data-action="to-sortie" ${sortieFull || disableAll ? "disabled" : ""}>出撃</button>
             </div>
           </div>
         `;
@@ -404,13 +406,16 @@ function renderRosterUI() {
               <div><b>${name}</b></div>
               <div class="tiny">出撃 ${s.count}人</div>
             </div>
-            <button class="btn ghost" data-action="to-standby">待機</button>
+            <button class="btn ghost" data-action="to-standby" ${disableAll ? "disabled" : ""}>待機</button>
           </div>
         `;
       })
       .join("");
     sortieEl.innerHTML = rows || `<div class="roster-empty">出撃予定の部隊はありません</div>`;
   }
+  [elements.rosterAuto, elements.rosterClear].forEach((btn) => {
+    if (btn) btn.disabled = disableAll;
+  });
 }
 
 /**
@@ -1136,6 +1141,7 @@ function finishBattle(forceDraw = false) {
   updateBattleInfo();
   pushLog("戦闘結果", `結果: ${result} / 味方${allies.length}・敵${enemies.length}`, "-");
   updateBattleButtons();
+  renderRosterUI();
   const handler = battleState.onEnd;
   if (handler) {
     battleState.onEnd = null;
@@ -1380,6 +1386,7 @@ function startBattle() {
   battleState.result = "";
   battleState.running = true;
   updateBattleButtons();
+  renderRosterUI();
   battleState.timer = setInterval(() => {
     const steps = Math.max(1, battleState.speed);
     for (let i = 0; i < steps; i++) {
@@ -1404,6 +1411,7 @@ function pauseBattle() {
     battleState.timer = null;
   }
   updateBattleButtons();
+  renderRosterUI();
 }
 
 /**
