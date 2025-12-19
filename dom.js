@@ -23,6 +23,7 @@ export const elements = {
   locationLabelEl: $("locationLabel"),
   gameTimeEl: $("gameTime"),
   ctxEl: $("context"),
+  oracleBattleBtn: $("oracleBattleBtn"),
   shipsIn: $("shipsIn"),
   troopsIn: $("troopsIn"),
   faithIn: $("faithIn"),

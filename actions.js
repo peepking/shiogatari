@@ -46,9 +46,14 @@ export function resetEncounterMeter() {
   state.encounterThreshold = randInt(ENCOUNTER_MIN, ENCOUNTER_MAX);
 }
 
-function buildEnemyFormation() {
+export function buildEnemyFormation(forceStrength) {
   const fame = Math.max(0, state.fame || 0);
-  const useStrong = fame >= 100 && Math.random() < STRONG_POOL_CHANCE;
+  const useStrong =
+    forceStrength === "elite"
+      ? true
+      : forceStrength === "normal"
+        ? false
+        : fame >= 100 && Math.random() < STRONG_POOL_CHANCE;
   const range = useStrong
     ? pickAnchorRange(fame, STRONG_ANCHORS)
     : pickAnchorRange(fame, NORMAL_ANCHORS);

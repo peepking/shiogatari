@@ -34,7 +34,12 @@ import {
   seedInitialQuests,
   receiveOracle,
   canReceiveOracle,
+  getOracleBattleAt,
+  completeOracleBattleQuest,
+  failOracleBattleQuest,
+  QUEST_TYPES,
 } from "./quests.js";
+import { buildEnemyFormation } from "./actions.js";
 import { wireBattleUI, setEnemyFormation, setBattleEndHandler, openBattle, setBattleTerrain } from "./battle.js";
 
 /**
@@ -207,6 +212,8 @@ function clearBattlePrep(resetMode = true) {
     enemyTotal: 0,
     strength: "normal",
     terrain: "plain",
+    oracleQuestId: null,
+    oracleQuestType: null,
   };
   if (resetMode) state.modeLabel = "通常";
   resetEncounterMeter();
@@ -272,6 +279,8 @@ function processBattleOutcome(result, meta) {
   const fameDelta = Math.floor(enemyTotal / 2);
   const isStrong = meta?.enemyFormation?.some((e) => (e.level || 1) > 1) || state.pendingEncounter?.strength === "elite";
   const isWin = result === "勝利";
+  const oracleQuestId = state.pendingEncounter?.oracleQuestId;
+  const oracleQuestType = state.pendingEncounter?.oracleQuestType;
   const summary = [];
   if (isWin) {
     state.fame += fameDelta;
@@ -323,42 +332,50 @@ function processBattleOutcome(result, meta) {
 
   const { losses, lossProb } = calcLosses(meta);
   applyTroopLosses(losses);
-  const lossText =
-    Object.entries(losses || {})
-      .map(([t, n]) => `${t} -${n}`)
-      .join("\n") || "なし";
-
-  summary.push(`損耗:\n${lossText}`);
+  const lossEntries = Object.entries(losses || {}).map(([t, n]) => `${t} -${n}`);
+  const lossText = lossEntries.length ? lossEntries.join(" / ") : "なし";
+  summary.push(`損耗:${lossText === "なし" ? lossText : " " + lossText}`);
 
   const captured = calcCaptures(meta);
   Object.entries(captured).forEach(([key, qty]) => {
     const [type, lvlStr] = key.split("|");
     addTroops(type, Number(lvlStr) || 1, qty);
   });
-  const capText =
-    Object.entries(captured || {})
-      .map(([key, n]) => {
-        const [type, lvl] = key.split("|");
-        return `${type} Lv${lvl} +${n}`;
-      })
-      .join("\n") || "なし";
-  summary.push(`拿捕:\n${capText}`);
+  const capEntries =
+    Object.entries(captured || {}).map(([key, n]) => {
+      const [type, lvl] = key.split("|");
+      return `${type} Lv${lvl} +${n}`;
+    }) || [];
+  const capText = capEntries.length ? capEntries.join(" / ") : "なし";
+  summary.push(`拿捕:${capText === "なし" ? capText : " " + capText}`);
 
   const killed = killedEnemyCount(meta);
   const leveled = levelUpTroopsRandom(killed);
   if (leveled > 0) {
     summary.push(`練度上昇: ${leveled}人がLv+1`);
   }
+  if (isWin && oracleQuestId) {
+    const ok = completeOracleBattleQuest(oracleQuestId);
+    if (ok) {
+      const label = oracleQuestType === QUEST_TYPES.ORACLE_ELITE ? "越えよ" : "奪え";
+      summary.push(`神託達成: ${label}`);
+    }
+  } else if (!isWin && oracleQuestId) {
+    const label = oracleQuestType === QUEST_TYPES.ORACLE_ELITE ? "越えよ" : "奪え";
+    failOracleBattleQuest(oracleQuestId, "戦闘に敗北しました");
+    summary.push(`神託失敗: ${label}`);
+  }
 
   clearBattlePrep(false);
-  const body = summary.join("\n\n");
+  const body = summary.join("\n");
   setOutput("戦後処理", body, [
     { text: result, kind: isWin ? "good" : "warn" },
     { text: `敵推定${enemyTotal}人`, kind: "" },
   ]);
   pushLog("戦闘結果", body, "-");
   pushToast("戦闘結果", result, isWin ? "good" : "warn");
-  showBattleResultModal(body);
+  const resultLabel = isWin ? "勝利" : "敗北";
+  showBattleResultModal(summary, resultLabel);
   syncUI();
 }
 
@@ -372,6 +389,36 @@ function startPrepBattle() {
   state.modeLabel = "戦闘中";
   openBattle();
   syncUI();
+}
+
+function startOracleBattle() {
+  if (state.pendingEncounter?.active || state.modeLabel === "戦闘中") return;
+  const quest = getOracleBattleAt(state.position);
+  if (!quest) return;
+  const force = quest.type === QUEST_TYPES.ORACLE_ELITE ? "elite" : "normal";
+  const { formation, total, strength } = buildEnemyFormation(force);
+  const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
+  state.pendingEncounter = {
+    active: true,
+    enemyFormation: formation,
+    enemyTotal: total,
+    strength,
+    terrain,
+    oracleQuestId: quest.id,
+    oracleQuestType: quest.type,
+  };
+  state.modeLabel = "戦闘準備";
+  resetEncounterMeter();
+  setOutput(
+    "討伐開始",
+    `${quest.title} の討伐を開始します（推定${total}人 / ${strength === "elite" ? "強編成" : "通常編成"}）。`,
+    [
+      { text: "討伐", kind: "warn" },
+      { text: strength === "elite" ? "強編成" : "通常編成", kind: "" },
+    ]
+  );
+  pushLog("討伐開始", `${quest.title} / 敵推定${total}人`, "-");
+  startPrepBattle();
 }
 
 function tryRunFromEncounter() {
@@ -412,6 +459,7 @@ function updateModeControls(loc) {
   const battleVisible = Boolean(elements.battleBlock && elements.battleBlock.hidden === false);
   const lockActions = prep || inBattle || battleVisible;
   const prepActive = prep && !!state.pendingEncounter?.active;
+  const oracleBattle = getOracleBattleAt(state.position);
   const visible = state.modeLabel === "街の中" || state.modeLabel === "村の中";
   if (elements.tradeBtn) elements.tradeBtn.hidden = !visible;
   if (elements.shipTradeBtn)
@@ -437,6 +485,14 @@ function updateModeControls(loc) {
   if (elements.modeWaitBtn) {
     elements.modeWaitBtn.hidden = lockActions;
     elements.modeWaitBtn.disabled = lockActions;
+  }
+  if (elements.oracleBattleBtn) {
+    const show = !lockActions && !!oracleBattle;
+    elements.oracleBattleBtn.hidden = !show;
+    elements.oracleBattleBtn.disabled = !show;
+    elements.oracleBattleBtn.title = show
+      ? `${oracleBattle.title}（${oracleBattle.type === QUEST_TYPES.ORACLE_ELITE ? "強編成" : "通常編成"}）`
+      : "";
   }
   if (elements.battlePrepRow) {
     const showPrepRow = prepActive && !inBattle && !battleVisible;
@@ -572,9 +628,28 @@ function closeModal(el) {
   if (el) el.hidden = true;
 }
 
-function showBattleResultModal(body) {
+function showBattleResultModal(lines, resultLabel = "") {
+  const esc = (s) =>
+    String(s ?? "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  const list =
+    Array.isArray(lines) && lines.length ? lines : String(lines ?? "").split(/\n\s*\n/);
   if (elements.battleResultBody) {
-    elements.battleResultBody.textContent = `${body}\n地図に戻るボタンでフィールドに戻ってください。`;
+    const items =
+      list && list.length
+        ? list
+            .map((l) => `<li>${esc(l).replace(/\n/g, "<br>")}</li>`)
+            .join("")
+        : "<li>結果なし</li>";
+    const resultText = resultLabel ? `${esc(resultLabel)}` : "結果";
+    elements.battleResultBody.innerHTML = `
+      <div class="battle-result-head">${resultText}</div>
+      <ul class="battle-result-list">
+        ${items}
+      </ul>
+    `;
   }
   openModal(elements.battleResultModal);
 }
@@ -823,6 +898,7 @@ function wireButtons() {
     renderQuestUI(syncUI);
     syncUI();
   });
+  elements.oracleBattleBtn?.addEventListener("click", startOracleBattle);
 }
 
 /**

@@ -23,6 +23,8 @@ const createState = () => ({
     enemyTotal: 0,
     strength: "normal",
     terrain: "plain",
+    oracleQuestId: null,
+    oracleQuestType: null,
   },
   lastRoll: null,
   lastResultText: "",

@@ -10,6 +10,7 @@ import {
   manhattan,
   pickRandomProcessed,
   randomSeaTarget,
+  randomHuntTarget,
 } from "./questUtils.js";
 
 /** @enum {string} 依頼種別 */
@@ -19,6 +20,8 @@ const QUEST_TYPES = {
   ORACLE_SUPPLY: "oracle_supply",
   ORACLE_MOVE: "oracle_move",
   ORACLE_TROOP: "oracle_troop",
+  ORACLE_HUNT: "oracle_hunt",
+  ORACLE_ELITE: "oracle_elite",
 };
 
 /**
@@ -300,6 +303,52 @@ function genOracleTroop() {
 }
 
 /**
+ * 神託（奪え）を生成する。
+ * @returns {object}
+ */
+function genOracleHunt() {
+  const avoid = (state.quests?.active || [])
+    .filter((q) => q.target)
+    .map((q) => q.target);
+  const target = randomHuntTarget(state.position, 3, 7, avoid);
+  const rewardFaith = rollDice(5, 4);
+  return {
+    id: nextId(),
+    type: QUEST_TYPES.ORACLE_HUNT,
+    title: "神託: 奪え",
+    target,
+    rewardFaith,
+    reward: 0,
+    acceptedAbs: absDay(state),
+    deadlineAbs: absDay(state) + 90,
+    desc: `指定座標(${target.x + 1}, ${target.y + 1})で討伐し勝利せよ。報酬: 信仰+${rewardFaith}`,
+  };
+}
+
+/**
+ * 神託（越えよ）を生成する。
+ * @returns {object}
+ */
+function genOracleElite() {
+  const avoid = (state.quests?.active || [])
+    .filter((q) => q.target)
+    .map((q) => q.target);
+  const target = randomHuntTarget(state.position, 3, 7, avoid);
+  const rewardFaith = rollDice(5, 5);
+  return {
+    id: nextId(),
+    type: QUEST_TYPES.ORACLE_ELITE,
+    title: "神託: 越えよ",
+    target,
+    rewardFaith,
+    reward: 0,
+    acceptedAbs: absDay(state),
+    deadlineAbs: absDay(state) + 90,
+    desc: `指定座標(${target.x + 1}, ${target.y + 1})で強編成を討伐し勝利せよ。報酬: 信仰+${rewardFaith}`,
+  };
+}
+
+/**
  * 神託が受注中かどうかを判定する。
  * @returns {boolean}
  */
@@ -309,7 +358,9 @@ function hasActiveOracle() {
     (q) =>
       q.type === QUEST_TYPES.ORACLE_SUPPLY ||
       q.type === QUEST_TYPES.ORACLE_MOVE ||
-      q.type === QUEST_TYPES.ORACLE_TROOP
+      q.type === QUEST_TYPES.ORACLE_TROOP ||
+      q.type === QUEST_TYPES.ORACLE_HUNT ||
+      q.type === QUEST_TYPES.ORACLE_ELITE
   );
 }
 
@@ -333,7 +384,8 @@ export function canReceiveOracle() {
 export function receiveOracle() {
   ensureState();
   if (!canReceiveOracle()) return null;
-  const pool = [genOracleSupply, genOracleMove, genOracleTroop];
+  const pool = [genOracleSupply, genOracleMove, genOracleTroop, genOracleHunt];
+  if ((state.faith || 0) >= 100) pool.push(genOracleElite);
   const pick = pool[randInt(0, pool.length - 1)]();
   state.quests.active.push(pick);
   state.quests.lastOracleSeason = { year: state.year, season: state.season };
@@ -396,6 +448,10 @@ export function completeQuest(id) {
     if (Object.keys(levels).length === 0) delete state.troops[q.troopType];
     state.faith += q.rewardFaith ?? 0;
   }
+  if (q.type === QUEST_TYPES.ORACLE_HUNT || q.type === QUEST_TYPES.ORACLE_ELITE) {
+    // 討伐系の神託は戦闘勝利時に別途完了させる。
+    return false;
+  }
   if (q.reward) state.funds += q.reward;
   state.quests.active.splice(idx, 1);
   const rewards = [];
@@ -437,7 +493,70 @@ export function canCompleteQuest(q) {
     if (!levels) return false;
     return Object.values(levels).some((qty) => qty > 0);
   }
+  if (q.type === QUEST_TYPES.ORACLE_HUNT || q.type === QUEST_TYPES.ORACLE_ELITE) {
+    return false;
+  }
   return false;
+}
+
+/**
+ * 討伐系の神託を戦闘勝利時に完了させる。
+ * @param {number} id
+ * @returns {boolean}
+ */
+export function completeOracleBattleQuest(id) {
+  ensureState();
+  const idx = state.quests.active.findIndex(
+    (q) => q.id === id && (q.type === QUEST_TYPES.ORACLE_HUNT || q.type === QUEST_TYPES.ORACLE_ELITE)
+  );
+  if (idx === -1) return false;
+  const q = state.quests.active[idx];
+  const rewardFaith = q.rewardFaith ?? 0;
+  state.faith += rewardFaith;
+  state.quests.active.splice(idx, 1);
+  const rewardText = rewardFaith > 0 ? `信仰+${rewardFaith}` : "報酬なし";
+  pushLog("神託達成", `${q.title} / ${rewardText}`, "-");
+  pushToast("神託達成", `${q.title} / ${rewardText}`, "good");
+  return true;
+}
+
+/**
+ * 討伐系の神託を失敗で消化する。
+ * @param {number} id
+ * @param {string} [reason]
+ * @returns {boolean}
+ */
+export function failOracleBattleQuest(id, reason = "") {
+  ensureState();
+  const idx = state.quests.active.findIndex(
+    (q) => q.id === id && (q.type === QUEST_TYPES.ORACLE_HUNT || q.type === QUEST_TYPES.ORACLE_ELITE)
+  );
+  if (idx === -1) return false;
+  const q = state.quests.active[idx];
+  state.quests.active.splice(idx, 1);
+  const note = reason ? ` / ${reason}` : "";
+  pushLog("神託失敗", `${q.title}${note}`, "-");
+  pushToast("神託失敗", `${q.title}${note}`, "bad");
+  return true;
+}
+
+/**
+ * 現在位置で討伐系の神託が発動可能か取得する。
+ * @param {{x:number,y:number}} pos
+ * @returns {object|null}
+ */
+export function getOracleBattleAt(pos) {
+  ensureState();
+  if (!pos) return null;
+  return (
+    state.quests.active.find(
+      (q) =>
+        (q.type === QUEST_TYPES.ORACLE_HUNT || q.type === QUEST_TYPES.ORACLE_ELITE) &&
+        q.target &&
+        q.target.x === pos.x &&
+        q.target.y === pos.y
+    ) || null
+  );
 }
 
 /**

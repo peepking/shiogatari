@@ -86,3 +86,36 @@ export function randomSeaTarget(origin) {
   if (!candidates.length) return origin;
   return candidates[randInt(0, candidates.length - 1)];
 }
+
+/**
+ * 現在地から一定距離の非拠点マスを探索して選ぶ（討伐用）。
+ * @param {{x:number,y:number}} origin
+ * @param {number} [minDist=3]
+ * @param {number} [maxDist=7]
+ * @param {Array<{x:number,y:number}>} [avoid=[]]
+ * @returns {{x:number,y:number}}
+ */
+export function randomHuntTarget(origin, minDist = 3, maxDist = 7, avoid = []) {
+  const avoidSet = new Set((avoid || []).map((p) => `${p.x},${p.y}`));
+  const pickFrom = (lo, hi) => {
+    const list = [];
+    for (let y = 0; y < mapData.length; y++) {
+      for (let x = 0; x < mapData[0].length; x++) {
+        const cell = mapData[y][x];
+        const d = manhattan(origin, { x, y });
+        if (d < lo || d > hi) continue;
+        if (cell?.building === "village" || cell?.building === "town" || cell?.settlement) continue;
+        const key = `${x},${y}`;
+        if (avoidSet.has(key)) continue;
+        list.push({ x, y });
+      }
+    }
+    return list;
+  };
+
+  let candidates = pickFrom(minDist, maxDist);
+  if (!candidates.length) candidates = pickFrom(2, maxDist + 5);
+  if (!candidates.length) candidates = pickFrom(1, Math.max(mapData.length, mapData[0].length));
+  if (!candidates.length) return origin;
+  return candidates[randInt(0, candidates.length - 1)];
+}
