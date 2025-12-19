@@ -1,7 +1,7 @@
 import { elements } from "./dom.js";
 import { state } from "./state.js";
 import { ASSETS, FACTIONS, ATTITUDE_LABELS } from "./lore.js";
-import { formatTroopDisplay } from "./troops.js";
+import { formatTroopDisplay, TROOP_STATS } from "./troops.js";
 import { formatSupplyDisplay, SUPPLY_ITEMS } from "./supplies.js";
 import { getSettlementsByNoble, nobleHome } from "./map.js";
 
@@ -117,9 +117,11 @@ export function renderNobleDetail(nobleId) {
           <div class="tiny">座標 (${s.coords.x + 1}, ${s.coords.y + 1}) / 勢力 ${factionName(
             s.factionId
           )}</div>
-          <div class="tiny">徴兵: ${s.garrison.join("・")} / 特産: ${supplyLabel(
-            s.specialty
-          )} / 物資: ${s.goods.join("・")}</div>
+          <div class="tiny">雇用可能: ${
+            (s.recruitSlots || [])
+              .map((slot) => TROOP_STATS[slot.type]?.name || slot.type)
+              .join("・") || "なし"
+          } / 特産: ${supplyLabel(s.specialty)}</div>
         </div>`
       )
       .join("");
