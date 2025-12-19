@@ -20,121 +20,182 @@
   <main>
     <div class="wrap">
       <div class="grid">
-        <!-- LEFT: navigator -->
-        <section class="card" aria-label="navigator">
-          <div class="hd">
-            <div class="row flex-wrap">
-              <span class="pill"><span id="gameTime">神歴1000年 / 春 / 1日</span></span>
-              <button class="btn ghost" id="manualModalBtn">状態手動上書き</button>
-              <button class="btn bad" id="resetBtn">リセット</button>
-            </div>
-          </div>
-
-          <div class="bd">
-            <div class="asset-grid mb-12">
-              <div class="asset-card" id="asset-ships">
-                <div class="asset-thumb">
-                  <img id="assetShipsImg" alt="船" />
-                </div>
-                <div class="asset-body">
-                  <div class="label">船</div>
-                  <div class="asset-value">
-                    <span class="sub">聖船+</span><b id="ships">0</b>
-                  </div>
-                  <div class="asset-note">沈まぬ象徴</div>
-                </div>
-              </div>
-              <div class="asset-card" id="asset-companions">
-                <div class="asset-thumb">
-                  <img id="assetTroopsImg" alt="部隊" />
-                </div>
-                <div class="asset-body">
-                  <div class="label">部隊</div>
-                  <div class="asset-value">
-                    <b id="troops">0/0</b>
-                  </div>
-                  <div class="asset-note">部隊数/上限</div>
-                </div>
-              </div>
-              <div class="asset-card" id="asset-faith">
-                <div class="asset-thumb">
-                  <img id="assetFaithImg" alt="信仰" />
-                </div>
-                <div class="asset-body">
-                  <div class="label">信仰</div>
-                  <div class="asset-value">
-                    <span class="sub"></span><b id="faith">0</b>
-                  </div>
-                  <div class="asset-note">海への貢</div>
-                </div>
-              </div>
-              <div class="asset-card" id="asset-supplies">
-                <div class="asset-thumb">
-                  <img id="assetSuppliesImg" alt="物資" />
-                </div>
-                <div class="asset-body">
-                  <div class="label">物資</div>
-                  <div class="asset-value">
-                    <b id="supplies">0/0</b>
-                  </div>
-                  <div class="asset-note">総数/上限</div>
-                </div>
-              </div>
-              <div class="asset-card" id="asset-funds">
-                <div class="asset-thumb">
-                  <img id="assetFundsImg" alt="資金" />
-                </div>
-                <div class="asset-body">
-                  <div class="label">資金</div>
-                  <div class="asset-value">
-                    <span class="sub"></span><b id="funds">0</b>
-                  </div>
-                  <div class="asset-note">たぶんデナール</div>
-                </div>
-              </div>
-              <div class="asset-card" id="asset-fame">
-                <div class="asset-thumb">
-                  <img id="assetFameImg" alt="名声" />
-                </div>
-                <div class="asset-body">
-                  <div class="label">名声</div>
-                  <div class="asset-value">
-                    <span class="sub"></span><b id="fame">0</b>
-                  </div>
-                  <div class="asset-note">評判・名誉</div>
-                </div>
+        <!-- LEFT: strategy (battle only) + navigator -->
+        <div class="col-stack">
+          <section class="card" aria-label="strategy" id="strategyCard" hidden>
+            <div class="hd">
+              <div class="row flex-wrap">
+                <span class="pill">作戦</span>
+                <span class="tiny">戦闘中のみ表示</span>
               </div>
             </div>
-            <div class="sep"></div>
-
-            <div class="out">
-              <h3>ログ</h3>
-              <div class="log max-h-320" id="log"></div>
-            </div>
-
-            <div class="sep"></div>
-
-            <div class="row">
-              <button class="btn good" id="logMark">ログにメモ</button>
-              <button class="btn" id="exportBtn">ログを書き出す</button>
-              <button class="btn bad" id="clearLog">ログ消去</button>
-            </div>
-
-            <div id="memoBox" class="mt-10" hidden>
-              <textarea id="memo" placeholder="航海日誌／一時メモ（任意）"></textarea>
-              <div class="row mt-10">
-                <button class="btn good" id="saveMemo">保存</button>
-                <button class="btn" id="cancelMemo">キャンセル</button>
+            <div class="bd">
+              <div class="strategy-grid">
+                <div>
+                  <label for="strategyTarget">攻撃方針</label>
+                  <select id="strategyTarget">
+                    <option value="type">兵種準拠</option>
+                    <option value="hp">HP優先</option>
+                    <option value="rear">後衛狙い</option>
+                    <option value="strong">強敵狙い</option>
+                    <option value="close">近い敵</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="strategyKite">距離維持</label>
+                  <select id="strategyKite">
+                    <option value="kite">後退（射程維持）</option>
+                    <option value="retreat">退避（HP閾値）</option>
+                    <option value="none">なし</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="strategyRetreat">退避HP閾値（%）</label>
+                  <input type="number" id="strategyRetreat" min="5" max="100" step="1" value="30" />
+                </div>
+                <div>
+                  <label for="strategyCharge">突撃抑制</label>
+                  <select id="strategyCharge">
+                    <option value="cavalry">騎兵のみ</option>
+                    <option value="all">全体</option>
+                    <option value="none">なし</option>
+                  </select>
+                </div>
+              </div>
+              <div class="row flex-wrap mt-10">
+                <div class="row flex-wrap strategy-speed">
+                  <span class="tiny mb-0">速度</span>
+                  <label class="pill">
+                    <input type="radio" name="strategySpeed" value="1" checked /> x1
+                  </label>
+                  <label class="pill">
+                    <input type="radio" name="strategySpeed" value="2" /> x2
+                  </label>
+                  <label class="pill">
+                    <input type="radio" name="strategySpeed" value="4" /> x4
+                  </label>
+                </div>
+                <button class="btn primary" id="strategyApply">作戦を保存</button>
               </div>
             </div>
-          </div>
-        </section>
+          </section>
+
+          <section class="card" aria-label="navigator">
+            <div class="hd">
+              <div class="row flex-wrap">
+                <span class="pill"><span id="gameTime">神歴1000年 / 春 / 1日</span></span>
+                <button class="btn ghost" id="manualModalBtn">状態手動上書き</button>
+                <button class="btn warn" id="battleBtn">戦闘</button>
+                <button class="btn bad" id="resetBtn">リセット</button>
+              </div>
+            </div>
+
+            <div class="bd">
+              <div class="asset-grid mb-12">
+                <div class="asset-card" id="asset-ships">
+                  <div class="asset-thumb">
+                    <img id="assetShipsImg" alt="船" />
+                  </div>
+                  <div class="asset-body">
+                    <div class="label">船</div>
+                    <div class="asset-value">
+                      <span class="sub">聖船+</span><b id="ships">0</b>
+                    </div>
+                    <div class="asset-note">沈まぬ象徴</div>
+                  </div>
+                </div>
+                <div class="asset-card" id="asset-companions">
+                  <div class="asset-thumb">
+                    <img id="assetTroopsImg" alt="部隊" />
+                  </div>
+                  <div class="asset-body">
+                    <div class="label">部隊</div>
+                    <div class="asset-value">
+                      <b id="troops">0/0</b>
+                    </div>
+                    <div class="asset-note">部隊数/上限</div>
+                  </div>
+                </div>
+                <div class="asset-card" id="asset-faith">
+                  <div class="asset-thumb">
+                    <img id="assetFaithImg" alt="信仰" />
+                  </div>
+                  <div class="asset-body">
+                    <div class="label">信仰</div>
+                    <div class="asset-value">
+                      <span class="sub"></span><b id="faith">0</b>
+                    </div>
+                    <div class="asset-note">海への貢</div>
+                  </div>
+                </div>
+                <div class="asset-card" id="asset-supplies">
+                  <div class="asset-thumb">
+                    <img id="assetSuppliesImg" alt="物資" />
+                  </div>
+                  <div class="asset-body">
+                    <div class="label">物資</div>
+                    <div class="asset-value">
+                      <b id="supplies">0/0</b>
+                    </div>
+                    <div class="asset-note">総数/上限</div>
+                  </div>
+                </div>
+                <div class="asset-card" id="asset-funds">
+                  <div class="asset-thumb">
+                    <img id="assetFundsImg" alt="資金" />
+                  </div>
+                  <div class="asset-body">
+                    <div class="label">資金</div>
+                    <div class="asset-value">
+                      <span class="sub"></span><b id="funds">0</b>
+                    </div>
+                    <div class="asset-note">たぶんデナール</div>
+                  </div>
+                </div>
+                <div class="asset-card" id="asset-fame">
+                  <div class="asset-thumb">
+                    <img id="assetFameImg" alt="名声" />
+                  </div>
+                  <div class="asset-body">
+                    <div class="label">名声</div>
+                    <div class="asset-value">
+                      <span class="sub"></span><b id="fame">0</b>
+                    </div>
+                    <div class="asset-note">評判・名誉</div>
+                  </div>
+                </div>
+              </div>
+              <div class="sep"></div>
+
+              <div class="out">
+                <h3>ログ</h3>
+                <div class="log max-h-320" id="log"></div>
+              </div>
+
+              <div class="sep"></div>
+
+              <div class="row">
+                <button class="btn good" id="logMark">ログにメモ</button>
+                <button class="btn" id="exportBtn">ログを書き出す</button>
+                <button class="btn bad" id="clearLog">ログ消去</button>
+              </div>
+
+              <div id="memoBox" class="mt-10" hidden>
+                <textarea id="memo" placeholder="航海日誌／一時メモ（任意）"></textarea>
+                <div class="row mt-10">
+                  <button class="btn good" id="saveMemo">保存</button>
+                  <button class="btn" id="cancelMemo">キャンセル</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
 
         <!-- CENTER STACK: guides + map/log -->
         <div class="col-stack">
           <aside class="card" aria-label="log">
             <div class="bd">
-              <div class="map-block mb-12">
+              <div class="map-block mb-12" id="mapBlock">
                 <div class="map-header">
                   <span class="tiny">現在地: <span id="mapPosLabel">(11, 11)</span></span>
                   <button class="btn ghost" id="mapToggle">全体 / 拡大 切替</button>
@@ -142,6 +203,39 @@
                 <canvas id="mapCanvas" width="640" height="640" aria-label="航路マップ"></canvas>
                 <div id="mapInfo"></div>
               </div>
+              <div class="battle-block mb-12" id="battleBlock" hidden>
+                <div class="battle-header">
+                  <span class="tiny">戦闘シミュレーション</span>
+                  <button class="btn ghost" id="battleBackBtn">地図に戻る</button>
+                </div>
+                <canvas id="battleCanvas" width="640" height="640" aria-label="戦闘マップ"></canvas>
+                <div class="battle-panel">
+                  <div class="row flex-wrap">
+                    <button class="btn good" id="battleStartBtn">開始</button>
+                    <button class="btn" id="battlePauseBtn" disabled>一時停止</button>
+                    <span class="pill">速度: <b id="battleSpeedLabel">x1</b></span>
+                  </div>
+                <div class="row flex-wrap mt-10">
+                  <button class="btn ghost battle-speed" data-battle-speed="1">x1</button>
+                  <button class="btn ghost battle-speed" data-battle-speed="2">x2</button>
+                  <button class="btn ghost battle-speed" data-battle-speed="4">x4</button>
+                  <span class="pill">経過: <b id="battleTime">0s</b></span>
+                  <span class="pill">残数: <b id="battleCount">-</b></span>
+                </div>
+                <div class="battle-formation row flex-wrap mt-6">
+                  <label class="tiny mb-0" for="battleFormationSelect">味方フォーメーション</label>
+                  <select id="battleFormationSelect" class="battle-select">
+                    <option value="balance">バランス</option>
+                    <option value="assault">突撃</option>
+                    <option value="defense">防御</option>
+                    <option value="custom">カスタム</option>
+                  </select>
+                  <button class="btn" id="battleFormationApply">配置更新</button>
+                  <button class="btn good" id="battleFormationSave" hidden>保存</button>
+                </div>
+                <div id="battleStatus" class="battle-status"></div>
+              </div>
+            </div>
 
               <div class="footer">
               </div>
@@ -169,6 +263,13 @@
                 <button class="btn ghost" id="exitVillageBtn" hidden>村を出る</button>
                 <button class="btn ghost" id="exitTownBtn" hidden>街を出る</button>
               </div>
+              <div class="mode-actions" id="battlePrepRow" hidden>
+                <button class="btn primary" id="battlePrepFightBtn">戦闘する</button>
+                <button class="btn" id="battlePrepRunBtn">逃走する</button>
+                <button class="btn good" id="battlePrepPrayBtn">海に祈る</button>
+                <button class="btn bad" id="battlePrepSurrenderBtn">降伏する</button>
+                <span class="pill" id="battlePrepInfo" hidden>敵推定: - 人</span>
+              </div>
             </div>
           </section>
 
@@ -191,6 +292,43 @@
 
         <!-- THIRD: quests + factions -->
         <div class="col-stack">
+          <section class="card" aria-label="battle-info" id="battleInfoCard" hidden>
+            <div class="hd">
+              <div class="row">
+                <span class="pill">戦闘情報</span>
+                <span class="tiny">ホバー/クリックで詳細表示</span>
+              </div>
+            </div>
+            <div class="bd">
+              <div id="battleInfo" class="battle-info"></div>
+              <div class="battle-log mt-10" id="battleLog"></div>
+            </div>
+          </section>
+          <section class="card" aria-label="roster" id="rosterCard" hidden>
+            <div class="hd">
+              <div class="row flex-wrap">
+                <span class="pill">出撃編成</span>
+                <span class="pill">出撃: <b id="rosterCount">0/10</b></span>
+                <div class="row roster-actions gap-6">
+                  <button class="btn" id="rosterAuto">自動配備</button>
+                  <button class="btn ghost" id="rosterClear">クリア</button>
+                  <button class="btn primary" id="rosterApply">編成を保存</button>
+                </div>
+              </div>
+            </div>
+            <div class="bd">
+              <div class="roster-cols">
+                <div class="roster-col">
+                  <div class="tiny mb-4">待機（兵種ごと）</div>
+                  <div id="rosterStandby" class="roster-list"></div>
+                </div>
+                <div class="roster-col">
+                  <div class="tiny mb-4">出撃（最大10部隊）</div>
+                  <div id="rosterSortie" class="roster-list"></div>
+                </div>
+              </div>
+            </div>
+          </section>
           <section class="card" aria-label="quests" id="questCard">
             <div class="hd cursor-pointer" id="questToggle">
               <div class="row">
@@ -471,6 +609,7 @@
           <table class="trade-table">
             <thead>
               <tr>
+                <th class="ta-center">画像</th>
                 <th class="ta-left">兵種</th>
                 <th class="ta-center">雇用費</th>
                 <th class="ta-center">残り</th>
@@ -500,6 +639,21 @@
       </div>
       <div class="modal-bd">
         <div class="sbBody" id="suppliesDetail"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="battleResultModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>戦果報告</div>
+        <button class="modal-close" id="battleResultClose">閉じる</button>
+      </div>
+      <div class="modal-bd scrollable">
+        <div class="sbBody" id="battleResultBody"></div>
+        <div class="row mt-12 justify-end">
+          <button class="btn primary" id="battleResultBack">地図に戻る</button>
+        </div>
       </div>
     </div>
   </div>

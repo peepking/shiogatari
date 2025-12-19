@@ -351,6 +351,11 @@ textarea {
   resize: vertical;
 }
 
+.modal .modal-bd.scrollable {
+  max-height: 420px;
+  overflow: auto;
+}
+
 select {
   appearance: none;
   -webkit-appearance: none;
@@ -611,6 +616,10 @@ option {
   column-gap: 8px;
 }
 
+#battlePrepRow {
+  margin-top: 12px;
+}
+
 .delta-pos {
   color: #7dffb2;
 }
@@ -668,6 +677,10 @@ option {
 
 .modal .modal-bd {
   padding: 14px;
+}
+
+#troopsModal .modal {
+  width: min(800px, 98vw);
 }
 
 .modal-close {
@@ -852,6 +865,24 @@ option {
   background: rgba(0, 0, 0, 0.12);
 }
 
+.battle-block {
+  margin-top: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.battle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: rgba(232, 239, 255, 0.82);
+}
+
 .map-header {
   display: flex;
   align-items: center;
@@ -871,6 +902,15 @@ option {
   background: #0b1020;
 }
 
+#battleCanvas {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0b1020;
+}
+
 #mapInfo {
   font-size: 11px;
   color: rgba(232, 239, 255, 0.75);
@@ -880,6 +920,225 @@ option {
   justify-content: space-between;
   gap: 10px;
   align-items: center;
+}
+
+.battle-panel {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.battle-select {
+  width: 160px;
+}
+
+.battle-select-highlight {
+  outline: 2px solid rgba(122, 167, 255, 0.9);
+  outline-offset: -2px;
+}
+
+.battle-info {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  line-height: 1.5;
+  height: 140px;
+  overflow: auto;
+}
+
+.battle-status {
+  font-size: 12px;
+  color: rgba(232, 239, 255, 0.75);
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.battle-roster {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.12);
+  margin-top: 10px;
+}
+
+.roster-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.roster-col {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roster-list {
+  max-height: 240px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roster-actions {
+  margin-left: auto;
+}
+
+.roster-row {
+  display: grid;
+  grid-template-columns: 1fr 140px;
+  grid-template-rows: auto auto;
+  gap: 6px 8px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.roster-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.roster-controls {
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  gap: 6px;
+  align-items: center;
+}
+
+.roster-right {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roster-row input[type="range"] {
+  width: 100%;
+}
+
+.roster-row input[type="number"] {
+  width: 100%;
+}
+
+.roster-row .btn {
+  padding: 4px 8px;
+  min-width: 40px;
+  justify-self: end;
+}
+
+.roster-empty {
+  font-size: 12px;
+  color: rgba(232, 239, 255, 0.65);
+}
+
+.strategy-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.strategy-speed label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.battle-log {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px;
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  line-height: 1.5;
+  height: 140px;
+  overflow: auto;
+  white-space: pre-line;
+}
+
+.battle-speed.active {
+  background: rgba(122, 167, 255, 0.18);
+  border-color: rgba(122, 167, 255, 0.35);
+}
+
+#battleResultBody {
+  flex: 1 1 auto;
+  min-height: 220px;
+  max-height: 60vh;
+  overflow: auto;
+  white-space: pre-wrap;
+}
+#battleResultModal .modal-bd {
+  position: relative;
+  padding-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 70vh;
+}
+#battleResultModal .modal-bd .row {
+  position: static;
+  background: none;
+  padding-top: 0;
+  margin-top: 0;
+}
+
+#troopsDetail {
+  max-height: 600px;
+  overflow: auto;
+  min-width: 720px;
+  width: auto;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+#troopsDetail .table-scroll {
+  max-height: 420px;
+  overflow: auto;
+  width: 100%;
+}
+
+#troopsDetail .table-scroll table {
+  min-width: 720px;
+}
+
+#troopsDetail .col-icon {
+  width: 60px;
+}
+#troopsDetail .col-name {
+  width: 110px;
+}
+#troopsDetail .col-lv {
+  width: 50px;
+}
+#troopsDetail .col-small {
+  width: 60px;
+}
+#troopsDetail .col-action {
+  width: 80px;
+}
+
+.sticky-footer {
+  position: sticky;
+  bottom: 0;
+  background: linear-gradient(180deg, transparent, rgba(17, 26, 51, 0.96));
+  padding-top: 10px;
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: flex-end;
 }
 
 .footer {
@@ -895,4 +1154,18 @@ option {
 
 a {
   color: var(--accent);
+}
+
+.troop-icon {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.hire-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
 }

@@ -1,9 +1,118 @@
 import { state } from "./state.js";
-import { setOutput, pushLog } from "./dom.js";
-import { getSettlementAtPosition, getLocationStatus } from "./map.js";
+import { setOutput, pushLog, pushToast } from "./dom.js";
+import { getSettlementAtPosition, getLocationStatus, getTerrainAt } from "./map.js";
 import { calcSupplyCap, totalSupplies } from "./supplies.js";
 import { calcTroopCap, totalTroops } from "./troops.js";
 import { advanceDayWithEvents } from "./time.js";
+import { TROOP_STATS } from "./troops.js";
+import { clamp } from "./util.js";
+
+const ENCOUNTER_MIN = 10;
+const ENCOUNTER_MAX = 15;
+const STRONG_POOL_CHANCE = 0.25;
+const NORMAL_ANCHORS = [
+  { fame: 0, min: 3, max: 5 },
+  { fame: 100, min: 7, max: 8 },
+  { fame: 500, min: 35, max: 40 },
+  { fame: 1000, min: 70, max: 80 },
+];
+const STRONG_ANCHORS = [
+  { fame: 100, min: 8, max: 9 },
+  { fame: 500, min: 40, max: 45 },
+  { fame: 1000, min: 80, max: 90 },
+];
+
+const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+
+function pickAnchorRange(fame, anchors) {
+  const list = [...anchors].sort((a, b) => a.fame - b.fame);
+  if (fame <= list[0].fame) return { min: list[0].min, max: list[0].max };
+  if (fame >= list[list.length - 1].fame)
+    return { min: list[list.length - 1].min, max: list[list.length - 1].max };
+  for (let i = 0; i < list.length - 1; i++) {
+    const a = list[i];
+    const b = list[i + 1];
+    if (fame >= a.fame && fame <= b.fame) {
+      const t = (fame - a.fame) / Math.max(1, b.fame - a.fame);
+      const lerp = (x, y) => Math.round(x + (y - x) * t);
+      return { min: lerp(a.min, b.min), max: lerp(a.max, b.max) };
+    }
+  }
+  return { min: list[0].min, max: list[0].max };
+}
+
+export function resetEncounterMeter() {
+  state.encounterProgress = 0;
+  state.encounterThreshold = randInt(ENCOUNTER_MIN, ENCOUNTER_MAX);
+}
+
+function buildEnemyFormation() {
+  const fame = Math.max(0, state.fame || 0);
+  const useStrong = fame >= 100 && Math.random() < STRONG_POOL_CHANCE;
+  const range = useStrong
+    ? pickAnchorRange(fame, STRONG_ANCHORS)
+    : pickAnchorRange(fame, NORMAL_ANCHORS);
+  const total = randInt(range.min, range.max);
+  const pool = useStrong
+    ? Object.keys(TROOP_STATS)
+        .slice()
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 6)
+    : ["infantry", "archer", "scout", "marine"];
+  const formation = [];
+  let remain = total;
+  while (remain > 0) {
+    const type = pool[randInt(0, pool.length - 1)];
+    const level = useStrong ? randInt(1, 3) : 1;
+    const chunk = Math.min(remain, Math.max(1, randInt(5, 10)));
+    formation.push({ type, count: chunk, level });
+    remain -= chunk;
+  }
+  return { formation, total, strength: useStrong ? "elite" : "normal" };
+}
+
+function triggerEncounter(syncUI) {
+  const { formation, total, strength } = buildEnemyFormation();
+  const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
+  state.pendingEncounter = {
+    active: true,
+    enemyFormation: formation,
+    enemyTotal: total,
+    strength,
+    terrain,
+  };
+  state.modeLabel = "戦闘準備";
+  resetEncounterMeter();
+  setOutput(
+    "敵襲",
+    `外洋海賊と遭遇しました（推定${total}人 / ${strength === "elite" ? "強編成" : "通常編成"}）。行動を選んでください。`,
+    [
+      { text: "戦闘準備", kind: "warn" },
+      { text: "行動選択", kind: "warn" },
+    ]
+  );
+  pushLog(
+    "敵襲",
+    `外洋海賊と遭遇（推定${total}人 / ${strength === "elite" ? "強編成" : "通常編成"}）。`,
+    state.lastRoll ?? "-"
+  );
+  syncUI?.();
+}
+
+function maybeTriggerEncounter(syncUI) {
+  if (state.pendingEncounter?.active) return false;
+  const loc = getLocationStatus();
+  // 村/街タイル上ではエンカウントしないが、リセットもしない（入場時のみリセット）
+  if (loc?.place === "村" || loc?.place === "街") return false;
+  const threshold = clamp(state.encounterThreshold || ENCOUNTER_MIN, ENCOUNTER_MIN, ENCOUNTER_MAX);
+  state.encounterProgress = (state.encounterProgress || 0) + 1;
+  if (state.encounterProgress >= threshold) {
+    triggerEncounter(syncUI);
+    pushToast("敵襲", "外洋海賊が接近中！ 戦闘準備をしてください。", "warn");
+    return true;
+  }
+  return false;
+}
 
 /**
  * 移動が可能か（上下左右1マス）を判定する。
@@ -28,6 +137,14 @@ export function isValidMove(from, to) {
  * @returns {boolean}
  */
 export function moveToSelected(showActionMessage, syncUI) {
+  if (state.pendingEncounter?.active) {
+    showActionMessage?.("戦闘準備中は移動できません。行動を選んでください。", "warn");
+    return false;
+  }
+  if (state.modeLabel === "戦闘中") {
+    showActionMessage?.("戦闘中は移動できません。地図に戻ってください。", "warn");
+    return false;
+  }
   if (state.modeLabel === "村の中" || state.modeLabel === "街の中") {
     showActionMessage?.("今は移動できません。村/街を出てから移動してください。", "error");
     return false;
@@ -78,6 +195,7 @@ export function moveToSelected(showActionMessage, syncUI) {
   ]);
   pushLog("移動", `選択マスへ移動 (${dest.x + 1}, ${dest.y + 1})`, state.lastRoll ?? "-");
   showActionMessage?.("", "info");
+  maybeTriggerEncounter(syncUI);
   syncUI?.();
   return true;
 }
@@ -101,6 +219,7 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
     return false;
   }
   state.modeLabel = insideLabel;
+  resetEncounterMeter();
   setOutput("入場", `${targetPlace}に入りました。`, [
     { text: targetPlace, kind: "" },
     { text: "滞在", kind: "" },
@@ -131,6 +250,7 @@ export function attemptExit(target, elements, clearActionMessage, setTradeError,
     return false;
   }
   state.modeLabel = "通常";
+  resetEncounterMeter();
   setOutput("出発", `${place}を出ました。`, [
     { text: "移動", kind: "" },
     { text: "通常", kind: "" },
@@ -150,6 +270,20 @@ export function attemptExit(target, elements, clearActionMessage, setTradeError,
  * @param {Function} syncUI
  */
 export function waitOneDay(elements, clearActionMessage, syncUI) {
+  if (state.pendingEncounter?.active) {
+    setOutput("待機できません", "戦闘準備中は待機できません。行動を選んでください。", [
+      { text: "戦闘準備", kind: "warn" },
+      { text: "待機不可", kind: "warn" },
+    ]);
+    return false;
+  }
+  if (state.modeLabel === "戦闘中") {
+    setOutput("待機できません", "戦闘中は待機できません。地図に戻ってください。", [
+      { text: "戦闘中", kind: "warn" },
+      { text: "待機不可", kind: "warn" },
+    ]);
+    return false;
+  }
   advanceDayWithEvents(1);
   setOutput("待機", "1日待機しました。", [
     { text: "待機", kind: "" },
@@ -159,6 +293,7 @@ export function waitOneDay(elements, clearActionMessage, syncUI) {
   clearActionMessage?.();
   if (elements?.ctxEl) elements.ctxEl.value = "move";
   syncUI?.();
+  return true;
 }
 
 /**

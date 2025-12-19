@@ -6,12 +6,24 @@ import { FACTIONS } from "./lore.js";
  */
 const createState = () => ({
   ships: 0,
-  troops: { marine: { 1: 4, 2: 1 } },
+  troops: {
+    infantry: { 1: 5 },
+    archer: { 1: 5 },
+  },
   faith: 0,
   supplies: { food: 10 },
   funds: 1000,
   fame: 0,
   silence: 0,
+  encounterProgress: 0,
+  encounterThreshold: 12,
+  pendingEncounter: {
+    active: false,
+    enemyFormation: [],
+    enemyTotal: 0,
+    strength: "normal",
+    terrain: "plain",
+  },
   lastRoll: null,
   lastResultText: "",
   modeLabel: "通常",

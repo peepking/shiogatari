@@ -541,6 +541,16 @@ export function getSettlementAtPosition(x, y) {
 }
 
 /**
+ * 指定座標の地形キーを返す。
+ * @param {number} x
+ * @param {number} y
+ * @returns {string}
+ */
+export function getTerrainAt(x, y) {
+  return mapData[y]?.[x]?.terrain || "plain";
+}
+
+/**
  * IDから拠点を取得する。
  * @param {string} id
  * @returns {object|null}

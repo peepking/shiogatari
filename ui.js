@@ -1,11 +1,14 @@
 import { state, resetState } from "./state.js";
-import { nowStr, formatGameTime } from "./util.js";
+import { nowStr, formatGameTime, clamp } from "./util.js";
 import { elements, setOutput, pushLog, pushToast } from "./dom.js";
-import { renderMap, wireMapHover, getLocationStatus } from "./map.js";
+import { renderMap, wireMapHover, getLocationStatus, getTerrainAt } from "./map.js";
 import {
   formatTroopDisplay,
   renderTroopModal,
   wireTroopDismiss,
+  applyTroopLosses,
+  addTroops,
+  levelUpTroopsRandom,
 } from "./troops.js";
 import {
   formatSupplyDisplay,
@@ -13,12 +16,14 @@ import {
   wireSupplyModal,
   wireSupplyDiscard,
 } from "./supplies.js";
+import { SUPPLY_ITEMS } from "./supplies.js";
 import {
   moveToSelected,
   attemptEnter,
   attemptExit,
   waitOneDay,
   getCurrentSettlement,
+  resetEncounterMeter,
 } from "./actions.js";
 import { wireMarketModals } from "./marketUI.js";
 import { wireHireModal } from "./hireUI.js";
@@ -30,6 +35,7 @@ import {
   receiveOracle,
   canReceiveOracle,
 } from "./quests.js";
+import { wireBattleUI, setEnemyFormation, setBattleEndHandler, openBattle, setBattleTerrain } from "./battle.js";
 
 /**
  * モード表示用のラベルを組み立てる。
@@ -168,6 +174,232 @@ function performPrayer() {
   return true;
 }
 
+const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const battlePrepActive = () => state.modeLabel === "戦闘準備";
+
+function totalTypeCount(type) {
+  const levels = state.troops?.[type];
+  if (!levels) return 0;
+  if (typeof levels === "number") return levels;
+  return Object.values(levels).reduce((s, v) => s + Number(v || 0), 0);
+}
+
+function enemyTotalEstimate(meta) {
+  if (state.pendingEncounter?.enemyTotal) return state.pendingEncounter.enemyTotal;
+  const fromMeta =
+    meta?.enemyFormation?.reduce((s, e) => s + Number(e?.count || 0), 0) ||
+    (meta?.units || [])
+      .filter((u) => u.side === "enemy")
+      .reduce((s, u) => s + Number(u.count || 0), 0);
+  return fromMeta || 0;
+}
+
+function escapeSuccessRate() {
+  const scouts = Math.min(10, totalTypeCount("scout"));
+  const bonus = 70 * (1 - Math.pow(0.6, scouts)); // 初手が大きく、漸減しつつ10人でほぼ+70%
+  return clamp(30 + bonus, 0, 100);
+}
+
+function clearBattlePrep(resetMode = true) {
+  state.pendingEncounter = {
+    active: false,
+    enemyFormation: [],
+    enemyTotal: 0,
+    strength: "normal",
+    terrain: "plain",
+  };
+  if (resetMode) state.modeLabel = "通常";
+  resetEncounterMeter();
+  setEnemyFormation(null);
+  setBattleTerrain("plain");
+}
+
+function escapeBattleSuccess(reason) {
+  const text = reason || "敵との接触を回避しました。";
+  clearBattlePrep();
+  setOutput("戦闘回避", text, [
+    { text: "戦闘回避", kind: "good" },
+  ]);
+  pushLog("戦闘回避", text, "-");
+  pushToast("逃走成功", text, "good");
+  syncUI();
+}
+
+function calcLosses(meta) {
+  const units = meta?.units || [];
+  const allies = units.filter((u) => u.side === "ally");
+  const medics = allies
+    .filter((u) => u.type === "medic")
+    .reduce((s, u) => s + Number(u.count || 0), 0);
+  const lossProb = Math.max(0, 0.5 * (1 - Math.min(10, medics) / 10));
+  const losses = {};
+  allies
+    .filter((u) => u.hp <= 0)
+    .forEach((u) => {
+      const lost = Math.round((u.count || 0) * lossProb);
+      if (lost > 0) losses[u.type] = (losses[u.type] || 0) + lost;
+    });
+  return { losses, lossProb };
+}
+
+function calcCaptures(meta) {
+  const units = meta?.units || [];
+  const enemies = units.filter((u) => u.side === "enemy" && u.hp <= 0);
+  const captured = {};
+  enemies.forEach((u) => {
+    const cnt = Math.max(0, Math.round(u.count || 0));
+    let got = 0;
+    for (let i = 0; i < cnt; i++) {
+      if (Math.random() < 0.1) got += 1;
+    }
+    if (got > 0) {
+      const lvl = Math.max(1, Math.round(u.level || 1));
+      captured[`${u.type}|${lvl}`] = (captured[`${u.type}|${lvl}`] || 0) + got;
+    }
+  });
+  return captured;
+}
+
+function killedEnemyCount(meta) {
+  const units = meta?.units || [];
+  return units
+    .filter((u) => u.side === "enemy" && u.hp <= 0)
+    .reduce((s, u) => s + Math.max(0, Math.round(u.count || 0)), 0);
+}
+
+function processBattleOutcome(result, meta) {
+  const enemyTotal = enemyTotalEstimate(meta);
+  const fameDelta = Math.floor(enemyTotal / 2);
+  const isStrong = meta?.enemyFormation?.some((e) => (e.level || 1) > 1) || state.pendingEncounter?.strength === "elite";
+  const isWin = result === "勝利";
+  const summary = [];
+  if (isWin) {
+    state.fame += fameDelta;
+    const fundsGainBase = enemyTotal * 20;
+    const fundsGain = Math.round(fundsGainBase * (0.9 + Math.random() * 0.2) * (isStrong ? 2 : 1));
+    const foodGainBase = enemyTotal * 0.5;
+    const foodGain = Math.max(0, Math.round(foodGainBase * (0.9 + Math.random() * 0.2) * (isStrong ? 2 : 1)));
+    const materialSlots = Math.max(1, isStrong ? 2 : 1);
+    const materialPool = SUPPLY_ITEMS.filter((i) => i.id !== "food").map((i) => i.id);
+    const pickedMap = {};
+    for (let i = 0; i < materialSlots; i++) {
+      const key =
+        materialPool.length > 0
+          ? materialPool[Math.floor(Math.random() * materialPool.length)]
+          : "food";
+      pickedMap[key] = (pickedMap[key] || 0) + 1;
+      state.supplies[key] = (state.supplies[key] ?? 0) + 1;
+    }
+    state.funds += fundsGain;
+    state.supplies.food = (state.supplies.food ?? 0) + foodGain;
+    summary.push(`名声 +${fameDelta}`);
+    summary.push(`資金 +${fundsGain}`);
+    summary.push(`食料 +${foodGain}`);
+    const matText =
+      Object.entries(pickedMap)
+        .map(([k, v]) => {
+          const name = SUPPLY_ITEMS.find((i) => i.id === k)?.name || k;
+          return `${name} +${v}`;
+        })
+        .join(" / ") || "なし";
+    summary.push(`物資: ${matText}`);
+  } else {
+    state.fame = Math.max(0, state.fame - fameDelta);
+    const lossRate = 0.45 + Math.random() * 0.1; // 45-55%
+    const fundsLost = Math.round(state.funds * lossRate);
+    state.funds = Math.max(0, state.funds - fundsLost);
+    summary.push(`名声 -${fameDelta}`);
+    summary.push(`資金 -${fundsLost}`);
+    const supplyLoss = {};
+    Object.keys(state.supplies || {}).forEach((k) => {
+      const cur = Number(state.supplies[k] || 0);
+      const lost = Math.round(cur * lossRate);
+      state.supplies[k] = Math.max(0, cur - lost);
+      supplyLoss[k] = lost;
+    });
+    const foodLost = supplyLoss.food ?? 0;
+    if (foodLost) summary.push(`食料 -${foodLost}`);
+  }
+
+  const { losses, lossProb } = calcLosses(meta);
+  applyTroopLosses(losses);
+  const lossText =
+    Object.entries(losses || {})
+      .map(([t, n]) => `${t} -${n}`)
+      .join("\n") || "なし";
+
+  summary.push(`損耗:\n${lossText}`);
+
+  const captured = calcCaptures(meta);
+  Object.entries(captured).forEach(([key, qty]) => {
+    const [type, lvlStr] = key.split("|");
+    addTroops(type, Number(lvlStr) || 1, qty);
+  });
+  const capText =
+    Object.entries(captured || {})
+      .map(([key, n]) => {
+        const [type, lvl] = key.split("|");
+        return `${type} Lv${lvl} +${n}`;
+      })
+      .join("\n") || "なし";
+  summary.push(`拿捕:\n${capText}`);
+
+  const killed = killedEnemyCount(meta);
+  const leveled = levelUpTroopsRandom(killed);
+  if (leveled > 0) {
+    summary.push(`練度上昇: ${leveled}人がLv+1`);
+  }
+
+  clearBattlePrep(false);
+  const body = summary.join("\n\n");
+  setOutput("戦後処理", body, [
+    { text: result, kind: isWin ? "good" : "warn" },
+    { text: `敵推定${enemyTotal}人`, kind: "" },
+  ]);
+  pushLog("戦闘結果", body, "-");
+  pushToast("戦闘結果", result, isWin ? "good" : "warn");
+  showBattleResultModal(body);
+  syncUI();
+}
+
+function startPrepBattle() {
+  if (!state.pendingEncounter?.active) return;
+  setEnemyFormation(state.pendingEncounter.enemyFormation || []);
+  setBattleEndHandler((res, meta) => {
+    processBattleOutcome(res, meta);
+  });
+  setBattleTerrain(state.pendingEncounter.terrain || getTerrainAt(state.position.x, state.position.y));
+  state.modeLabel = "戦闘中";
+  openBattle();
+  syncUI();
+}
+
+function tryRunFromEncounter() {
+  if (!state.pendingEncounter?.active) return;
+  const rate = escapeSuccessRate();
+  const roll = Math.random() * 100;
+  if (roll < rate) {
+    escapeBattleSuccess(`逃走成功 (${Math.round(rate)}%)`);
+    return;
+  }
+  setOutput("逃走失敗", "逃走に失敗しました。戦闘に突入します。", [
+    { text: "逃走失敗", kind: "warn" },
+  ]);
+  pushToast("逃走失敗", "戦闘に突入します。", "warn");
+  startPrepBattle();
+}
+
+function tryPrayEscape() {
+  const ok = performPrayer();
+  if (!ok) return;
+  escapeBattleSuccess("海に祈り、敵を退けました。");
+}
+
+function surrenderBattle() {
+  if (!state.pendingEncounter?.active) return;
+  processBattleOutcome("敗北", { enemyFormation: state.pendingEncounter.enemyFormation });
+}
+
 // 移動/待機/入退場の処理は actions.js に集約。
 
 /**
@@ -175,6 +407,11 @@ function performPrayer() {
  * @param {object|null} loc
  */
 function updateModeControls(loc) {
+  const prep = battlePrepActive();
+  const inBattle = state.modeLabel === "戦闘中";
+  const battleVisible = Boolean(elements.battleBlock && elements.battleBlock.hidden === false);
+  const lockActions = prep || inBattle || battleVisible;
+  const prepActive = prep && !!state.pendingEncounter?.active;
   const visible = state.modeLabel === "街の中" || state.modeLabel === "村の中";
   if (elements.tradeBtn) elements.tradeBtn.hidden = !visible;
   if (elements.shipTradeBtn)
@@ -182,11 +419,12 @@ function updateModeControls(loc) {
   if (elements.questOpenBtn) elements.questOpenBtn.hidden = !visible;
   if (elements.hireBtn) elements.hireBtn.hidden = !visible;
   if (elements.oracleBtn) {
-    elements.oracleBtn.hidden = false;
-    elements.oracleBtn.disabled = !canReceiveOracle();
+    elements.oracleBtn.hidden = lockActions;
+    elements.oracleBtn.disabled = lockActions || !canReceiveOracle();
   }
   if (elements.modePrayBtn) {
-    elements.modePrayBtn.disabled = !canPray();
+    elements.modePrayBtn.hidden = lockActions;
+    elements.modePrayBtn.disabled = lockActions || !canPray();
   }
   if (elements.enterVillageBtn)
     elements.enterVillageBtn.hidden = !(loc?.place === "村" && state.modeLabel !== "村の中");
@@ -196,6 +434,48 @@ function updateModeControls(loc) {
     elements.exitVillageBtn.hidden = state.modeLabel !== "村の中";
   if (elements.exitTownBtn)
     elements.exitTownBtn.hidden = state.modeLabel !== "街の中";
+  if (elements.modeWaitBtn) {
+    elements.modeWaitBtn.hidden = lockActions;
+    elements.modeWaitBtn.disabled = lockActions;
+  }
+  if (elements.battlePrepRow) {
+    const showPrepRow = prepActive && !inBattle && !battleVisible;
+    elements.battlePrepRow.hidden = !showPrepRow;
+    if (!showPrepRow) {
+      elements.battlePrepFightBtn && (elements.battlePrepFightBtn.hidden = true);
+      elements.battlePrepRunBtn && (elements.battlePrepRunBtn.hidden = true);
+      elements.battlePrepPrayBtn && (elements.battlePrepPrayBtn.hidden = true);
+      elements.battlePrepSurrenderBtn && (elements.battlePrepSurrenderBtn.hidden = true);
+    } else {
+      elements.battlePrepFightBtn && (elements.battlePrepFightBtn.hidden = false);
+      elements.battlePrepRunBtn && (elements.battlePrepRunBtn.hidden = false);
+      elements.battlePrepPrayBtn && (elements.battlePrepPrayBtn.hidden = false);
+      elements.battlePrepSurrenderBtn && (elements.battlePrepSurrenderBtn.hidden = false);
+      if (elements.battlePrepRunBtn) {
+        const rate = Math.round(escapeSuccessRate());
+        elements.battlePrepRunBtn.title = `逃走成功率: ${rate}%`;
+      }
+    }
+    if (!showPrepRow && elements.battlePrepRunBtn) {
+      elements.battlePrepRunBtn.title = "";
+    }
+  }
+  if (elements.tradeBtn) elements.tradeBtn.disabled = lockActions;
+  if (elements.shipTradeBtn) elements.shipTradeBtn.disabled = lockActions;
+  if (elements.questOpenBtn) elements.questOpenBtn.disabled = lockActions;
+  if (elements.hireBtn) elements.hireBtn.disabled = lockActions;
+  if (elements.battlePrepPrayBtn) elements.battlePrepPrayBtn.disabled = !prepActive || !canPray();
+  if (elements.battlePrepInfo) {
+    const showInfo = prepActive && !inBattle && !battleVisible;
+    if (!showInfo) {
+      elements.battlePrepInfo.hidden = true;
+    } else {
+      const total = state.pendingEncounter.enemyTotal || "-";
+      const strong = state.pendingEncounter.strength === "elite";
+      elements.battlePrepInfo.hidden = false;
+      elements.battlePrepInfo.textContent = `敵推定: ${total}人${strong ? "（強編成）" : ""}`;
+    }
+  }
 }
 
 /**
@@ -292,6 +572,13 @@ function closeModal(el) {
   if (el) el.hidden = true;
 }
 
+function showBattleResultModal(body) {
+  if (elements.battleResultBody) {
+    elements.battleResultBody.textContent = `${body}\n地図に戻るボタンでフィールドに戻ってください。`;
+  }
+  openModal(elements.battleResultModal);
+}
+
 /**
  * モーダルの閉じる挙動を紐づける。
  * @param {HTMLElement|null} modal
@@ -323,6 +610,7 @@ function wireButtons() {
   bindModal(elements.helpModal, elements.helpModalClose);
   bindModal(elements.loreModal, elements.loreModalClose);
   bindModal(elements.endingsModal, elements.endingsModalClose);
+  bindModal(elements.battleResultModal, elements.battleResultClose);
 
   document.getElementById("modeBattleAlert")?.addEventListener("click", () => {
     state.modeLabel = "戦闘警戒";
@@ -393,6 +681,7 @@ function wireButtons() {
   document.getElementById("resetBtn")?.addEventListener("click", () => {
     if (!confirm("状態とログをリセットしますか？")) return;
     resetState();
+    resetEncounterMeter();
     if (elements.logEl) elements.logEl.innerHTML = "";
     setOutput("次の操作", "状況を選んで、1D6を振ってください", [
       { text: "-", kind: "" },
@@ -478,6 +767,18 @@ function wireButtons() {
     }
   });
 
+  elements.battlePrepFightBtn?.addEventListener("click", startPrepBattle);
+  elements.battlePrepRunBtn?.addEventListener("click", tryRunFromEncounter);
+  elements.battlePrepPrayBtn?.addEventListener("click", tryPrayEscape);
+  elements.battlePrepSurrenderBtn?.addEventListener("click", surrenderBattle);
+  elements.battleResultBack?.addEventListener("click", () => {
+    closeModal(elements.battleResultModal);
+    elements.battleBackBtn?.click();
+  });
+  elements.battleBackBtn?.addEventListener("click", () => {
+    setTimeout(() => syncUI(), 0);
+  });
+
   wireFactionPanel();
   wireMapToggle(renderMap);
 
@@ -530,7 +831,9 @@ function wireButtons() {
 export function initUI() {
   seedInitialQuests();
   ensureSeasonalQuests(getCurrentSettlement());
+  resetEncounterMeter();
   wireButtons();
+  wireBattleUI();
   wireTroopDismiss(elements.troopsDetail, syncUI);
   wireSupplyDiscard(elements.suppliesDetail, syncUI);
   wireMapHover();

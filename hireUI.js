@@ -59,7 +59,7 @@ export function renderHireModal(settlement) {
   const body = elements.hireTableBody;
   if (!body) return;
   if (!settlement) {
-    body.innerHTML = `<tr><td colspan="4" class="ta-center pad-10">街・村の中でのみ雇用できます。</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="ta-center pad-10">街・村の中でのみ雇用できます。</td></tr>`;
     setHireError("");
     if (elements.hireDelta) elements.hireDelta.hidden = true;
     if (elements.hireFunds) elements.hireFunds.textContent = String(state.funds);
@@ -67,7 +67,7 @@ export function renderHireModal(settlement) {
   }
   const slots = settlement.recruitSlots || [];
   if (!slots.length) {
-    body.innerHTML = `<tr><td colspan="4" class="ta-center pad-10">雇用枠がありません。</td></tr>`;
+    body.innerHTML = `<tr><td colspan="5" class="ta-center pad-10">雇用枠がありません。</td></tr>`;
     setHireError("");
     if (elements.hireDelta) elements.hireDelta.hidden = true;
     if (elements.hireFunds) elements.hireFunds.textContent = String(state.funds);
@@ -80,8 +80,10 @@ export function renderHireModal(settlement) {
       const hire = stat?.hire ?? 0;
       const remaining = Math.max(0, Number(slot.remaining) || 0);
       const disabled = remaining <= 0 ? "disabled" : "";
+      const imgSrc = `image/troops/${slot.type}.gif`;
       return `
         <tr>
+          <td class="ta-center"><img src="${imgSrc}" alt="${name}" class="hire-icon"></td>
           <td>${name}</td>
           <td class="ta-center">${hire}</td>
           <td class="ta-center">${remaining}</td>
@@ -152,6 +154,7 @@ export function wireHireModal({ openModal, bindModal, syncUI }) {
     const summary = selections
       .map((s) => `${TROOP_STATS[s.type]?.name || s.type} x${s.qty}`)
       .join(" / ");
+    state.funds = Math.max(0, state.funds - totalCost);
     pushLog("雇用", `雇用: ${summary} / 資金-${totalCost}`, "-");
     renderHireModal(settlement);
     syncUI?.();
