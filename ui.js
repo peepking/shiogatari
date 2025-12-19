@@ -43,6 +43,7 @@ import {
 } from "./quests.js";
 import { buildEnemyFormation } from "./actions.js";
 import { wireBattleUI, setEnemyFormation, setBattleEndHandler, openBattle, setBattleTerrain } from "./battle.js";
+import { loadGameFromStorage } from "./storage.js";
 
 /**
  * モード表示用のラベルを組み立てる。
@@ -940,9 +941,12 @@ function wireButtons() {
  * UIの初期化処理。
  */
 export function initUI() {
+  const restored = loadGameFromStorage();
   seedInitialQuests();
   ensureSeasonalQuests(getCurrentSettlement());
-  resetEncounterMeter();
+  if (!restored) {
+    resetEncounterMeter();
+  }
   wireButtons();
   wireBattleUI();
   wireTroopDismiss(elements.troopsDetail, syncUI);

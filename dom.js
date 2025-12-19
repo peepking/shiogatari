@@ -1,5 +1,6 @@
 import { nowStr, escapeHtml, formatGameTime } from "./util.js";
 import { state } from "./state.js";
+import { saveGameToStorage } from "./storage.js";
 
 /**
  * 指定IDの要素を取得する。
@@ -202,11 +203,12 @@ export function pushLog(title, body, lastRollDisplay = "-") {
           <div class="what">${escapeHtml(title)}</div>
           <div class="when">${escapeHtml(gameTime)}</div>
         </div>
-      </div>
-      <div class="txt">${escapeHtml(body)}</div>
-      <div class="when mt-6">${escapeHtml(realTime)}</div>
-    `;
+    </div>
+    <div class="txt">${escapeHtml(body)}</div>
+    <div class="when mt-6">${escapeHtml(realTime)}</div>
+  `;
   elements.logEl.prepend(item);
+  saveGameToStorage();
 }
 
 /**

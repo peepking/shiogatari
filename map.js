@@ -551,6 +551,76 @@ export function getTerrainAt(x, y) {
 }
 
 /**
+ * 現在のマップ/拠点情報をスナップショットとして返す。
+ * @returns {{cells:Array,settlements:Array,nobleHome:Array}}
+ */
+export function snapshotWorld() {
+  const cells = mapData.map((row) =>
+    row.map((cell) => ({
+      terrain: cell.terrain,
+      building: cell.building,
+      factionId: cell.factionId ?? null,
+      settlementId: cell.settlement?.id || null,
+    }))
+  );
+  const settlementsSnap = settlements.map((s) => ({ ...s, coords: { ...s.coords } }));
+  const nobleHomeSnap = Array.from(nobleHome.entries());
+  return { cells, settlements: settlementsSnap, nobleHome: nobleHomeSnap };
+}
+
+/**
+ * スナップショットからマップ/拠点を復元する。
+ * @param {{cells:Array,settlements:Array,nobleHome:Array}|null} snapshot
+ * @returns {boolean} 復元成功時 true
+ */
+export function restoreWorld(snapshot) {
+  try {
+    if (!snapshot?.cells || !snapshot?.settlements) return false;
+    if (
+      !Array.isArray(snapshot.cells) ||
+      snapshot.cells.length !== MAP_SIZE ||
+      snapshot.cells[0]?.length !== MAP_SIZE
+    )
+      return false;
+    // mapDataはconstなので中身を上書きする
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const src = snapshot.cells[y][x];
+        const cell = mapData[y][x];
+        cell.terrain = src.terrain;
+        cell.building = src.building;
+        cell.factionId = src.factionId ?? null;
+        cell.settlement = null;
+      }
+    }
+    // 拠点を再構築
+    settlements.length = 0;
+    snapshot.settlements.forEach((s) => settlements.push({ ...s }));
+    // nobleHomeを再構築
+    nobleHome.clear();
+    (snapshot.nobleHome || []).forEach(([k, v]) => nobleHome.set(k, v));
+    const settlementById = new Map(settlements.map((s) => [s.id, s]));
+    // mapDataにsettlement参照を差し戻す
+    snapshot.cells.forEach((row, y) => {
+      row.forEach((src, x) => {
+        if (src.settlementId) {
+          const s = settlementById.get(src.settlementId);
+          if (s) {
+            mapData[y][x].settlement = s;
+            mapData[y][x].building = s.kind;
+            mapData[y][x].factionId = s.factionId;
+          }
+        }
+      });
+    });
+    return true;
+  } catch (e) {
+    console.error("restoreWorld failed", e);
+    return false;
+  }
+}
+
+/**
  * IDから拠点を取得する。
  * @param {string} id
  * @returns {object|null}
