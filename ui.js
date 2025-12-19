@@ -37,6 +37,7 @@ import {
   getOracleBattleAt,
   completeOracleBattleQuest,
   failOracleBattleQuest,
+  completeHuntBattleQuest,
   QUEST_TYPES,
 } from "./quests.js";
 import { buildEnemyFormation } from "./actions.js";
@@ -212,8 +213,8 @@ function clearBattlePrep(resetMode = true) {
     enemyTotal: 0,
     strength: "normal",
     terrain: "plain",
-    oracleQuestId: null,
-    oracleQuestType: null,
+    questId: null,
+    questType: null,
   };
   if (resetMode) state.modeLabel = "通常";
   resetEncounterMeter();
@@ -279,8 +280,8 @@ function processBattleOutcome(result, meta) {
   const fameDelta = Math.floor(enemyTotal / 2);
   const isStrong = meta?.enemyFormation?.some((e) => (e.level || 1) > 1) || state.pendingEncounter?.strength === "elite";
   const isWin = result === "勝利";
-  const oracleQuestId = state.pendingEncounter?.oracleQuestId;
-  const oracleQuestType = state.pendingEncounter?.oracleQuestType;
+  const questId = state.pendingEncounter?.questId;
+  const questType = state.pendingEncounter?.questType;
   const summary = [];
   if (isWin) {
     state.fame += fameDelta;
@@ -354,16 +355,28 @@ function processBattleOutcome(result, meta) {
   if (leveled > 0) {
     summary.push(`練度上昇: ${leveled}人がLv+1`);
   }
-  if (isWin && oracleQuestId) {
-    const ok = completeOracleBattleQuest(oracleQuestId);
-    if (ok) {
-      const label = oracleQuestType === QUEST_TYPES.ORACLE_ELITE ? "越えよ" : "奪え";
-      summary.push(`神託達成: ${label}`);
+  if (questId) {
+    if (questType === QUEST_TYPES.ORACLE_HUNT || questType === QUEST_TYPES.ORACLE_ELITE) {
+      if (isWin) {
+        const ok = completeOracleBattleQuest(questId);
+        if (ok) {
+          const label = questType === QUEST_TYPES.ORACLE_ELITE ? "越えよ" : "奪え";
+          summary.push(`神託達成: ${label}`);
+        }
+      } else {
+        const label = questType === QUEST_TYPES.ORACLE_ELITE ? "越えよ" : "奪え";
+        failOracleBattleQuest(questId, "戦闘に敗北しました");
+        summary.push(`神託失敗: ${label}`);
+      }
+    } else if (questType === QUEST_TYPES.PIRATE_HUNT || questType === QUEST_TYPES.BOUNTY_HUNT) {
+      if (isWin) {
+        completeHuntBattleQuest(questId, true);
+        summary.push(`討伐達成: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "賞金首" : "海賊"}`);
+      } else {
+        completeHuntBattleQuest(questId, false, "戦闘に敗北しました");
+        summary.push(`討伐失敗: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "賞金首" : "海賊"}`);
+      }
     }
-  } else if (!isWin && oracleQuestId) {
-    const label = oracleQuestType === QUEST_TYPES.ORACLE_ELITE ? "越えよ" : "奪え";
-    failOracleBattleQuest(oracleQuestId, "戦闘に敗北しました");
-    summary.push(`神託失敗: ${label}`);
   }
 
   clearBattlePrep(false);
@@ -395,7 +408,8 @@ function startOracleBattle() {
   if (state.pendingEncounter?.active || state.modeLabel === "戦闘中") return;
   const quest = getOracleBattleAt(state.position);
   if (!quest) return;
-  const force = quest.type === QUEST_TYPES.ORACLE_ELITE ? "elite" : "normal";
+  const force =
+    quest.type === QUEST_TYPES.ORACLE_ELITE || quest.type === QUEST_TYPES.BOUNTY_HUNT ? "elite" : "normal";
   const { formation, total, strength } = buildEnemyFormation(force);
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   state.pendingEncounter = {
@@ -404,8 +418,8 @@ function startOracleBattle() {
     enemyTotal: total,
     strength,
     terrain,
-    oracleQuestId: quest.id,
-    oracleQuestType: quest.type,
+    questId: quest.id,
+    questType: quest.type,
   };
   state.modeLabel = "戦闘準備";
   resetEncounterMeter();

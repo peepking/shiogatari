@@ -37,22 +37,51 @@ export function renderQuestUI(syncUI) {
       const itemName = SUPPLY_ITEMS.find((i) => i.id === q.itemId)?.name || q.itemId;
       const remain = q.deadlineAbs != null ? Math.max(0, q.deadlineAbs - now) : null;
       const remainText = remain == null ? "期限なし" : `残り${remain}日`;
-      const typeLabel = q.type === QUEST_TYPES.SUPPLY ? "調達" : "配達";
+      const typeLabel =
+        q.type === QUEST_TYPES.SUPPLY
+          ? "調達"
+          : q.type === QUEST_TYPES.DELIVERY
+            ? "配達"
+            : q.type === QUEST_TYPES.ORACLE_SUPPLY ||
+                q.type === QUEST_TYPES.ORACLE_MOVE ||
+                q.type === QUEST_TYPES.ORACLE_TROOP ||
+                q.type === QUEST_TYPES.ORACLE_HUNT ||
+                q.type === QUEST_TYPES.ORACLE_ELITE
+              ? "神託"
+              : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
+                ? "討伐"
+                : "";
       const placeLabel =
         q.type === QUEST_TYPES.SUPPLY
-          ? `${origin?.name ?? "不明"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1
-          })で納品`
+          ? `${origin?.name ?? "不明"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})で納品`
           : q.type === QUEST_TYPES.DELIVERY
-            ? `${target?.name ?? "不明"}(${(target?.coords?.x ?? 0) + 1}, ${(target?.coords?.y ?? 0) + 1
-            })へ配送`
+            ? `${target?.name ?? "不明"}(${(target?.coords?.x ?? 0) + 1}, ${(target?.coords?.y ?? 0) + 1})へ配送`
             : q.type === QUEST_TYPES.ORACLE_SUPPLY
               ? `神託: 加工品を捧げよ`
               : q.type === QUEST_TYPES.ORACLE_MOVE
                 ? `神託: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})へ移動`
                 : q.type === QUEST_TYPES.ORACLE_TROOP
                   ? `神託: 人身を捧げよ`
-                  : "";
+                  : q.type === QUEST_TYPES.ORACLE_HUNT
+                    ? `神託: 討伐（通常編成）`
+                    : q.type === QUEST_TYPES.ORACLE_ELITE
+                      ? `神託: 討伐（強編成）`
+                      : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
+                        ? `討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                        : "";
       const canFinish = remain == null ? canCompleteQuest(q) : remain >= 0 && canCompleteQuest(q);
+      const rewardExtra =
+        q.type === QUEST_TYPES.SUPPLY || q.type === QUEST_TYPES.DELIVERY
+          ? `名声+${q.rewardFame ?? 0}`
+        : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
+          ? `名声+${q.rewardFame ?? Math.floor((q.estimatedTotal || 0) / 2)}`
+          : q.type === QUEST_TYPES.ORACLE_HUNT ||
+              q.type === QUEST_TYPES.ORACLE_ELITE ||
+              q.type === QUEST_TYPES.ORACLE_SUPPLY ||
+              q.type === QUEST_TYPES.ORACLE_MOVE ||
+              q.type === QUEST_TYPES.ORACLE_TROOP
+            ? `信仰+${q.rewardFaith ?? 0}`
+            : "";
       return `
         <div class="sideBlock mb-8">
           <div class="sbTitle sbTitle-quest">
@@ -62,6 +91,7 @@ export function renderQuestUI(syncUI) {
             </div>
             <div class="row gap-6">
               <span class="pill">報酬 <b>${q.reward ?? 0}</b></span>
+              ${rewardExtra ? `<span class="pill">${rewardExtra}</span>` : ""}
               <span class="pill">${remainText}</span>
               <button class="btn good quest-complete" data-id="${q.id}" ${canFinish ? "" : "disabled"
         } aria-disabled="${canFinish ? "false" : "true"}">完了</button>
@@ -116,21 +146,38 @@ export function renderQuestModal(settlement, syncUI) {
       const origin = getSettlementById(q.originId);
       const target = getSettlementById(q.targetId);
       const itemName = SUPPLY_ITEMS.find((i) => i.id === q.itemId)?.name || q.itemId;
-      const typeLabel = q.type === QUEST_TYPES.SUPPLY ? "調達" : "配達";
+      const typeLabel =
+        q.type === QUEST_TYPES.SUPPLY
+          ? "調達"
+          : q.type === QUEST_TYPES.DELIVERY
+            ? "配達"
+            : q.type === QUEST_TYPES.ORACLE_SUPPLY ||
+                q.type === QUEST_TYPES.ORACLE_MOVE ||
+                q.type === QUEST_TYPES.ORACLE_TROOP ||
+                q.type === QUEST_TYPES.ORACLE_HUNT ||
+                q.type === QUEST_TYPES.ORACLE_ELITE
+              ? "神託"
+              : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
+                ? "討伐"
+                : "";
       const placeLabel =
         q.type === QUEST_TYPES.SUPPLY
-          ? `${origin?.name ?? "不明"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1
-          })で納品`
+          ? `${origin?.name ?? "不明"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})で納品`
           : q.type === QUEST_TYPES.DELIVERY
-            ? `${target?.name ?? "不明"}(${(target?.coords?.x ?? 0) + 1}, ${(target?.coords?.y ?? 0) + 1
-            })へ配送`
+            ? `${target?.name ?? "不明"}(${(target?.coords?.x ?? 0) + 1}, ${(target?.coords?.y ?? 0) + 1})へ配送`
             : q.type === QUEST_TYPES.ORACLE_SUPPLY
               ? `神託: 加工品を捧げよ`
               : q.type === QUEST_TYPES.ORACLE_MOVE
                 ? `神託: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})へ移動`
                 : q.type === QUEST_TYPES.ORACLE_TROOP
                   ? `神託: 人身を捧げよ`
-                  : "";
+                  : q.type === QUEST_TYPES.ORACLE_HUNT
+                    ? `神託: 討伐（通常編成）`
+                    : q.type === QUEST_TYPES.ORACLE_ELITE
+                      ? `神託: 討伐（強編成）`
+                      : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
+                        ? `討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                        : "";
       const deadlineText = q.deadlineAbs ? `残り${Math.max(0, q.deadlineAbs - now)}日` : "受注から30日";
       return `
         <tr>
@@ -138,9 +185,9 @@ export function renderQuestModal(settlement, syncUI) {
             <div class="tiny">${typeLabel} / ${placeLabel}</div>
             <div><b>${q.title || itemName}</b></div>
             <div class="tiny">${q.type === QUEST_TYPES.ORACLE_TROOP
-          ? `${TROOP_STATS[q.troopType]?.name || q.troopType} x1`
-          : q.desc || `${itemName} x${q.qty ?? 0}`
-        }</div>
+            ? `${TROOP_STATS[q.troopType]?.name || q.troopType} x1`
+            : q.desc || `${itemName} x${q.qty ?? 0}`
+          }</div>
           </td>
           <td class="ta-center">${q.reward ?? 0}</td>
           <td class="ta-center">${deadlineText}</td>

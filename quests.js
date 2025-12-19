@@ -13,6 +13,18 @@ import {
   randomHuntTarget,
 } from "./questUtils.js";
 
+const NORMAL_ANCHORS = [
+  { fame: 0, min: 3, max: 5 },
+  { fame: 100, min: 7, max: 8 },
+  { fame: 500, min: 35, max: 40 },
+  { fame: 1000, min: 70, max: 80 },
+];
+const STRONG_ANCHORS = [
+  { fame: 100, min: 8, max: 9 },
+  { fame: 500, min: 40, max: 45 },
+  { fame: 1000, min: 80, max: 90 },
+];
+
 /** @enum {string} 依頼種別 */
 const QUEST_TYPES = {
   SUPPLY: "supply",
@@ -22,6 +34,8 @@ const QUEST_TYPES = {
   ORACLE_TROOP: "oracle_troop",
   ORACLE_HUNT: "oracle_hunt",
   ORACLE_ELITE: "oracle_elite",
+  PIRATE_HUNT: "pirate_hunt",
+  BOUNTY_HUNT: "bounty_hunt",
 };
 
 /**
@@ -88,6 +102,7 @@ function genSupplyQuest(settlement) {
   const qty = choice === "raw" ? Math.max(3, rollDice(3, 1)) : Math.max(2, rollDice(2, 1));
   const price = calcSupplyPrice(itemPick.id, demand[itemPick.id] ?? 10) ?? 0;
   const reward = price * qty * 2;
+  const rewardFame = Math.max(1, Math.round(qty / 2));
   const itemName = SUPPLY_ITEMS.find((i) => i.id === itemPick.id)?.name || itemPick.id;
   return {
     id: nextId(),
@@ -96,6 +111,7 @@ function genSupplyQuest(settlement) {
     itemId: itemPick.id,
     qty,
     reward,
+    rewardFame,
     originId: settlement.id,
     targetId: settlement.id,
     acceptedAbs: null,
@@ -128,6 +144,7 @@ function genDeliveryQuest(settlement) {
   const dist = pick?.dist ?? 1;
   const qty = 1;
   const reward = dist * 50;
+  const rewardFame = Math.max(1, Math.round(dist / 2));
   return {
     id: nextId(),
     type: QUEST_TYPES.DELIVERY,
@@ -135,6 +152,7 @@ function genDeliveryQuest(settlement) {
     itemId: item.id,
     qty,
     reward,
+    rewardFame,
     originId: settlement.id,
     targetId: target.id,
     acceptedAbs: null,
@@ -150,10 +168,19 @@ function genDeliveryQuest(settlement) {
 function generateSeasonQuestsForSettlement(settlement) {
   ensureState();
   if (!settlement) return;
-  const pool = [];
-  pool.push(genSupplyQuest(settlement));
-  pool.push(genDeliveryQuest(settlement));
-  pool.push(Math.random() > 0.5 ? genSupplyQuest(settlement) : genDeliveryQuest(settlement));
+  const candidates = [];
+  candidates.push(genSupplyQuest(settlement));
+  candidates.push(genDeliveryQuest(settlement));
+  candidates.push(Math.random() > 0.5 ? genSupplyQuest(settlement) : genDeliveryQuest(settlement));
+  candidates.push(genPirateHuntQuest());
+  if ((state.fame || 0) >= 100) {
+    candidates.push(genBountyHuntQuest());
+  }
+  // 3枠に収める
+  const pool = candidates
+    .slice()
+    .sort(() => Math.random() - 0.5)
+    .slice(0, 3);
   state.quests.availableBySettlement[settlement.id] = pool;
   state.quests.lastSeasonBySettlement[settlement.id] = { year: state.year, season: state.season };
 }
@@ -230,6 +257,9 @@ export function acceptQuest(id, settlement) {
   if (q.type === QUEST_TYPES.DELIVERY) {
     // 配達依頼は受注時に対象物資を受け取る。
     state.supplies[q.itemId] = (state.supplies[q.itemId] ?? 0) + q.qty;
+  }
+  if (q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT) {
+    q.deadlineAbs = now + 45;
   }
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
@@ -348,6 +378,75 @@ function genOracleElite() {
   };
 }
 
+function pickAnchorRange(fame, anchors) {
+  const list = [...anchors].sort((a, b) => a.fame - b.fame);
+  if (fame <= list[0].fame) return { min: list[0].min, max: list[0].max };
+  if (fame >= list[list.length - 1].fame) return { min: list[list.length - 1].min, max: list[list.length - 1].max };
+  for (let i = 0; i < list.length - 1; i++) {
+    const a = list[i];
+    const b = list[i + 1];
+    if (fame >= a.fame && fame <= b.fame) {
+      const t = (fame - a.fame) / Math.max(1, b.fame - a.fame);
+      const lerp = (x, y) => Math.round(x + (y - x) * t);
+      return { min: lerp(a.min, b.min), max: lerp(a.max, b.max) };
+    }
+  }
+  return { min: list[0].min, max: list[0].max };
+}
+
+function predictEnemyTotal(forceStrength) {
+  const fame = Math.max(0, state.fame || 0);
+  const useStrong = forceStrength === "elite";
+  const range = useStrong ? pickAnchorRange(fame, STRONG_ANCHORS) : pickAnchorRange(fame, NORMAL_ANCHORS);
+  return randInt(range.min, range.max);
+}
+
+function genPirateHuntQuest() {
+  const avoid = (state.quests?.active || [])
+    .filter((q) => q.target)
+    .map((q) => q.target);
+  const target = randomHuntTarget(state.position, 3, 7, avoid);
+  const estimatedTotal = predictEnemyTotal("normal");
+  const reward = estimatedTotal * 50 + 100;
+  const rewardFame = Math.floor(estimatedTotal / 2) + 5;
+  return {
+    id: nextId(),
+    type: QUEST_TYPES.PIRATE_HUNT,
+    title: "海賊討伐",
+    target,
+    estimatedTotal,
+    reward,
+    rewardFame,
+    strength: "normal",
+    acceptedAbs: null,
+    deadlineAbs: null,
+    desc: `(${target.x + 1}, ${target.y + 1})で海賊を討伐（推定${estimatedTotal}人）`,
+  };
+}
+
+function genBountyHuntQuest() {
+  const avoid = (state.quests?.active || [])
+    .filter((q) => q.target)
+    .map((q) => q.target);
+  const target = randomHuntTarget(state.position, 3, 7, avoid);
+  const estimatedTotal = predictEnemyTotal("elite");
+  const reward = estimatedTotal * 100 + 100;
+  const rewardFame = Math.floor(estimatedTotal / 2) + 5;
+  return {
+    id: nextId(),
+    type: QUEST_TYPES.BOUNTY_HUNT,
+    title: "賞金首討伐",
+    target,
+    estimatedTotal,
+    reward,
+    rewardFame,
+    strength: "elite",
+    acceptedAbs: null,
+    deadlineAbs: null,
+    desc: `(${target.x + 1}, ${target.y + 1})で賞金首を討伐（推定${estimatedTotal}人 / 強編成）`,
+  };
+}
+
 /**
  * 神託が受注中かどうかを判定する。
  * @returns {boolean}
@@ -452,6 +551,9 @@ export function completeQuest(id) {
     // 討伐系の神託は戦闘勝利時に別途完了させる。
     return false;
   }
+  if (q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT) {
+    return false;
+  }
   if (q.reward) state.funds += q.reward;
   state.quests.active.splice(idx, 1);
   const rewards = [];
@@ -494,6 +596,9 @@ export function canCompleteQuest(q) {
     return Object.values(levels).some((qty) => qty > 0);
   }
   if (q.type === QUEST_TYPES.ORACLE_HUNT || q.type === QUEST_TYPES.ORACLE_ELITE) {
+    return false;
+  }
+  if (q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT) {
     return false;
   }
   return false;
@@ -541,6 +646,39 @@ export function failOracleBattleQuest(id, reason = "") {
 }
 
 /**
+ * 討伐依頼（海賊/賞金首）の達成/失敗を処理する。
+ * @param {number} id
+ * @param {boolean} success
+ * @param {string} [reason]
+ * @returns {boolean}
+ */
+export function completeHuntBattleQuest(id, success, reason = "") {
+  ensureState();
+  const idx = state.quests.active.findIndex(
+    (q) => q.id === id && (q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT)
+  );
+  if (idx === -1) return false;
+  const q = state.quests.active[idx];
+  if (success) {
+    if (q.reward) state.funds += q.reward;
+    if (q.rewardFame) state.fame += q.rewardFame;
+    state.quests.active.splice(idx, 1);
+    const rewards = [];
+    if (q.reward) rewards.push(`資金+${q.reward}`);
+    if (q.rewardFame) rewards.push(`名声+${q.rewardFame}`);
+    const rewardText = rewards.length ? rewards.join(" / ") : "報酬なし";
+    pushLog("討伐達成", `${q.title} / ${rewardText}`, "-");
+    pushToast("討伐達成", `${q.title} / ${rewardText}`, "good");
+  } else {
+    state.quests.active.splice(idx, 1);
+    const note = reason ? ` / ${reason}` : "";
+    pushLog("討伐失敗", `${q.title}${note}`, "-");
+    pushToast("討伐失敗", `${q.title}${note}`, "bad");
+  }
+  return true;
+}
+
+/**
  * 現在位置で討伐系の神託が発動可能か取得する。
  * @param {{x:number,y:number}} pos
  * @returns {object|null}
@@ -551,7 +689,10 @@ export function getOracleBattleAt(pos) {
   return (
     state.quests.active.find(
       (q) =>
-        (q.type === QUEST_TYPES.ORACLE_HUNT || q.type === QUEST_TYPES.ORACLE_ELITE) &&
+        (q.type === QUEST_TYPES.ORACLE_HUNT ||
+          q.type === QUEST_TYPES.ORACLE_ELITE ||
+          q.type === QUEST_TYPES.PIRATE_HUNT ||
+          q.type === QUEST_TYPES.BOUNTY_HUNT) &&
         q.target &&
         q.target.x === pos.x &&
         q.target.y === pos.y
