@@ -276,6 +276,11 @@ function killedEnemyCount(meta) {
     .reduce((s, u) => s + Math.max(0, Math.round(u.count || 0)), 0);
 }
 
+/**
+ * 戦闘結果を処理し、報酬/損耗/依頼・神託の完了/失敗を反映する。
+ * @param {"勝利"|"敗北"|"引き分け"} result
+ * @param {object} meta
+ */
 function processBattleOutcome(result, meta) {
   const enemyTotal = enemyTotalEstimate(meta);
   const fameDelta = Math.floor(enemyTotal / 2);
@@ -400,6 +405,10 @@ function processBattleOutcome(result, meta) {
   syncUI();
 }
 
+/**
+ * pendingEncounterから戦闘を開始する（準備モード→戦闘画面）。
+ * @returns {void}
+ */
 function startPrepBattle() {
   if (!state.pendingEncounter?.active) return;
   setEnemyFormation(state.pendingEncounter.enemyFormation || []);
@@ -412,6 +421,10 @@ function startPrepBattle() {
   syncUI();
 }
 
+/**
+ * 討伐系（依頼/神託）から戦闘を開始する。
+ * @returns {void}
+ */
 function startOracleBattle() {
   if (state.pendingEncounter?.active || state.modeLabel === "戦闘中") return;
   const quest = getOracleBattleAt(state.position);

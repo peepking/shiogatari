@@ -352,7 +352,8 @@ function clearRoster() {
 }
 
 /**
- * ロスターUIを描画する。
+ * ロスターUIを描画する。戦闘開始後は入力・ボタンをロックする。
+ * @returns {void}
  */
 function renderRosterUI() {
   const standbyEl = elements.rosterStandby;
@@ -1375,7 +1376,8 @@ function findUnitAt(x, y) {
 }
 
 /**
- * 戦闘を開始する。
+ * 戦闘を開始する。開始時に編成UIをロックし、タイマーを起動する。
+ * @returns {void}
  */
 function startBattle() {
   if (battleState.running || !battleState.ready) return;
@@ -1402,7 +1404,8 @@ function startBattle() {
 }
 
 /**
- * 戦闘を一時停止する。
+ * 戦闘を一時停止し、UIを更新する。
+ * @returns {void}
  */
 function pauseBattle() {
   battleState.running = false;
@@ -1498,7 +1501,8 @@ function setBattleSpeed(speed) {
 }
 
 /**
- * 戦闘表示を開く。
+ * 戦闘画面を開き、編成・作戦UIを初期化する。
+ * @returns {void}
  */
 function openBattleView() {
   if (elements.mapBlock) elements.mapBlock.hidden = true;
