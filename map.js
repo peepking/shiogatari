@@ -410,7 +410,10 @@ export function renderMap() {
   mapCanvas.width = cells * cellSize + pad * 2;
   mapCanvas.height = cells * cellSize + pad * 2;
   mapCanvas.style.width = "100%";
+  mapCanvas.style.height = "auto";
   const ctx = mapCanvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
   ctx.fillStyle = "#0b1020";
   ctx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
 

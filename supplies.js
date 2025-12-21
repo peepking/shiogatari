@@ -159,7 +159,7 @@ export function renderSupplyModal(detailEl) {
         ${rows || `<tr><td colspan="4" class="ta-center">在庫なし</td></tr>`}
       </tbody>
     </table>
-    <div class="row mt-10 justify-end">
+    <div class="sticky-footer justify-end">
       <button class="btn bad" id="supplyDiscardBtn">選択分を破棄</button>
     </div>
   `;

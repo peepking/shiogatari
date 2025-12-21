@@ -23,12 +23,6 @@
         <!-- LEFT: strategy (battle only) + navigator -->
         <div class="col-stack">
           <section class="card" aria-label="strategy" id="strategyCard" hidden>
-            <div class="hd">
-              <div class="row flex-wrap">
-                <span class="pill">作戦</span>
-                <span class="tiny">戦闘中のみ表示</span>
-              </div>
-            </div>
             <div class="bd">
               <div class="strategy-grid">
                 <div>
@@ -293,12 +287,6 @@
         <!-- THIRD: quests + factions -->
         <div class="col-stack">
           <section class="card" aria-label="battle-info" id="battleInfoCard" hidden>
-            <div class="hd">
-              <div class="row">
-                <span class="pill">戦闘情報</span>
-                <span class="tiny">ホバー/クリックで詳細表示</span>
-              </div>
-            </div>
             <div class="bd">
               <div id="battleInfo" class="battle-info"></div>
               <div class="battle-log mt-10" id="battleLog"></div>
@@ -512,25 +500,27 @@
         <div>物資取引</div>
         <button class="modal-close" id="tradeModalClose">閉じる</button>
       </div>
-      <div class="modal-bd">
-        <div class="table mt-10">
-          <table class="trade-table">
-            <thead>
-              <tr>
-                <th class="ta-left"> </th>
-                <th class="ta-left">品目</th>
-                <th class="ta-center">単価</th>
-                <th class="ta-center">在庫</th>
-                <th class="ta-center">所持数</th>
-                <th class="ta-center">購入</th>
-                <th class="ta-center">売却</th>
-              </tr>
-            </thead>
-            <tbody id="tradeTableBody"></tbody>
-          </table>
+      <div class="modal-bd with-footer">
+        <div class="modal-scroll">
+          <div class="table mt-10">
+            <table class="trade-table">
+              <thead>
+                <tr>
+                  <th class="ta-left"> </th>
+                  <th class="ta-left">品目</th>
+                  <th class="ta-center">単価</th>
+                  <th class="ta-center">在庫</th>
+                  <th class="ta-center">所持数</th>
+                  <th class="ta-center">購入</th>
+                  <th class="ta-center">売却</th>
+                </tr>
+              </thead>
+              <tbody id="tradeTableBody"></tbody>
+            </table>
+          </div>
+          <div id="tradeError" class="msg error mt-10" hidden></div>
         </div>
-        <div id="tradeError" class="msg error mt-10" hidden></div>
-        <div class="row mt-12 gap-12 w-100">
+        <div class="sticky-footer row gap-12 w-100">
           <button class="btn primary" id="tradeConfirm">取引を確定</button>
           <div class="modal-summary">
             <span class="pill">現在の資金: <b id="tradeFunds">0</b></span>
@@ -547,23 +537,25 @@
         <div>船取引</div>
         <button class="modal-close" id="shipTradeModalClose">閉じる</button>
       </div>
-      <div class="modal-bd">
-        <div class="table mt-10">
-          <table class="trade-table">
-            <thead>
-              <tr>
-                <th class="ta-left">品目</th>
-                <th class="ta-center">単価</th>
-                <th class="ta-center">所持数</th>
-                <th class="ta-center">購入</th>
-                <th class="ta-center">売却</th>
-              </tr>
-            </thead>
-            <tbody id="shipTradeTableBody"></tbody>
-          </table>
+      <div class="modal-bd with-footer">
+        <div class="modal-scroll">
+          <div class="table mt-10">
+            <table class="trade-table">
+              <thead>
+                <tr>
+                  <th class="ta-left">品目</th>
+                  <th class="ta-center">単価</th>
+                  <th class="ta-center">所持数</th>
+                  <th class="ta-center">購入</th>
+                  <th class="ta-center">売却</th>
+                </tr>
+              </thead>
+              <tbody id="shipTradeTableBody"></tbody>
+            </table>
+          </div>
+          <div id="shipTradeError" class="msg error mt-10" hidden></div>
         </div>
-        <div id="shipTradeError" class="msg error mt-10" hidden></div>
-        <div class="row mt-12 gap-12 w-100">
+        <div class="sticky-footer row gap-12 w-100">
           <button class="btn primary" id="shipTradeConfirm">取引を確定</button>
           <div class="modal-summary">
             <span class="pill">現在の資金: <b id="shipTradeFunds">0</b></span>
@@ -637,8 +629,10 @@
         <div>物資詳細</div>
         <button class="modal-close" id="suppliesModalClose">閉じる</button>
       </div>
-      <div class="modal-bd">
-        <div class="sbBody" id="suppliesDetail"></div>
+      <div class="modal-bd with-footer">
+        <div class="modal-scroll">
+          <div class="sbBody" id="suppliesDetail"></div>
+        </div>
       </div>
     </div>
   </div>

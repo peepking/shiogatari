@@ -8,6 +8,18 @@
   --accent2: #7dffb2;
   --warn: #ffd27a;
   --bad: #ff7a7a;
+  --space-4: 4px;
+  --space-6: 6px;
+  --space-8: 8px;
+  --space-10: 10px;
+  --space-12: 12px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --wrap-max: 1680px;
+  --wrap-pad: clamp(12px, 1.6vw, 22px);
+  --card-pad: clamp(12px, 1.5vw, 16px);
+  --modal-max-w: min(640px, 96vw);
+  --modal-max-h: 92vh;
 }
 
 * {
@@ -42,28 +54,28 @@ header {
 }
 
 .wrap {
-  width: 90vw;
-  max-width: 1680px;
+  width: min(96vw, var(--wrap-max));
+  max-width: var(--wrap-max);
   margin: 0 auto;
-  padding: 14px 14px 22px;
+  padding: var(--wrap-pad);
 }
 
 h1 {
-  font-size: 18px;
+  font-size: clamp(16px, 2vw, 20px);
   margin: 0;
   letter-spacing: 0.04em;
 }
 
 .sub {
   color: var(--muted);
-  font-size: 12px;
+  font-size: clamp(11px, 1.4vw, 13px);
   margin-top: 6px;
   line-height: 1.4;
 }
 
 .grid {
   display: grid;
-  grid-template-columns: 1.0fr 1.0fr 1.0fr;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
   gap: 14px;
   align-items: start;
 }
@@ -85,22 +97,22 @@ h1 {
       rgba(17, 26, 51, 0.92),
       rgba(17, 26, 51, 0.72));
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: var(--radius-lg);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
   overflow: hidden;
 }
 
 .card .hd {
-  padding: 14px;
+  padding: var(--card-pad);
   border-bottom: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: clamp(6px, 1vw, 10px);
 }
 
 .row {
   display: flex;
-  gap: 8px;
+  gap: clamp(6px, 1vw, 10px);
   align-items: center;
 }
 
@@ -109,7 +121,7 @@ h1 {
 }
 
 .card .bd {
-  padding: 14px;
+  padding: var(--card-pad);
 }
 
 .flex-wrap {
@@ -193,9 +205,9 @@ h1 {
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.05);
   color: var(--text);
-  padding: 8px 10px;
+  padding: clamp(6px, 1vw, 9px) clamp(8px, 1.4vw, 12px);
   border-radius: 10px;
-  font-size: 12px;
+  font-size: clamp(11px, 1.4vw, 13px);
   font-weight: 650;
   cursor: pointer;
   transition: 0.15s transform, 0.15s background, 0.15s border;
@@ -334,7 +346,7 @@ input[type="number"],
 select,
 textarea {
   width: 100%;
-  padding: 10px 12px;
+  padding: clamp(8px, 1.3vw, 12px) clamp(10px, 1.6vw, 14px);
   border-radius: 12px;
   border: 1px solid var(--line);
   background: rgba(255, 255, 255, 0.06);
@@ -352,7 +364,7 @@ textarea {
 }
 
 .modal .modal-bd.scrollable {
-  max-height: 420px;
+  max-height: min(420px, 65vh);
   overflow: auto;
 }
 
@@ -519,7 +531,7 @@ option {
 }
 
 .log {
-  max-height: 420px;
+  max-height: min(420px, 55vh);
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -584,16 +596,16 @@ option {
 .trade-table th,
 .trade-table td {
   border-bottom: 1px solid var(--line);
-  padding: 8px 6px;
+  padding: clamp(6px, 1vw, 8px) clamp(6px, 1vw, 8px);
 }
 
 .trade-table .pad-10 {
-  padding: 10px;
+  padding: clamp(8px, 1.2vw, 10px);
 }
 
 .trade-table {
   width: 100%;
-  font-size: 13px;
+  font-size: clamp(12px, 1.4vw, 13px);
   border-collapse: collapse;
 }
 
@@ -657,17 +669,21 @@ option {
 .modal {
   background: linear-gradient(180deg, rgba(17, 26, 51, 0.96), rgba(17, 26, 51, 0.8));
   border: 1px solid var(--line);
-  border-radius: 16px;
-  width: min(540px, 100%);
+  border-radius: var(--radius-lg);
+  width: var(--modal-max-w);
+  max-height: var(--modal-max-h);
+  display: flex;
+  flex-direction: column;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
 }
 
 .modal.modal-sm {
-  width: min(420px, 100%);
+  width: min(420px, 92vw);
 }
 
 .modal .modal-hd {
-  padding: 14px;
+  padding: var(--card-pad);
   border-bottom: 1px solid var(--line);
   display: flex;
   justify-content: space-between;
@@ -676,11 +692,25 @@ option {
 }
 
 .modal .modal-bd {
-  padding: 14px;
+  padding: var(--card-pad);
+  overflow: auto;
+  flex: 1 1 auto;
+}
+.modal-bd.with-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow: hidden;
+}
+.modal-bd.with-footer .modal-scroll {
+  flex: 1 1 auto;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 #troopsModal .modal {
-  width: min(800px, 98vw);
+  width: min(880px, 98vw);
+  max-height: var(--modal-max-h);
 }
 
 .modal-close {
@@ -894,7 +924,9 @@ option {
 }
 
 #mapCanvas {
-  width: 100%;
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
   height: auto;
   border-radius: 8px;
   display: block;
@@ -903,7 +935,9 @@ option {
 }
 
 #battleCanvas {
-  width: 100%;
+  display: block;
+  margin: 0 auto;
+  max-width: 100%;
   height: auto;
   border-radius: 8px;
   display: block;
@@ -930,7 +964,7 @@ option {
 }
 
 .battle-select {
-  width: 160px;
+  width: clamp(140px, 20vw, 200px);
 }
 
 .battle-select-highlight {
@@ -941,11 +975,12 @@ option {
 .battle-info {
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 8px;
+  padding: clamp(8px, 1vw, 12px);
   background: rgba(0, 0, 0, 0.18);
   font-size: 12px;
   line-height: 1.5;
-  height: 140px;
+  min-height: 120px;
+  max-height: 32vh;
   overflow: auto;
 }
 
@@ -983,7 +1018,7 @@ option {
 }
 
 .roster-list {
-  max-height: 240px;
+  max-height: min(320px, 45vh);
   overflow: auto;
   display: flex;
   flex-direction: column;
@@ -996,13 +1031,13 @@ option {
 
 .roster-row {
   display: grid;
-  grid-template-columns: 1fr 140px;
+  grid-template-columns: 1fr minmax(120px, 0.5fr);
   grid-template-rows: auto auto;
-  gap: 6px 8px;
+  gap: clamp(4px, 1vw, 8px) clamp(6px, 1vw, 10px);
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 8px;
-  padding: 6px;
+  padding: clamp(6px, 1vw, 10px);
   background: rgba(0, 0, 0, 0.08);
 }
 
@@ -1014,7 +1049,7 @@ option {
 
 .roster-controls {
   display: grid;
-  grid-template-columns: 1fr 64px;
+  grid-template-columns: 1fr 48px;
   gap: 6px;
   align-items: center;
 }
@@ -1059,11 +1094,12 @@ option {
 .battle-log {
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 8px;
+  padding: clamp(8px, 1vw, 12px);
   background: rgba(0, 0, 0, 0.18);
   font-size: 12px;
   line-height: 1.5;
-  height: 140px;
+  min-height: 120px;
+  max-height: 32vh;
   overflow: auto;
   white-space: pre-line;
 }
@@ -1101,22 +1137,21 @@ option {
 }
 
 #troopsDetail {
-  max-height: 600px;
+  max-height: min(600px, 80vh);
   overflow: auto;
-  min-width: 720px;
-  width: auto;
-  max-width: 100%;
+  min-width: 0;
+  width: min(100%, 900px);
   box-sizing: border-box;
 }
 
 #troopsDetail .table-scroll {
-  max-height: 420px;
+  max-height: min(420px, 65vh);
   overflow: auto;
   width: 100%;
 }
 
 #troopsDetail .table-scroll table {
-  min-width: 720px;
+  min-width: 640px;
 }
 
 #troopsDetail .col-icon {
@@ -1138,12 +1173,13 @@ option {
 .sticky-footer {
   position: sticky;
   bottom: 0;
-  background: linear-gradient(180deg, transparent, rgba(17, 26, 51, 0.96));
-  padding-top: 10px;
+  background: rgba(17, 26, 51, 0.96);
+  padding: 10px 0 0;
   display: flex;
   width: 100%;
   box-sizing: border-box;
   justify-content: flex-end;
+  border-top: 1px solid var(--line);
 }
 
 .footer {

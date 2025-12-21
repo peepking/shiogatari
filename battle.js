@@ -15,6 +15,32 @@ const MAX_UNIT_COUNT = 10;
 const ATTACK_FX_TTL = 2;
 const DECK_KEY = "deck";
 
+/**
+ * バトルキャンバスを画面幅とDPRに合わせてリサイズする
+ */
+function resizeBattleCanvas() {
+  const canvas = elements.battleCanvas;
+  if (!canvas) return;
+  const size = battleState.size || FIXED_BATTLE_SIZE;
+  const dpr = window.devicePixelRatio || 1;
+  const parentWidth =
+    canvas.parentElement?.clientWidth || canvas.clientWidth || canvas.width || 640;
+  // 親幅いっぱいに合わせ、ズーム/全体でサイズを変えない
+  const drawSize = parentWidth;
+  const cellDisplay = Math.max(24, Math.floor(drawSize / size));
+  canvas.style.width = `${drawSize}px`;
+  canvas.style.height = `${drawSize}px`;
+  canvas.width = Math.floor(drawSize * dpr);
+  canvas.height = Math.floor(drawSize * dpr);
+  if (!battleState.ctx) battleState.ctx = canvas.getContext("2d");
+  battleState.dpr = dpr;
+  battleState.cellDisplay = cellDisplay;
+  if (battleState.ctx) {
+    battleState.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    battleState.ctx.clearRect(0, 0, drawSize, drawSize);
+  }
+}
+
 const TERRAIN_KINDS = [
   { key: "sea", name: "海", color: "#0f4c81" },
   { key: "forest", name: "森", color: "#16603a" },
@@ -1257,12 +1283,17 @@ function updateBattleButtons() {
  * 戦闘UIを描画する。
  */
 function renderBattle() {
-  const ctx = battleState.ctx;
   const canvas = elements.battleCanvas;
-  if (!ctx || !canvas) return;
+  if (!canvas) return;
+  resizeBattleCanvas();
+  const ctx = battleState.ctx;
+  if (!ctx) return;
   const size = battleState.size;
-  const cell = canvas.width / size;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const dpr = battleState.dpr || 1;
+  const drawSize = (canvas.width || 0) / dpr;
+  const cell = drawSize / size;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, drawSize, drawSize);
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const terrainKey = battleState.grid[y]?.[x];
@@ -1272,16 +1303,16 @@ function renderBattle() {
     }
   }
   ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
-  ctx.lineWidth = 1;
+  ctx.lineWidth = Math.max(1, Math.floor(cell * 0.06));
   for (let i = 0; i <= size; i++) {
     const pos = i * cell;
     ctx.beginPath();
     ctx.moveTo(pos, 0);
-    ctx.lineTo(pos, canvas.height);
+    ctx.lineTo(pos, drawSize);
     ctx.stroke();
     ctx.beginPath();
     ctx.moveTo(0, pos);
-    ctx.lineTo(canvas.width, pos);
+    ctx.lineTo(drawSize, pos);
     ctx.stroke();
   }
   const alive = battleState.units.filter((u) => u.hp > 0);
@@ -1543,6 +1574,7 @@ function closeBattleView() {
 export function wireBattleUI() {
   if (!elements.battleCanvas) return;
   battleState.ctx = elements.battleCanvas.getContext("2d");
+  resizeBattleCanvas();
   resetRoster();
   renderRosterUI();
   elements.battleBtn?.addEventListener("click", openBattleView);
