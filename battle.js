@@ -385,7 +385,7 @@ function renderRosterUI() {
   const standbyEl = elements.rosterStandby;
   const sortieEl = elements.rosterSortie;
   const countEl = elements.rosterCount;
-  const disableAll = battleState.running;
+  const disableAll = battleState.running || !!battleState.result;
   const sortieCount = battleRoster.sortie.length;
   if (countEl) countEl.textContent = `${sortieCount}/10`;
   const sortieFull = sortieCount >= 10;
@@ -813,8 +813,21 @@ function applyCustomDraftToAllies(map) {
  * フォーメーションUIの表示状態を同期する。
  */
 function syncFormationUI() {
-  if (elements.battleFormationSelect) elements.battleFormationSelect.value = battleState.allyFormation;
-  if (elements.battleFormationSave) elements.battleFormationSave.hidden = !battleState.editing;
+  const lock = battleState.running || !!battleState.result;
+  if (elements.battleFormationSelect) {
+    elements.battleFormationSelect.value = battleState.allyFormation;
+    elements.battleFormationSelect.disabled = lock;
+    elements.battleFormationSelect.setAttribute("aria-disabled", String(lock));
+  }
+  if (elements.battleFormationApply) {
+    elements.battleFormationApply.disabled = lock;
+    elements.battleFormationApply.setAttribute("aria-disabled", String(lock));
+  }
+  if (elements.battleFormationSave) {
+    elements.battleFormationSave.hidden = !battleState.editing;
+    elements.battleFormationSave.disabled = lock;
+    elements.battleFormationSave.setAttribute("aria-disabled", String(lock));
+  }
 }
 
 /**
@@ -1277,6 +1290,7 @@ function updateBattleButtons() {
   if (elements.battlePauseBtn) elements.battlePauseBtn.disabled = !battleState.running;
   if (elements.battleBackBtn)
     elements.battleBackBtn.disabled = !battleState.result;
+  syncFormationUI();
 }
 
 /**
@@ -1753,6 +1767,7 @@ export function wireBattleUI() {
     renderBattle();
   });
   elements.battleFormationApply?.addEventListener("click", () => {
+    if (battleState.running || battleState.result) return;
     const val = elements.battleFormationSelect?.value || "balance";
     battleState.allyFormation = val;
     battleState.selectedUnitId = null;
@@ -1770,6 +1785,7 @@ export function wireBattleUI() {
     updateBattleInfo();
   });
   elements.battleFormationSelect?.addEventListener("change", () => {
+    if (battleState.running || battleState.result) return;
     const val = elements.battleFormationSelect?.value || "balance";
     battleState.allyFormation = val;
     battleState.editing = false;
@@ -1778,6 +1794,7 @@ export function wireBattleUI() {
     syncFormationUI();
   });
   elements.battleFormationSave?.addEventListener("click", () => {
+    if (battleState.running || battleState.result) return;
     // 保存ボタンは編集中のみ有効
     if (!battleState.editing || battleState.allyFormation !== "custom") return;
     battleState.customSlots = { ...battleState.customSlotsDraft };
