@@ -652,34 +652,37 @@ function updateMapInfo(hoverText) {
 export function wireMapHover() {
   const { mapCanvas } = elements;
   if (!mapCanvas) return;
-  mapCanvas.addEventListener("mousemove", (e) => {
-    const rect = mapCanvas.getBoundingClientRect();
-    const cells = state.mapMode === "zoom" ? MAP_ZOOM : MAP_SIZE;
-    const scaleX = rect.width / mapCanvas.width;
-    const pad = MAP_PAD * scaleX;
-    const cell = (rect.width - pad * 2) / cells;
-    const localX = Math.floor((e.clientX - rect.left - pad) / cell);
-    const localY = Math.floor((e.clientY - rect.top - pad) / cell);
-    if (localX < 0 || localY < 0 || localX >= cells || localY >= cells) {
-      updateMapInfo("");
-      return;
-    }
-    const startX =
-      state.mapMode === "zoom"
-        ? clamp(state.position.x - Math.floor(MAP_ZOOM / 2), 0, MAP_SIZE - MAP_ZOOM)
-        : 0;
-    const startY =
-      state.mapMode === "zoom"
-        ? clamp(state.position.y - Math.floor(MAP_ZOOM / 2), 0, MAP_SIZE - MAP_ZOOM)
-        : 0;
-    const gx = startX + localX;
-    const gy = startY + localY;
-    updateMapInfo(formatCellInfo(gx, gy));
-  });
+  const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+  if (!isTouch) {
+    mapCanvas.addEventListener("mousemove", (e) => {
+      const rect = mapCanvas.getBoundingClientRect();
+      const cells = state.mapMode === "zoom" ? MAP_ZOOM : MAP_SIZE;
+      const scaleX = rect.width / mapCanvas.width;
+      const pad = MAP_PAD * scaleX;
+      const cell = (rect.width - pad * 2) / cells;
+      const localX = Math.floor((e.clientX - rect.left - pad) / cell);
+      const localY = Math.floor((e.clientY - rect.top - pad) / cell);
+      if (localX < 0 || localY < 0 || localX >= cells || localY >= cells) {
+        updateMapInfo("");
+        return;
+      }
+      const startX =
+        state.mapMode === "zoom"
+          ? clamp(state.position.x - Math.floor(MAP_ZOOM / 2), 0, MAP_SIZE - MAP_ZOOM)
+          : 0;
+      const startY =
+        state.mapMode === "zoom"
+          ? clamp(state.position.y - Math.floor(MAP_ZOOM / 2), 0, MAP_SIZE - MAP_ZOOM)
+          : 0;
+      const gx = startX + localX;
+      const gy = startY + localY;
+      updateMapInfo(formatCellInfo(gx, gy));
+    });
 
-  mapCanvas.addEventListener("mouseleave", () => {
-    updateMapInfo("");
-  });
+    mapCanvas.addEventListener("mouseleave", () => {
+      updateMapInfo("");
+    });
+  }
 
   mapCanvas.addEventListener("click", (e) => {
     const rect = mapCanvas.getBoundingClientRect();

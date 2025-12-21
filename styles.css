@@ -211,6 +211,7 @@ h1 {
   font-weight: 650;
   cursor: pointer;
   transition: 0.15s transform, 0.15s background, 0.15s border;
+  touch-action: manipulation;
 }
 
 .btn:hover {
