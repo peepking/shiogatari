@@ -792,6 +792,8 @@ function wireButtons() {
   document.getElementById("resetBtn")?.addEventListener("click", () => {
     if (!confirm("状態とログをリセットしますか？")) return;
     resetState();
+    seedInitialQuests();
+    ensureSeasonalQuests(getCurrentSettlement());
     resetEncounterMeter();
     if (elements.logEl) elements.logEl.innerHTML = "";
     setOutput("次の操作", "状況を選んで、1D6を振ってください", [
