@@ -150,10 +150,6 @@ export function moveToSelected(showActionMessage, syncUI) {
     showActionMessage?.("戦闘中は移動できません。地図に戻ってください。", "warn");
     return false;
   }
-  if (state.modeLabel === "村の中" || state.modeLabel === "街の中") {
-    showActionMessage?.("今は移動できません。村/街を出てから移動してください。", "error");
-    return false;
-  }
   // 物資/部隊が上限を超えている場合は移動を封じ、破棄/解雇を促す。
   const supplyTotal = totalSupplies();
   const supplyCap = calcSupplyCap(state.ships);
@@ -191,6 +187,13 @@ export function moveToSelected(showActionMessage, syncUI) {
     ]);
     showActionMessage?.("移動できるのは上下左右1マス以内です。", "error");
     return false;
+  }
+  // 拠点内なら自動で外へ出る
+  if (state.modeLabel === "村の中") {
+    state.modeLabel = "通常";
+  }
+  if (state.modeLabel === "街の中") {
+    state.modeLabel = "通常";
   }
   state.position = { ...dest };
   advanceDayWithEvents(1);
