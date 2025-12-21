@@ -71,17 +71,13 @@ export function renderQuestUI(syncUI) {
                         : "";
       const canFinish = remain == null ? canCompleteQuest(q) : remain >= 0 && canCompleteQuest(q);
       const rewardExtra =
-        q.type === QUEST_TYPES.SUPPLY || q.type === QUEST_TYPES.DELIVERY
-          ? `名声+${q.rewardFame ?? 0}`
-        : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
-          ? `名声+${q.rewardFame ?? Math.floor((q.estimatedTotal || 0) / 2)}`
-          : q.type === QUEST_TYPES.ORACLE_HUNT ||
-              q.type === QUEST_TYPES.ORACLE_ELITE ||
-              q.type === QUEST_TYPES.ORACLE_SUPPLY ||
-              q.type === QUEST_TYPES.ORACLE_MOVE ||
-              q.type === QUEST_TYPES.ORACLE_TROOP
-            ? `信仰+${q.rewardFaith ?? 0}`
-            : "";
+        q.type === QUEST_TYPES.ORACLE_HUNT ||
+        q.type === QUEST_TYPES.ORACLE_ELITE ||
+        q.type === QUEST_TYPES.ORACLE_SUPPLY ||
+        q.type === QUEST_TYPES.ORACLE_MOVE ||
+        q.type === QUEST_TYPES.ORACLE_TROOP
+          ? `信仰+${q.rewardFaith ?? 0}`
+          : "";
       return `
         <div class="sideBlock mb-8">
           <div class="sbTitle sbTitle-quest">

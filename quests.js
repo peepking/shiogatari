@@ -1,4 +1,4 @@
-import { state } from "./state.js";
+﻿import { state } from "./state.js";
 import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 import { settlements, getSettlementAtPosition } from "./map.js";
 import { pushLog, pushToast } from "./dom.js";
@@ -172,9 +172,9 @@ function generateSeasonQuestsForSettlement(settlement) {
   candidates.push(genSupplyQuest(settlement));
   candidates.push(genDeliveryQuest(settlement));
   candidates.push(Math.random() > 0.5 ? genSupplyQuest(settlement) : genDeliveryQuest(settlement));
-  candidates.push(genPirateHuntQuest());
+  candidates.push(genPirateHuntQuest(settlement));
   if ((state.fame || 0) >= 100) {
-    candidates.push(genBountyHuntQuest());
+    candidates.push(genBountyHuntQuest(settlement));
   }
   // 3枠に収める
   const pool = candidates
@@ -401,9 +401,8 @@ function predictEnemyTotal(forceStrength) {
   return randInt(range.min, range.max);
 }
 
-function genPirateHuntQuest() {
-  // 依頼を受けた拠点を基準にターゲットを決定する
-  const origin = state.selectedSettlement || state.position;
+function genPirateHuntQuest(settlement) {
+  const origin = settlement?.coords || state.position;
   const avoid = (state.quests?.active || [])
     .filter((q) => q.target)
     .map((q) => q.target);
@@ -422,13 +421,12 @@ function genPirateHuntQuest() {
     strength: "normal",
     acceptedAbs: null,
     deadlineAbs: null,
-    desc: `(${target.x + 1}, ${target.y + 1})で海賊を討伐（推定${estimatedTotal}人）`,
+    desc: `(${target.x + 1}, ${target.y + 1})で海賊を討伐（推定${estimatedTotal}人程度）`,
   };
 }
 
-function genBountyHuntQuest() {
-  // 依頼を受けた拠点を基準にターゲットを決定する
-  const origin = state.selectedSettlement || state.position;
+function genBountyHuntQuest(settlement) {
+  const origin = settlement?.coords || state.position;
   const avoid = (state.quests?.active || [])
     .filter((q) => q.target)
     .map((q) => q.target);
@@ -733,3 +731,4 @@ export function questTickDay(days = 1) {
 }
 
 export { QUEST_TYPES };
+
