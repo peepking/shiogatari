@@ -1559,6 +1559,8 @@ function openBattleView() {
   if (!battleState.battleTerrain) {
     battleState.battleTerrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   }
+  battleState.running = false;
+  battleState.result = "";
   battleState.editing = false;
   resetRoster();
   renderRosterUI();
@@ -1571,6 +1573,8 @@ function openBattleView() {
  */
 function closeBattleView() {
   pauseBattle();
+  battleState.running = false;
+  battleState.result = "";
   if (elements.battleBlock) elements.battleBlock.hidden = true;
   if (elements.mapBlock) elements.mapBlock.hidden = false;
   if (elements.battleInfoCard) elements.battleInfoCard.hidden = true;
