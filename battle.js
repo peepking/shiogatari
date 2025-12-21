@@ -12,6 +12,7 @@ const MELEE_SEARCH_RANGE = 3;
 const TARGET_SWITCH_RATIO = 1.5;
 const SPEED_OPTIONS = [1, 2, 4];
 const MAX_UNIT_COUNT = 10;
+const MAX_SQUADS = 20;
 const ATTACK_FX_TTL = 2;
 const DECK_KEY = "deck";
 
@@ -311,11 +312,11 @@ function pushToStandby(type, count, level) {
 }
 
 /**
- * 出撃部隊一覧を返す（最大10件）。
+ * 出撃部隊一覧を返す（最大20件）。
  * @returns {Array<{type:string,count:number}>}
  */
 function getSortieEntries() {
-  return battleRoster.sortie.slice(0, 10);
+  return battleRoster.sortie.slice(0, MAX_SQUADS);
 }
 
 /**
@@ -346,26 +347,28 @@ function autoWeight(type) {
 function autoDeployRoster() {
   resetRoster();
   const totals = standbyTotals();
-  const entries = Object.entries(totals)
+  // 部隊（最大10人）チャンク単位で重み付けし、強い順に詰める
+  const chunks = Object.entries(totals)
     .filter(([, cnt]) => cnt > 0)
-    .map(([type, cnt]) => {
+    .flatMap(([type, cnt]) => {
       const avgLv = standbyAverageLevel(type);
-      const weight = autoWeight(type) * (1 + 0.1 * (avgLv - 1));
-      return { type, count: cnt, weight };
+      const base = autoWeight(type) * (1 + 0.1 * (avgLv - 1));
+      const slotCount = Math.ceil(cnt / MAX_UNIT_COUNT);
+      return Array.from({ length: slotCount }, (_, i) => {
+        const remain = cnt - i * MAX_UNIT_COUNT;
+        const chunk = Math.min(MAX_UNIT_COUNT, Math.max(1, remain));
+        return { type, size: chunk, weight: base * chunk, avgLv };
+      });
     })
-    .sort((a, b) => b.weight - a.weight);
+    .sort((a, b) => b.weight - a.weight || b.size - a.size);
 
   battleRoster.sortie = [];
   // standbyは takeFromStandby が直接更新するので既存を再利用
-  for (const e of entries) {
-    let remain = e.count;
-    while (remain > 0 && battleRoster.sortie.length < 10) {
-      const take = Math.min(10, remain);
-      const pulled = takeFromStandby(e.type, take);
-      if (pulled.count <= 0) break;
-      battleRoster.sortie.push({ type: e.type, count: pulled.count, level: pulled.level });
-      remain -= pulled.count;
-    }
+  for (const chunk of chunks) {
+    if (battleRoster.sortie.length >= MAX_SQUADS) break;
+    const pulled = takeFromStandby(chunk.type, chunk.size);
+    if (pulled.count <= 0) continue;
+    battleRoster.sortie.push({ type: chunk.type, count: pulled.count, level: pulled.level });
   }
   // standby は takeFromStandby が既に減算済み
 }
@@ -387,8 +390,8 @@ function renderRosterUI() {
   const countEl = elements.rosterCount;
   const disableAll = battleState.running || !!battleState.result;
   const sortieCount = battleRoster.sortie.length;
-  if (countEl) countEl.textContent = `${sortieCount}/10`;
-  const sortieFull = sortieCount >= 10;
+  if (countEl) countEl.textContent = `${sortieCount}/${MAX_SQUADS}`;
+  const sortieFull = sortieCount >= MAX_SQUADS;
   if (elements.rosterApply) elements.rosterApply.disabled = sortieCount === 0 || disableAll;
 
   // 合計人数を先に算出
@@ -1635,7 +1638,7 @@ export function wireBattleUI() {
     const type = row.getAttribute("data-type");
     const max = Number(row.getAttribute("data-count") || 0);
     if (!type || max <= 0) return;
-    if (battleRoster.sortie.length >= 10) return;
+    if (battleRoster.sortie.length >= MAX_SQUADS) return;
     const slider = row.querySelector(".roster-slider");
     const number = row.querySelector(".roster-number");
     const val = Math.max(

@@ -4,7 +4,7 @@ import { pushLog, pushToast, confirmAction } from "./dom.js";
 /** @type {number} 基本の部隊上限 */
 export const BASE_TROOP_CAP = 30;
 /** @type {number} 船1隻あたりの部隊上限増分 */
-export const CAP_PER_SHIP = 20;
+export const CAP_PER_SHIP = 15;
 
 /** @type {object} 兵種の定義 */
 export const TROOP_STATS = {
@@ -40,21 +40,21 @@ export const TROOP_STATS = {
     name: "海兵",
     hire: 150,
     upkeep: 3,
-    basePower: 150,
-    hp: 110,
-    atk: 28,
+    basePower: 120,
+    hp: 120,
+    atk: 30,
     def: 18,
     spd: 2,
     range: 1,
     move: 1,
-    terrain: { plain: 100, forest: 100, mountain: 100, shoal: 120, sea: 130 },
+    terrain: { plain: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 },
     level: 1,
   },
   archer: {
     name: "弓兵",
     hire: 150,
     upkeep: 3,
-    basePower: 150,
+    basePower: 120,
     hp: 80,
     atk: 30,
     def: 8,
@@ -82,7 +82,7 @@ export const TROOP_STATS = {
     name: "騎兵",
     hire: 200,
     upkeep: 4,
-    basePower: 200,
+    basePower: 150,
     hp: 130,
     atk: 34,
     def: 18,
@@ -96,7 +96,7 @@ export const TROOP_STATS = {
     name: "弩兵",
     hire: 180,
     upkeep: 3,
-    basePower: 170,
+    basePower: 130,
     hp: 85,
     atk: 40,
     def: 8,
@@ -124,14 +124,14 @@ export const TROOP_STATS = {
     name: "海弓兵",
     hire: 170,
     upkeep: 3,
-    basePower: 150,
-    hp: 85,
+    basePower: 130,
+    hp: 90,
     atk: 30,
     def: 10,
     spd: 3,
     range: 4,
     move: 1,
-    terrain: { plain: 100, forest: 100, mountain: 100, shoal: 120, sea: 130 },
+    terrain: { plain: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 },
     level: 1,
   },
 };
