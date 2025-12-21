@@ -340,7 +340,7 @@ function genOracleHunt() {
   const avoid = (state.quests?.active || [])
     .filter((q) => q.target)
     .map((q) => q.target);
-  const target = randomHuntTarget(state.position, 3, 7, avoid);
+  const target = randomHuntTarget(state.position, 2, 5, avoid);
   const rewardFaith = rollDice(5, 4);
   return {
     id: nextId(),
@@ -363,7 +363,7 @@ function genOracleElite() {
   const avoid = (state.quests?.active || [])
     .filter((q) => q.target)
     .map((q) => q.target);
-  const target = randomHuntTarget(state.position, 3, 7, avoid);
+  const target = randomHuntTarget(state.position, 2, 5, avoid);
   const rewardFaith = rollDice(5, 5);
   return {
     id: nextId(),
@@ -402,10 +402,12 @@ function predictEnemyTotal(forceStrength) {
 }
 
 function genPirateHuntQuest() {
+  // 依頼を受けた拠点を基準にターゲットを決定する
+  const origin = state.selectedSettlement || state.position;
   const avoid = (state.quests?.active || [])
     .filter((q) => q.target)
     .map((q) => q.target);
-  const target = randomHuntTarget(state.position, 3, 7, avoid);
+  const target = randomHuntTarget(origin, 2, 5, avoid);
   const estimatedTotal = predictEnemyTotal("normal");
   const reward = estimatedTotal * 50 + 100;
   const rewardFame = Math.floor(estimatedTotal / 2) + 5;
@@ -425,10 +427,12 @@ function genPirateHuntQuest() {
 }
 
 function genBountyHuntQuest() {
+  // 依頼を受けた拠点を基準にターゲットを決定する
+  const origin = state.selectedSettlement || state.position;
   const avoid = (state.quests?.active || [])
     .filter((q) => q.target)
     .map((q) => q.target);
-  const target = randomHuntTarget(state.position, 3, 7, avoid);
+  const target = randomHuntTarget(origin, 2, 5, avoid);
   const estimatedTotal = predictEnemyTotal("elite");
   const reward = estimatedTotal * 100 + 100;
   const rewardFame = Math.floor(estimatedTotal / 2) + 5;
