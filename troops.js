@@ -328,7 +328,7 @@ export function applyTroopLosses(losses) {
  */
 export function addTroops(type, level, qty) {
   if (!type || qty <= 0) return;
-  const lvl = Math.max(1, Math.round(level || 1));
+  const lvl = Math.min(5, Math.max(1, Math.round(level || 1)));
   if (!state.troops[type]) state.troops[type] = {};
   if (typeof state.troops[type] === "number") {
     state.troops[type] = { [lvl]: (state.troops[type] || 0) + qty };
@@ -355,7 +355,8 @@ export function levelUpTroopsRandom(upCount) {
       }
       Object.entries(levels || {}).forEach(([lvl, cnt]) => {
         const c = Number(cnt || 0);
-        if (c > 0) entries.push({ type, lvl: Number(lvl), count: c });
+        const levelNum = Number(lvl);
+        if (c > 0 && levelNum < 5) entries.push({ type, lvl: levelNum, count: c });
       });
     });
     return entries;
@@ -379,11 +380,12 @@ export function levelUpTroopsRandom(upCount) {
     // 1人分をレベルアップ移動
     const bucket = state.troops[target.type];
     if (typeof bucket === "number") {
-      state.troops[target.type] = { 1: bucket - 1, [target.lvl + 1]: 1 + ((state.troops[target.type] || {})[target.lvl + 1] || 0) };
+      const nextLvl = Math.min(5, target.lvl + 1);
+      state.troops[target.type] = { 1: bucket - 1, [nextLvl]: 1 + ((state.troops[target.type] || {})[nextLvl] || 0) };
     } else if (bucket) {
       bucket[target.lvl] = Math.max(0, (bucket[target.lvl] || 0) - 1);
       if (bucket[target.lvl] <= 0) delete bucket[target.lvl];
-      const nextLvl = target.lvl + 1;
+      const nextLvl = Math.min(5, target.lvl + 1);
       bucket[nextLvl] = (bucket[nextLvl] || 0) + 1;
       if (!Object.keys(bucket).length) delete state.troops[target.type];
     }
