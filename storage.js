@@ -18,9 +18,13 @@ function simpleHash(str) {
 
 /**
  * ゲーム状態をローカルストレージへ保存する。
+ * 戦闘準備/戦闘中など不安定なタイミングではスキップする。
+ * @param {boolean} [force=false] trueなら強制保存
  * @returns {boolean}
  */
-export function saveGameToStorage() {
+export function saveGameToStorage(force = false) {
+  const unsafe = state.modeLabel === "戦闘中" || state.pendingEncounter?.active;
+  if (!force && unsafe) return false;
   try {
     const data = {
       state,
