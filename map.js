@@ -713,7 +713,7 @@ export function wireMapHover() {
     updateMapInfo(formatCellInfo(gx, gy));
     if (sameSelection) {
       if (isCurrent) {
-        document.dispatchEvent(new CustomEvent("map-wait-request"));
+        return;
       } else {
         const dx = Math.abs(state.position.x - gx);
         const dy = Math.abs(state.position.y - gy);
