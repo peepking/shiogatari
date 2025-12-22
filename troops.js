@@ -291,7 +291,7 @@ export function totalTroops(troops = state.troops) {
 }
 
 /**
- * 損耗を兵種ごとに適用する（高レベルから優先して減算）。
+ * 損耗を兵種ごとに適用する
  * @param {Record<string, number>} losses
  */
 export function applyTroopLosses(losses) {
@@ -305,17 +305,27 @@ export function applyTroopLosses(losses) {
       return;
     }
     const levels = bucket || {};
-    const levelKeys = Object.keys(levels)
-      .map((k) => Number(k))
-      .sort((a, b) => b - a);
-    for (const lvl of levelKeys) {
+    // ランダムにレベルを選んで減算する（加重ランダム）
+    const pickLevel = () => {
+      const entries = Object.entries(levels).map(([lvl, qty]) => [Number(lvl), Number(qty || 0)]);
+      const total = entries.reduce((s, [, q]) => s + q, 0);
+      if (total <= 0) return null;
+      let roll = Math.random() * total;
+      for (const [lvl, qty] of entries) {
+        roll -= qty;
+        if (roll <= 0) return lvl;
+      }
+      return entries[entries.length - 1][0];
+    };
+    while (remain > 0 && Object.keys(levels).length) {
+      const lvl = pickLevel();
+      if (lvl === null) break;
       const qty = levels[lvl] || 0;
-      const take = Math.min(qty, remain);
-      levels[lvl] = qty - take;
-      remain -= take;
+      levels[lvl] = qty - 1;
+      remain -= 1;
       if (levels[lvl] <= 0) delete levels[lvl];
-      if (remain <= 0) break;
     }
+    // safety: if remain still >0 but no levels, clear type
     if (!Object.keys(levels).length) delete state.troops[type];
   });
 }
