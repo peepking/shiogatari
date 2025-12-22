@@ -370,6 +370,11 @@ function genOracleElite() {
   };
 }
 
+/**
+ * 推定的総数を返す
+ * @param {String} forceStrength 
+ * @returns {number}
+ */
 function predictEnemyTotal(forceStrength) {
   const fame = Math.max(0, state.fame || 0);
   const useStrong = forceStrength === "elite";
@@ -377,6 +382,11 @@ function predictEnemyTotal(forceStrength) {
   return randInt(range.min, range.max);
 }
 
+/**
+ * 海賊討伐依頼を生成
+ * @param {object} settlement 
+ * @returns {object}
+ */
 function genPirateHuntQuest(settlement) {
   const origin = settlement?.coords || state.position;
   const avoid = (state.quests?.active || [])
@@ -401,6 +411,11 @@ function genPirateHuntQuest(settlement) {
   };
 }
 
+/**
+ * 賞金首討伐依頼を生成
+ * @param {object} settlement 
+ * @returns {object}
+ */
 function genBountyHuntQuest(settlement) {
   const origin = settlement?.coords || state.position;
   const avoid = (state.quests?.active || [])
