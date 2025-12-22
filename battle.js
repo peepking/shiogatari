@@ -1741,9 +1741,22 @@ export function wireBattleUI() {
         }
         return;
       }
-      // 選択中で別ユニットをクリックした場合は選択を切り替え
+      // 選択中で別ユニットをクリックした場合は位置を入れ替える
       if (unitAt && unitAt.id !== battleState.selectedUnitId) {
-        battleState.selectedUnitId = unitAt.id;
+        const slotIndexFor = (uid) => {
+          if (typeof battleState.customSlotsDraft[uid] === "number") return battleState.customSlotsDraft[uid];
+          const u = allies.find((x) => x.id === uid);
+          if (!u) return -1;
+          return slots.findIndex((s) => s.x === u.x && s.y === u.y);
+        };
+        const selSlot = slotIndexFor(battleState.selectedUnitId);
+        const targetSlot = slotIndexFor(unitAt.id);
+        if (selSlot >= 0 && targetSlot >= 0) {
+          battleState.customSlotsDraft[battleState.selectedUnitId] = targetSlot;
+          battleState.customSlotsDraft[unitAt.id] = selSlot;
+          applyCustomDraftToAllies(battleState.customSlotsDraft);
+        }
+        battleState.selectedUnitId = battleState.selectedUnitId;
         renderCustomEditor();
         renderBattle();
         updateBattleInfo();
@@ -1817,6 +1830,7 @@ export function wireBattleUI() {
     if (!battleState.editing || battleState.allyFormation !== "custom") return;
     battleState.customSlots = { ...battleState.customSlotsDraft };
     battleState.editing = false;
+    battleState.selectedUnitId = null;
     resetBattle();
     renderCustomEditor();
   });
