@@ -25,6 +25,12 @@ const STRONG_ANCHORS = [
 
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 
+/**
+ * 名声に近いアンカーから人数レンジを補間して取得する。
+ * @param {number} fame 名声
+ * @param {Array<{fame:number,min:number,max:number}>} anchors アンカー配列
+ * @returns {{min:number,max:number}} 人数レンジ
+ */
 function pickAnchorRange(fame, anchors) {
   const list = [...anchors].sort((a, b) => a.fame - b.fame);
   if (fame <= list[0].fame) return { min: list[0].min, max: list[0].max };
@@ -42,11 +48,20 @@ function pickAnchorRange(fame, anchors) {
   return { min: list[0].min, max: list[0].max };
 }
 
+/**
+ * エンカウント進捗と閾値をリセットする。
+ * @returns {void}
+ */
 export function resetEncounterMeter() {
   state.encounterProgress = 0;
   state.encounterThreshold = randInt(ENCOUNTER_MIN, ENCOUNTER_MAX);
 }
 
+/**
+ * 名声と強敵フラグから敵編成を生成する。
+ * @param {"normal"|"elite"|null} forceStrength 強敵プール強制指定
+ * @returns {{formation:Array, total:number, strength:string, terrain?:string}} 生成結果
+ */
 export function buildEnemyFormation(forceStrength) {
   const fame = Math.max(0, state.fame || 0);
   const useStrong =
@@ -77,6 +92,11 @@ export function buildEnemyFormation(forceStrength) {
   return { formation, total, strength: useStrong ? "elite" : "normal" };
 }
 
+/**
+ * エンカウントを発火し、戦闘準備モードへ遷移する。
+ * @param {Function} syncUI UI同期関数
+ * @returns {void}
+ */
 function triggerEncounter(syncUI) {
   const { formation, total, strength } = buildEnemyFormation();
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
@@ -105,6 +125,11 @@ function triggerEncounter(syncUI) {
   syncUI?.();
 }
 
+/**
+ * 移動進捗に応じてエンカウントをチェックする。
+ * @param {Function} syncUI UI同期関数
+ * @returns {boolean} 発生したか
+ */
 function maybeTriggerEncounter(syncUI) {
   if (state.pendingEncounter?.active) return false;
   const loc = getLocationStatus();
@@ -121,9 +146,9 @@ function maybeTriggerEncounter(syncUI) {
 }
 
 /**
- * 移動が可能か（上下左右1マス）を判定する。
- * @param {{x:number,y:number}} from
- * @param {{x:number,y:number}} to
+ * マップ境界内への移動か判定する。
+ * @param {{x:number,y:number}} from 現在位置
+ * @param {{x:number,y:number}} to 目標位置
  * @returns {boolean}
  */
 export function isValidMove(from, to) {
@@ -137,10 +162,10 @@ export function isValidMove(from, to) {
 }
 
 /**
- * 選択マスへ移動し、可能なら1日進める。
- * @param {Function} showActionMessage
- * @param {Function} syncUI
- * @returns {boolean}
+ * 選択したマスへ移動し、エンカウントやUI更新を行う。
+ * @param {Function} showActionMessage アクションメッセージ表示
+ * @param {Function} syncUI UI同期関数
+ * @returns {boolean} 移動成功か
  */
 export function moveToSelected(showActionMessage, syncUI) {
   if (state.pendingEncounter?.active) {
@@ -210,11 +235,11 @@ export function moveToSelected(showActionMessage, syncUI) {
 }
 
 /**
- * 村/街に入る処理を行い、モードを更新する。
- * @param {"village"|"town"} target
- * @param {Function} clearActionMessage
- * @param {Function} syncUI
- * @returns {boolean}
+ * 村/街への入場を試みる。
+ * @param {"village"|"town"} target 入場先種別
+ * @param {Function} clearActionMessage 表示中のメッセージを消す
+ * @param {Function} syncUI UI同期関数
+ * @returns {boolean} 入場できたか
  */
 export function attemptEnter(target, clearActionMessage, syncUI) {
   const loc = getLocationStatus();
@@ -240,13 +265,13 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
 }
 
 /**
- * 村/街から出る処理を行い、通常モードへ戻す。
- * @param {"village"|"town"} target
- * @param {object} elements
- * @param {Function} clearActionMessage
- * @param {Function} setTradeError
- * @param {Function} syncUI
- * @returns {boolean}
+ * 村/街から出る処理を行い通常モードへ戻す。
+ * @param {"village"|"town"} target 退出対象
+ * @param {object} elements DOM要素群
+ * @param {Function} clearActionMessage メッセージ消去
+ * @param {Function} setTradeError 取引エラー設定
+ * @param {Function} syncUI UI同期
+ * @returns {boolean} 退出できたか
  */
 export function attemptExit(target, elements, clearActionMessage, setTradeError, syncUI) {
   const label = target === "village" ? MODE_LABEL.IN_VILLAGE : MODE_LABEL.IN_TOWN;
@@ -273,10 +298,11 @@ export function attemptExit(target, elements, clearActionMessage, setTradeError,
 }
 
 /**
- * 移動せずに1日進める。
- * @param {object} elements
- * @param {Function} clearActionMessage
- * @param {Function} syncUI
+ * 1日経過処理を行いUIを更新する。
+ * @param {object} elements DOM要素群
+ * @param {Function} clearActionMessage メッセージ消去
+ * @param {Function} syncUI UI同期
+ * @returns {void}
  */
 export function waitOneDay(elements, clearActionMessage, syncUI) {
   if (state.pendingEncounter?.active) {
@@ -306,8 +332,8 @@ export function waitOneDay(elements, clearActionMessage, syncUI) {
 }
 
 /**
- * 現在地にある拠点を返す。
- * @returns {object|null}
+ * 現在位置の拠点情報を返す。
+ * @returns {object|null} 拠点情報
  */
 export function getCurrentSettlement() {
   return getSettlementAtPosition(state.position.x, state.position.y);
