@@ -14,6 +14,7 @@ export const NORMAL_ANCHORS = [
   { fame: 100, min: 7, max: 8 },
   { fame: 500, min: 35, max: 40 },
   { fame: 1000, min: 70, max: 80 },
+  { fame: 2500, min: 170, max: 190 },
 ];
 
 /** 敵人数計算用アンカー（強編成） */
@@ -21,6 +22,7 @@ export const STRONG_ANCHORS = [
   { fame: 100, min: 8, max: 9 },
   { fame: 500, min: 40, max: 45 },
   { fame: 1000, min: 80, max: 90 },
+  { fame: 2500, min: 180, max: 200 },
 ];
 
 /**
