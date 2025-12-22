@@ -30,6 +30,7 @@ const createState = () => ({
   lastRoll: null,
   lastResultText: "",
   modeLabel: MODE_LABEL.NORMAL,
+  mapPinsVisible: true,
   year: 1000,
   season: 0, // 0:春 1:夏 2:秋 3:冬
   day: 1, // 1-30

@@ -3,7 +3,7 @@ import { state } from "./state.js";
 import { ASSETS, FACTIONS, ATTITUDE_LABELS } from "./lore.js";
 import { formatTroopDisplay, TROOP_STATS } from "./troops.js";
 import { formatSupplyDisplay, SUPPLY_ITEMS } from "./supplies.js";
-import { getSettlementsByNoble, nobleHome } from "./map.js";
+import { getSettlementsByNoble, nobleHome, refreshMapInfo } from "./map.js";
 
 /**
  * 勢力IDから名称を取得する。
@@ -158,5 +158,11 @@ export function wireMapToggle(renderMap) {
   elements.mapToggle?.addEventListener("click", () => {
     state.mapMode = state.mapMode === "full" ? "zoom" : "full";
     renderMap?.();
+    refreshMapInfo();
+  });
+  elements.mapPinsToggle?.addEventListener("click", () => {
+    state.mapPinsVisible = !state.mapPinsVisible;
+    renderMap?.();
+    refreshMapInfo();
   });
 }

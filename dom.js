@@ -52,6 +52,7 @@ export const elements = {
   nobleDetail: $("nobleDetail"),
   closeNoblesBtn: $("closeNobles"),
   mapCanvas: $("mapCanvas"),
+  mapPinsToggle: $("mapPinsToggle"),
   mapToggle: $("mapToggle"),
   mapInfo: $("mapInfo"),
   mapPosLabel: $("mapPosLabel"),

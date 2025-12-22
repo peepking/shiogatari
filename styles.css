@@ -960,9 +960,41 @@ option {
   margin-top: 6px;
   min-height: 14px;
   display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.map-info-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.map-info-col.right {
+  align-items: flex-end;
+  text-align: right;
+}
+
+.map-info-line {
+  display: flex;
   justify-content: space-between;
   gap: 10px;
   align-items: center;
+  width: 100%;
+}
+
+.map-info-line.pin-line {
+  justify-content: flex-start;
+  font-size: 10px;
+  color: rgba(232, 239, 255, 0.68);
+  gap: 6px;
+}
+
+.map-info-col.right .map-info-line {
+  justify-content: flex-end;
 }
 
 .battle-panel {

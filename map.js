@@ -2,6 +2,8 @@ import { clamp } from "./util.js";
 import { state } from "./state.js";
 import { elements } from "./dom.js";
 import { FACTIONS } from "./lore.js";
+import { QUEST_TYPES } from "./quests.js";
+import { absDay } from "./questUtils.js";
 import {
   refreshSettlementDemand,
   refreshSettlementStock,
@@ -18,6 +20,15 @@ export const MAP_ZOOM = 9;
 export const MAP_CELL = 14;
 /** @type {number} 描画パディング */
 export const MAP_PAD = 4;
+
+const PIN_STYLES = {
+  hunt: { shape: "star", color: "#ff9b3a", priority: 1 },
+  bounty: { shape: "star", color: "#ff4d4d", priority: 1 },
+  move: { shape: "triangle", color: "#ff66b3", priority: 2 },
+  supply: { shape: "dot", color: "#6b3dff", priority: 0, mergeKey: "supply" },
+};
+
+let pinCache = { list: [], byPos: new Map() };
 
 /**
  * 地形
@@ -342,6 +353,126 @@ function factionName(id) {
   return FACTIONS.find((f) => f.id === id)?.name || id;
 }
 
+function questToPin(q, nowAbs) {
+  const title = q.title || "依頼";
+  const deadlineText =
+    typeof q.deadlineAbs === "number" ? `期限あと${Math.max(0, q.deadlineAbs - nowAbs)}日` : "期限不明";
+  const common = {
+    labels: [title],
+    deadlines: [deadlineText],
+  };
+  const style = (kind) => ({ ...common, ...PIN_STYLES[kind] });
+  // 座標取得
+  const fromTarget = (t, styleKey) => {
+    if (!t || typeof t.x !== "number" || typeof t.y !== "number") return null;
+    return { ...style(styleKey), x: t.x, y: t.y };
+  };
+  const fromSettlementId = (sid, styleKey, mergeKey) => {
+    const s = getSettlementById(sid);
+    if (!s) return null;
+    return { ...style(styleKey), x: s.coords.x, y: s.coords.y, mergeKey: mergeKey || style(styleKey).mergeKey };
+  };
+
+  switch (q.type) {
+    case QUEST_TYPES.PIRATE_HUNT:
+    case QUEST_TYPES.ORACLE_HUNT:
+      return fromTarget(q.target, "hunt");
+    case QUEST_TYPES.BOUNTY_HUNT:
+    case QUEST_TYPES.ORACLE_ELITE:
+      return fromTarget(q.target, "bounty");
+    case QUEST_TYPES.ORACLE_MOVE:
+      return fromTarget(q.target, "move");
+    case QUEST_TYPES.SUPPLY:
+    case QUEST_TYPES.DELIVERY:
+      return fromSettlementId(q.targetId || q.originId, "supply", "supply");
+    default:
+      return null;
+  }
+}
+
+function buildPinCache(pins) {
+  const merged = [];
+  const mergeMap = new Map();
+  pins.forEach((p) => {
+    if (p.mergeKey) {
+      const key = `${p.mergeKey}:${p.x},${p.y}`;
+      const existing = mergeMap.get(key);
+      if (existing) {
+        existing.labels.push(...(p.labels || []));
+        existing.deadlines.push(...(p.deadlines || []));
+      } else {
+        mergeMap.set(key, { ...p, labels: [...(p.labels || [])], deadlines: [...(p.deadlines || [])] });
+      }
+    } else {
+      merged.push(p);
+    }
+  });
+  merged.push(...mergeMap.values());
+  merged.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+  const byPos = new Map();
+  merged.forEach((p) => {
+    const infoParts = (p.labels || []).map((lbl, idx) => `${lbl}（${p.deadlines?.[idx] || "期限不明"}）`);
+    const entry = { ...p, info: infoParts.join(", ") };
+    const key = `${p.x},${p.y}`;
+    if (!byPos.has(key)) byPos.set(key, []);
+    byPos.get(key).push(entry);
+  });
+  return { list: merged, byPos };
+}
+
+function refreshPinCache() {
+  pinCache = { list: [], byPos: new Map() };
+  if (state.mapPinsVisible === false) return;
+  const nowAbs = absDay(state);
+  const active = state.quests?.active || [];
+  const pins = active
+    .map((q) => questToPin(q, nowAbs))
+    .filter((p) => p && typeof p.x === "number" && typeof p.y === "number");
+  pinCache = buildPinCache(pins);
+}
+
+function pinsAt(x, y) {
+  return pinCache.byPos.get(`${x},${y}`) || [];
+}
+
+function drawPin(ctx, pin, pad, cellSize, startX, startY) {
+  const cx = pad + (pin.x - startX) * cellSize + cellSize / 2;
+  const cy = pad + (pin.y - startY) * cellSize + cellSize / 2;
+  const r = Math.max(3, cellSize * 0.24);
+  ctx.save();
+  ctx.fillStyle = pin.color;
+  ctx.strokeStyle = "#ffffffaa";
+  ctx.lineWidth = 1.4;
+  if (pin.shape === "dot") {
+    const size = Math.max(1.0, r * 0.30);
+    ctx.beginPath();
+    ctx.arc(cx, cy, size, 0, Math.PI * 2);
+    ctx.fill();
+    // ドットは枠線なし
+  } else if (pin.shape === "triangle") {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx - r, cy + r);
+    ctx.lineTo(cx + r, cy + r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (pin.shape === "star") {
+    ctx.beginPath();
+    const spikes = 5;
+    const outer = Math.max(r * 1.15, 4);
+    const inner = outer * 0.45;
+    for (let i = 0; i < spikes * 2; i++) {
+      const rad = (Math.PI * i) / spikes;
+      const rr = i % 2 === 0 ? outer : inner;
+      ctx.lineTo(cx + Math.cos(rad - Math.PI / 2) * rr, cy + Math.sin(rad - Math.PI / 2) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 /**
  * マップ座標の表示用テキストを生成する。
  * @param {number} gx
@@ -401,6 +532,7 @@ function refreshSettlementDemandIfNeeded() {
  */
 export function renderMap() {
   refreshSettlementDemandIfNeeded();
+  refreshPinCache();
   const { mapCanvas, mapPosLabel } = elements;
   if (!mapCanvas) return;
   const isZoom = state.mapMode === "zoom";
@@ -527,9 +659,24 @@ export function renderMap() {
     cellSize - 1
   );
 
+  // ピン描画
+  if (state.mapPinsVisible !== false) {
+    pinCache.list.forEach((pin) => {
+      if (
+        pin.x < startX ||
+        pin.x >= startX + cells ||
+        pin.y < startY ||
+        pin.y >= startY + cells
+      )
+        return;
+      drawPin(ctx, pin, pad, cellSize, startX, startY);
+    });
+  }
+
   if (mapPosLabel) {
     mapPosLabel.textContent = `(${state.position.x + 1}, ${state.position.y + 1})`;
   }
+  refreshMapInfo();
 }
 
 /**
@@ -634,16 +781,68 @@ export function getSettlementById(id) {
 
 /**
  * マップ情報表示を更新する。
- * @param {string} hoverText
+ * 左列: ホバー情報, 右列: 選択情報。それぞれ独立に依頼ピン詳細を表示する。
+ * @param {string} [hoverText]
+ * @param {{x:number,y:number}|null} [hoverPos]
+ * @param {boolean} [suppressHoverPins=false] ホバーを消すときにピン行も消したい場合に true
  */
-function updateMapInfo(hoverText) {
+function updateMapInfo(hoverText = "", hoverPos = null, suppressHoverPins = false) {
   const { mapInfo } = elements;
   if (!mapInfo) return;
-  const sel = state.selectedPosition
+
+  const selectedText = state.selectedPosition
     ? `選択中: ${formatCellInfo(state.selectedPosition.x, state.selectedPosition.y)}`
     : "選択中: なし";
-  const left = hoverText || "";
-  mapInfo.innerHTML = `<span>${left}</span><span>${sel}</span>`;
+
+  const pinLineText = (pos, suppress) => {
+    if (!pos || state.mapPinsVisible === false || suppress) return "";
+    const pins = pinsAt(pos.x, pos.y);
+    const parts = pins.map((p) => p.info).filter(Boolean);
+    return parts.length ? parts.join(" / ") : "";
+  };
+
+  const hoverPins = pinLineText(hoverPos, suppressHoverPins);
+  const selectedPins = pinLineText(state.selectedPosition, false);
+
+  mapInfo.innerHTML = "";
+
+  const leftCol = document.createElement("div");
+  leftCol.className = "map-info-col left";
+  if (hoverText) {
+    const line = document.createElement("div");
+    line.className = "map-info-line";
+    line.textContent = hoverText;
+    leftCol.append(line);
+  }
+  if (hoverPins) {
+    const line = document.createElement("div");
+    line.className = "map-info-line pin-line";
+    line.textContent = hoverPins;
+    leftCol.append(line);
+  }
+
+  const rightCol = document.createElement("div");
+  rightCol.className = "map-info-col right";
+  const selLine = document.createElement("div");
+  selLine.className = "map-info-line";
+  selLine.textContent = selectedText;
+  rightCol.append(selLine);
+  if (selectedPins) {
+    const line = document.createElement("div");
+    line.className = "map-info-line pin-line";
+    line.textContent = selectedPins;
+    rightCol.append(line);
+  }
+
+  mapInfo.append(leftCol, rightCol);
+}
+
+/**
+ * 選択中のマスに合わせてマップ情報を再計算する。
+ */
+export function refreshMapInfo() {
+  const pos = state.selectedPosition ? { ...state.selectedPosition } : null;
+  updateMapInfo("", pos);
 }
 
 /**
@@ -663,7 +862,8 @@ export function wireMapHover() {
       const localX = Math.floor((e.clientX - rect.left - pad) / cell);
       const localY = Math.floor((e.clientY - rect.top - pad) / cell);
       if (localX < 0 || localY < 0 || localX >= cells || localY >= cells) {
-        updateMapInfo("");
+        const sel = state.selectedPosition ? { ...state.selectedPosition } : null;
+        updateMapInfo("", sel, true);
         return;
       }
       const startX =
@@ -676,11 +876,12 @@ export function wireMapHover() {
           : 0;
       const gx = startX + localX;
       const gy = startY + localY;
-      updateMapInfo(formatCellInfo(gx, gy));
+      updateMapInfo(formatCellInfo(gx, gy), { x: gx, y: gy });
     });
 
     mapCanvas.addEventListener("mouseleave", () => {
-      updateMapInfo("");
+      const sel = state.selectedPosition ? { ...state.selectedPosition } : null;
+      updateMapInfo("", sel, true);
     });
   }
 
@@ -710,7 +911,7 @@ export function wireMapHover() {
     const isCurrent = state.position.x === gx && state.position.y === gy;
     state.selectedPosition = { x: gx, y: gy };
     renderMap();
-    updateMapInfo(formatCellInfo(gx, gy));
+    updateMapInfo(formatCellInfo(gx, gy), { x: gx, y: gy });
     if (sameSelection) {
       if (isCurrent) {
         return;
