@@ -97,8 +97,8 @@ export function pickRandomProcessed(count = 2) {
  */
 export function randomSeaTarget(origin) {
   const candidates = [];
-  const minDist = 20;
-  const maxDist = 30;
+  const minDist = 10;
+  const maxDist = 15;
   for (let y = 0; y < mapData.length; y++) {
     for (let x = 0; x < mapData[0].length; x++) {
       const cell = mapData[y][x];
