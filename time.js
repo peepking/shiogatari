@@ -47,12 +47,24 @@ function applySeasonUpkeep() {
 
   const fundsBefore = state.funds || 0;
   const fundsPaid = Math.min(fundsBefore, upkeepCost);
+  const deficitFunds = Math.max(0, upkeepCost - fundsPaid);
   state.funds = Math.max(0, fundsBefore - upkeepCost);
 
   if (upkeepCost === 0) return;
+
+  // 資金不足時は不足額/6人ぶんの兵士を損耗（人数比で按分、余りは順繰り）
+  let lossCount = 0;
+  if (deficitFunds > 0) {
+    lossCount = Math.floor(deficitFunds / 6);
+    if (lossCount > 0) {
+      applyTroopLosses(buildLossesMap(lossCount));
+    }
+  }
   pushLog(
     "維持費・消費",
-    `資金 -${fundsPaid}（必要資金 ${upkeepCost}）`,
+    `資金 -${fundsPaid}（必要資金 ${upkeepCost}` +
+      (lossCount > 0 ? ` / 資金不足による損耗 -${lossCount}` : "") +
+      "）",
     state.lastRoll ?? "-"
   );
 }
