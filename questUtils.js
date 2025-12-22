@@ -8,6 +8,21 @@ export const SEASONS_PER_YEAR = 4;
 /** @type {number} 1年あたりの日数 */
 export const DAY_PER_YEAR = DAY_PER_SEASON * SEASONS_PER_YEAR;
 
+/** 敵人数計算用アンカー（通常） */
+export const NORMAL_ANCHORS = [
+  { fame: 0, min: 3, max: 5 },
+  { fame: 100, min: 7, max: 8 },
+  { fame: 500, min: 35, max: 40 },
+  { fame: 1000, min: 70, max: 80 },
+];
+
+/** 敵人数計算用アンカー（強編成） */
+export const STRONG_ANCHORS = [
+  { fame: 100, min: 8, max: 9 },
+  { fame: 500, min: 40, max: 45 },
+  { fame: 1000, min: 80, max: 90 },
+];
+
 /**
  * 指定範囲の整数乱数を返す。
  * @param {number} min
@@ -36,6 +51,28 @@ export const absDay = ({ year, season, day }) => year * DAY_PER_YEAR + season * 
  * @returns {number}
  */
 export const manhattan = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
+
+/**
+ * 名声アンカーから補間した人数レンジを返す。
+ * @param {number} fame 名声
+ * @param {Array<{fame:number,min:number,max:number}>} anchors アンカー配列
+ * @returns {{min:number,max:number}}
+ */
+export function pickAnchorRange(fame, anchors) {
+  const list = [...anchors].sort((a, b) => a.fame - b.fame);
+  if (fame <= list[0].fame) return { min: list[0].min, max: list[0].max };
+  if (fame >= list[list.length - 1].fame) return { min: list[list.length - 1].min, max: list[list.length - 1].max };
+  for (let i = 0; i < list.length - 1; i++) {
+    const a = list[i];
+    const b = list[i + 1];
+    if (fame >= a.fame && fame <= b.fame) {
+      const t = (fame - a.fame) / Math.max(1, b.fame - a.fame);
+      const lerp = (x, y) => Math.round(x + (y - x) * t);
+      return { min: lerp(a.min, b.min), max: lerp(a.max, b.max) };
+    }
+  }
+  return { min: list[0].min, max: list[0].max };
+}
 
 /**
  * 加工品から重複なしで指定数を選ぶ。

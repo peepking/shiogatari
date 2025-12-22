@@ -7,6 +7,7 @@ import { calcTroopCap, totalTroops } from "./troops.js";
 import { advanceDayWithEvents } from "./time.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
+import { randInt, absDay, rollDice, manhattan, pickRandomProcessed, randomSeaTarget, randomHuntTarget, NORMAL_ANCHORS, STRONG_ANCHORS, pickAnchorRange } from "./questUtils.js";
 
 /**
  * エンカウント歩数
@@ -17,53 +18,8 @@ const ENCOUNTER_MAX = 15;
  * 強プール確率
  */
 const STRONG_POOL_CHANCE = 0.25;
-/**
- * 名声に比例した敵戦力の計算に使用する点
- */
-const NORMAL_ANCHORS = [
-  { fame: 0, min: 3, max: 5 },
-  { fame: 100, min: 7, max: 8 },
-  { fame: 500, min: 35, max: 40 },
-  { fame: 1000, min: 70, max: 80 },
-];
-/**
- * 名声に比例した敵戦力の計算に使用する点（強プール）
- */
-const STRONG_ANCHORS = [
-  { fame: 100, min: 8, max: 9 },
-  { fame: 500, min: 40, max: 45 },
-  { fame: 1000, min: 80, max: 90 },
-];
 
-const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
-
-/**
- * 名声に近いアンカーから人数レンジを補間して取得する。
- * @param {number} fame 名声
- * @param {Array<{fame:number,min:number,max:number}>} anchors アンカー配列
- * @returns {{min:number,max:number}} 人数レンジ
- */
-function pickAnchorRange(fame, anchors) {
-  const list = [...anchors].sort((a, b) => a.fame - b.fame);
-  if (fame <= list[0].fame) return { min: list[0].min, max: list[0].max };
-  if (fame >= list[list.length - 1].fame)
-    return { min: list[list.length - 1].min, max: list[list.length - 1].max };
-  for (let i = 0; i < list.length - 1; i++) {
-    const a = list[i];
-    const b = list[i + 1];
-    if (fame >= a.fame && fame <= b.fame) {
-      const t = (fame - a.fame) / Math.max(1, b.fame - a.fame);
-      const lerp = (x, y) => Math.round(x + (y - x) * t);
-      return { min: lerp(a.min, b.min), max: lerp(a.max, b.max) };
-    }
-  }
-  return { min: list[0].min, max: list[0].max };
-}
-
-/**
- * エンカウント進捗と閾値をリセットする。
- * @returns {void}
- */
+/** エンカウント進捗と閾値をリセットする。 */
 export function resetEncounterMeter() {
   state.encounterProgress = 0;
   state.encounterThreshold = randInt(ENCOUNTER_MIN, ENCOUNTER_MAX);

@@ -11,26 +11,11 @@ import {
   pickRandomProcessed,
   randomSeaTarget,
   randomHuntTarget,
+  NORMAL_ANCHORS,
+  STRONG_ANCHORS,
+  pickAnchorRange,
 } from "./questUtils.js";
 
-/**
- * 名声に比例した敵戦力の計算に使用する点
- */
-const NORMAL_ANCHORS = [
-  { fame: 0, min: 3, max: 5 },
-  { fame: 100, min: 7, max: 8 },
-  { fame: 500, min: 35, max: 40 },
-  { fame: 1000, min: 70, max: 80 },
-];
-
-/**
- * 名声に比例した敵戦力の計算に使用する点（強プール）
- */
-const STRONG_ANCHORS = [
-  { fame: 100, min: 8, max: 9 },
-  { fame: 500, min: 40, max: 45 },
-  { fame: 1000, min: 80, max: 90 },
-];
 
 /** @enum {string} 依頼種別 */
 const QUEST_TYPES = {
@@ -385,22 +370,6 @@ function genOracleElite() {
   };
 }
 
-function pickAnchorRange(fame, anchors) {
-  const list = [...anchors].sort((a, b) => a.fame - b.fame);
-  if (fame <= list[0].fame) return { min: list[0].min, max: list[0].max };
-  if (fame >= list[list.length - 1].fame) return { min: list[list.length - 1].min, max: list[list.length - 1].max };
-  for (let i = 0; i < list.length - 1; i++) {
-    const a = list[i];
-    const b = list[i + 1];
-    if (fame >= a.fame && fame <= b.fame) {
-      const t = (fame - a.fame) / Math.max(1, b.fame - a.fame);
-      const lerp = (x, y) => Math.round(x + (y - x) * t);
-      return { min: lerp(a.min, b.min), max: lerp(a.max, b.max) };
-    }
-  }
-  return { min: list[0].min, max: list[0].max };
-}
-
 function predictEnemyTotal(forceStrength) {
   const fame = Math.max(0, state.fame || 0);
   const useStrong = forceStrength === "elite";
@@ -738,4 +707,3 @@ export function questTickDay(days = 1) {
 }
 
 export { QUEST_TYPES };
-
