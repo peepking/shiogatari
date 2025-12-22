@@ -19,6 +19,9 @@ export const MAP_CELL = 14;
 /** @type {number} 描画パディング */
 export const MAP_PAD = 4;
 
+/**
+ * 地形
+ */
 const terrainKinds = [
   { key: "sea", name: "海", color: "#0f4c81" },
   { key: "forest", name: "森", color: "#16603a" },
@@ -27,6 +30,9 @@ const terrainKinds = [
   { key: "shoal", name: "浅瀬", color: "#227f91" },
 ];
 
+/**
+ * 拠点のランダムネーム定義
+ */
 const settlementNames = {
   prefix: ["北", "南", "東", "西", "潮", "波", "風", "岩", "砂", "霧", "蒼", "紅"],
   middle: [
@@ -38,7 +44,6 @@ const settlementNames = {
   ],
 };
 
-const garrisonPool = ["海兵", "弓兵", "歩兵", "斥候", "騎兵"];
 const goodsPool = ["食料", "木材", "石材", "鉄", "繊維", "塩", "織物", "酒", "武具", "香辛料", "なめし革"];
 
 /** @type {Array} 生成済み拠点の一覧 */
@@ -286,11 +291,7 @@ let lastDemandSeason = { year: state.year, season: state.season };
       const owner =
         (usePreferred ? pickNobleByFaction(preferred) : null) || pickFallbackNoble();
       const id = `set-${settlements.length + 1}`;
-      const garrison = [
-        garrisonPool[Math.floor(Math.random() * garrisonPool.length)],
-        garrisonPool[Math.floor(Math.random() * garrisonPool.length)],
-      ];
-      const goods = [
+const goods = [
         goodsPool[Math.floor(Math.random() * goodsPool.length)],
         goodsPool[Math.floor(Math.random() * goodsPool.length)],
       ];
@@ -307,7 +308,6 @@ let lastDemandSeason = { year: state.year, season: state.season };
         kind: cell.building,
         factionId: owner.factionId,
         nobleId: owner.id,
-        garrison,
         goods,
         coords: { x, y },
         specialty,

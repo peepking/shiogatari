@@ -13,12 +13,19 @@ import {
   randomHuntTarget,
 } from "./questUtils.js";
 
+/**
+ * 名声に比例した敵戦力の計算に使用する点
+ */
 const NORMAL_ANCHORS = [
   { fame: 0, min: 3, max: 5 },
   { fame: 100, min: 7, max: 8 },
   { fame: 500, min: 35, max: 40 },
   { fame: 1000, min: 70, max: 80 },
 ];
+
+/**
+ * 名声に比例した敵戦力の計算に使用する点（強プール）
+ */
 const STRONG_ANCHORS = [
   { fame: 100, min: 8, max: 9 },
   { fame: 500, min: 40, max: 45 },

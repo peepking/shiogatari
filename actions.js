@@ -8,15 +8,27 @@ import { advanceDayWithEvents } from "./time.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
 
+/**
+ * エンカウント歩数
+ */
 const ENCOUNTER_MIN = 10;
 const ENCOUNTER_MAX = 15;
+/**
+ * 強プール確率
+ */
 const STRONG_POOL_CHANCE = 0.25;
+/**
+ * 名声に比例した敵戦力の計算に使用する点
+ */
 const NORMAL_ANCHORS = [
   { fame: 0, min: 3, max: 5 },
   { fame: 100, min: 7, max: 8 },
   { fame: 500, min: 35, max: 40 },
   { fame: 1000, min: 70, max: 80 },
 ];
+/**
+ * 名声に比例した敵戦力の計算に使用する点（強プール）
+ */
 const STRONG_ANCHORS = [
   { fame: 100, min: 8, max: 9 },
   { fame: 500, min: 40, max: 45 },

@@ -59,14 +59,6 @@ const formatModeLabel = () => {
   return parts.join("/");
 };
 
-
-
-
-
-
-
-
-
 /**
  * 行動メッセージをトーストで表示する。
  * @param {string} msg
