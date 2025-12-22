@@ -1,5 +1,6 @@
 import { elements, setOutput, pushLog, confirmAction } from "./dom.js";
 import { state } from "./state.js";
+import { MODE_LABEL } from "./constants.js";
 import { SUPPLY_ITEMS, calcSupplyPrice, calcSupplyCap, totalSupplies } from "./supplies.js";
 import { getCurrentSettlement } from "./actions.js";
 
@@ -198,7 +199,7 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
   });
   elements.shipTradeBtn?.addEventListener("click", () => {
     const settlement = getCurrentSettlement();
-    if (!settlement || state.modeLabel !== "街の中") {
+    if (!settlement || state.modeLabel !== MODE_LABEL.IN_TOWN) {
       setOutput("船取引不可", "街の中でのみ船取引ができます。", [
         { text: "船取引", kind: "warn" },
         { text: "街のみ", kind: "warn" },

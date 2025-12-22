@@ -1,5 +1,6 @@
 import { elements, setOutput, pushLog } from "./dom.js";
 import { state } from "./state.js";
+import { MODE_LABEL } from "./constants.js";
 import { getCurrentSettlement } from "./actions.js";
 import { TROOP_STATS } from "./troops.js";
 
@@ -161,7 +162,7 @@ export function wireHireModal({ openModal, bindModal, syncUI }) {
   });
   const openHireModal = () => {
     const settlement = getCurrentSettlement();
-    if (!settlement || (state.modeLabel !== "村の中" && state.modeLabel !== "街の中")) {
+    if (!settlement || (state.modeLabel !== MODE_LABEL.IN_VILLAGE && state.modeLabel !== MODE_LABEL.IN_TOWN)) {
       setOutput("雇用不可", "街・村の中でのみ雇用できます。", [
         { text: "雇用", kind: "warn" },
         { text: "入場時に利用可", kind: "warn" },

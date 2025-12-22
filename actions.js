@@ -1,4 +1,5 @@
 import { state } from "./state.js";
+import { MODE_LABEL, PLACE } from "./constants.js";
 import { setOutput, pushLog, pushToast } from "./dom.js";
 import { getSettlementAtPosition, getLocationStatus, getTerrainAt } from "./map.js";
 import { calcSupplyCap, totalSupplies } from "./supplies.js";
@@ -86,7 +87,7 @@ function triggerEncounter(syncUI) {
     strength,
     terrain,
   };
-  state.modeLabel = "戦闘準備";
+  state.modeLabel = MODE_LABEL.PREP;
   resetEncounterMeter();
   setOutput(
     "敵襲",
@@ -108,7 +109,7 @@ function maybeTriggerEncounter(syncUI) {
   if (state.pendingEncounter?.active) return false;
   const loc = getLocationStatus();
   // 村/街タイル上ではエンカウントしないが、リセットもしない（入場時のみリセット）
-  if (loc?.place === "村" || loc?.place === "街") return false;
+  if (loc?.place === PLACE.VILLAGE || loc?.place === PLACE.TOWN) return false;
   const threshold = clamp(state.encounterThreshold || ENCOUNTER_MIN, ENCOUNTER_MIN, ENCOUNTER_MAX);
   state.encounterProgress = (state.encounterProgress || 0) + 1;
   if (state.encounterProgress >= threshold) {
@@ -146,7 +147,7 @@ export function moveToSelected(showActionMessage, syncUI) {
     showActionMessage?.("戦闘準備中は移動できません。行動を選んでください。", "warn");
     return false;
   }
-  if (state.modeLabel === "戦闘中") {
+  if (state.modeLabel === MODE_LABEL.BATTLE) {
     showActionMessage?.("戦闘中は移動できません。地図に戻ってください。", "warn");
     return false;
   }
@@ -189,11 +190,11 @@ export function moveToSelected(showActionMessage, syncUI) {
     return false;
   }
   // 拠点内なら自動で外へ出る
-  if (state.modeLabel === "村の中") {
-    state.modeLabel = "通常";
+  if (state.modeLabel === MODE_LABEL.IN_VILLAGE) {
+    state.modeLabel = MODE_LABEL.NORMAL;
   }
-  if (state.modeLabel === "街の中") {
-    state.modeLabel = "通常";
+  if (state.modeLabel === MODE_LABEL.IN_TOWN) {
+    state.modeLabel = MODE_LABEL.NORMAL;
   }
   state.position = { ...dest };
   advanceDayWithEvents(1);
@@ -217,8 +218,8 @@ export function moveToSelected(showActionMessage, syncUI) {
  */
 export function attemptEnter(target, clearActionMessage, syncUI) {
   const loc = getLocationStatus();
-  const targetPlace = target === "village" ? "村" : "街";
-  const insideLabel = target === "village" ? "村の中" : "街の中";
+  const targetPlace = target === "village" ? PLACE.VILLAGE : PLACE.TOWN;
+  const insideLabel = target === "village" ? MODE_LABEL.IN_VILLAGE : MODE_LABEL.IN_TOWN;
   if (loc?.place !== targetPlace) {
     setOutput("入場できません", `${targetPlace}にいません。`, [
       { text: targetPlace, kind: "warn" },
@@ -248,8 +249,8 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
  * @returns {boolean}
  */
 export function attemptExit(target, elements, clearActionMessage, setTradeError, syncUI) {
-  const label = target === "village" ? "村の中" : "街の中";
-  const place = target === "village" ? "村" : "街";
+  const label = target === "village" ? MODE_LABEL.IN_VILLAGE : MODE_LABEL.IN_TOWN;
+  const place = target === "village" ? PLACE.VILLAGE : PLACE.TOWN;
   if (state.modeLabel !== label) {
     setOutput("出られません", `${label}ではありません。`, [
       { text: "場所", kind: "warn" },
@@ -257,7 +258,7 @@ export function attemptExit(target, elements, clearActionMessage, setTradeError,
     ]);
     return false;
   }
-  state.modeLabel = "通常";
+  state.modeLabel = MODE_LABEL.NORMAL;
   resetEncounterMeter();
   setOutput("出発", `${place}を出ました。`, [
     { text: "移動", kind: "" },
@@ -285,7 +286,7 @@ export function waitOneDay(elements, clearActionMessage, syncUI) {
     ]);
     return false;
   }
-  if (state.modeLabel === "戦闘中") {
+  if (state.modeLabel === MODE_LABEL.BATTLE) {
     setOutput("待機できません", "戦闘中は待機できません。地図に戻ってください。", [
       { text: "戦闘中", kind: "warn" },
       { text: "待機不可", kind: "warn" },

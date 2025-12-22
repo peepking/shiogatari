@@ -1,4 +1,5 @@
 import { state, resetState } from "./state.js";
+import { MODE_LABEL, BATTLE_RESULT, BATTLE_RESULT_LABEL, PLACE, NONE_LABEL } from "./constants.js";
 import { nowStr, formatGameTime, clamp } from "./util.js";
 import { elements, setOutput, pushLog, pushToast } from "./dom.js";
 import { renderMap, wireMapHover, getLocationStatus, getTerrainAt } from "./map.js";
@@ -183,7 +184,7 @@ function performPrayer() {
 }
 
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
-const battlePrepActive = () => state.modeLabel === "戦闘準備";
+const battlePrepActive = () => state.modeLabel === MODE_LABEL.PREP;
 
 function totalTypeCount(type) {
   const levels = state.troops?.[type];
@@ -218,7 +219,7 @@ function clearBattlePrep(resetMode = true) {
     questId: null,
     questType: null,
   };
-  if (resetMode) state.modeLabel = "通常";
+  if (resetMode) state.modeLabel = MODE_LABEL.NORMAL;
   resetEncounterMeter();
   setEnemyFormation(null);
   setBattleTerrain("plain");
@@ -279,14 +280,15 @@ function killedEnemyCount(meta) {
 
 /**
  * 戦闘結果を処理し、報酬/損耗/依頼・神託の完了/失敗を反映する。
- * @param {"勝利"|"敗北"|"引き分け"} result
+ * @param {"win"|"lose"|"draw"} resultCode
  * @param {object} meta
  */
-function processBattleOutcome(result, meta) {
+function processBattleOutcome(resultCode, meta) {
   const enemyTotal = enemyTotalEstimate(meta);
   const fameDelta = Math.floor(enemyTotal / 2);
   const isStrong = meta?.enemyFormation?.some((e) => (e.level || 1) > 1) || state.pendingEncounter?.strength === "elite";
-  const isWin = result === "勝利";
+  const resultLabel = BATTLE_RESULT_LABEL[resultCode] || resultCode;
+  const isWin = resultCode === BATTLE_RESULT.WIN;
   const questId = state.pendingEncounter?.questId;
   const questType = state.pendingEncounter?.questType;
   const summary = [];
@@ -347,8 +349,8 @@ function processBattleOutcome(result, meta) {
       const name = TROOP_STATS[type]?.name || type;
       return `${name} ${rest || ""}`.trim();
     })
-    .join(" / ") || "なし";
-  summary.push(`損耗:${lossText === "なし" ? lossText : " " + lossText}`);
+    .join(" / ") || NONE_LABEL;
+  summary.push(`損耗:${lossText === NONE_LABEL ? lossText : " " + lossText}`);
 
   const captured = calcCaptures(meta);
   Object.entries(captured).forEach(([key, qty]) => {
@@ -361,8 +363,8 @@ function processBattleOutcome(result, meta) {
       const name = TROOP_STATS[type]?.name || type;
       return `${name} Lv${lvl} +${n}`;
     }) || [];
-  const capText = capEntries.length ? capEntries.join(" / ") : "なし";
-  summary.push(`拿捕:${capText === "なし" ? capText : " " + capText}`);
+  const capText = capEntries.length ? capEntries.join(" / ") : NONE_LABEL;
+  summary.push(`拿捕:${capText === NONE_LABEL ? capText : " " + capText}`);
 
   const killed = killedEnemyCount(meta);
   const leveled = levelUpTroopsRandom(killed);
@@ -396,12 +398,11 @@ function processBattleOutcome(result, meta) {
   clearBattlePrep(false);
   const body = summary.join("\n");
   setOutput("戦後処理", body, [
-    { text: result, kind: isWin ? "good" : "warn" },
+    { text: resultLabel, kind: isWin ? "good" : "warn" },
     { text: `敵推定${enemyTotal}人`, kind: "" },
   ]);
   pushLog("戦闘結果", body, "-");
-  pushToast("戦闘結果", result, isWin ? "good" : "warn");
-  const resultLabel = isWin ? "勝利" : "敗北";
+  pushToast("戦闘結果", resultLabel, isWin ? "good" : "warn");
   showBattleResultModal(summary, resultLabel);
   syncUI();
 }
@@ -417,7 +418,7 @@ function startPrepBattle() {
     processBattleOutcome(res, meta);
   });
   setBattleTerrain(state.pendingEncounter.terrain || getTerrainAt(state.position.x, state.position.y));
-  state.modeLabel = "戦闘中";
+  state.modeLabel = MODE_LABEL.BATTLE;
   openBattle();
   syncUI();
 }
@@ -427,7 +428,7 @@ function startPrepBattle() {
  * @returns {void}
  */
 function startOracleBattle() {
-  if (state.pendingEncounter?.active || state.modeLabel === "戦闘中") return;
+  if (state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE) return;
   const quest = getOracleBattleAt(state.position);
   if (!quest) return;
   const force =
@@ -443,7 +444,7 @@ function startOracleBattle() {
     questId: quest.id,
     questType: quest.type,
   };
-  state.modeLabel = "戦闘準備";
+  state.modeLabel = MODE_LABEL.PREP;
   resetEncounterMeter();
   setOutput(
     "討伐開始",
@@ -491,15 +492,15 @@ function surrenderBattle() {
  */
 function updateModeControls(loc) {
   const prep = battlePrepActive();
-  const inBattle = state.modeLabel === "戦闘中";
+  const inBattle = state.modeLabel === MODE_LABEL.BATTLE;
   const battleVisible = Boolean(elements.battleBlock && elements.battleBlock.hidden === false);
   const lockActions = prep || inBattle || battleVisible;
   const prepActive = prep && !!state.pendingEncounter?.active;
   const oracleBattle = getOracleBattleAt(state.position);
-  const visible = state.modeLabel === "街の中" || state.modeLabel === "村の中";
+  const visible = state.modeLabel === MODE_LABEL.IN_TOWN || state.modeLabel === MODE_LABEL.IN_VILLAGE;
   if (elements.tradeBtn) elements.tradeBtn.hidden = !visible;
   if (elements.shipTradeBtn)
-    elements.shipTradeBtn.hidden = state.modeLabel !== "街の中";
+    elements.shipTradeBtn.hidden = state.modeLabel !== MODE_LABEL.IN_TOWN;
   if (elements.questOpenBtn) elements.questOpenBtn.hidden = !visible;
   if (elements.hireBtn) elements.hireBtn.hidden = !visible;
   if (elements.oracleBtn) {
@@ -511,13 +512,13 @@ function updateModeControls(loc) {
     elements.modePrayBtn.disabled = lockActions || !canPray();
   }
   if (elements.enterVillageBtn)
-    elements.enterVillageBtn.hidden = !(loc?.place === "村" && state.modeLabel !== "村の中");
+    elements.enterVillageBtn.hidden = !(loc?.place === PLACE.VILLAGE && state.modeLabel !== MODE_LABEL.IN_VILLAGE);
   if (elements.enterTownBtn)
-    elements.enterTownBtn.hidden = !(loc?.place === "街" && state.modeLabel !== "街の中");
+    elements.enterTownBtn.hidden = !(loc?.place === PLACE.TOWN && state.modeLabel !== MODE_LABEL.IN_TOWN);
   if (elements.exitVillageBtn)
-    elements.exitVillageBtn.hidden = state.modeLabel !== "村の中";
+    elements.exitVillageBtn.hidden = state.modeLabel !== MODE_LABEL.IN_VILLAGE;
   if (elements.exitTownBtn)
-    elements.exitTownBtn.hidden = state.modeLabel !== "街の中";
+    elements.exitTownBtn.hidden = state.modeLabel !== MODE_LABEL.IN_TOWN;
   if (elements.modeWaitBtn) {
     elements.modeWaitBtn.hidden = lockActions;
     elements.modeWaitBtn.disabled = lockActions;
@@ -629,10 +630,10 @@ function syncUI() {
     const tOpt = elements.ctxEl.querySelector('option[value="enterTown"]');
     const vExit = elements.ctxEl.querySelector('option[value="exitVillage"]');
     const tExit = elements.ctxEl.querySelector('option[value="exitTown"]');
-    if (vOpt) vOpt.disabled = loc?.place !== "村";
-    if (tOpt) tOpt.disabled = loc?.place !== "街";
-    if (vExit) vExit.disabled = state.modeLabel !== "村の中";
-    if (tExit) tExit.disabled = state.modeLabel !== "街の中";
+    if (vOpt) vOpt.disabled = loc?.place !== PLACE.VILLAGE;
+    if (tOpt) tOpt.disabled = loc?.place !== PLACE.TOWN;
+    if (vExit) vExit.disabled = state.modeLabel !== MODE_LABEL.IN_VILLAGE;
+    if (tExit) tExit.disabled = state.modeLabel !== MODE_LABEL.IN_TOWN;
     if (elements.ctxEl.value === "enterVillage" && vOpt?.disabled) {
       elements.ctxEl.value = "move";
     }
@@ -724,11 +725,11 @@ function wireButtons() {
   bindModal(elements.battleResultModal, elements.battleResultClose);
 
   document.getElementById("modeBattleAlert")?.addEventListener("click", () => {
-    state.modeLabel = "戦闘警戒";
+    state.modeLabel = MODE_LABEL.ALERT;
     syncUI();
   });
   document.getElementById("modeBattle")?.addEventListener("click", () => {
-    state.modeLabel = "戦闘中";
+    state.modeLabel = MODE_LABEL.BATTLE;
     syncUI();
   });
   elements.modeWaitBtn?.addEventListener("click", () => {

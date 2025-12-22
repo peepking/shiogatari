@@ -1,4 +1,5 @@
 import { state, resetState } from "./state.js";
+import { MODE_LABEL } from "./constants.js";
 import { snapshotWorld, restoreWorld } from "./map.js";
 
 const SAVE_KEY = "shiogatari-save";
@@ -23,7 +24,7 @@ function simpleHash(str) {
  * @returns {boolean}
  */
 export function saveGameToStorage(force = false) {
-  const unsafe = state.modeLabel === "戦闘中" || state.pendingEncounter?.active;
+  const unsafe = state.modeLabel === MODE_LABEL.BATTLE || state.pendingEncounter?.active;
   if (!force && unsafe) return false;
   try {
     const data = {

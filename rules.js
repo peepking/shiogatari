@@ -6,6 +6,7 @@ import {
   MERC_MORPH,
 } from "./lore.js";
 import { state, pending } from "./state.js";
+import { MODE_LABEL, INTENSITY_KEY } from "./constants.js";
 import { totalTroops, setTroopsManual } from "./troops.js";
 
 /**
@@ -78,7 +79,7 @@ function resolveCore(context, r) {
         patch: () => {
           pending.kind = "intensity";
           pending.direction = r;
-          state.modeLabel = "行動決定中";
+          state.modeLabel = MODE_LABEL.DECIDING;
         },
         omenDirection: dir.key,
       };
@@ -120,7 +121,7 @@ export function resolvePending(r) {
     pending.kind = null;
     pending.direction = null;
     pending.forceDirection = null;
-    state.modeLabel = "行動決定中";
+    state.modeLabel = MODE_LABEL.DECIDING;
 
     const doList = [...(dir?.do || [])];
     const dontList = [...(dir?.dont || [])];
@@ -140,7 +141,7 @@ export function resolvePending(r) {
         { text: `方向=${dir?.key ?? "-"}`, kind: "" },
         {
           text: `強度=${inten?.key ?? "-"}`,
-          kind: inten?.key === "沈黙" ? "warn" : inten?.key === "全力" ? "good" : "",
+      kind: inten?.key === INTENSITY_KEY.SILENCE ? "warn" : inten?.key === INTENSITY_KEY.FULL ? "good" : "",
         },
       ],
       omenDirection: dir?.key,
@@ -156,7 +157,7 @@ export function resolvePending(r) {
     }
 
     pending.kind = null;
-    state.modeLabel = "航海中";
+    state.modeLabel = MODE_LABEL.SAILING;
 
     const title = "仲間の運命を決定";
     const text = fmtOps({
@@ -180,7 +181,7 @@ export function resolvePending(r) {
   if (pending.kind === "mercMorph") {
     const m = MERC_MORPH[r];
     pending.kind = null;
-    state.modeLabel = "航海中";
+    state.modeLabel = MODE_LABEL.SAILING;
 
     const title = "傭兵契約の転化結果";
     const text = fmtOps({

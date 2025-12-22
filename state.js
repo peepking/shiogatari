@@ -1,4 +1,5 @@
 import { FACTIONS } from "./lore.js";
+import { MODE_LABEL } from "./constants.js";
 
 /**
  * ゲームの初期状態を生成する。
@@ -28,7 +29,7 @@ const createState = () => ({
   },
   lastRoll: null,
   lastResultText: "",
-  modeLabel: "通常",
+  modeLabel: MODE_LABEL.NORMAL,
   year: 1000,
   season: 0, // 0:春 1:夏 2:秋 3:冬
   day: 1, // 1-30

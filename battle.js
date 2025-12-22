@@ -2,6 +2,7 @@ import { elements, pushLog, pushToast } from "./dom.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
 import { state } from "./state.js";
+import { MODE_LABEL, BATTLE_RESULT, BATTLE_RESULT_LABEL } from "./constants.js";
 import { getTerrainAt } from "./map.js";
 
 const BASE_TICK_MS = 1000;
@@ -107,6 +108,7 @@ const battleState = {
   timer: null,
   ctx: null,
   logLines: [],
+  resultCode: "",
   result: "",
   hoveredId: null,
   selectedId: null,
@@ -1167,28 +1169,34 @@ function finishBattle(forceDraw = false) {
   const alive = battleState.units.filter((u) => u.hp > 0);
   const allies = alive.filter((u) => u.side === "ally");
   const enemies = alive.filter((u) => u.side === "enemy");
-  let result = "引き分け";
+  let result = BATTLE_RESULT.DRAW;
   if (!forceDraw) {
-    if (allies.length && !enemies.length) result = "勝利";
-    else if (!allies.length && enemies.length) result = "敗北";
+    if (allies.length && !enemies.length) result = BATTLE_RESULT.WIN;
+    else if (!allies.length && enemies.length) result = BATTLE_RESULT.LOSE;
   }
-  if (result === "引き分け" && (allies.length || enemies.length)) {
+  if (result === BATTLE_RESULT.DRAW && (allies.length || enemies.length)) {
     const allyHp = allies.reduce((sum, u) => sum + u.hp, 0);
     const enemyHp = enemies.reduce((sum, u) => sum + u.hp, 0);
-    if (allyHp > enemyHp) result = "勝利";
-    else if (enemyHp > allyHp) result = "敗北";
+    if (allyHp > enemyHp) result = BATTLE_RESULT.WIN;
+    else if (enemyHp > allyHp) result = BATTLE_RESULT.LOSE;
   }
-  battleState.result = result;
-  addBattleLog(`戦闘終了: ${result}`);
+  battleState.resultCode = result;
+  const resultLabel = BATTLE_RESULT_LABEL[result] || "";
+  battleState.result = resultLabel;
+  addBattleLog(`戦闘終了: ${resultLabel}`);
   updateBattleStatus();
   updateBattleInfo();
-  pushLog("戦闘結果", `結果: ${result} / 味方${allies.length}・敵${enemies.length}`, "-");
+  pushLog("戦闘結果", `結果: ${resultLabel} / 味方${allies.length}・敵${enemies.length}`, "-");
   updateBattleButtons();
   renderRosterUI();
   const handler = battleState.onEnd;
   if (handler) {
     battleState.onEnd = null;
-    handler(result, { units: battleState.units, enemyFormation: battleState.enemyFormation });
+    handler(result, {
+      units: battleState.units,
+      enemyFormation: battleState.enemyFormation,
+      resultLabel,
+    });
   }
 }
 
@@ -1473,6 +1481,7 @@ function pauseBattle() {
 function resetBattle(useDraft = false, preserveField = true) {
   pauseBattle();
   battleState.tick = 0;
+  battleState.resultCode = "";
   battleState.result = "";
   battleState.hoveredId = null;
   battleState.selectedId = null;
@@ -1563,6 +1572,7 @@ function openBattleView() {
     battleState.battleTerrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   }
   battleState.running = false;
+  battleState.resultCode = "";
   battleState.result = "";
   battleState.editing = false;
   resetRoster();
@@ -1577,6 +1587,7 @@ function openBattleView() {
 function closeBattleView() {
   pauseBattle();
   battleState.running = false;
+  battleState.resultCode = "";
   battleState.result = "";
   if (elements.battleBlock) elements.battleBlock.hidden = true;
   if (elements.mapBlock) elements.mapBlock.hidden = false;
@@ -1586,7 +1597,7 @@ function closeBattleView() {
   battleState.editing = false;
   battleState.battleTerrain = null;
   syncFormationUI();
-  state.modeLabel = "通常";
+  state.modeLabel = MODE_LABEL.NORMAL;
 }
 
 /**
