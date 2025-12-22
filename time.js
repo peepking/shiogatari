@@ -92,6 +92,7 @@ function applyPeriodicFood() {
  * @returns 
  */
 function buildLossesMap(totalLoss) {
+  // 兵種ごとの人数比に応じて損耗数を按分し、余りは多い順で順繰りに配分する（ランダムではない）
   const counts = {};
   Object.entries(state.troops || {}).forEach(([type, levels]) => {
     if (typeof levels === "number") {
@@ -109,7 +110,6 @@ function buildLossesMap(totalLoss) {
     Object.entries(counts).forEach(([type, cnt]) => (losses[type] = cnt));
     return losses;
   }
-  // 兵種ごとの人数に比例して損耗数を割り振る（人数の多い兵種ほど多めに減る）
   let remaining = totalLoss;
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
   entries.forEach(([type, cnt], idx) => {
