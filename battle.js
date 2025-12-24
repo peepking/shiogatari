@@ -15,6 +15,13 @@ const SPEED_OPTIONS = [1, 2, 4];
 const MAX_UNIT_COUNT = 10;
 const MAX_SQUADS = 20;
 const ATTACK_FX_TTL = 2;
+const MOVE_FX_TTL = 3;
+const MOVE_COLORS = {
+  ally: "#4ec7f0",
+  enemy: "#f26b6b",
+  allyRetreat: "#f6a63c",
+  enemyRetreat: "#f08232",
+};
 const DECK_KEY = "deck";
 
 /**
@@ -101,6 +108,7 @@ const battleState = {
   ready: false,
   running: false,
   speed: 1,
+  elapsedMs: 0,
   tick: 0,
   size: 10,
   grid: [],
@@ -118,6 +126,7 @@ const battleState = {
   editing: false,
   selectedUnitId: null,
   attackFx: [],
+  moveFx: [],
   enemyFormation: null,
   enemyFactionId: null,
   onEnd: null,
@@ -962,6 +971,30 @@ function moveToward(unit, target, occupied, maxStep = unit.move) {
 }
 
 /**
+ * 移動軌跡を記録する。
+ * @param {object} unit
+ * @param {number} fromX
+ * @param {number} fromY
+ * @param {boolean} retreatMove
+ */
+function recordMoveTrail(unit, fromX, fromY, retreatMove = false) {
+  if (unit.x === fromX && unit.y === fromY) return;
+  if (!battleState.moveFx) battleState.moveFx = [];
+  battleState.moveFx.push({
+    fromX,
+    fromY,
+    toX: unit.x,
+    toY: unit.y,
+    side: unit.side,
+    retreat: retreatMove,
+    ttl: MOVE_FX_TTL,
+  });
+  if (battleState.moveFx.length > 400) {
+    battleState.moveFx = battleState.moveFx.slice(-400);
+  }
+}
+
+/**
  * 有利地形へ1歩退避する（現在地より補正が高い隣接マスがあれば移動）。
  * @param {object} unit
  * @param {Set<string>} occupied
@@ -1060,7 +1093,13 @@ function applyAttack(attacker, target) {
  * 戦闘状態を1ティック進める。
  * @returns {boolean}
  */
-function advanceBattleTick() {
+/**
+ * 戦闘状態を1ティック進める。
+ * @param {number} dtMs 進行時間(ms)
+ * @returns {boolean}
+ */
+function advanceBattleTick(dtMs = BASE_TICK_MS) {
+  battleState.elapsedMs += dtMs;
   battleState.tick += 1;
   const alive = battleState.units.filter((u) => u.hp > 0);
   const allies = alive.filter((u) => u.side === "ally");
@@ -1070,9 +1109,17 @@ function advanceBattleTick() {
   battleState.attackFx = (battleState.attackFx || [])
     .map((fx) => ({ ...fx, ttl: (fx.ttl || 0) - 1 }))
     .filter((fx) => fx.ttl > 0);
+  // 移動軌跡の寿命を減衰
+  battleState.moveFx = (battleState.moveFx || [])
+    .map((fx) => ({ ...fx, ttl: (fx.ttl || 0) - 1 }))
+    .filter((fx) => fx.ttl > 0);
 
   alive.forEach((unit) => {
     if (unit.hp <= 0) return;
+    const startX = unit.x;
+    const startY = unit.y;
+    let movedTrail = false;
+    let retreatTrail = false;
     unit.switchLock = Math.max(0, (unit.switchLock || 0) - 1);
     unit.cooldown = Math.max(0, unit.cooldown - 1);
     const enemyList = unit.side === "ally" ? enemies : allies;
@@ -1100,7 +1147,12 @@ function advanceBattleTick() {
     if (retreatLimit && hpRatio < retreatLimit) {
       // 有利地形へ退避を試みる
       const moved = retreatToBetterTerrain(unit, occupied);
-      if (moved) return;
+      if (moved) {
+        movedTrail = true;
+        retreatTrail = true;
+        recordMoveTrail(unit, startX, startY, true);
+        return;
+      }
     }
     let cappedMove = unit.move;
     const chargeMode = battleStrategy.chargeMode || "cavalry";
@@ -1126,6 +1178,8 @@ function advanceBattleTick() {
     if (allowKite) {
       const kited = kiteForRanged(unit, enemyList, target, occupied);
       if (kited) {
+        movedTrail = true;
+        retreatTrail = true;
         // 位置が変わるので距離を更新
         const distAfter = manhattan(unit, target);
         dist = distAfter;
@@ -1134,6 +1188,7 @@ function advanceBattleTick() {
             applyAttack(unit, target);
             unit.cooldown = unit.spd;
           }
+          recordMoveTrail(unit, startX, startY, true);
           return;
         }
       }
@@ -1143,9 +1198,16 @@ function advanceBattleTick() {
       if (unit.cooldown > 0) return;
       applyAttack(unit, target);
       unit.cooldown = unit.spd;
+      if (movedTrail) recordMoveTrail(unit, startX, startY, retreatTrail);
       return;
     }
+    const beforeX = unit.x;
+    const beforeY = unit.y;
     moveToward(unit, target, occupied, cappedMove);
+    if (unit.x !== beforeX || unit.y !== beforeY) {
+      movedTrail = true;
+    }
+    if (movedTrail) recordMoveTrail(unit, startX, startY, retreatTrail);
   });
 
   const nextAllies = alive.filter((u) => u.hp > 0 && u.side === "ally");
@@ -1220,7 +1282,8 @@ function updateBattleStatus() {
   const alive = battleState.units.filter((u) => u.hp > 0);
   const allies = alive.filter((u) => u.side === "ally");
   const enemies = alive.filter((u) => u.side === "enemy");
-  if (elements.battleTime) elements.battleTime.textContent = `${battleState.tick}s`;
+  if (elements.battleTime)
+    elements.battleTime.textContent = `${Math.floor((battleState.elapsedMs || 0) / 1000)}s`;
   if (elements.battleCount)
     elements.battleCount.textContent = `${allies.length} vs ${enemies.length}`;
   if (elements.battleStatus) {
@@ -1419,6 +1482,31 @@ function renderBattle() {
     ctx.arc(toX, toY, 4, 0, Math.PI * 2);
     ctx.fill();
   });
+  // 移動軌跡（細いライン表示）
+  (battleState.moveFx || []).forEach((fx) => {
+    const fromX = fx.fromX * cell + cell / 2;
+    const fromY = fx.fromY * cell + cell / 2;
+    const toX = fx.toX * cell + cell / 2;
+    const toY = fx.toY * cell + cell / 2;
+    const ally = fx.side === "ally";
+    const color = fx.retreat
+      ? ally
+        ? MOVE_COLORS.allyRetreat
+        : MOVE_COLORS.enemyRetreat
+      : ally
+        ? MOVE_COLORS.ally
+        : MOVE_COLORS.enemy;
+    const alpha = Math.max(0.15, Math.min(1, (fx.ttl || 1) / MOVE_FX_TTL));
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+    ctx.restore();
+  });
 }
 
 /**
@@ -1444,20 +1532,11 @@ function startBattle() {
   const sel = getUnitById(battleState.selectedId, true);
   if (sel && sel.hp <= 0) battleState.selectedId = null;
   battleState.result = "";
+  battleState.elapsedMs = 0;
   battleState.running = true;
   updateBattleButtons();
   renderRosterUI();
-  battleState.timer = setInterval(() => {
-    const steps = Math.max(1, battleState.speed);
-    for (let i = 0; i < steps; i++) {
-      if (!battleState.running) break;
-      const ended = advanceBattleTick();
-      if (ended) break;
-    }
-    renderBattle();
-    updateBattleStatus();
-    updateBattleInfo();
-  }, BASE_TICK_MS);
+  scheduleBattleTimer();
   addBattleLog("戦闘開始。");
 }
 
@@ -1483,11 +1562,14 @@ function pauseBattle() {
 function resetBattle(useDraft = false, preserveField = true) {
   pauseBattle();
   battleState.tick = 0;
+  battleState.elapsedMs = 0;
   battleState.resultCode = "";
   battleState.result = "";
   battleState.hoveredId = null;
   battleState.selectedId = null;
   battleState.attackFx = [];
+  battleState.moveFx = [];
+  battleState.moveFx = [];
   const allyEntries = getSortieEntries();
   const allies = allyEntries.length ? allyEntries : [];
   const enemiesFormation = battleState.enemyFormation && battleState.enemyFormation.length
@@ -1556,7 +1638,33 @@ function setBattleSpeed(speed) {
   if (!SPEED_OPTIONS.includes(speed)) return;
   battleState.speed = speed;
   battleStrategy.speed = speed;
+  if (battleState.running) {
+    scheduleBattleTimer();
+  }
   updateSpeedUI();
+}
+
+/**
+ * 戦闘タイマーを現在の速度で再設定する。
+ */
+function scheduleBattleTimer() {
+  if (battleState.timer) {
+    clearInterval(battleState.timer);
+    battleState.timer = null;
+  }
+  if (!battleState.running) return;
+  const interval = Math.max(50, Math.floor(BASE_TICK_MS / Math.max(1, battleState.speed)));
+  battleState.timer = setInterval(() => {
+    const ended = advanceBattleTick(interval);
+    renderBattle();
+    updateBattleStatus();
+    updateBattleInfo();
+    if (ended) {
+      pauseBattle();
+      updateBattleStatus();
+      updateBattleInfo();
+    }
+  }, interval);
 }
 
 /**
