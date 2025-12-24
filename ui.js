@@ -2,7 +2,7 @@ import { state, resetState } from "./state.js";
 import { MODE_LABEL, BATTLE_RESULT, BATTLE_RESULT_LABEL, PLACE, NONE_LABEL } from "./constants.js";
 import { nowStr, formatGameTime, clamp } from "./util.js";
 import { elements, setOutput, pushLog, pushToast } from "./dom.js";
-import { renderMap, wireMapHover, getLocationStatus, getTerrainAt } from "./map.js";
+import { renderMap, wireMapHover, getLocationStatus, getTerrainAt, ensureNobleHomes } from "./map.js";
 import {
   formatTroopDisplay,
   renderTroopModal,
@@ -43,8 +43,19 @@ import {
   QUEST_TYPES,
 } from "./quests.js";
 import { buildEnemyFormation } from "./actions.js";
-import { wireBattleUI, setEnemyFormation, setBattleEndHandler, openBattle, setBattleTerrain } from "./battle.js";
+import { addWarScore, getPlayerFactionId, adjustNobleFavor } from "./faction.js";
+import { absDay } from "./questUtils.js";
+import {
+  wireBattleUI,
+  setEnemyFormation,
+  setBattleEndHandler,
+  openBattle,
+  setBattleTerrain,
+  setBattleEnemyFaction,
+} from "./battle.js";
 import { loadGameFromStorage } from "./storage.js";
+import { initEventQueueUI } from "./events.js";
+import { ensureFactionState } from "./faction.js";
 
 /**
  * モード表示用のラベルを組み立てる。
@@ -169,6 +180,7 @@ function performPrayer() {
   ]);
   pushLog("祈り", text, state.lastRoll ?? "-");
   pushToast("祈りの結果", text, "good");
+  addWarScore(getPlayerFactionId(), "pirates", 0, absDay(state), 0, consume);
   clearActionMessage();
   if (elements.ctxEl) elements.ctxEl.value = "move";
   syncUI();
@@ -210,10 +222,12 @@ function clearBattlePrep(resetMode = true) {
     terrain: "plain",
     questId: null,
     questType: null,
+    enemyFactionId: null,
   };
   if (resetMode) state.modeLabel = MODE_LABEL.NORMAL;
   resetEncounterMeter();
   setEnemyFormation(null);
+  setBattleEnemyFaction(null);
   setBattleTerrain("plain");
 }
 
@@ -279,6 +293,8 @@ function processBattleOutcome(resultCode, meta) {
   const enemyTotal = enemyTotalEstimate(meta);
   const fameDelta = Math.floor(enemyTotal / 2);
   const isStrong = meta?.enemyFormation?.some((e) => (e.level || 1) > 1) || state.pendingEncounter?.strength === "elite";
+  const enemyFactionId = meta?.enemyFactionId || state.pendingEncounter?.enemyFactionId || "pirates";
+  const playerFactionId = getPlayerFactionId();
   const resultLabel = BATTLE_RESULT_LABEL[resultCode] || resultCode;
   const isWin = resultCode === BATTLE_RESULT.WIN;
   const questId = state.pendingEncounter?.questId;
@@ -386,6 +402,24 @@ function processBattleOutcome(resultCode, meta) {
       }
     }
   }
+  // 依頼以外の海賊遭遇に勝利したら、近傍拠点の貴族好感度をわずかに上げる
+  if (!questId && enemyFactionId === "pirates" && isWin) {
+    const nearest = settlements
+      .map((s) => ({ s, d: manhattan(s.coords, state.position) }))
+      .filter((o) => o.d != null)
+      .sort((a, b) => a.d - b.d);
+    if (nearest.length) {
+      const topDist = nearest[0].d;
+      const tied = nearest.filter((o) => o.d === topDist).map((o) => o.s);
+      const pick = tied[Math.floor(Math.random() * tied.length)];
+      if (pick?.nobleId) adjustNobleFavor(pick.nobleId, 2);
+    }
+  }
+  // 戦況スコア反映（敵勢力ID必須化）
+  const delta = isWin ? 8 : resultCode === BATTLE_RESULT.LOSE ? -6 : 0;
+  if (delta !== 0) {
+    addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
+  }
 
   clearBattlePrep(false);
   const body = summary.join("\n");
@@ -406,6 +440,8 @@ function processBattleOutcome(resultCode, meta) {
 function startPrepBattle() {
   if (!state.pendingEncounter?.active) return;
   setEnemyFormation(state.pendingEncounter.enemyFormation || []);
+  const enemyFactionId = state.pendingEncounter?.enemyFactionId || "pirates";
+  setBattleEnemyFaction(enemyFactionId);
   setBattleEndHandler((res, meta) => {
     processBattleOutcome(res, meta);
   });
@@ -435,6 +471,7 @@ function startOracleBattle() {
     terrain,
     questId: quest.id,
     questType: quest.type,
+    enemyFactionId: quest.enemyFactionId || "pirates",
   };
   state.modeLabel = MODE_LABEL.PREP;
   resetEncounterMeter();
@@ -785,6 +822,7 @@ function wireButtons() {
   document.getElementById("resetBtn")?.addEventListener("click", () => {
     if (!confirm("状態とログをリセットしますか？")) return;
     resetState();
+    ensureNobleHomes();
     seedInitialQuests();
     ensureSeasonalQuests(getCurrentSettlement());
     resetEncounterMeter();
@@ -937,8 +975,10 @@ function wireButtons() {
  */
 export function initUI() {
   const restored = loadGameFromStorage();
+  ensureFactionState();
   seedInitialQuests();
   ensureSeasonalQuests(getCurrentSettlement());
+  ensureNobleHomes();
   if (!restored) {
     resetEncounterMeter();
   }
@@ -947,6 +987,7 @@ export function initUI() {
   wireTroopDismiss(elements.troopsDetail, syncUI);
   wireSupplyDiscard(elements.suppliesDetail, syncUI);
   wireMapHover();
+  initEventQueueUI();
   syncUI();
   setOutput("次の操作", "状況を選んで、1D6を振ってください", [
     { text: "-", kind: "" },

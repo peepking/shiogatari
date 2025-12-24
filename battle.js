@@ -119,6 +119,7 @@ const battleState = {
   selectedUnitId: null,
   attackFx: [],
   enemyFormation: null,
+  enemyFactionId: null,
   onEnd: null,
   battleTerrain: "plain",
   enemySlotOrder: null,
@@ -1195,6 +1196,7 @@ function finishBattle(forceDraw = false) {
     handler(result, {
       units: battleState.units,
       enemyFormation: battleState.enemyFormation,
+      enemyFactionId: battleState.enemyFactionId,
       resultLabel,
     });
   }
@@ -1842,6 +1844,14 @@ export function wireBattleUI() {
   syncFormationUI();
   renderCustomEditor();
   renderStrategyUI();
+}
+
+/**
+ * 敵勢力IDを設定する。
+ * @param {string|null} factionId
+ */
+export function setBattleEnemyFaction(factionId) {
+  battleState.enemyFactionId = factionId || null;
 }
 
 export function setEnemyFormation(entries) {

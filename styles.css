@@ -716,6 +716,21 @@ option {
   overflow: auto;
   padding-right: 2px;
 }
+#eventModal .modal-bd {
+  padding-bottom: 8px;
+}
+#eventModal .event-body {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: rgba(232, 239, 255, 0.9);
+}
+#eventModal .modal-ft {
+  padding: 10px var(--card-pad);
+  border-top: 1px solid var(--line);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 
 #troopsModal .modal {
   width: min(880px, 98vw);
@@ -844,6 +859,16 @@ option {
   border-radius: 999px;
   border: 1px solid var(--line);
   font-size: 11px;
+  white-space: pre-wrap;
+}
+
+.f-war {
+  margin-top: 4px;
+  display: inline-flex;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11px;
 }
 
 .noble-panel {
@@ -894,6 +919,9 @@ option {
   font-size: 11px;
   color: rgba(232, 239, 255, 0.7);
   margin-top: 2px;
+}
+.n-body .n-title:last-child {
+  color: rgba(232, 239, 255, 0.9);
 }
 
 .map-block {

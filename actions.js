@@ -1,13 +1,16 @@
 import { state } from "./state.js";
 import { MODE_LABEL, PLACE } from "./constants.js";
 import { setOutput, pushLog, pushToast } from "./dom.js";
-import { getSettlementAtPosition, getLocationStatus, getTerrainAt } from "./map.js";
+import { getSettlementAtPosition, getLocationStatus, getTerrainAt, settlements } from "./map.js";
 import { calcSupplyCap, totalSupplies } from "./supplies.js";
 import { calcTroopCap, totalTroops } from "./troops.js";
 import { advanceDayWithEvents } from "./time.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
 import { randInt, absDay, rollDice, manhattan, pickRandomProcessed, randomSeaTarget, randomHuntTarget, NORMAL_ANCHORS, STRONG_ANCHORS, pickAnchorRange } from "./questUtils.js";
+import { warScoreLabel } from "./util.js";
+import { getWarEntry, getPlayerFactionId } from "./faction.js";
+import { FACTIONS } from "./lore.js";
 
 /**
  * エンカウント歩数
@@ -18,6 +21,7 @@ const ENCOUNTER_MAX = 15;
  * 強プール確率
  */
 const STRONG_POOL_CHANCE = 0.25;
+const ENCOUNTER_RADIUS = 5;
 
 /** エンカウント進捗と閾値をリセットする。 */
 export function resetEncounterMeter() {
@@ -61,6 +65,55 @@ export function buildEnemyFormation(forceStrength) {
 }
 
 /**
+ * 現在位置・地形に応じてエンカウント勢力を決める。
+ * 近傍拠点で最頻出の勢力を優先し、戦況・地形で重み付けする。
+ * @param {{x:number,y:number}} pos
+ * @param {string} terrain
+ * @returns {string} 勢力ID
+ */
+function pickEncounterFaction(pos, terrain) {
+  const regionWeight = new Map();
+  settlements.forEach((s) => {
+    if (!s?.factionId) return;
+    const dist = manhattan(s.coords, pos);
+    if (dist > ENCOUNTER_RADIUS) return;
+    const w = ENCOUNTER_RADIUS - dist + 1;
+    regionWeight.set(s.factionId, (regionWeight.get(s.factionId) || 0) + w);
+  });
+  const warFactor = (fid) => {
+    const entry = getWarEntry(getPlayerFactionId(), fid);
+    const label = warScoreLabel(entry?.score || 0);
+    if (label === "losing") return 1.5;
+    if (label === "disadvantage") return 1.2;
+    if (label === "advantage") return 0.8;
+    if (label === "winning") return 0.7;
+    return 1;
+  };
+  const entries = [];
+  const pirateBase = terrain === "sea" || terrain === "shoal" ? 1.0 : 0.3;
+  const pushFaction = (fid, base) => {
+    let w = base;
+    const rw = regionWeight.get(fid) || 0;
+    if (rw > 0) w *= 1 + rw / 10;
+    w *= warFactor(fid);
+    entries.push({ fid, w });
+  };
+  pushFaction("pirates", pirateBase);
+  FACTIONS.filter((f) => f.id !== "pirates").forEach((f) => {
+    const base = regionWeight.has(f.id) ? 1.0 : 0.4;
+    pushFaction(f.id, base);
+  });
+  const total = entries.reduce((s, e) => s + e.w, 0);
+  if (total <= 0) return "pirates";
+  let roll = Math.random() * total;
+  for (const e of entries) {
+    roll -= e.w;
+    if (roll <= 0) return e.fid;
+  }
+  return entries[entries.length - 1].fid || "pirates";
+}
+
+/**
  * エンカウントを発火し、戦闘準備モードへ遷移する。
  * @param {Function} syncUI UI同期関数
  * @returns {void}
@@ -68,12 +121,14 @@ export function buildEnemyFormation(forceStrength) {
 function triggerEncounter(syncUI) {
   const { formation, total, strength } = buildEnemyFormation();
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
+  const enemyFactionId = pickEncounterFaction(state.position, terrain);
   state.pendingEncounter = {
     active: true,
     enemyFormation: formation,
     enemyTotal: total,
     strength,
     terrain,
+    enemyFactionId,
   };
   state.modeLabel = MODE_LABEL.PREP;
   resetEncounterMeter();
@@ -104,7 +159,11 @@ function maybeTriggerEncounter(syncUI) {
   // 村/街タイル上ではエンカウントしないが、リセットもしない（入場時のみリセット）
   if (loc?.place === PLACE.VILLAGE || loc?.place === PLACE.TOWN) return false;
   const threshold = clamp(state.encounterThreshold || ENCOUNTER_MIN, ENCOUNTER_MIN, ENCOUNTER_MAX);
-  state.encounterProgress = (state.encounterProgress || 0) + 1;
+  const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
+  const enemyFactionId = pickEncounterFaction(state.position, terrain);
+  const playerFid = getPlayerFactionId();
+  const nearbyEnemyBoost = enemyFactionId !== "pirates" && enemyFactionId !== playerFid ? 1.3 : 1;
+  state.encounterProgress = (state.encounterProgress || 0) + nearbyEnemyBoost;
   if (state.encounterProgress >= threshold) {
     triggerEncounter(syncUI);
     pushToast("敵襲", "外洋海賊が接近中！ 戦闘準備をしてください。", "warn");

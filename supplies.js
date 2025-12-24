@@ -1,6 +1,7 @@
 import { state } from "./state.js";
 import { sumValues } from "./util.js";
 import { pushLog, pushToast, confirmAction } from "./dom.js";
+import { getWarEntry, getWarScoreLabel, getSupportLabel, getPlayerFactionId } from "./faction.js";
 
 /** @type {number} 基本の物資上限 */
 export const BASE_SUPPLY_CAP = 50;
@@ -56,6 +57,44 @@ const rollDice = (times, faces) => {
   for (let i = 0; i < times; i++) total += randInt(1, faces);
   return total;
 };
+
+/**
+ * 戦況ラベルに応じた価格倍率を返す。
+ * @param {string|null} factionId
+ * @param {string|null} settlementId
+ * @returns {number}
+ */
+function priceWarMultiplier(factionId, settlementId) {
+  if (!factionId) return 1;
+  const entry = getWarEntry(getPlayerFactionId(), factionId);
+  const label = getWarScoreLabel(entry?.score || 0);
+  switch (label) {
+    case "winning":
+      return 0.8;
+    case "advantage":
+      return 0.9;
+    case "disadvantage":
+      return 1.15;
+    case "losing":
+      return 1.2;
+    default:
+      return 1;
+  }
+}
+
+/**
+ * 支持度ラベルに応じた価格倍率を返す。
+ * @param {string|null} factionId
+ * @param {string|null} settlementId
+ * @returns {number}
+ */
+function priceSupportMultiplier(factionId, settlementId) {
+  if (!factionId || !settlementId) return 1;
+  const label = getSupportLabel(settlementId, factionId);
+  if (label === "high") return 0.95;
+  if (label === "low") return 1.05;
+  return 1;
+}
 
 /**
  * 物資の所持上限を計算する。
@@ -260,12 +299,14 @@ export function wireSupplyModal(elements, openModal, closeModal) {
  * @param {number} demand
  * @returns {number|null}
  */
-export function calcSupplyPrice(supplyId, demand) {
+export function calcSupplyPrice(supplyId, demand, opts = {}) {
   const item = SUPPLY_INDEX[supplyId];
   if (!item) return null;
   const d = clamp(Number(demand) || 0, 1, 10);
   // 価格は基本価格 * (1 + 需要度/10)、小数点切り捨て。
-  return Math.floor(item.basePrice * (1 + d / 10));
+  const warMul = priceWarMultiplier(opts.factionId, opts.settlementId);
+  const supportMul = priceSupportMultiplier(opts.factionId, opts.settlementId);
+  return Math.floor(item.basePrice * (1 + d / 10) * warMul * supportMul);
 }
 
 /**

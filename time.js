@@ -2,6 +2,8 @@ import { advanceDay as baseAdvanceDay, state } from "./state.js";
 import { questTickDay } from "./quests.js";
 import { TROOP_STATS, totalTroops, applyTroopLosses } from "./troops.js";
 import { pushLog } from "./dom.js";
+import { absDay } from "./questUtils.js";
+import { tickDailyWar, maybeQueueHonorInvite, applySupportDrift } from "./faction.js";
 
 /**
  * 日付更新と、それに連動するイベント処理を進める。
@@ -15,6 +17,12 @@ export function advanceDayWithEvents(days = 1) {
     const d = state.day;
     if (d === 10 || d === 20 || d === 30) {
       applyPeriodicFood();
+    }
+    const today = absDay(state);
+    tickDailyWar(today);
+    maybeQueueHonorInvite(today);
+    if (state.day % 7 === 0) {
+      applySupportDrift();
     }
   }
   // 季節が進んだ回数だけ維持費処理を行う。

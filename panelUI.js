@@ -1,9 +1,11 @@
 import { elements } from "./dom.js";
 import { state } from "./state.js";
-import { ASSETS, FACTIONS, ATTITUDE_LABELS } from "./lore.js";
+import { ASSETS, FACTIONS } from "./lore.js";
 import { formatTroopDisplay, TROOP_STATS } from "./troops.js";
 import { formatSupplyDisplay, SUPPLY_ITEMS } from "./supplies.js";
-import { getSettlementsByNoble, nobleHome, refreshMapInfo } from "./map.js";
+import { getSettlementsByNoble, nobleHome, refreshMapInfo, settlements } from "./map.js";
+import { getWarEntry, getWarScoreLabel, isHonorFaction, getPlayerFactionId, getRelation } from "./faction.js";
+import { displayWarLabel, displayRelationLabel } from "./util.js";
 
 /**
  * 勢力IDから名称を取得する。
@@ -11,6 +13,19 @@ import { getSettlementsByNoble, nobleHome, refreshMapInfo } from "./map.js";
  * @returns {string}
  */
 const factionName = (id) => FACTIONS.find((f) => f.id === id)?.name || id;
+
+/**
+ * 勢力の状態ラベル（態度＋戦争中フラグ）を返す。
+ * @param {string} fid
+ * @returns {string}
+ */
+function factionStatusText(fid) {
+  const pf = getPlayerFactionId();
+  const rel = getRelation(pf, fid);
+  const relLabel = displayRelationLabel(rel === "war" ? "cold" : rel === "ally" ? "ally" : "wary");
+  const war = state.factionState?.[fid]?.warFlags?.active ? " / 戦争中" : "";
+  return `${relLabel}${war}`;
+}
 
 /**
  * 資産カードの表示を更新する。
@@ -45,8 +60,10 @@ export function renderAssets() {
 export function renderFactions() {
   if (!elements.factionListEl) return;
   elements.factionListEl.innerHTML = FACTIONS.map((f) => {
-    const attitude = state.factionAttitudes[f.id] || "neutral";
-    const attText = ATTITUDE_LABELS[attitude] || attitude;
+    const attText = factionStatusText(f.id);
+    const warEntry = getWarEntry(getPlayerFactionId(), f.id);
+    const warLabel = displayWarLabel(getWarScoreLabel(warEntry?.score || 0));
+    const honor = isHonorFaction(f.id);
     return `
       <div class="faction-card" data-fid="${f.id}" data-fcolor="${f.color}">
         <div class="faction-flag">
@@ -55,7 +72,8 @@ export function renderFactions() {
         <div class="faction-body">
           <div class="f-name">${f.name}</div>
           <div class="f-tagline">${f.tagline}</div>
-          <div class="f-attitude">${attText}</div>
+          <div class="f-attitude">${attText}${honor ? " / 名誉家臣" : ""}</div>
+          <div class="f-war">戦況: ${warLabel}</div>
         </div>
       </div>
     `;
@@ -75,16 +93,28 @@ export function renderNobles(fid) {
   if (!f) return;
   elements.noblePanel.hidden = false;
   elements.nobleFactionName.textContent = f.name;
+  const homeMap = new Map(nobleHome.entries());
+  const getStay = (nid) => {
+    const hid = homeMap.get(nid);
+    if (!hid) return "滞在中: -";
+    const set = settlements.find((s) => s.id === hid);
+    if (!set) return "滞在中: -";
+    return `滞在中: ${set.name} (${set.coords.x + 1}, ${set.coords.y + 1})`;
+  };
   elements.nobleListEl.innerHTML = f.nobles
     .map(
-      (n) => `
+      (n) => {
+        const stayText = getStay(n.id);
+        return `
       <div class="noble-card" data-nid="${n.id}">
         <img src="${n.img}" alt="${n.name}">
         <div class="n-body">
           <div class="n-name">${n.name}</div>
           <div class="n-title">${n.title}</div>
+          <div class="n-title">${stayText}</div>
         </div>
-      </div>`
+      </div>`;
+      }
     )
     .join("");
   if (elements.nobleDetail) elements.nobleDetail.innerHTML = "";
@@ -103,16 +133,11 @@ export function renderNobleDetail(nobleId) {
     elements.nobleDetail.textContent = "保有する街や村はありません。";
     return;
   }
-  const stayLine = home
-    ? `<div class="tiny">滞在中: ${home.name} (${home.kind === "town" ? "街" : "村"})</div>`
-    : "";
   const supplyLabel = (id) => SUPPLY_ITEMS.find((i) => i.id === id)?.name || id || "なし";
-  elements.nobleDetail.innerHTML =
-    stayLine +
-    owned
-      .map(
-        (s) =>
-          `<div class="noble-settlement">
+  elements.nobleDetail.innerHTML = owned
+    .map(
+      (s) =>
+        `<div class="noble-settlement">
           <div><b>${s.name}</b>・${s.kind === "town" ? "街" : "村"}</div>
           <div class="tiny">座標 (${s.coords.x + 1}, ${s.coords.y + 1}) / 勢力 ${factionName(
             s.factionId
@@ -123,8 +148,8 @@ export function renderNobleDetail(nobleId) {
               .join("・") || "なし"
           } / 特産: ${supplyLabel(s.specialty)}</div>
         </div>`
-      )
-      .join("");
+    )
+    .join("");
 }
 
 /**

@@ -78,6 +78,8 @@ export const FACTIONS = [
     nobles: [
       { id: "citadel_cape", name: "岬の代官", title: "港湾徴発の長", img: ASSETS.noble },
       { id: "citadel_fort", name: "砦の守備卿", title: "船団入港の判定役", img: ASSETS.noble },
+      { id: "citadel_wall", name: "海壁の監督", title: "外郭城壁の監督官", img: ASSETS.noble },
+      { id: "citadel_beacon", name: "烽火の管主", title: "烽火台の管制役", img: ASSETS.noble },
     ],
   },
   {

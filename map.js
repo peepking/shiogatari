@@ -4,6 +4,7 @@ import { elements } from "./dom.js";
 import { FACTIONS } from "./lore.js";
 import { QUEST_TYPES } from "./quests.js";
 import { absDay } from "./questUtils.js";
+import { supportLabel, displaySupportLabel, displayWarLabel } from "./util.js";
 import {
   refreshSettlementDemand,
   refreshSettlementStock,
@@ -227,38 +228,11 @@ let lastDemandSeason = { year: state.year, season: state.season };
  */
 (function assignSettlements() {
   const usedNames = new Set();
-  const nobles = FACTIONS.flatMap((f) =>
-    (f.nobles || []).map((n) => ({ ...n, factionId: f.id }))
-  );
-  if (!nobles.length) return;
-  let idx = 0;
-  const factionOrder = {};
-  const noblesByFaction = nobles.reduce((acc, noble) => {
-    if (!acc[noble.factionId]) acc[noble.factionId] = [];
-    acc[noble.factionId].push(noble);
-    return acc;
-  }, {});
-  /**
-   * 勢力に属する貴族を順番に選ぶ。
-   * @param {string} factionId
-   * @returns {object|null}
-   */
-  const pickNobleByFaction = (factionId) => {
-    const list = noblesByFaction[factionId] || [];
-    if (!list.length) return null;
-    const next = factionOrder[factionId] ?? 0;
-    factionOrder[factionId] = next + 1;
-    return list[next % list.length];
-  };
-  /**
-   * 全体から貴族を順繰りで選ぶ。
-   * @returns {object}
-   */
-  const pickFallbackNoble = () => {
-    const owner = nobles[idx % nobles.length];
-    idx += 1;
-    return owner;
-  };
+  const noblesByFaction = new Map();
+  FACTIONS.forEach((f) => noblesByFaction.set(f.id, (f.nobles || []).map((n) => ({ ...n, factionId: f.id }))));
+  const factionCursor = new Map();
+  const fallbackList = Array.from(noblesByFaction.values()).flat();
+  let fallbackCursor = 0;
   // 拠点の所属は島ごとの勢力偏りを持たせる（左上/右上/下の島）。
   /**
    * 座標ごとの優先勢力を返す。
@@ -297,10 +271,17 @@ let lastDemandSeason = { year: state.year, season: state.season };
       }
 
       const preferred = preferredFactionForCell(x, y);
-      // 地域の勢力偏りを75%で適用する。
-      const usePreferred = preferred && Math.random() < 0.75;
-      const owner =
-        (usePreferred ? pickNobleByFaction(preferred) : null) || pickFallbackNoble();
+      let owner = null;
+      const list = (preferred && noblesByFaction.get(preferred)) || null;
+      if (list && list.length) {
+        const cur = factionCursor.get(preferred) || 0;
+        owner = list[cur % list.length];
+        factionCursor.set(preferred, cur + 1);
+      }
+      if (!owner && fallbackList.length) {
+        owner = fallbackList[fallbackCursor % fallbackList.length];
+        fallbackCursor += 1;
+      }
       const id = `set-${settlements.length + 1}`;
 const goods = [
         goodsPool[Math.floor(Math.random() * goodsPool.length)],
@@ -322,6 +303,9 @@ const goods = [
         goods,
         coords: { x, y },
         specialty,
+        controllerId: owner.id,
+        support: Object.fromEntries(FACTIONS.map((f) => [f.id, 0])),
+        warState: { contested: false, frontline: false },
       };
       initSettlementRecruitment(settlement);
       refreshSettlementDemand(settlement);
@@ -330,10 +314,46 @@ const goods = [
       cell.settlement = settlement;
       cell.factionId = settlement.factionId;
       if (!nobleHome.has(owner.id)) nobleHome.set(owner.id, id);
+      // 貴族のhomeSettlementIdを設定（既存のnobleHomeマップと合わせて持つ）
+      const nobleObj = FACTIONS.find((f) => f.id === owner.factionId)?.nobles?.find((n) => n.id === owner.id);
+      if (nobleObj && !nobleObj.homeSettlementId) nobleObj.homeSettlementId = id;
     }
   }
   lastDemandSeason = { year: state.year, season: state.season };
 })();
+
+/**
+ * 勢力内で均等に貴族を拠点へ割り振る（拠点数 < 貴族数の場合は再利用）。
+ */
+export function ensureNobleHomes() {
+  nobleHome.clear();
+  const fallbackSet = settlements[0] || null;
+  FACTIONS.forEach((f) => {
+    const sets = settlements.filter((s) => s.factionId === f.id);
+    const nobles = f.nobles || [];
+    if (!sets.length || !nobles.length) return;
+    sets.forEach((s, idx) => {
+      const n = nobles[idx % nobles.length];
+      s.nobleId = n.id;
+      s.controllerId = n.id;
+      if (!nobleHome.has(n.id)) {
+        nobleHome.set(n.id, s.id);
+        n.homeSettlementId = n.homeSettlementId || s.id;
+      }
+    });
+  });
+  // 勢力に拠点が無い貴族がいる場合のフォールバック
+  FACTIONS.forEach((f) => {
+    (f.nobles || []).forEach((n) => {
+      if (nobleHome.has(n.id)) return;
+      if (fallbackSet) {
+        nobleHome.set(n.id, fallbackSet.id);
+        n.homeSettlementId = n.homeSettlementId || fallbackSet.id;
+      }
+    });
+  });
+}
+ensureNobleHomes();
 
 /**
  * 指定の貴族が保有する拠点を返す。
@@ -351,6 +371,11 @@ export function getSettlementsByNoble(nobleId) {
  */
 function factionName(id) {
   return FACTIONS.find((f) => f.id === id)?.name || id;
+}
+
+function nobleName(nobleId) {
+  const nob = FACTIONS.flatMap((f) => f.nobles || []).find((n) => n.id === nobleId);
+  return nob?.name || nobleId;
 }
 
 function questToPin(q, nowAbs) {
@@ -484,10 +509,17 @@ function formatCellInfo(gx, gy) {
   if (!cell) return "";
   const t = terrainKinds.find((t) => t.key === cell.terrain);
   const terr = t ? t.name : cell.terrain;
-  const detail = cell.settlement
-    ? ` / ${cell.settlement.name}（${factionName(cell.settlement.factionId)}）`
-    : "";
-  return `(${gx + 1}, ${gy + 1}) ${terr}${detail}`;
+  if (!cell.settlement) return `(${gx + 1}, ${gy + 1}) ${terr}`;
+  const s = cell.settlement;
+  const ctrl = nobleName(s.nobleId);
+  const support = displaySupportLabel(supportLabel(s.support?.[s.factionId] ?? 0));
+  const war =
+    s.warState?.label
+      ? displayWarLabel(s.warState.label)
+      : s.warState?.frontline || s.warState?.contested
+        ? "前線"
+        : "平常";
+  return `(${gx + 1}, ${gy + 1}) ${terr} / ${s.name}（${factionName(s.factionId)}） / 支配: ${ctrl} / 支持: ${support} / 戦況: ${war}`;
 }
 
 /**

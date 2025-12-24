@@ -1,7 +1,9 @@
 ﻿import { state } from "./state.js";
 import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
-import { settlements, getSettlementAtPosition } from "./map.js";
+import { settlements, getSettlementAtPosition, getSettlementById } from "./map.js";
 import { pushLog, pushToast } from "./dom.js";
+import { enqueueEvent } from "./events.js";
+import { addWarScore, adjustSupport, getWarEntry, getWarScoreLabel, getPlayerFactionId, adjustNobleFavor } from "./faction.js";
 import { TROOP_STATS } from "./troops.js";
 import {
   randInt,
@@ -92,7 +94,10 @@ function genSupplyQuest(settlement) {
   const choice = !bestProcessed || (bestRaw && bestRaw.demand >= bestProcessed.demand) ? "raw" : "processed";
   const itemPick = choice === "raw" ? bestRaw : bestProcessed;
   const qty = choice === "raw" ? Math.max(3, rollDice(3, 1)) : Math.max(2, rollDice(2, 1));
-  const price = calcSupplyPrice(itemPick.id, demand[itemPick.id] ?? 10) ?? 0;
+    const price = calcSupplyPrice(itemPick.id, demand[itemPick.id] ?? 10, {
+      factionId: settlement.factionId,
+      settlementId: settlement.id,
+    }) ?? 0;
   const reward = price * qty * 2;
   const rewardFame = Math.max(1, Math.round(qty / 2));
   const itemName = SUPPLY_ITEMS.find((i) => i.id === itemPick.id)?.name || itemPick.id;
@@ -168,6 +173,10 @@ function generateSeasonQuestsForSettlement(settlement) {
   if ((state.fame || 0) >= 100) {
     candidates.push(genBountyHuntQuest(settlement));
   }
+  const warLabel = getWarScoreLabel(getWarEntry(getPlayerFactionId(), settlement.factionId)?.score || 0);
+  if (warLabel === "disadvantage" || warLabel === "losing") {
+    candidates.push(genPirateHuntQuest(settlement));
+  }
   // 3枠に収める
   const pool = candidates
     .slice()
@@ -238,7 +247,10 @@ export function acceptQuest(id, settlement) {
   // 受注拠点基準で報酬を確定
   if (q.type === QUEST_TYPES.SUPPLY) {
     const demand = settlement.demand || {};
-    const price = calcSupplyPrice(q.itemId, demand[q.itemId] ?? 10) ?? 0;
+    const price = calcSupplyPrice(q.itemId, demand[q.itemId] ?? 10, {
+      factionId: settlement.factionId,
+      settlementId: settlement.id,
+    }) ?? 0;
     q.reward = price * q.qty * 2;
   }
   if (q.type === QUEST_TYPES.DELIVERY) {
@@ -339,6 +351,7 @@ function genOracleHunt() {
     type: QUEST_TYPES.ORACLE_HUNT,
     title: "神託: 奪え",
     target,
+    enemyFactionId: "pirates",
     rewardFaith,
     reward: 0,
     acceptedAbs: absDay(state),
@@ -362,6 +375,7 @@ function genOracleElite() {
     type: QUEST_TYPES.ORACLE_ELITE,
     title: "神託: 越えよ",
     target,
+    enemyFactionId: "pirates",
     rewardFaith,
     reward: 0,
     acceptedAbs: absDay(state),
@@ -401,6 +415,7 @@ function genPirateHuntQuest(settlement) {
     type: QUEST_TYPES.PIRATE_HUNT,
     title: "海賊討伐",
     target,
+    enemyFactionId: "pirates",
     estimatedTotal,
     reward,
     rewardFame,
@@ -430,6 +445,7 @@ function genBountyHuntQuest(settlement) {
     type: QUEST_TYPES.BOUNTY_HUNT,
     title: "賞金首討伐",
     target,
+    enemyFactionId: "pirates",
     estimatedTotal,
     reward,
     rewardFame,
@@ -501,6 +517,10 @@ export function completeQuest(id) {
   if (q.type === QUEST_TYPES.SUPPLY) {
     if (!here || here.id !== q.originId) return false;
     if ((state.supplies?.[q.itemId] ?? 0) < q.qty) return false;
+    adjustSupport(q.originId, here.factionId, 3);
+    addWarScore(getPlayerFactionId(), "pirates", 0, absDay(state), 3, 0);
+    const set = getSettlementById(q.originId);
+    if (set?.nobleId) adjustNobleFavor(set.nobleId, 3);
     state.supplies[q.itemId] -= q.qty;
     fameReward = rollDice(5, 2);
     state.fame += fameReward;
@@ -508,6 +528,10 @@ export function completeQuest(id) {
   if (q.type === QUEST_TYPES.DELIVERY) {
     if (!here || here.id !== q.targetId) return false;
     if ((state.supplies?.[q.itemId] ?? 0) < q.qty) return false;
+    adjustSupport(q.targetId, here.factionId, 3);
+    addWarScore(getPlayerFactionId(), "pirates", 0, absDay(state), 3, 0);
+    const set = getSettlementById(q.targetId);
+    if (set?.nobleId) adjustNobleFavor(set.nobleId, 3);
     state.supplies[q.itemId] -= q.qty;
     fameReward = rollDice(5, 2);
     state.fame += fameReward;
@@ -556,6 +580,7 @@ export function completeQuest(id) {
   const rewardText = rewards.length ? rewards.join(" / ") : "報酬なし";
   pushLog("依頼完了", `${q.title} / ${rewardText}`, "-");
   pushToast("依頼完了", `${q.title} / ${rewardText}`, "good");
+  enqueueEvent({ title: "依頼完了", body: `${q.title} / ${rewardText}` });
   return true;
 }
 
@@ -615,6 +640,7 @@ export function completeOracleBattleQuest(id) {
   const rewardText = rewardFaith > 0 ? `信仰+${rewardFaith}` : "報酬なし";
   pushLog("神託達成", `${q.title} / ${rewardText}`, "-");
   pushToast("神託達成", `${q.title} / ${rewardText}`, "good");
+  enqueueEvent({ title: "神託達成", body: `${q.title} / ${rewardText}` });
   return true;
 }
 
@@ -635,6 +661,7 @@ export function failOracleBattleQuest(id, reason = "") {
   const note = reason ? ` / ${reason}` : "";
   pushLog("神託失敗", `${q.title}${note}`, "-");
   pushToast("神託失敗", `${q.title}${note}`, "bad");
+  enqueueEvent({ title: "神託失敗", body: `${q.title}${note}` });
   return true;
 }
 
@@ -662,11 +689,17 @@ export function completeHuntBattleQuest(id, success, reason = "") {
     const rewardText = rewards.length ? rewards.join(" / ") : "報酬なし";
     pushLog("討伐達成", `${q.title} / ${rewardText}`, "-");
     pushToast("討伐達成", `${q.title} / ${rewardText}`, "good");
+    const fid = q.enemyFactionId || "pirates";
+    addWarScore(getPlayerFactionId(), fid, 8, absDay(state));
+    enqueueEvent({ title: "討伐達成", body: `${q.title} / ${rewardText}` });
   } else {
     state.quests.active.splice(idx, 1);
     const note = reason ? ` / ${reason}` : "";
     pushLog("討伐失敗", `${q.title}${note}`, "-");
     pushToast("討伐失敗", `${q.title}${note}`, "bad");
+    const fid = q.enemyFactionId || "pirates";
+    addWarScore(getPlayerFactionId(), fid, -6, absDay(state));
+    enqueueEvent({ title: "討伐失敗", body: `${q.title}${note}` });
   }
   return true;
 }
@@ -704,7 +737,20 @@ export function questTickDay(days = 1) {
     // 期限切れ
     const expired = state.quests.active.filter((q) => q.deadlineAbs != null && now > q.deadlineAbs);
     if (expired.length) {
-      expired.forEach((q) => pushLog("依頼失敗", `${q.title} の期限切れ`, "-"));
+      expired.forEach((q) => {
+        pushLog("依頼失敗", `${q.title} の期限切れ`, "-");
+        enqueueEvent({ title: "依頼失敗", body: `${q.title} の期限切れ` });
+        if (q.type === QUEST_TYPES.SUPPLY && q.originId) {
+          const s = getSettlementById(q.originId);
+          if (s?.factionId) adjustSupport(q.originId, s.factionId, -2);
+          if (s?.nobleId) adjustNobleFavor(s.nobleId, -3);
+        }
+        if (q.type === QUEST_TYPES.DELIVERY && q.targetId) {
+          const s = getSettlementById(q.targetId);
+          if (s?.factionId) adjustSupport(q.targetId, s.factionId, -2);
+          if (s?.nobleId) adjustNobleFavor(s.nobleId, -3);
+        }
+      });
       state.quests.active = state.quests.active.filter(
         (q) => !(q.deadlineAbs != null && now > q.deadlineAbs)
       );

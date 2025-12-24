@@ -61,7 +61,10 @@ export function renderTradeSelects() {
   const demand = settlement.demand || {};
   const stock = settlement.stock || {};
   const rows = SUPPLY_ITEMS.map((i) => {
-    const price = calcSupplyPrice(i.id, demand[i.id] ?? 10) ?? 0;
+    const price = calcSupplyPrice(i.id, demand[i.id] ?? 10, {
+      factionId: settlement.factionId,
+      settlementId: settlement.id,
+    }) ?? 0;
     const townQty = stock[i.id] ?? 0;
     const haveQty = state.supplies?.[i.id] ?? 0;
     return {
@@ -116,7 +119,10 @@ function recalcTradeDelta() {
       v = max;
       inp.value = String(v);
     }
-    const price = calcSupplyPrice(id, demand[id] ?? 10) ?? 0;
+    const price = calcSupplyPrice(id, demand[id] ?? 10, {
+      factionId: settlement.factionId,
+      settlementId: settlement.id,
+    }) ?? 0;
     delta -= v * price;
   });
   const sellInputs = elements.tradeTableBody?.querySelectorAll(".trade-sell") || [];
@@ -128,7 +134,10 @@ function recalcTradeDelta() {
       v = max;
       inp.value = String(v);
     }
-    const price = calcSupplyPrice(id, demand[id] ?? 10) ?? 0;
+    const price = calcSupplyPrice(id, demand[id] ?? 10, {
+      factionId: settlement.factionId,
+      settlementId: settlement.id,
+    }) ?? 0;
     delta += v * price;
   });
   const el = elements.tradeDelta;
@@ -246,7 +255,10 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
       if (v > max) v = max;
       inp.value = String(v);
       if (v > 0) buys[id] = v;
-      const price = calcSupplyPrice(id, demand[id] ?? 10) ?? 0;
+      const price = calcSupplyPrice(id, demand[id] ?? 10, {
+        factionId: settlement.factionId,
+        settlementId: settlement.id,
+      }) ?? 0;
       fundsDelta -= v * price;
     });
     const sellInputs = elements.tradeTableBody?.querySelectorAll(".trade-sell") || [];
@@ -257,7 +269,10 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
       if (v > max) v = max;
       inp.value = String(v);
       if (v > 0) sells[id] = v;
-      const price = calcSupplyPrice(id, demand[id] ?? 10) ?? 0;
+      const price = calcSupplyPrice(id, demand[id] ?? 10, {
+        factionId: settlement.factionId,
+        settlementId: settlement.id,
+      }) ?? 0;
       fundsDelta += v * price;
     });
     const allIds = new Set([...Object.keys(buys), ...Object.keys(sells)]);

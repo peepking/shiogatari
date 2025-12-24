@@ -1,5 +1,5 @@
-import { FACTIONS } from "./lore.js";
 import { MODE_LABEL } from "./constants.js";
+import { FACTIONS } from "./lore.js";
 
 /**
  * ゲームの初期状態を生成する。
@@ -16,6 +16,8 @@ const createState = () => ({
   funds: 1000,
   fame: 0,
   silence: 0,
+  factionState: {},
+  warLedger: { entries: [] },
   encounterProgress: 0,
   encounterThreshold: 12,
   pendingEncounter: {
@@ -26,11 +28,18 @@ const createState = () => ({
     terrain: "plain",
     questId: null,
     questType: null,
+    enemyFactionId: null,
   },
   lastRoll: null,
   lastResultText: "",
   modeLabel: MODE_LABEL.NORMAL,
   mapPinsVisible: true,
+  eventQueue: [],
+  eventSeq: 1,
+  honorFactions: [],
+  honorInviteLog: {},
+  playerFactionId: null,
+  nobleFavor: {},
   year: 1000,
   season: 0, // 0:春 1:夏 2:秋 3:冬
   day: 1, // 1-30
@@ -62,8 +71,31 @@ const createPending = () => ({
   forceDirection: null,
 });
 
+function initFactionState() {
+  const map = {};
+  (FACTIONS || []).forEach((f) => {
+    map[f.id] = {
+      id: f.id,
+      name: f.name,
+      color: f.color,
+      attitude: f.attitude || "neutral",
+      relations: {},
+      warFlags: { active: false, startedAt: null, fronts: [] },
+      supplyStatus: { morale: 0, supply: 0 },
+    };
+  });
+  Object.keys(map).forEach((a) => {
+    Object.keys(map).forEach((b) => {
+      if (a === b) return;
+      map[a].relations[b] = "neutral";
+    });
+  });
+  return map;
+}
+
 /** @type {object} ゲームの進行状態 */
 export const state = createState();
+state.factionState = initFactionState();
 /** @type {object} 行動決定の一時状態 */
 export const pending = createPending();
 
@@ -72,6 +104,8 @@ export const pending = createPending();
  */
 export function resetState() {
   Object.assign(state, createState());
+  state.factionState = initFactionState();
+  state.warLedger = { entries: [] };
   Object.assign(pending, createPending());
 }
 
