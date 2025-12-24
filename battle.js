@@ -22,6 +22,10 @@ const MOVE_COLORS = {
   allyRetreat: "#f6a63c",
   enemyRetreat: "#f08232",
 };
+const ATTACK_COLORS = {
+  ally: "#ffd447", // 黄金色で移動ラインと差別化
+  enemy: "#ff4df5", // マゼンタ寄りでコントラストを確保
+};
 const DECK_KEY = "deck";
 
 /**
@@ -1084,6 +1088,7 @@ function applyAttack(attacker, target) {
   target.hp = Math.max(0, target.hp - dmg);
   // 攻撃エフェクトのため記録
   battleState.attackFx.push({ from: attacker.id, to: target.id, ttl: ATTACK_FX_TTL });
+  battleState.attackFx.push({ from: attacker.id, to: target.id, ttl: ATTACK_FX_TTL, impact: true, crit: dmg > atk * 0.8 });
   if (target.hp <= 0) {
     addBattleLog(`${target.side === "ally" ? "味方" : "敵"}の${target.name}が撃破された。`);
   }
@@ -1460,7 +1465,7 @@ function renderBattle() {
     ctx.fillRect(centerX - barW / 2, centerY + cell * 0.22, barW * hpRatio, barH);
   });
 
-  // 攻撃エフェクト（簡易ライン表示）
+  // 攻撃エフェクト（ライン + スパーク）
   (battleState.attackFx || []).forEach((fx) => {
     const from = getUnitById(fx.from, true);
     const to = getUnitById(fx.to, true);
@@ -1470,17 +1475,30 @@ function renderBattle() {
     const toX = to.x * cell + cell / 2;
     const toY = to.y * cell + cell / 2;
     const ally = from.side === "ally";
+    const color = ally ? ATTACK_COLORS.ally : ATTACK_COLORS.enemy;
     const alpha = Math.max(0.2, Math.min(1, (fx.ttl || 1) / ATTACK_FX_TTL));
-    ctx.strokeStyle = ally ? `rgba(122,167,255,${alpha})` : `rgba(255,122,122,${alpha})`;
-    ctx.lineWidth = 2;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // ライン（頭太尻細）
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.4;
+    ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(fromX, fromY);
     ctx.lineTo(toX, toY);
     ctx.stroke();
-    ctx.fillStyle = ally ? `rgba(122,167,255,${alpha})` : `rgba(255,122,122,${alpha})`;
-    ctx.beginPath();
-    ctx.arc(toX, toY, 4, 0, Math.PI * 2);
-    ctx.fill();
+    // スパーク
+    ctx.fillStyle = color;
+    const spark = fx.impact ? 5 : 3;
+    for (let i = 0; i < spark; i++) {
+      const angle = (Math.PI * 2 * i) / spark;
+      const len = fx.crit ? cell * 0.22 : cell * 0.16;
+      ctx.beginPath();
+      ctx.moveTo(toX, toY);
+      ctx.lineTo(toX + Math.cos(angle) * len, toY + Math.sin(angle) * len);
+      ctx.stroke();
+    }
+    ctx.restore();
   });
   // 移動軌跡（細いライン表示）
   (battleState.moveFx || []).forEach((fx) => {
