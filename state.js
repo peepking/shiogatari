@@ -41,6 +41,7 @@ const createState = () => ({
   playerFactionId: null,
   nobleFavor: {},
   refugeeEscort: { active: false, targetId: null, factionId: null, nobleId: null },
+  eventTrade: null,
   year: 1000,
   season: 0, // 0:春 1:夏 2:秋 3:冬
   day: 1, // 1-30

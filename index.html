@@ -585,6 +585,42 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="eventTradeModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div id="eventTradeTitle">取引</div>
+        <button class="modal-close" id="eventTradeModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd with-footer">
+        <div class="modal-scroll">
+          <div class="tiny" id="eventTradeNote"></div>
+          <div class="table mt-10">
+            <table class="trade-table">
+              <thead>
+                <tr>
+                  <th class="ta-left"> </th>
+                  <th class="ta-left">品目</th>
+                  <th class="ta-center">単価</th>
+                  <th class="ta-center">在庫</th>
+                  <th class="ta-center">購入</th>
+                </tr>
+              </thead>
+              <tbody id="eventTradeTableBody"></tbody>
+            </table>
+          </div>
+          <div id="eventTradeError" class="msg error mt-10" hidden></div>
+        </div>
+        <div class="sticky-footer row gap-12 w-100">
+          <button class="btn primary" id="eventTradeConfirm">取引を確定</button>
+          <div class="modal-summary">
+            <span class="pill">現在の資金: <b id="eventTradeFunds">0</b></span>
+            <div id="eventTradeDelta" class="pill" hidden></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="questModal" hidden>
     <div class="modal">
       <div class="modal-hd">
