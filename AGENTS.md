@@ -16,6 +16,7 @@ All files MUST be written in:
 To prevent encoding corruption:
 
 - Prefer `apply_patch` for all modifications
+- Never rewrite entire files unless explicitly requested; use minimal diffs via apply_patch.
 - NEVER use PowerShell default encoding commands:
   - `Set-Content`
   - `Out-File`
@@ -59,7 +60,9 @@ If a file or function becomes large or complex:
   - Write a new JSDoc instead
 
 ### Language
+- All comments must be written in Japanese.
 - JSDoc descriptions MUST be written in Japanese
+- JSDoc tags (@param, @returns, etc.) must remain standard and must not be translated.
 
 ### Internal behavior
 For logic involving:
