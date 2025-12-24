@@ -1,8 +1,9 @@
-import { elements, setOutput, pushLog, confirmAction } from "./dom.js";
+import { elements, setOutput, pushLog, confirmAction, pushToast } from "./dom.js";
 import { state } from "./state.js";
 import { MODE_LABEL } from "./constants.js";
 import { SUPPLY_ITEMS, calcSupplyPrice, calcSupplyCap, totalSupplies } from "./supplies.js";
 import { getCurrentSettlement } from "./actions.js";
+import { adjustSupport } from "./faction.js";
 
 // 船の単価は固定（1隻=5000資金）。
 const SHIP_PRICE = 5000;
@@ -53,6 +54,14 @@ function setShipTradeError(msg) {
 }
 
 /**
+ * イベント取引モーダルのエラー表示を更新する。
+ * @param {string} msg
+ */
+function setEventTradeError(msg) {
+  setInlineMessage(elements.eventTradeError, msg);
+}
+
+/**
  * 物資取引の一覧を描画する。
  */
 export function renderTradeSelects() {
@@ -66,12 +75,20 @@ export function renderTradeSelects() {
       settlementId: settlement.id,
       mode: "buy",
     }) ?? 0;
+    const basePrice = calcSupplyPrice(i.id, demand[i.id] ?? 10, {
+      factionId: settlement.factionId,
+      settlementId: settlement.id,
+      mode: "sell", // 支持度補正なしの基準価格として利用
+    }) ?? price;
+    const discountPct = basePrice > 0 ? Math.max(0, Math.round((1 - price / basePrice) * 100)) : 0;
     const townQty = stock[i.id] ?? 0;
     const haveQty = state.supplies?.[i.id] ?? 0;
     return {
       id: i.id,
       name: i.name,
       price,
+      basePrice,
+      discountPct,
       townQty,
       haveQty,
     };
@@ -83,7 +100,7 @@ export function renderTradeSelects() {
       (r) => `
         <tr>
           <td class="ta-center">${SUPPLY_ICONS[r.id] || "・"}</td>
-          <td>${r.name}</td>
+          <td>${r.name}${r.discountPct > 0 ? `<span class="pill off-pill">買値${r.discountPct}%OFF</span>` : ""}</td>
           <td class="ta-center">${r.price}</td>
           <td class="ta-center">${r.townQty}</td>
           <td class="ta-center">${r.haveQty}</td>
@@ -152,6 +169,138 @@ function recalcTradeDelta() {
 }
 
 /**
+ * イベント取引の収支を再計算する。
+ * @returns {void}
+ */
+function recalcEventTradeDelta() {
+  const deltaEl = elements.eventTradeDelta;
+  if (!deltaEl) return;
+  setEventTradeError("");
+  let delta = 0;
+  const inputs = elements.eventTradeTableBody?.querySelectorAll(".event-trade-buy") || [];
+  inputs.forEach((inp) => {
+    const price = Number(inp.getAttribute("data-price")) || 0;
+    const max = Math.max(0, Number(inp.getAttribute("data-stock")) || 0);
+    let v = Math.max(0, Number(inp.value) || 0);
+    if (v > max) {
+      v = max;
+      inp.value = String(v);
+    }
+    delta -= v * price;
+  });
+  deltaEl.hidden = false;
+  deltaEl.textContent = `資金変動: ${delta > 0 ? "+" : ""}${delta}`;
+  deltaEl.className = "pill " + (delta > 0 ? "delta-pos" : delta < 0 ? "delta-neg" : "delta-zero");
+}
+
+let currentEventTrade = null;
+
+/**
+ * イベント取引用のモーダルを描画する。
+ * @param {{title:string,note?:string,deals:Array<{id:string,name:string,price:number,stock:number}>}} trade
+ */
+export function renderEventTradeModal(trade) {
+  currentEventTrade = trade;
+  const body = elements.eventTradeTableBody;
+  if (!body) return;
+  body.innerHTML = (trade?.deals || [])
+    .map(
+      (d) => `
+        <tr>
+          <td class="ta-center">${SUPPLY_ICONS[d.id] || "・"}</td>
+          <td>${d.name}</td>
+          <td class="ta-center">${d.price}</td>
+          <td class="ta-center">${d.stock}</td>
+          <td class="ta-center">
+            <input type="number" min="0" value="0" data-id="${d.id}" data-price="${d.price}" data-stock="${d.stock}" class="event-trade-buy input-70">
+          </td>
+        </tr>`
+    )
+    .join("");
+  if (elements.eventTradeTitle) elements.eventTradeTitle.textContent = trade?.title || "取引";
+  if (elements.eventTradeNote) {
+    elements.eventTradeNote.textContent = trade?.note || "";
+    elements.eventTradeNote.hidden = !trade?.note;
+  }
+  if (elements.eventTradeFunds) elements.eventTradeFunds.textContent = String(state.funds);
+  if (elements.eventTradeDelta) {
+    elements.eventTradeDelta.hidden = false;
+    elements.eventTradeDelta.textContent = "資金変動: 0";
+    elements.eventTradeDelta.className = "pill delta-zero";
+  }
+  setEventTradeError("");
+}
+
+/**
+ * イベント取引を確定する。
+ * @param {Function} closeModal
+ * @param {Function} syncUI
+ */
+function confirmEventTrade(closeModal, syncUI) {
+  if (!currentEventTrade?.deals?.length) {
+    closeModal?.(elements.eventTradeModal);
+    state.eventTrade = null;
+    return;
+  }
+  const buys = {};
+  let fundsDelta = 0;
+  const inputs = elements.eventTradeTableBody?.querySelectorAll(".event-trade-buy") || [];
+  inputs.forEach((inp) => {
+    const id = inp.getAttribute("data-id");
+    const price = Number(inp.getAttribute("data-price")) || 0;
+    const max = Math.max(0, Number(inp.getAttribute("data-stock")) || 0);
+    const v = Math.max(0, Math.min(max, Number(inp.value) || 0));
+    if (v > 0 && id) {
+      buys[id] = (buys[id] || 0) + v;
+      fundsDelta -= v * price;
+    }
+  });
+  const totalBuy = Object.values(buys).reduce((a, b) => a + b, 0);
+  if (!totalBuy) {
+    setEventTradeError("購入数量を入力してください。");
+    return;
+  }
+  if (fundsDelta < 0 && state.funds < -fundsDelta) {
+    setEventTradeError("資金が足りません。");
+    return;
+  }
+  const cap = calcSupplyCap(state.ships);
+  const totalBefore = totalSupplies(state.supplies);
+  if (totalBefore + totalBuy > cap) {
+    setEventTradeError(`所持上限(${cap})を超えます。`);
+    return;
+  }
+  const stockMap = Object.fromEntries((currentEventTrade.deals || []).map((d) => [d.id, d.stock]));
+  for (const [id, qty] of Object.entries(buys)) {
+    if ((stockMap[id] ?? 0) < qty) {
+      setEventTradeError("在庫を超える数量は購入できません。");
+      return;
+    }
+  }
+  if (!state.supplies) state.supplies = {};
+  Object.entries(buys).forEach(([id, qty]) => {
+    state.supplies[id] = (state.supplies[id] || 0) + qty;
+  });
+  state.funds += fundsDelta;
+  if (state.eventTrade?.source === "smuggle") {
+    const sid = state.eventTrade.settlementId;
+    const fid = state.eventTrade.factionId;
+    if (sid && fid) adjustSupport(sid, fid, -2);
+  }
+  const summary = Object.entries(buys)
+    .map(([id, q]) => `${SUPPLY_ITEMS.find((i) => i.id === id)?.name ?? id} x${q}`)
+    .join(" / ");
+  pushLog(currentEventTrade.title || "取引", `資金${fundsDelta} / 入手: ${summary}`, "-");
+  pushToast(currentEventTrade.title || "取引", `資金${fundsDelta} / ${summary}`, fundsDelta <= 0 ? "info" : "good");
+  state.eventTrade = null;
+  closeModal?.(elements.eventTradeModal);
+  setEventTradeError("");
+  recalcEventTradeDelta();
+  syncUI?.();
+}
+
+
+/**
  * 船取引モーダルを描画する。
  */
 function renderShipTradeModal() {
@@ -205,6 +354,11 @@ function updateShipTradeDelta() {
 export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage }) {
   bindModal?.(elements.tradeModal, elements.tradeModalClose);
   bindModal?.(elements.shipTradeModal, elements.shipTradeModalClose);
+  bindModal?.(elements.eventTradeModal, elements.eventTradeModalClose);
+  elements.eventTradeModalClose?.addEventListener("click", () => {
+    state.eventTrade = null;
+    currentEventTrade = null;
+  });
 
   elements.tradeBtn?.addEventListener("click", () => {
     renderTradeSelects();
@@ -389,4 +543,26 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
       },
     });
   });
+
+  elements.eventTradeTableBody?.addEventListener("input", (e) => {
+    const target = e.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    if (!target.classList.contains("event-trade-buy")) return;
+    recalcEventTradeDelta();
+  });
+
+  elements.eventTradeConfirm?.addEventListener("click", () => {
+    confirmEventTrade(closeModal, syncUI);
+  });
+}
+
+/**
+ * イベント取引を開く（state.eventTradeを参照）。
+ * @param {Function} openModal
+ * @returns {void}
+ */
+export function openEventTrade(openModal) {
+  if (!state.eventTrade || !state.eventTrade.deals?.length) return;
+  renderEventTradeModal(state.eventTrade);
+  openModal?.(elements.eventTradeModal);
 }

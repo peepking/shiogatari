@@ -27,7 +27,7 @@ import {
   getCurrentSettlement,
   resetEncounterMeter,
 } from "./actions.js";
-import { wireMarketModals } from "./marketUI.js";
+import { wireMarketModals, openEventTrade } from "./marketUI.js";
 import { wireHireModal } from "./hireUI.js";
 import { renderAssets, renderFactions, wireFactionPanel, wireMapToggle } from "./panelUI.js";
 import { renderQuestUI, renderQuestModal } from "./questUI.js";
@@ -1111,6 +1111,7 @@ function wireButtons() {
   wireMapToggle(renderMap);
 
   wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage });
+  document.addEventListener("event-trade-open", () => openEventTrade(openModal));
   wireHireModal({ openModal, bindModal, syncUI });
 
   const troopCard = document.getElementById("asset-companions") || document.getElementById("asset-troops");
@@ -1173,6 +1174,7 @@ export function initUI() {
   wireMapHover();
   initEventQueueUI();
   syncUI();
+  openEventTrade(openModal);
   setOutput("次の操作", "状況を選んで、1D6を振ってください", [
     { text: "-", kind: "" },
     { text: "-", kind: "" },

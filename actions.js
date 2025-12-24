@@ -2,7 +2,7 @@ import { state } from "./state.js";
 import { MODE_LABEL, PLACE } from "./constants.js";
 import { setOutput, pushLog, pushToast } from "./dom.js";
 import { getSettlementAtPosition, getLocationStatus, getTerrainAt, settlements } from "./map.js";
-import { calcSupplyCap, totalSupplies } from "./supplies.js";
+import { calcSupplyCap, totalSupplies, createSettlementDemand } from "./supplies.js";
 import { calcTroopCap, totalTroops } from "./troops.js";
 import { advanceDayWithEvents } from "./time.js";
 import { TROOP_STATS } from "./troops.js";
@@ -476,22 +476,18 @@ export function handleTravelEventAction(action) {
     case "merchant_trade": {
       const deals = action.payload?.deals || [];
       if (!deals.length) return true;
-      const totalCost = deals.reduce((s, d) => s + (d.cost || 0), 0);
-      if ((state.funds || 0) < totalCost) {
-        pushToast("資金不足", "取引に必要な資金が足りません。", "warn");
-        return true;
-      }
-      state.funds = Math.max(0, (state.funds || 0) - totalCost);
-      if (!state.supplies) state.supplies = {};
-      deals.forEach((d) => {
-        if (!d.id || !d.qty) return;
-        state.supplies[d.id] = (state.supplies[d.id] || 0) + d.qty;
-      });
-      const summary = deals
-        .map((d) => `${SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id} x${d.qty}`)
-        .join(" / ");
-      pushLog("行商人と取引", `支出: ${totalCost} / 入手: ${summary}`, "-");
-      pushToast("取引完了", `資金-${totalCost} / ${summary}`, "good");
+      state.eventTrade = {
+    source: "merchant",
+    title: "行商人との取引",
+    note: "相場より高めの価格です。",
+        deals: deals.map((d) => ({
+          id: d.id,
+          name: SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id,
+          price: Math.max(1, Math.round((d.cost || 0) / Math.max(1, d.qty || 1))),
+          stock: d.qty || 0,
+        })),
+      };
+      if (typeof document !== "undefined") document.dispatchEvent(new CustomEvent("event-trade-open"));
       travelSync?.();
       return true;
     }
@@ -538,23 +534,22 @@ export function handleTravelEventAction(action) {
       return true;
     case "smuggle_trade": {
       const ctx = action.payload || {};
-      const cost = ctx.discounted || Math.max(1, Math.floor((ctx.totalCost || 0) * 0.7));
-      if ((state.funds || 0) < cost) {
-        pushToast("資金不足", "資金が足りません。", "warn");
-        return true;
-      }
-      state.funds = Math.max(0, (state.funds || 0) - cost);
-      if (!state.supplies) state.supplies = {};
-      (ctx.deals || []).forEach((d) => {
-        if (!d.id || !d.qty) return;
-        state.supplies[d.id] = (state.supplies[d.id] || 0) + d.qty;
-      });
-      if (ctx.settlementId && ctx.factionId) adjustSupport(ctx.settlementId, ctx.factionId, -2);
-      const summary = (ctx.deals || [])
-        .map((d) => `${SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id} x${d.qty}`)
-        .join(" / ");
-      pushLog("密輸取引", `資金-${cost} / 入手: ${summary || "なし"}`, "-");
-      pushToast("密輸取引", `資金-${cost}で物資を入手しました。`, "warn");
+      const deals = ctx.deals || [];
+      const discounted = ctx.discounted || Math.max(1, Math.floor((ctx.totalCost || 0) * 0.7));
+      state.eventTrade = {
+    source: "smuggle",
+    title: "密輸船との取引",
+    note: "相場より高めの価格です。",
+    deals: deals.map((d) => ({
+      id: d.id,
+      name: SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id,
+      price: Math.max(1, Math.round((d.cost || 0) / Math.max(1, d.qty || 1))),
+      stock: d.qty || 0,
+        })),
+        settlementId: ctx.settlementId || null,
+        factionId: ctx.factionId || null,
+      };
+      if (typeof document !== "undefined") document.dispatchEvent(new CustomEvent("event-trade-open"));
       travelSync?.();
       return true;
     }
@@ -798,13 +793,11 @@ function enqueueMerchantEvent(terrain) {
   // 海/浅瀬でなくても発生するようにし、地形は参考文言のみ
   const info = nearestSettlementInfo();
   const deals = pickDeals();
-  const totalCost = deals.reduce((s, d) => s + d.cost, 0);
-  const dealText = formatDeals(deals);
   enqueueEvent({
     title: "行商人との遭遇",
-    body: `行商人と遭遇しました（地形: ${terrain}）。\n取引品: ${dealText}\n合計価格: ${totalCost}\nどうしますか？`,
+    body: `行商人と遭遇しました（地形: ${terrain}）。\nどうしますか？`,
     actions: [
-      { id: "trade", label: "取引する", type: "merchant_trade", payload: { deals, totalCost } },
+      { id: "trade", label: "取引する", type: "merchant_trade", payload: { deals } },
       { id: "leave", label: "立ち去る", type: "merchant_leave" },
       {
         id: "raid",
@@ -856,13 +849,26 @@ function enqueueMerchantRescueEvent(terrain) {
  * @returns {Array<{id:string,qty:number,cost:number}>}
  */
 function pickDeals() {
-  const shuffled = SUPPLY_ITEMS.slice().sort(() => Math.random() - 0.5);
-  const picks = shuffled.slice(0, 3);
-  return picks.map((p) => {
+  const demand = createSettlementDemand("village");
+  const candidates = SUPPLY_ITEMS.slice();
+  const deals = [];
+  while (candidates.length && deals.length < 7) {
+    const totalW = candidates.reduce((s, i) => s + (demand[i.id] || 1), 0);
+    let roll = Math.random() * totalW;
+    let pickIdx = 0;
+    for (let i = 0; i < candidates.length; i++) {
+      roll -= demand[candidates[i].id] || 1;
+      if (roll <= 0) {
+        pickIdx = i;
+        break;
+      }
+    }
+    const item = candidates.splice(pickIdx, 1)[0];
     const qty = randInt(1, 3);
-    const cost = Math.floor(p.basePrice * qty * 1.6);
-    return { id: p.id, qty, cost };
-  });
+    const cost = Math.floor(item.basePrice * qty * 1.6);
+    deals.push({ id: item.id, qty, cost });
+  }
+  return deals;
 }
 
 /**
@@ -941,14 +947,11 @@ export function startTravelEncounter({ forceStrength, enemyFactionId, title, fla
 function enqueueSmuggleEvent(terrain) {
   const info = nearestSettlementInfo();
   const deals = pickDeals();
-  const totalCost = deals.reduce((s, d) => s + d.cost, 0);
-  const discounted = Math.max(1, Math.floor(totalCost * 0.7));
-  const dealText = formatDeals(deals);
   enqueueEvent({
     title: "密輸船を発見",
-    body: `正規ルートを避ける船団を発見しました（地形: ${terrain}）。\n取引品: ${dealText}\n合計価格（値引き後）: ${discounted}\nどうしますか？`,
+    body: `正規ルートを避ける船団を発見しました（地形: ${terrain}）。\nどうしますか？`,
     actions: [
-      { id: "smug-trade", label: "取引する", type: "smuggle_trade", payload: { deals, totalCost, discounted, ...info } },
+      { id: "smug-trade", label: "取引する", type: "smuggle_trade", payload: { deals, ...info } },
       { id: "smug-bust", label: "摘発する", type: "smuggle_bust", payload: info || {} },
       { id: "smug-raid", label: "襲撃する", type: "smuggle_attack", payload: info || {} },
       { id: "smug-leave", label: "立ち去る", type: "merchant_leave" },

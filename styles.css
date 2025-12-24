@@ -208,6 +208,12 @@ h1 {
   color: var(--accent);
 }
 
+.off-pill {
+  font-size: 10px;
+  padding: 2px 6px;
+  margin-left: 6px;
+}
+
 .btn {
   appearance: none;
   border: 1px solid var(--line);
