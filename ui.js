@@ -2,7 +2,7 @@ import { state, resetState } from "./state.js";
 import { MODE_LABEL, BATTLE_RESULT, BATTLE_RESULT_LABEL, PLACE, NONE_LABEL } from "./constants.js";
 import { nowStr, formatGameTime, clamp } from "./util.js";
 import { elements, setOutput, pushLog, pushToast } from "./dom.js";
-import { renderMap, wireMapHover, getLocationStatus, getTerrainAt, ensureNobleHomes } from "./map.js";
+import { renderMap, wireMapHover, getLocationStatus, getTerrainAt, ensureNobleHomes, settlements, resetSettlementSupport } from "./map.js";
 import {
   formatTroopDisplay,
   renderTroopModal,
@@ -18,7 +18,7 @@ import {
   wireSupplyModal,
   wireSupplyDiscard,
 } from "./supplies.js";
-import { SUPPLY_ITEMS } from "./supplies.js";
+import { SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 import {
   moveToSelected,
   attemptEnter,
@@ -43,8 +43,8 @@ import {
   QUEST_TYPES,
 } from "./quests.js";
 import { buildEnemyFormation } from "./actions.js";
-import { addWarScore, getPlayerFactionId, adjustNobleFavor } from "./faction.js";
-import { absDay } from "./questUtils.js";
+import { addWarScore, getPlayerFactionId, adjustNobleFavor, adjustSupport } from "./faction.js";
+import { absDay, manhattan } from "./questUtils.js";
 import {
   wireBattleUI,
   setEnemyFormation,
@@ -128,6 +128,9 @@ function setTradeError(msg) {
  */
 const rollDice = (sides, count) =>
   Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1).reduce((a, b) => a + b, 0);
+
+let autoMoveTimer = null;
+let autoMoveTarget = null;
 
 /**
  * 海に祈る行動が可能か判定する。
@@ -231,6 +234,59 @@ function clearBattlePrep(resetMode = true) {
   setBattleTerrain("plain");
 }
 
+function stopAutoMove() {
+  if (autoMoveTimer) {
+    clearTimeout(autoMoveTimer);
+    autoMoveTimer = null;
+  }
+  autoMoveTarget = null;
+}
+
+function stepAutoMove() {
+  if (!autoMoveTarget) {
+    stopAutoMove();
+    return;
+  }
+  if (state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE || state.modeLabel === MODE_LABEL.PREP) {
+    stopAutoMove();
+    return;
+  }
+  const { x: tx, y: ty } = autoMoveTarget;
+  const { x: cx, y: cy } = state.position;
+  if (cx === tx && cy === ty) {
+    stopAutoMove();
+    return;
+  }
+  const dx = tx - cx;
+  const dy = ty - cy;
+  const next = {
+    x: cx + Math.sign(dx || 0),
+    y: cy + (dx === 0 ? Math.sign(dy || 0) : 0),
+  };
+  state.selectedPosition = { ...next };
+  const moved = moveToSelected(showActionMessage, syncUI);
+  if (!moved) {
+    stopAutoMove();
+    return;
+  }
+  if (state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE || state.modeLabel === MODE_LABEL.PREP) {
+    stopAutoMove();
+    return;
+  }
+  if (state.position.x === tx && state.position.y === ty) {
+    stopAutoMove();
+    return;
+  }
+  autoMoveTimer = setTimeout(stepAutoMove, 500);
+}
+
+function startAutoMove(target) {
+  stopAutoMove();
+  if (!target) return;
+  autoMoveTarget = { ...target };
+  stepAutoMove();
+}
+
 function escapeBattleSuccess(reason) {
   const text = reason || "敵との接触を回避しました。";
   clearBattlePrep();
@@ -267,7 +323,7 @@ function calcCaptures(meta) {
     const cnt = Math.max(0, Math.round(u.count || 0));
     let got = 0;
     for (let i = 0; i < cnt; i++) {
-      if (Math.random() < 0.1) got += 1;
+      if (Math.random() < 0.05) got += 1;
     }
     if (got > 0) {
       const lvl = Math.max(1, Math.round(u.level || 1));
@@ -290,147 +346,262 @@ function killedEnemyCount(meta) {
  * @param {object} meta
  */
 function processBattleOutcome(resultCode, meta) {
-  const enemyTotal = enemyTotalEstimate(meta);
-  const fameDelta = Math.floor(enemyTotal / 2);
-  const isStrong = meta?.enemyFormation?.some((e) => (e.level || 1) > 1) || state.pendingEncounter?.strength === "elite";
-  const enemyFactionId = meta?.enemyFactionId || state.pendingEncounter?.enemyFactionId || "pirates";
+  const pending = state.pendingEncounter || {};
+  const enemyTotal = pending.enemyTotal || enemyTotalEstimate(meta);
+  const fameDelta = Math.floor(enemyTotal / 4);
+  const isStrong = meta?.enemyFormation?.some((e) => (e.level || 1) > 1) || pending.strength === "elite";
+  const enemyFactionId = meta?.enemyFactionId || pending.enemyFactionId || "pirates";
   const playerFactionId = getPlayerFactionId();
+  const eventTag = meta?.eventTag || pending.eventTag || null;
+  const eventContext = meta?.eventContext || pending.eventContext || null;
   const resultLabel = BATTLE_RESULT_LABEL[resultCode] || resultCode;
   const isWin = resultCode === BATTLE_RESULT.WIN;
-  const questId = state.pendingEncounter?.questId;
-  const questType = state.pendingEncounter?.questType;
+  const questId = pending.questId;
+  const questType = pending.questType;
   const summary = [];
-  if (isWin) {
-    state.fame += fameDelta;
-    const fundsGainBase = enemyTotal * 20;
-    const fundsGain = Math.round(fundsGainBase * (0.9 + Math.random() * 0.2) * (isStrong ? 2 : 1));
-    const foodGainBase = enemyTotal * 0.5;
-    const foodGain = Math.max(0, Math.round(foodGainBase * (0.9 + Math.random() * 0.2) * (isStrong ? 2 : 1)));
-    const materialSlots = Math.max(1, isStrong ? 2 : 1);
-    const materialPool = SUPPLY_ITEMS.filter((i) => i.id !== "food").map((i) => i.id);
-    const pickedMap = {};
-    for (let i = 0; i < materialSlots; i++) {
-      const key =
-        materialPool.length > 0
-          ? materialPool[Math.floor(Math.random() * materialPool.length)]
-          : "food";
-      pickedMap[key] = (pickedMap[key] || 0) + 1;
-      state.supplies[key] = (state.supplies[key] ?? 0) + 1;
+  /**
+   * 行商人関連の追加戦利品を付与する。
+   * @param {number} scale 元となる敵規模
+   * @param {boolean} elite 強編成かどうか
+   * @param {"raid"|"help"} kind 襲撃/救助の別
+   * @returns {string[]} 付与内容の表示テキスト
+   */
+  const grantMerchantBonusLoot = (scale, elite, kind) => {
+    const texts = [];
+    state.supplies ||= {};
+    const variance = 0.9 + Math.random() * 0.2;
+    const fundsGain = Math.max(5, Math.round(scale * (kind === "help" ? 15 : 20) * variance * (elite ? 1.2 : 1)));
+    state.funds = (state.funds || 0) + fundsGain;
+    texts.push(`資金 +${fundsGain}`);
+    if (kind === "help") return texts;
+    const rawPool = SUPPLY_ITEMS.filter((i) => i.type === SUPPLY_TYPES.raw);
+    const procPool = SUPPLY_ITEMS.filter((i) => i.type === SUPPLY_TYPES.processed);
+    const rawQty = Math.max(1, Math.round(scale / 25));
+    const procQty = Math.max(1, Math.round(scale / 40));
+    const rawPicks = [];
+    const procPicks = [];
+    for (let i = 0; i < 3 && rawPool.length; i++) {
+      const pick = rawPool[Math.floor(Math.random() * rawPool.length)];
+      rawPicks.push(pick);
+      state.supplies[pick.id] = (state.supplies[pick.id] ?? 0) + rawQty;
     }
-    state.funds += fundsGain;
-    state.supplies.food = (state.supplies.food ?? 0) + foodGain;
-    summary.push(`名声 +${fameDelta}`);
-    summary.push(`資金 +${fundsGain}`);
-    summary.push(`食料 +${foodGain}`);
-    const matText =
-      Object.entries(pickedMap)
-        .map(([k, v]) => {
-          const name = SUPPLY_ITEMS.find((i) => i.id === k)?.name || k;
-          return `${name} +${v}`;
-        })
-        .join(" / ") || "なし";
-    summary.push(`物資: ${matText}`);
-  } else {
-    state.fame = Math.max(0, state.fame - fameDelta);
-    const lossRate = 0.45 + Math.random() * 0.1; // 45-55%
-    const fundsLost = Math.round(state.funds * lossRate);
-    state.funds = Math.max(0, state.funds - fundsLost);
-    summary.push(`名声 -${fameDelta}`);
-    summary.push(`資金 -${fundsLost}`);
-    const supplyLoss = {};
-    Object.keys(state.supplies || {}).forEach((k) => {
-      const cur = Number(state.supplies[k] || 0);
-      const lost = Math.round(cur * lossRate);
-      state.supplies[k] = Math.max(0, cur - lost);
-      supplyLoss[k] = lost;
+    for (let i = 0; i < 2 && procPool.length; i++) {
+      const pick = procPool[Math.floor(Math.random() * procPool.length)];
+      procPicks.push(pick);
+      state.supplies[pick.id] = (state.supplies[pick.id] ?? 0) + procQty;
+    }
+    if (rawPicks.length) {
+      texts.push(
+        `原料: ${rawPicks
+          .map((p) => `${p.name} +${rawQty}`)
+          .join(" / ")}`
+      );
+    }
+    if (procPicks.length) {
+      texts.push(
+        `加工品: ${procPicks
+          .map((p) => `${p.name} +${procQty}`)
+          .join(" / ")}`
+      );
+    }
+    return texts;
+  };
+  try {
+    if (isWin) {
+      state.fame += fameDelta;
+      const fundsGainBase = enemyTotal * 20;
+      const fundsGain = Math.round(fundsGainBase * (0.9 + Math.random() * 0.2) * (isStrong ? 2 : 1));
+      const foodGainBase = enemyTotal * 0.5;
+      const foodGain = Math.max(0, Math.round(foodGainBase * (0.9 + Math.random() * 0.2) * (isStrong ? 2 : 1)));
+      const materialSlots = Math.max(1, isStrong ? 2 : 1);
+      const materialPool = SUPPLY_ITEMS.filter((i) => i.id !== "food").map((i) => i.id);
+      const pickedMap = {};
+      for (let i = 0; i < materialSlots; i++) {
+        const key =
+          materialPool.length > 0
+            ? materialPool[Math.floor(Math.random() * materialPool.length)]
+            : "food";
+        pickedMap[key] = (pickedMap[key] || 0) + 1;
+        state.supplies[key] = (state.supplies[key] ?? 0) + 1;
+      }
+      state.funds += fundsGain;
+      state.supplies.food = (state.supplies.food ?? 0) + foodGain;
+      summary.push(`名声 +${fameDelta}`);
+      summary.push(`資金 +${fundsGain}`);
+      summary.push(`食料 +${foodGain}`);
+      const matText =
+        Object.entries(pickedMap)
+          .map(([k, v]) => {
+            const name = SUPPLY_ITEMS.find((i) => i.id === k)?.name || k;
+            return `${name} +${v}`;
+          })
+          .join(" / ") || "なし";
+      summary.push(`物資: ${matText}`);
+    } else {
+      state.fame = Math.max(0, state.fame - fameDelta);
+      const lossRate = 0.45 + Math.random() * 0.1; // 45-55%
+      const fundsLost = Math.round(state.funds * lossRate);
+      state.funds = Math.max(0, state.funds - fundsLost);
+      summary.push(`名声 -${fameDelta}`);
+      summary.push(`資金 -${fundsLost}`);
+      const supplyLoss = {};
+      Object.keys(state.supplies || {}).forEach((k) => {
+        const cur = Number(state.supplies[k] || 0);
+        const lost = Math.round(cur * lossRate);
+        state.supplies[k] = Math.max(0, cur - lost);
+        supplyLoss[k] = lost;
+      });
+      const foodLost = supplyLoss.food ?? 0;
+      if (foodLost) summary.push(`食料 -${foodLost}`);
+    }
+
+    const { losses, lossProb } = calcLosses(meta);
+    applyTroopLosses(losses);
+    const lossEntries = Object.entries(losses || {}).map(([t, n]) => `${t} -${n}`);
+    const lossText = lossEntries
+      .map((txt) => {
+        const [type, rest] = txt.split(" ");
+        const name = TROOP_STATS[type]?.name || type;
+        return `${name} ${rest || ""}`.trim();
+      })
+      .join(" / ") || NONE_LABEL;
+    summary.push(`損耗:${lossText === NONE_LABEL ? lossText : " " + lossText}`);
+
+    const captured = calcCaptures(meta);
+    Object.entries(captured).forEach(([key, qty]) => {
+      const [type, lvlStr] = key.split("|");
+      addTroops(type, Number(lvlStr) || 1, qty);
     });
-    const foodLost = supplyLoss.food ?? 0;
-    if (foodLost) summary.push(`食料 -${foodLost}`);
-  }
+    const capEntries =
+      Object.entries(captured || {}).map(([key, n]) => {
+        const [type, lvl] = key.split("|");
+        const name = TROOP_STATS[type]?.name || type;
+        return `${name} Lv${lvl} +${n}`;
+      }) || [];
+    const capText = capEntries.length ? capEntries.join(" / ") : NONE_LABEL;
+    summary.push(`拿捕:${capText === NONE_LABEL ? capText : " " + capText}`);
 
-  const { losses, lossProb } = calcLosses(meta);
-  applyTroopLosses(losses);
-  const lossEntries = Object.entries(losses || {}).map(([t, n]) => `${t} -${n}`);
-  const lossText = lossEntries
-    .map((txt) => {
-      const [type, rest] = txt.split(" ");
-      const name = TROOP_STATS[type]?.name || type;
-      return `${name} ${rest || ""}`.trim();
-    })
-    .join(" / ") || NONE_LABEL;
-  summary.push(`損耗:${lossText === NONE_LABEL ? lossText : " " + lossText}`);
-
-  const captured = calcCaptures(meta);
-  Object.entries(captured).forEach(([key, qty]) => {
-    const [type, lvlStr] = key.split("|");
-    addTroops(type, Number(lvlStr) || 1, qty);
-  });
-  const capEntries =
-    Object.entries(captured || {}).map(([key, n]) => {
-      const [type, lvl] = key.split("|");
-      const name = TROOP_STATS[type]?.name || type;
-      return `${name} Lv${lvl} +${n}`;
-    }) || [];
-  const capText = capEntries.length ? capEntries.join(" / ") : NONE_LABEL;
-  summary.push(`拿捕:${capText === NONE_LABEL ? capText : " " + capText}`);
-
-  const killed = killedEnemyCount(meta);
-  const leveled = levelUpTroopsRandom(killed);
-  if (leveled > 0) {
-    summary.push(`練度上昇: ${leveled}人がLv+1`);
-  }
-  if (questId) {
-    if (questType === QUEST_TYPES.ORACLE_HUNT || questType === QUEST_TYPES.ORACLE_ELITE) {
-      if (isWin) {
-        const ok = completeOracleBattleQuest(questId);
-        if (ok) {
+    const killed = killedEnemyCount(meta);
+    const leveled = levelUpTroopsRandom(killed);
+    if (leveled > 0) {
+      summary.push(`練度上昇: ${leveled}人がLv+1`);
+    }
+    if (questId) {
+      if (questType === QUEST_TYPES.ORACLE_HUNT || questType === QUEST_TYPES.ORACLE_ELITE) {
+        if (isWin) {
+          const ok = completeOracleBattleQuest(questId);
+          if (ok) {
+            const label = questType === QUEST_TYPES.ORACLE_ELITE ? "越えよ" : "奪え";
+            summary.push(`神託達成: ${label}`);
+          }
+        } else {
           const label = questType === QUEST_TYPES.ORACLE_ELITE ? "越えよ" : "奪え";
-          summary.push(`神託達成: ${label}`);
+          failOracleBattleQuest(questId, "戦闘に敗北しました");
+          summary.push(`神託失敗: ${label}`);
         }
-      } else {
-        const label = questType === QUEST_TYPES.ORACLE_ELITE ? "越えよ" : "奪え";
-        failOracleBattleQuest(questId, "戦闘に敗北しました");
-        summary.push(`神託失敗: ${label}`);
+      } else if (questType === QUEST_TYPES.PIRATE_HUNT || questType === QUEST_TYPES.BOUNTY_HUNT) {
+        if (isWin) {
+          completeHuntBattleQuest(questId, true);
+          summary.push(`討伐達成: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "賞金首" : "海賊"}`);
+        } else {
+          completeHuntBattleQuest(questId, false, "戦闘に敗北しました");
+          summary.push(`討伐失敗: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "賞金首" : "海賊"}`);
+        }
       }
-    } else if (questType === QUEST_TYPES.PIRATE_HUNT || questType === QUEST_TYPES.BOUNTY_HUNT) {
+    }
+    if (eventTag === "merchant_attack") {
+      const fid = eventContext?.enemyFactionId || enemyFactionId;
+      const setId = eventContext?.settlementId;
+      const nobId = eventContext?.nobleId;
       if (isWin) {
-        completeHuntBattleQuest(questId, true);
-        summary.push(`討伐達成: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "賞金首" : "海賊"}`);
+        addWarScore(playerFactionId, fid, -4, absDay(state), 0, 0);
+        summary.push("行商人襲撃: 戦況悪化");
+        const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "raid");
+        if (extras.length) summary.push(`追加戦利品: ${extras.join(" / ")}`);
       } else {
-        completeHuntBattleQuest(questId, false, "戦闘に敗北しました");
-        summary.push(`討伐失敗: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "賞金首" : "海賊"}`);
+        addWarScore(playerFactionId, fid, 3, absDay(state), 0, 0);
+        summary.push("行商人襲撃失敗: 戦況悪化");
+      }
+      if (setId && fid) adjustSupport(setId, fid, -1);
+      if (nobId) adjustNobleFavor(nobId, -1);
+    } else if (eventTag === "merchant_rescue_help") {
+      const fid = eventContext?.enemyFactionId || enemyFactionId;
+      const setId = eventContext?.settlementId;
+      const nobId = eventContext?.nobleId;
+      if (isWin) {
+        addWarScore(playerFactionId, fid, 6, absDay(state), 0, 0);
+        if (setId && fid) adjustSupport(setId, fid, 3);
+        if (nobId) adjustNobleFavor(nobId, 4);
+        summary.push("救助成功: 支持/好感度が上昇");
+        const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "help");
+        if (extras.length) summary.push(`追加報酬: ${extras.join(" / ")}`);
+      } else {
+        addWarScore(playerFactionId, fid, -4, absDay(state), 0, 0);
+        if (setId && fid) adjustSupport(setId, fid, -1);
+        summary.push("救助失敗: 支持が低下");
+      }
+    } else if (eventTag === "merchant_rescue_raid") {
+      const fid = eventContext?.enemyFactionId || enemyFactionId;
+      const setId = eventContext?.settlementId;
+      const nobId = eventContext?.nobleId;
+      if (isWin) {
+        addWarScore(playerFactionId, fid, -6, absDay(state), 0, 0);
+        summary.push("難民襲撃: 戦況悪化");
+        const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "raid");
+        if (extras.length) summary.push(`追加戦利品: ${extras.join(" / ")}`);
+      } else {
+        addWarScore(playerFactionId, fid, 4, absDay(state), 0, 0);
+        summary.push("難民襲撃失敗: 戦況悪化");
+      }
+      if (setId && fid) adjustSupport(setId, fid, -2);
+      if (nobId) adjustNobleFavor(nobId, -2);
+    } else if (eventTag === "smuggle_raid") {
+      addWarScore(playerFactionId, enemyFactionId, -3, absDay(state), 0, 0);
+      summary.push("密輸襲撃: 戦況悪化");
+    } else if (eventTag === "refugee_raid") {
+      addWarScore(playerFactionId, enemyFactionId, -4, absDay(state), 0, 0);
+      summary.push("難民襲撃: 戦況悪化");
+    } else if (eventTag === "checkpoint_force") {
+      addWarScore(playerFactionId, enemyFactionId, -2, absDay(state), 0, 0);
+      summary.push("検問突破: 戦況に影響");
+    } else if (eventTag === "omen_attack") {
+      addWarScore(playerFactionId, enemyFactionId, -1, absDay(state), 0, 0);
+      summary.push("災いの襲撃を退けました");
+    } else if (eventTag === "wreck_attack") {
+      addWarScore(playerFactionId, enemyFactionId, -1, absDay(state), 0, 0);
+      summary.push("廃船の罠: 戦況に影響");
+    }
+    // 依頼以外の海賊遭遇に勝利したら、近傍拠点の貴族好感度をわずかに上げる
+    if (!questId && enemyFactionId === "pirates" && isWin) {
+      const nearest = settlements
+        .map((s) => ({ s, d: manhattan(s.coords, state.position) }))
+        .filter((o) => o.d != null)
+        .sort((a, b) => a.d - b.d);
+      if (nearest.length) {
+        const topDist = nearest[0].d;
+        const tied = nearest.filter((o) => o.d === topDist).map((o) => o.s);
+        const pick = tied[Math.floor(Math.random() * tied.length)];
+        if (pick?.nobleId) adjustNobleFavor(pick.nobleId, 2);
       }
     }
-  }
-  // 依頼以外の海賊遭遇に勝利したら、近傍拠点の貴族好感度をわずかに上げる
-  if (!questId && enemyFactionId === "pirates" && isWin) {
-    const nearest = settlements
-      .map((s) => ({ s, d: manhattan(s.coords, state.position) }))
-      .filter((o) => o.d != null)
-      .sort((a, b) => a.d - b.d);
-    if (nearest.length) {
-      const topDist = nearest[0].d;
-      const tied = nearest.filter((o) => o.d === topDist).map((o) => o.s);
-      const pick = tied[Math.floor(Math.random() * tied.length)];
-      if (pick?.nobleId) adjustNobleFavor(pick.nobleId, 2);
+    // 戦況スコア反映（敵勢力ID必須化）
+    const delta = isWin ? 8 : resultCode === BATTLE_RESULT.LOSE ? -6 : 0;
+    if (delta !== 0) {
+      addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
     }
-  }
-  // 戦況スコア反映（敵勢力ID必須化）
-  const delta = isWin ? 8 : resultCode === BATTLE_RESULT.LOSE ? -6 : 0;
-  if (delta !== 0) {
-    addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
-  }
 
-  clearBattlePrep(false);
-  const body = summary.join("\n");
-  setOutput("戦後処理", body, [
-    { text: resultLabel, kind: isWin ? "good" : "warn" },
-    { text: `敵推定${enemyTotal}人`, kind: "" },
-  ]);
-  pushLog("戦闘結果", body, "-");
-  pushToast("戦闘結果", resultLabel, isWin ? "good" : "warn");
-  showBattleResultModal(summary, resultLabel);
-  syncUI();
+    const body = summary.join("\n");
+    setOutput("戦後処理", body, [
+      { text: resultLabel, kind: isWin ? "good" : "warn" },
+      { text: `敵推定${enemyTotal}人`, kind: "" },
+    ]);
+    pushLog("戦闘結果", body, "-");
+    pushToast("戦闘結果", resultLabel, isWin ? "good" : "warn");
+    showBattleResultModal(summary, resultLabel);
+    syncUI();
+  } finally {
+    clearBattlePrep(true);
+  }
 }
 
 /**
@@ -443,7 +614,12 @@ function startPrepBattle() {
   const enemyFactionId = state.pendingEncounter?.enemyFactionId || "pirates";
   setBattleEnemyFaction(enemyFactionId);
   setBattleEndHandler((res, meta) => {
-    processBattleOutcome(res, meta);
+    const extendedMeta = {
+      ...meta,
+      eventTag: state.pendingEncounter?.eventTag || meta?.eventTag || null,
+      eventContext: state.pendingEncounter?.eventContext || meta?.eventContext || null,
+    };
+    processBattleOutcome(res, extendedMeta);
   });
   setBattleTerrain(state.pendingEncounter.terrain || getTerrainAt(state.position.x, state.position.y));
   state.modeLabel = MODE_LABEL.BATTLE;
@@ -785,8 +961,15 @@ function wireButtons() {
   document.addEventListener("map-wait-request", () => {
     waitOneDay(elements, clearActionMessage, syncUI);
   });
-  document.addEventListener("map-move-invalid", () => {
-    showActionMessage("移動できるのは上下左右1マス以内です。", "error");
+  document.addEventListener("map-auto-move-request", (e) => {
+    const tgt = e.detail?.target;
+    if (tgt) startAutoMove(tgt);
+  });
+  document.addEventListener("auto-move-stop", () => {
+    stopAutoMove();
+  });
+  document.addEventListener("quests-updated", () => {
+    renderQuestUI(syncUI);
   });
 
   document.getElementById("syncBtn")?.addEventListener("click", () => {
@@ -822,6 +1005,7 @@ function wireButtons() {
   document.getElementById("resetBtn")?.addEventListener("click", () => {
     if (!confirm("状態とログをリセットしますか？")) return;
     resetState();
+    resetSettlementSupport();
     ensureNobleHomes();
     seedInitialQuests();
     ensureSeasonalQuests(getCurrentSettlement());

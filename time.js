@@ -4,6 +4,9 @@ import { TROOP_STATS, totalTroops, applyTroopLosses } from "./troops.js";
 import { pushLog } from "./dom.js";
 import { absDay } from "./questUtils.js";
 import { tickDailyWar, maybeQueueHonorInvite, applySupportDrift } from "./faction.js";
+import { enqueueEvent } from "./events.js";
+import { startTravelEncounter } from "./actions.js";
+import { MODE_LABEL } from "./constants.js";
 
 /**
  * 日付更新と、それに連動するイベント処理を進める。
@@ -15,7 +18,7 @@ export function advanceDayWithEvents(days = 1) {
   for (let i = 0; i < days; i++) {
     baseAdvanceDay(1);
     const d = state.day;
-    if (d === 10 || d === 20 || d === 30) {
+    if (d === 10 || d === 30) {
       applyPeriodicFood();
     }
     const today = absDay(state);
@@ -24,6 +27,7 @@ export function advanceDayWithEvents(days = 1) {
     if (state.day % 7 === 0) {
       applySupportDrift();
     }
+    processScheduledOmens(today);
   }
   // 季節が進んだ回数だけ維持費処理を行う。
   const prevIndex = prevYear * 4 + prevSeason;
@@ -78,7 +82,7 @@ function applySeasonUpkeep() {
 }
 
 /**
- * 10/20/30日に食料を消費し、足りなければ損耗させる。
+ * 10/30日に食料を消費し、足りなければ損耗させる。
  */
 function applyPeriodicFood() {
   const troopCount = totalTroops();
@@ -150,4 +154,52 @@ function buildLossesMap(totalLoss) {
     idx += 1;
   }
   return losses;
+}
+
+/**
+ * スケジュールされた災いイベントを処理する。
+ * @param {number} todayAbs
+ */
+function processScheduledOmens(todayAbs) {
+  if (!Array.isArray(state.pendingOmens)) return;
+  const remaining = [];
+  state.pendingOmens.forEach((o) => {
+    if (!o || o.handled) return;
+    if (todayAbs < o.day) {
+      remaining.push(o);
+      return;
+    }
+    if (state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE) {
+      remaining.push(o);
+      return;
+    }
+    const roll = Math.random();
+    if (roll < 0.5) {
+      startTravelEncounter({
+        forceStrength: "elite",
+        enemyFactionId: "pirates",
+        title: "災いの襲撃",
+        flavor: "災いが形を取り、敵が迫ります。",
+        eventTag: "omen_attack",
+        eventContext: {},
+      });
+      enqueueEvent({
+        title: "災い",
+        body: "不吉な兆しが現実となり、敵が接近しています。",
+        actions: [{ label: "戦闘準備", type: "close" }],
+      });
+    } else {
+      const total = totalTroops();
+      const loss = Math.max(1, Math.floor(total * 0.1));
+      applyTroopLosses(buildLossesMap(loss));
+      pushLog("災い", `災いにより兵士を失いました（-${loss}人）。`, "-");
+      enqueueEvent({
+        title: "災い",
+        body: `災いにより兵士を${loss}人失いました。`,
+        actions: [{ label: "閉じる", type: "close" }],
+      });
+    }
+    o.handled = true;
+  });
+  state.pendingOmens = remaining;
 }

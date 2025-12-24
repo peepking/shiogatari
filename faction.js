@@ -1,6 +1,6 @@
 import { state } from "./state.js";
 import { settlements } from "./map.js";
-import { clamp, relationLabel, supportLabel, warScoreLabel, displayRelationLabel } from "./util.js";
+import { clamp, relationLabel, supportLabel, warScoreLabel, displayWarLabel } from "./util.js";
 import { enqueueEvent } from "./events.js";
 import { FACTIONS } from "./lore.js";
 
@@ -70,32 +70,8 @@ export function adjustNobleFavor(nobleId, delta) {
 }
 
 /**
- * 貴族の好感度を取得する（なければ0）。
- * @param {string} nobleId
- * @returns {number}
- */
-export function getNobleFavor(nobleId) {
-  if (!nobleId) return 0;
-  if (!state.nobleFavor) state.nobleFavor = {};
-  return Number(state.nobleFavor[nobleId] || 0);
-}
-
-/**
- * 貴族の好感度を加算する。
- * @param {string} nobleId
- * @param {number} delta
- * @returns {number} 更新後の値
- */
-export function adjustNobleFavor(nobleId, delta) {
-  if (!nobleId || !delta) return getNobleFavor(nobleId);
-  if (!state.nobleFavor) state.nobleFavor = {};
-  const next = clamp(getNobleFavor(nobleId) + delta, -100, 100);
-  state.nobleFavor[nobleId] = next;
-  return next;
-}
-
-/**
  * 名誉家臣勧誘イベントを日次で判定・投入する。
+ * 条件: 名声100以上かつ勢力内で最も好感度が高い貴族の好感度が閾値以上。
  * @param {number} absDay
  */
 export function maybeQueueHonorInvite(absDay) {
@@ -117,10 +93,10 @@ export function maybeQueueHonorInvite(absDay) {
       state.honorInviteLog[f.id] = absDay;
       enqueueEvent({
         title: "名誉家臣の要請",
-        body: `${f.name} から名誉家臣の打診が届きました。受け入れますか？`,
+        body: `${f.name} の ${best.n.name} から名誉家臣の打診が届きました。受け入れますか？`,
         actions: [
-          { label: "受け入れる", type: "honor_accept", payload: { factionId: f.id } },
-          { label: "断る", type: "honor_decline", payload: { factionId: f.id } },
+          { label: "受け入れる", type: "honor_accept", payload: { factionId: f.id, nobleId: best.n.id } },
+          { label: "断る", type: "honor_decline", payload: { factionId: f.id, nobleId: best.n.id } },
         ],
       });
     });
@@ -128,10 +104,11 @@ export function maybeQueueHonorInvite(absDay) {
 
 /**
  * 勢力状態を初期化/補完する。
+ * @returns {object}
  */
 export function ensureFactionState() {
   if (!state.factionState) state.factionState = {};
-  // 既存のfactionStateが空なら resetState側で初期化済みの値を保持
+  // 既存のfactionStateが空ならresetState側で初期化済みの値を保持
   return state.factionState;
 }
 
@@ -158,7 +135,7 @@ export function getRelation(a, b) {
 }
 
 /**
- * 関係のラベルを返す（内部値→段階ラベル）。
+ * 関係値を段階ラベルに変換する。
  * @param {number} value
  * @returns {"cold"|"wary"|"soft"|"warm"|"ally"}
  */
@@ -219,7 +196,7 @@ export function getWarScoreLabel(score) {
 }
 
 /**
- * 勢力間の戦況エントリを取得する（存在しない場合はnull）。
+ * 勢力間の戦況エントリを取得する（存在しなければnull）。
  * @param {string} a
  * @param {string} b
  * @returns {{id:string,factions:[string,string],score:number,supply:number,faith:number,startedAt:number|null}|null}
@@ -232,13 +209,13 @@ export function getWarEntry(a, b) {
 }
 
 /**
- * 戦況スコアや補給・信仰寄与を更新する（存在しなければ作成）。
+ * 戦況スコア・兵站・信仰値を更新する（存在しなければ作成する）。
  * @param {string} a 勢力ID
  * @param {string} b 勢力ID
  * @param {number} scoreDelta 戦況スコア加算
- * @param {number|null} startedAt 開始時刻（absDay）
- * @param {number} supplyDelta 兵站寄与の加算
- * @param {number} faithDelta 信仰寄与の加算
+ * @param {number|null} startedAt 開始時刻(absDay)
+ * @param {number} supplyDelta 兵站加算
+ * @param {number} faithDelta 信仰加算
  * @returns {object|null} 更新後のエントリ
  */
 export function addWarScore(a, b, scoreDelta, startedAt = null, supplyDelta = 0, faithDelta = 0) {
@@ -272,7 +249,7 @@ export function addWarScore(a, b, scoreDelta, startedAt = null, supplyDelta = 0,
   ) {
     enqueueEvent({
       title: "戦況変化",
-      body: `戦況が「${afterLabel}」に変化しました。`,
+      body: `戦況が「${displayWarLabel(afterLabel)}」に変化しました。`,
     });
     entry.lastAlert = afterLabel;
     if (afterLabel === "disadvantage" || afterLabel === "losing") {
@@ -338,7 +315,7 @@ function queueLogisticsRequest(entry) {
 
 /**
  * 戦況を日次で確認し、劣勢なら兵站要請イベントを積む。
- * 7日間は再送しないクールダウンを設けてスパムを抑止する。
+ * 7日間は再送しないクールダウンでスパムを抑止する。
  * @param {number} absDay 現在の通算日数
  */
 export function tickDailyWar(absDay) {

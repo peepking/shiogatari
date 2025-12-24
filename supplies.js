@@ -4,9 +4,9 @@ import { pushLog, pushToast, confirmAction } from "./dom.js";
 import { getWarEntry, getWarScoreLabel, getSupportLabel, getPlayerFactionId } from "./faction.js";
 
 /** @type {number} 基本の物資上限 */
-export const BASE_SUPPLY_CAP = 50;
+export const BASE_SUPPLY_CAP = 60;
 /** @type {number} 船1隻あたりの物資上限増分 */
-export const CAP_PER_SHIP_SUPPLY = 30;
+export const CAP_PER_SHIP_SUPPLY = 45;
 
 /** @enum {string} 物資タイプ */
 export const SUPPLY_TYPES = {
@@ -295,17 +295,20 @@ export function wireSupplyModal(elements, openModal, closeModal) {
 
 /**
  * 需要度から物資価格を計算する。
+ * modeが"buy"のときのみ支持度補正を適用し、売却時は支持度による減額を避ける。
  * @param {string} supplyId
  * @param {number} demand
+ * @param {{factionId?:string|null,settlementId?:string|null,mode?:"buy"|"sell"}} [opts]
  * @returns {number|null}
  */
 export function calcSupplyPrice(supplyId, demand, opts = {}) {
   const item = SUPPLY_INDEX[supplyId];
   if (!item) return null;
   const d = clamp(Number(demand) || 0, 1, 10);
-  // 価格は基本価格 * (1 + 需要度/10)、小数点切り捨て。
   const warMul = priceWarMultiplier(opts.factionId, opts.settlementId);
-  const supportMul = priceSupportMultiplier(opts.factionId, opts.settlementId);
+  const mode = opts.mode || "buy";
+  const supportMul = mode === "buy" ? priceSupportMultiplier(opts.factionId, opts.settlementId) : 1;
+  // 価格は基本価格 * (1 + 需要度/10) * 各補正、小数点切り捨て。
   return Math.floor(item.basePrice * (1 + d / 10) * warMul * supportMul);
 }
 

@@ -356,6 +356,17 @@ export function ensureNobleHomes() {
 ensureNobleHomes();
 
 /**
+ * 拠点の可変状態を初期値にリセットする（支持度・戦況など）。
+ * マップ生成は再実行せず、既存のsettlement配列を初期状態に戻す。
+ */
+export function resetSettlementSupport() {
+  settlements.forEach((s) => {
+    s.support = Object.fromEntries(FACTIONS.map((f) => [f.id, 0]));
+    s.warState = { contested: false, frontline: false, label: null };
+  });
+}
+
+/**
  * 指定の貴族が保有する拠点を返す。
  * @param {string} nobleId
  * @returns {Array}
@@ -409,6 +420,7 @@ function questToPin(q, nowAbs) {
       return fromTarget(q.target, "move");
     case QUEST_TYPES.SUPPLY:
     case QUEST_TYPES.DELIVERY:
+    case QUEST_TYPES.REFUGEE_ESCORT:
       return fromSettlementId(q.targetId || q.originId, "supply", "supply");
     default:
       return null;
@@ -635,32 +647,6 @@ export function renderMap() {
   }
 
   // 移動可能範囲の強調表示（上下左右）。
-  const reachables = [];
-  for (let i = 1; i <= 1; i++) {
-    reachables.push({ x: state.position.x + i, y: state.position.y });
-    reachables.push({ x: state.position.x - i, y: state.position.y });
-    reachables.push({ x: state.position.x, y: state.position.y + i });
-    reachables.push({ x: state.position.x, y: state.position.y - i });
-  }
-  ctx.strokeStyle = "rgba(255, 122, 122, 0.8)";
-  ctx.lineWidth = 3;
-  reachables.forEach((pos) => {
-    if (
-      pos.x < startX ||
-      pos.x >= startX + cells ||
-      pos.y < startY ||
-      pos.y >= startY + cells
-    )
-      return;
-    // 先に描画し、現在位置と重なる場合は後で上書きする。
-    ctx.strokeRect(
-      pad + (pos.x - startX) * cellSize,
-      pad + (pos.y - startY) * cellSize,
-      cellSize - 1,
-      cellSize - 1
-    );
-  });
-
   // 選択マスの強調表示
   if (state.selectedPosition) {
     const sel = state.selectedPosition;
@@ -918,6 +904,8 @@ export function wireMapHover() {
   }
 
   mapCanvas.addEventListener("click", (e) => {
+    // クリックで自動移動を強制停止
+    document.dispatchEvent(new CustomEvent("auto-move-stop"));
     const rect = mapCanvas.getBoundingClientRect();
     const cells = state.mapMode === "zoom" ? MAP_ZOOM : MAP_SIZE;
     const scaleX = rect.width / mapCanvas.width;
@@ -954,8 +942,8 @@ export function wireMapHover() {
           document.dispatchEvent(new CustomEvent("map-move-request"));
         } else {
           document.dispatchEvent(
-            new CustomEvent("map-move-invalid", {
-              detail: { reason: "range" },
+            new CustomEvent("map-auto-move-request", {
+              detail: { target: { x: gx, y: gy } },
             })
           );
         }

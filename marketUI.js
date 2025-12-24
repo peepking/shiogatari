@@ -64,6 +64,7 @@ export function renderTradeSelects() {
     const price = calcSupplyPrice(i.id, demand[i.id] ?? 10, {
       factionId: settlement.factionId,
       settlementId: settlement.id,
+      mode: "buy",
     }) ?? 0;
     const townQty = stock[i.id] ?? 0;
     const haveQty = state.supplies?.[i.id] ?? 0;
@@ -96,6 +97,7 @@ export function renderTradeSelects() {
     deltaEl.hidden = rows.length === 0;
     deltaEl.textContent = "資金変動: 0";
     deltaEl.className = "pill delta-zero";
+    deltaEl.title = "買値のみ支持度補正（売値は補正なし）";
   }
   setTradeError("");
   if (elements.tradeFunds) elements.tradeFunds.textContent = String(state.funds);
@@ -122,6 +124,7 @@ function recalcTradeDelta() {
     const price = calcSupplyPrice(id, demand[id] ?? 10, {
       factionId: settlement.factionId,
       settlementId: settlement.id,
+      mode: "buy",
     }) ?? 0;
     delta -= v * price;
   });
@@ -137,6 +140,7 @@ function recalcTradeDelta() {
     const price = calcSupplyPrice(id, demand[id] ?? 10, {
       factionId: settlement.factionId,
       settlementId: settlement.id,
+      mode: "sell",
     }) ?? 0;
     delta += v * price;
   });
@@ -258,6 +262,7 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
       const price = calcSupplyPrice(id, demand[id] ?? 10, {
         factionId: settlement.factionId,
         settlementId: settlement.id,
+        mode: "buy",
       }) ?? 0;
       fundsDelta -= v * price;
     });
@@ -272,6 +277,7 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
       const price = calcSupplyPrice(id, demand[id] ?? 10, {
         factionId: settlement.factionId,
         settlementId: settlement.id,
+        mode: "sell",
       }) ?? 0;
       fundsDelta += v * price;
     });

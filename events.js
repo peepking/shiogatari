@@ -1,6 +1,7 @@
 import { state } from "./state.js";
 import { elements } from "./dom.js";
 import { adjustSupport, addWarScore, addHonorFaction, getPlayerFactionId, adjustNobleFavor } from "./faction.js";
+import { handleTravelEventAction } from "./actions.js";
 
 /**
  * イベントキューにイベントを追加し、未表示なら即座に表示する。
@@ -77,6 +78,10 @@ function normalizeActions(actions, baseId) {
 
 function handleAction(action) {
   if (!action) {
+    resolveCurrentEvent();
+    return;
+  }
+  if (handleTravelEventAction(action)) {
     resolveCurrentEvent();
     return;
   }

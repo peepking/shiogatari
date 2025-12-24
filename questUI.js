@@ -42,6 +42,8 @@ export function renderQuestUI(syncUI) {
           ? "調達"
           : q.type === QUEST_TYPES.DELIVERY
             ? "配達"
+            : q.type === QUEST_TYPES.REFUGEE_ESCORT
+              ? "護送"
             : q.type === QUEST_TYPES.ORACLE_SUPPLY ||
                 q.type === QUEST_TYPES.ORACLE_MOVE ||
                 q.type === QUEST_TYPES.ORACLE_TROOP ||
@@ -56,6 +58,8 @@ export function renderQuestUI(syncUI) {
           ? `${origin?.name ?? "不明"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})で納品`
           : q.type === QUEST_TYPES.DELIVERY
             ? `${target?.name ?? "不明"}(${(target?.coords?.x ?? 0) + 1}, ${(target?.coords?.y ?? 0) + 1})へ配送`
+            : q.type === QUEST_TYPES.REFUGEE_ESCORT
+              ? `護送: (${(target?.coords?.x ?? 0) + 1}, ${(target?.coords?.y ?? 0) + 1})`
             : q.type === QUEST_TYPES.ORACLE_SUPPLY
               ? `神託: 加工品を捧げよ`
               : q.type === QUEST_TYPES.ORACLE_MOVE

@@ -30,6 +30,7 @@ const QUEST_TYPES = {
   ORACLE_ELITE: "oracle_elite",
   PIRATE_HUNT: "pirate_hunt",
   BOUNTY_HUNT: "bounty_hunt",
+  REFUGEE_ESCORT: "refugee_escort",
 };
 
 /**
@@ -142,10 +143,11 @@ function genDeliveryQuest(settlement) {
   const qty = 1;
   const reward = dist * 50;
   const rewardFame = Math.max(1, Math.round(dist / 2));
+  const titleTarget = `${target.name}(${target.coords.x + 1}, ${target.coords.y + 1})`;
   return {
     id: nextId(),
     type: QUEST_TYPES.DELIVERY,
-    title: `配達依頼: ${item.name}を${target.name}へ`,
+    title: `配達依頼: ${item.name}を${titleTarget}へ`,
     itemId: item.id,
     qty,
     reward,
@@ -154,7 +156,7 @@ function genDeliveryQuest(settlement) {
     targetId: target.id,
     acceptedAbs: null,
     deadlineAbs: null,
-    desc: `${target.name}へ${item.name}を届ける。報酬: ${reward}資金`,
+    desc: `${titleTarget}へ${item.name}を届ける。報酬: ${reward}資金`,
   };
 }
 
@@ -226,6 +228,31 @@ export function seedInitialQuests() {
   if (state.quests.seeded) return;
   settlements.forEach((s) => generateSeasonQuestsForSettlement(s));
   state.quests.seeded = true;
+}
+
+/**
+ * 難民護送依頼を追加する（移動イベント専用）。
+ * @param {object} targetSet 拠点
+ * @returns {object|null}
+ */
+export function addRefugeeEscortQuest(targetSet) {
+  ensureState();
+  if (!targetSet) return null;
+  const titleTarget = `${targetSet.name}(${targetSet.coords.x + 1}, ${targetSet.coords.y + 1})`;
+  const q = {
+    id: nextId(),
+    type: QUEST_TYPES.REFUGEE_ESCORT,
+    title: `護送: (${targetSet.coords.x + 1}, ${targetSet.coords.y + 1})`,
+    targetId: targetSet.id,
+    acceptedAbs: absDay(state),
+    deadlineAbs: absDay(state) + 30,
+    desc: `${titleTarget}へ難民旅団を護送せよ（期限30日）。`,
+  };
+  state.quests.active.push(q);
+  pushLog("依頼受注", q.title, "-");
+  pushToast("依頼受注", q.title, "warn");
+  enqueueEvent({ title: "護送依頼", body: `${q.title} を受注しました。期限30日。` });
+  return q;
 }
 
 /**
@@ -410,6 +437,7 @@ function genPirateHuntQuest(settlement) {
   const estimatedTotal = predictEnemyTotal("normal");
   const reward = estimatedTotal * 50 + 100;
   const rewardFame = Math.floor(estimatedTotal / 2) + 5;
+  const targetLabel = `(${target.x + 1}, ${target.y + 1})`;
   return {
     id: nextId(),
     type: QUEST_TYPES.PIRATE_HUNT,
@@ -440,6 +468,7 @@ function genBountyHuntQuest(settlement) {
   const estimatedTotal = predictEnemyTotal("elite");
   const reward = estimatedTotal * 100 + 100;
   const rewardFame = Math.floor(estimatedTotal / 2) + 5;
+  const targetLabel = `(${target.x + 1}, ${target.y + 1})`;
   return {
     id: nextId(),
     type: QUEST_TYPES.BOUNTY_HUNT,
@@ -619,6 +648,9 @@ export function canCompleteQuest(q) {
   if (q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT) {
     return false;
   }
+  if (q.type === QUEST_TYPES.REFUGEE_ESCORT) {
+    return false;
+  }
   return false;
 }
 
@@ -750,6 +782,13 @@ export function questTickDay(days = 1) {
           if (s?.factionId) adjustSupport(q.targetId, s.factionId, -2);
           if (s?.nobleId) adjustNobleFavor(s.nobleId, -3);
         }
+        if (q.type === QUEST_TYPES.REFUGEE_ESCORT && q.targetId) {
+          const s = getSettlementById(q.targetId);
+          if (s?.factionId) adjustSupport(q.targetId, s.factionId, -2);
+          if (s?.nobleId) adjustNobleFavor(s.nobleId, -3);
+          // 護送フラグを解除
+          state.refugeeEscort = { active: false, targetId: null, factionId: null, nobleId: null };
+        }
       });
       state.quests.active = state.quests.active.filter(
         (q) => !(q.deadlineAbs != null && now > q.deadlineAbs)
@@ -768,3 +807,30 @@ export function questTickDay(days = 1) {
 }
 
 export { QUEST_TYPES };
+
+/**
+ * 護送依頼を目的地で完了する。
+ * @param {object|null} settlement
+ * @returns {boolean}
+ */
+export function completeRefugeeEscortAt(settlement) {
+  ensureState();
+  if (!settlement) return false;
+  const idx = state.quests.active.findIndex(
+    (q) => q.type === QUEST_TYPES.REFUGEE_ESCORT && q.targetId === settlement.id
+  );
+  if (idx === -1) return false;
+  const q = state.quests.active[idx];
+  const factionId = settlement.factionId || "pirates";
+  state.fame += 4;
+  adjustSupport(settlement.id, factionId, 3);
+  addWarScore(getPlayerFactionId(), factionId, 4, absDay(state), 0, 0);
+  if (settlement.nobleId) adjustNobleFavor(settlement.nobleId, 3);
+  state.quests.active.splice(idx, 1);
+  state.refugeeEscort = { active: false, targetId: null, factionId: null, nobleId: null };
+  const rewardText = "名声+4 / 支持が上昇";
+  pushLog("護送完了", `${q.title} / ${rewardText}`, "-");
+  pushToast("護送完了", `${q.title} / ${rewardText}`, "good");
+  enqueueEvent({ title: "護送完了", body: `${q.title} / ${rewardText}` });
+  return true;
+}
