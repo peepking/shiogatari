@@ -109,7 +109,7 @@ export function renderQuestUI(syncUI) {
                       : q.type === QUEST_TYPES.WAR_ESCORT
                         ? `輸送護衛 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
                       : q.type === QUEST_TYPES.WAR_BLOCKADE
-                        ? `補給封鎖 ??${(q.fights || []).filter((f) => !f.done).length}??`
+                        ? `補給封鎖 残り${(q.fights || []).filter((f) => !f.done).length}箇所`
                       : "";
       const canFinish = remain == null ? canCompleteQuest(q) : remain >= 0 && canCompleteQuest(q);
       const rewardExtra =
