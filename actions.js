@@ -308,7 +308,7 @@ export function moveToSelected(showActionMessage, syncUI) {
     { text: "移動", kind: "" },
     { text: "日数+1", kind: "" },
   ]);
-  pushLog("移動", `選択マスへ移動 (${dest.x + 1}, ${dest.y + 1})`, state.lastRoll ?? "-");
+  // pushLog("移動", `選択マスへ移動 (${dest.x + 1}, ${dest.y + 1})`, state.lastRoll ?? "-");
   showActionMessage?.("", "info");
   setTravelEventSync(syncUI);
   const travelEventHit = rollTravelEvents();

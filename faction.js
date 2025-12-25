@@ -437,7 +437,13 @@ function adjustRelationTension(a, b, delta) {
     state.relationScores[key] = 0;
     const aName = FACTIONS.find((f) => f.id === a)?.name || a;
     const bName = FACTIONS.find((f) => f.id === b)?.name || b;
-    enqueueEvent({ title: "同盟締結", body: `${aName} と ${bName} は同盟を結びました。` });
+    const pf = getPlayerFactionId();
+    const playerInvolved = pf === a || pf === b;
+    if (playerInvolved) {
+      enqueueEvent({ title: "同盟締結", body: `${aName} と ${bName} は同盟を結びました。` });
+    } else {
+      pushToast("同盟締結", `${aName} と ${bName} は同盟を結びました。`, "info");
+    }
     pushLog("同盟締結", `${aName} と ${bName} が同盟を締結`, "-");
     return null;
   }
@@ -448,16 +454,28 @@ function adjustRelationTension(a, b, delta) {
       state.relationScores[key] = 0;
       const aName = FACTIONS.find((f) => f.id === a)?.name || a;
       const bName = FACTIONS.find((f) => f.id === b)?.name || b;
+      const pf = getPlayerFactionId();
+      const playerInvolved = pf === a || pf === b;
+    if (playerInvolved) {
       enqueueEvent({ title: "同盟破棄", body: `${aName} と ${bName} は同盟を解消しました。` });
-      pushLog("同盟破棄", `${aName} と ${bName} が同盟を解消`, "-");
-      return null;
+    } else {
+      pushToast("同盟破棄", `${aName} と ${bName} は同盟を解消しました。`, "info");
     }
-    setRelation(a, b, "war");
+    pushLog("同盟破棄", `${aName} と ${bName} が同盟を解消`, "-");
+    return null;
+  }
+  setRelation(a, b, "war");
     const seedScore = 0; // 開戦時の戦況はフラットからスタート
     state.relationScores[key] = 0;
     const aName = FACTIONS.find((f) => f.id === a)?.name || a;
     const bName = FACTIONS.find((f) => f.id === b)?.name || b;
-    enqueueEvent({ title: "開戦", body: `${aName} と ${bName} の間で戦争が始まりました。` });
+    const pf = getPlayerFactionId();
+    const playerInvolved = pf === a || pf === b;
+    if (playerInvolved) {
+      enqueueEvent({ title: "開戦", body: `${aName} と ${bName} の間で戦争が始まりました。` });
+    } else {
+      pushToast("開戦", `${aName} と ${bName} の間で戦争が始まりました。`, "info");
+    }
     pushLog("開戦", `${aName} と ${bName} が交戦状態に入りました`, "-");
     return addWarScore(a, b, seedScore, absDay(state), 0, 0);
   }
@@ -507,15 +525,18 @@ function maybeStartFront(entry, absDay, duration) {
   const defenderName = FACTIONS.find((f) => f.id === defender)?.name || defender;
   const setObj = settlements.find((s) => s.id === target.id);
   const setName = setObj?.name || "拠点";
-  enqueueEvent({
-    title: "拠点攻撃開始",
-    body: `${attackerName} が ${defenderName} の ${setName} を攻撃中です。`,
-  });
-  pushLog(
-    "攻撃開始",
-    `${attackerName} が ${defenderName} の ${setName} (${(setObj?.coords?.x ?? 0) + 1}, ${(setObj?.coords?.y ?? 0) + 1}) を攻撃開始`,
-    "-"
-  );
+  const setPos = `(${(setObj?.coords?.x ?? 0) + 1}, ${(setObj?.coords?.y ?? 0) + 1})`;
+  const pf = getPlayerFactionId();
+  const playerInvolved = pf === attacker || pf === defender;
+  if (playerInvolved) {
+    enqueueEvent({
+      title: "拠点攻撃開始",
+      body: `${setName} ${setPos} への攻撃が始まりました。${attackerName} vs ${defenderName}`,
+    });
+  } else {
+    pushToast("拠点攻撃開始", `${setName} ${setPos} への攻撃が始まりました。`, "info");
+  }
+  pushLog("攻撃開始", `${attackerName} が ${defenderName} の ${setName} ${setPos} を攻撃開始`, "-");
 }
 
 function resolveFront(entry, front, attackerWins) {
@@ -563,11 +584,19 @@ function resolveFront(entry, front, attackerWins) {
       }
     }
   }
-  enqueueEvent({
-    title: "拠点攻防の決着",
-    body: `${set?.name ?? "拠点"} は ${winnerName} が占領しました`,
-  });
-  pushLog("攻防決着", `${set?.name ?? "拠点"} (${(set?.coords?.x ?? 0) + 1}, ${(set?.coords?.y ?? 0) + 1}) が ${winnerName} に占領されました`, "-");
+  const setName = set?.name ?? "拠点";
+  const setPos = `(${(set?.coords?.x ?? 0) + 1}, ${(set?.coords?.y ?? 0) + 1})`;
+  const pf = getPlayerFactionId();
+  const playerInvolved = pf === front.attacker || pf === front.defender;
+  if (playerInvolved) {
+    enqueueEvent({
+      title: "拠点攻防の決着",
+      body: `${setName} ${setPos} は ${winnerName} が占領しました`,
+    });
+  } else {
+    pushToast("拠点攻防の決着", `${setName} ${setPos} は ${winnerName} が占領しました`, "info");
+  }
+  pushLog("攻防決着", `${setName} ${setPos} が ${winnerName} に占領されました`, "-");
   if (state?.quests?.active) {
     const warTypes = new Set(["war_defend_raid", "war_attack_raid", "war_skirmish", "war_supply", "war_escort", "war_blockade"]);
     state.quests.active = state.quests.active.filter(
