@@ -73,36 +73,38 @@ function notifyAutoMoveStop() {
 /**
  * 名声と強敵フラグから敵編成を生成する。
  * @param {"normal"|"elite"|null} forceStrength 強敵プール強制指定
+ * @param {string|null} enemyFactionId 敵勢力ID（正規軍プール判定用）
  * @returns {{formation:Array, total:number, strength:string, terrain?:string}} 生成結果
  */
-export function buildEnemyFormation(forceStrength) {
+export function buildEnemyFormation(forceStrength, enemyFactionId = null) {
   const fame = Math.max(0, state.fame || 0);
+  const useRegular = enemyFactionId && enemyFactionId !== "pirates";
   const useStrong =
     forceStrength === "elite"
       ? true
       : forceStrength === "normal"
         ? false
         : fame >= 100 && Math.random() < STRONG_POOL_CHANCE;
-  const range = useStrong
-    ? pickAnchorRange(fame, STRONG_ANCHORS)
-    : pickAnchorRange(fame, NORMAL_ANCHORS);
+  const useStrongScale = useStrong || useRegular;
+  const range = useStrongScale ? pickAnchorRange(fame, STRONG_ANCHORS) : pickAnchorRange(fame, NORMAL_ANCHORS);
   const total = randInt(range.min, range.max);
-  const pool = useStrong
-    ? Object.keys(TROOP_STATS)
-        .slice()
-        .sort(() => Math.random() - 0.5)
-        .slice(0, 6)
-    : ["infantry", "archer", "scout", "marine"];
+  const basePool = useRegular
+    ? Object.keys(TROOP_STATS).filter((k) => k !== "scout" && k !== "medic")
+    : useStrong
+      ? Object.keys(TROOP_STATS)
+      : ["infantry", "archer", "scout", "marine"];
+  const pool = basePool.slice().sort(() => Math.random() - 0.5).slice(0, Math.min(6, basePool.length));
+  if (!pool.length) pool.push("infantry");
   const formation = [];
   let remain = total;
   while (remain > 0) {
     const type = pool[randInt(0, pool.length - 1)];
-    const level = useStrong ? randInt(1, 3) : 1;
+    const level = useStrongScale ? randInt(1, 3) : 1;
     const chunk = Math.min(remain, Math.max(1, randInt(5, 10)));
     formation.push({ type, count: chunk, level });
     remain -= chunk;
   }
-  return { formation, total, strength: useStrong ? "elite" : "normal" };
+  return { formation, total, strength: useStrongScale ? "elite" : "normal" };
 }
 
 /**
@@ -160,9 +162,9 @@ function pickEncounterFaction(pos, terrain) {
  * @returns {void}
  */
 function triggerEncounter(syncUI) {
-  const { formation, total, strength } = buildEnemyFormation();
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   const enemyFactionId = pickEncounterFaction(state.position, terrain);
+  const { formation, total, strength } = buildEnemyFormation(null, enemyFactionId);
   state.pendingEncounter = {
     active: true,
     enemyFormation: formation,
@@ -1000,7 +1002,7 @@ function applyAggressivePenalties(ctx) {
  * @param {object} param0
  */
 export function startTravelEncounter({ forceStrength, enemyFactionId, title, flavor, eventTag, eventContext }) {
-  const { formation, total, strength } = buildEnemyFormation(forceStrength);
+  const { formation, total, strength } = buildEnemyFormation(forceStrength, enemyFactionId || "pirates");
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   state.pendingEncounter = {
     active: true,

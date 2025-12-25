@@ -498,6 +498,7 @@ function maybeStartFront(entry, absDay, duration) {
     endAbs: absDay + duration,
     resolved: false,
     baseScore,
+    usedKinds: [],
   };
   if (!entry.activeFronts) entry.activeFronts = [];
   entry.activeFronts.push(front);
@@ -580,6 +581,19 @@ function endWar(entry) {
   const aName = FACTIONS.find((f) => f.id === a)?.name || a;
   const bName = FACTIONS.find((f) => f.id === b)?.name || b;
   // warLedger から削除し、関係を中立へ戻す
+  const warTypes = new Set(["war_defend_raid", "war_attack_raid", "war_skirmish", "war_supply", "war_escort", "war_blockade"]);
+  const frontSettlementIds = (entry.activeFronts || []).map((f) => f?.settlementId).filter(Boolean);
+  if (state?.quests?.active && warTypes.size) {
+    state.quests.active = state.quests.active.filter((q) => {
+      if (!warTypes.has(q.type)) return true;
+      if (frontSettlementIds.includes(q.frontSettlementId)) return false;
+      if ((entry.factions || []).includes(q.enemyFactionId)) return false;
+      return true;
+    });
+    if (typeof document !== "undefined") {
+      document.dispatchEvent(new CustomEvent("quests-updated"));
+    }
+  }
   state.warLedger.entries = state.warLedger.entries.filter((e) => e !== entry);
   setRelation(a, b, "neutral");
   const fa = state.factionState?.[a];

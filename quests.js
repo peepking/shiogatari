@@ -718,6 +718,7 @@ function genNobleSecurityQuest(settlement, noble) {
       { target: first, strength: "normal", done: false, estimatedTotal: firstEstimate },
       { target: second, strength: "elite", done: false, estimatedTotal: secondEstimate },
     ],
+    enemyFactionId: "pirates",
     fightTotals: [],
     estimatedTotal: totalEstimate,
     reward: estimatedReward,
@@ -860,11 +861,13 @@ export function genWarFrontQuest(settlement, front, role, kind) {
   };
   if (kind === "defendRaid" || kind === "attackRaid") {
     const estimatedTotal = predictEnemyTotal("elite");
+    const target = randomHuntTarget(settlement.coords, 2, 5, usedTargets());
+    if (!target) return null;
     return {
       ...common,
       type: kind === "defendRaid" ? QUEST_TYPES.WAR_DEFEND_RAID : QUEST_TYPES.WAR_ATTACK_RAID,
       title: kind === "defendRaid" ? "補給路迎撃" : "補給路襲撃",
-      target: { ...settlement.coords },
+      target,
       strength: "elite",
       estimatedTotal,
       desc: `${settlement.name} 周辺で敵の補給路を断つ。`,
@@ -970,10 +973,13 @@ export function addWarFrontQuest(settlement, front, role, kind) {
   };
   const tgtType = typeMap[kind];
   if (!tgtType) return null;
+  if (Array.isArray(front.usedKinds) && front.usedKinds.includes(kind)) return null;
   const dup = state.quests.active.some((q) => q.frontSettlementId === settlement.id && q.type === tgtType);
   if (dup) return null;
   const q = genWarFrontQuest(settlement, front, role, kind);
   if (!q) return null;
+  if (!Array.isArray(front.usedKinds)) front.usedKinds = [];
+  front.usedKinds.push(kind);
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
   return q;
@@ -988,10 +994,10 @@ function applyWarFrontScore(q, success) {
     [QUEST_TYPES.WAR_SKIRMISH]: 8,
     [QUEST_TYPES.WAR_SUPPLY]: 5,
     [QUEST_TYPES.WAR_ESCORT]: 8,
-    [QUEST_TYPES.WAR_BLOCKADE]: 8,
+    [QUEST_TYPES.WAR_BLOCKADE]: 18,
   };
   const base = deltaMap[q.type] || 0;
-  const delta = success ? base : base ? -base : 0;
+  const delta = success ? base : base ? -Math.round(base * 2 / 3) : 0;
   if (delta) addFrontScore(pf, q.enemyFactionId, q.frontSettlementId, delta, absDay(state), 0, 0);
 }
 

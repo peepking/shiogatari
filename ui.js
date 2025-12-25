@@ -832,7 +832,8 @@ function startOracleBattle() {
   if (!meta) return;
   const quest = meta.quest;
   const force = meta.strength === "elite" ? "elite" : "normal";
-  const { formation, total, strength } = buildEnemyFormation(force);
+  const enemyFactionId = meta.enemyFactionId || quest.enemyFactionId || "pirates";
+  const { formation, total, strength } = buildEnemyFormation(force, enemyFactionId);
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   state.pendingEncounter = {
     active: true,
@@ -842,7 +843,7 @@ function startOracleBattle() {
     terrain,
     questId: quest.id,
     questType: quest.type,
-    enemyFactionId: meta.enemyFactionId || quest.enemyFactionId || "pirates",
+    enemyFactionId,
     questFightIdx: meta.fightIdx ?? null,
   };
   state.modeLabel = MODE_LABEL.PREP;
@@ -948,6 +949,8 @@ function updateModeControls(loc) {
       pf &&
       pf !== "player" &&
       fronts.length > 0; // 前線が存在する拠点でのみ表示
+    const frontCtx = fronts[0]?.front || null;
+    const usedKinds = new Set(frontCtx?.usedKinds || []);
     elements.warActionRow.hidden = !war;
     const btns = [
       elements.warDefendRaidBtn,
@@ -964,10 +967,28 @@ function updateModeControls(loc) {
       b.hidden = !war;
       b.disabled = !war;
     });
-    if (elements.warDefendRaidBtn) elements.warDefendRaidBtn.hidden = !isDefending;
-    if (elements.warEscortBtn) elements.warEscortBtn.hidden = !isDefending;
-    if (elements.warAttackRaidBtn) elements.warAttackRaidBtn.hidden = !isAttacking;
-    if (elements.warBlockBtn) elements.warBlockBtn.hidden = !isAttacking;
+    if (elements.warDefendRaidBtn) {
+      elements.warDefendRaidBtn.hidden = !isDefending;
+      elements.warDefendRaidBtn.disabled = elements.warDefendRaidBtn.disabled || !isDefending || usedKinds.has("defendRaid");
+    }
+    if (elements.warEscortBtn) {
+      elements.warEscortBtn.hidden = !isDefending;
+      elements.warEscortBtn.disabled = elements.warEscortBtn.disabled || !isDefending || usedKinds.has("escort");
+    }
+    if (elements.warAttackRaidBtn) {
+      elements.warAttackRaidBtn.hidden = !isAttacking;
+      elements.warAttackRaidBtn.disabled = elements.warAttackRaidBtn.disabled || !isAttacking || usedKinds.has("attackRaid");
+    }
+    if (elements.warBlockBtn) {
+      elements.warBlockBtn.hidden = !isAttacking;
+      elements.warBlockBtn.disabled = elements.warBlockBtn.disabled || !isAttacking || usedKinds.has("blockade");
+    }
+    if (elements.warSkirmishBtn) {
+      elements.warSkirmishBtn.disabled = elements.warSkirmishBtn.disabled || !war || usedKinds.has("skirmish");
+    }
+    if (elements.warSupplyFoodBtn) {
+      elements.warSupplyFoodBtn.disabled = elements.warSupplyFoodBtn.disabled || !war || usedKinds.has("supplyFood");
+    }
     // 両陣営で使えるものは隠さない
   }
   if (elements.oracleBattleBtn) {
