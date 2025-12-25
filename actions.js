@@ -8,18 +8,20 @@ import { advanceDayWithEvents } from "./time.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
 import { randInt, absDay, rollDice, manhattan, pickRandomProcessed, randomSeaTarget, randomHuntTarget, NORMAL_ANCHORS, STRONG_ANCHORS, pickAnchorRange } from "./questUtils.js";
+import { addWarScore, getPlayerFactionId, getWarEntry, adjustSupport, adjustNobleFavor, getFrontForSettlement } from "./faction.js";
 import { warScoreLabel } from "./util.js";
-import { getWarEntry, getPlayerFactionId, adjustSupport, adjustNobleFavor } from "./faction.js";
 import { FACTIONS } from "./lore.js";
 import { SUPPLY_ITEMS } from "./supplies.js";
 import { enqueueEvent } from "./events.js";
 import { addTroops } from "./troops.js";
-import { addWarScore } from "./faction.js";
 import {
   addRefugeeEscortQuest,
   completeRefugeeEscortAt,
   markNobleRefugeePickup,
   completeNobleRefugeeAt,
+  addWarFrontQuest,
+  markWarEscortPickup,
+  completeWarEscortAt,
 } from "./quests.js";
 import { getSettlementById } from "./map.js";
 
@@ -235,6 +237,10 @@ export function isValidMove(from, to) {
  * @returns {boolean} 移動成功か
  */
 export function moveToSelected(showActionMessage, syncUI) {
+  // 謁見モードのまま移動した場合は通常モードに戻す
+  if (state.modeLabel === MODE_LABEL.AUDIENCE) {
+    state.modeLabel = MODE_LABEL.NORMAL;
+  }
   if (state.pendingEncounter?.active) {
     showActionMessage?.("戦闘準備中は移動できません。行動を選んでください。", "warn");
     return false;
@@ -290,6 +296,11 @@ export function moveToSelected(showActionMessage, syncUI) {
   }
   state.position = { ...dest };
   markNobleRefugeePickup(state.position);
+  markWarEscortPickup(state.position);
+  const arrivedSet = getSettlementAtPosition(state.position.x, state.position.y);
+  if (arrivedSet) {
+    completeWarEscortAt(arrivedSet);
+  }
   advanceDayWithEvents(1);
   setOutput("移動", `(${dest.x + 1}, ${dest.y + 1}) へ移動しました。`, [
     { text: "移動", kind: "" },
@@ -431,45 +442,101 @@ export function getCurrentSettlement() {
 export function rollTravelEvents() {
   if (state.pendingEncounter?.active) return false;
   if (state.modeLabel === MODE_LABEL.BATTLE || state.modeLabel === MODE_LABEL.PREP) return false;
+  if ((state.travelEventCooldown || 0) > 0) {
+    state.travelEventCooldown = Math.max(0, (state.travelEventCooldown || 0) - 1);
+    return false;
+  }
   const loc = getLocationStatus();
   if (loc?.place === PLACE.VILLAGE || loc?.place === PLACE.TOWN) return false;
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   // 行商人救助は先に判定
   if (Math.random() < RESCUE_EVENT_RATE) {
     const queued = enqueueMerchantRescueEvent(terrain);
-    if (queued) return true;
+    if (queued) {
+      state.travelEventCooldown = 5;
+      return true;
+    }
   }
   if (Math.random() < MERCHANT_EVENT_RATE) {
     const queued = enqueueMerchantEvent(terrain);
-    if (queued) return true;
+    if (queued) {
+      state.travelEventCooldown = 5;
+      return true;
+    }
   }
   if (Math.random() < SMUGGLE_EVENT_RATE && (terrain === "sea" || terrain === "shoal")) {
     const queued = enqueueSmuggleEvent(terrain);
-    if (queued) return true;
+    if (queued) {
+      state.travelEventCooldown = 5;
+      return true;
+    }
   }
   if (!state.refugeeEscort?.active && Math.random() < REFUGEE_EVENT_RATE) {
     const queued = enqueueRefugeeEvent(terrain);
-    if (queued) return true;
+    if (queued) {
+      state.travelEventCooldown = 5;
+      return true;
+    }
   }
   if (terrain === "sea" || terrain === "shoal") {
     if (Math.random() < WRECK_EVENT_RATE) {
       const queued = enqueueWreckEvent(terrain);
-      if (queued) return true;
+      if (queued) {
+        state.travelEventCooldown = 5;
+        return true;
+      }
     }
   }
   if (Math.random() < OMEN_EVENT_RATE) {
     const queued = enqueueOmenEvent();
-    if (queued) return true;
+    if (queued) {
+      state.travelEventCooldown = 5;
+      return true;
+    }
   }
   if (Math.random() < TRAITOR_EVENT_RATE) {
     const queued = enqueueTraitorEvent();
-    if (queued) return true;
+    if (queued) {
+      state.travelEventCooldown = 5;
+      return true;
+    }
   }
   if (Math.random() < CHECKPOINT_EVENT_RATE) {
     const queued = enqueueCheckpointEvent();
-    if (queued) return true;
+    if (queued) {
+      state.travelEventCooldown = 5;
+      return true;
+    }
   }
   return false;
+}
+
+/**
+ * 拠点での戦時アクションを即時で処理し、戦況スコアを加算する。
+ * @param {"defendRaid"|"attackRaid"|"skirmish"|"supplyFood"|"escort"|"blockade"} kind
+ * @returns {boolean}
+ */
+export function triggerWarAction(kind) {
+  const here = getSettlementAtPosition(state.position.x, state.position.y);
+  const pf = getPlayerFactionId();
+  if (!here || !here.factionId || !pf || pf === "player") {
+    pushToast("????", "?????????????", "warn");
+    return false;
+  }
+  const frontInfo = getFrontForSettlement(pf, here.id);
+  if (!frontInfo?.front) {
+    pushToast("????", "???????????????", "warn");
+    return false;
+  }
+  const role = frontInfo.front.defender === pf ? "defend" : "attack";
+  const q = addWarFrontQuest(here, frontInfo.front, role, kind);
+  if (!q) {
+    pushToast("????", "?????????????????", "info");
+    return false;
+  }
+  pushLog("????", `${q.title} ???????`, "-");
+  pushToast("????", `${q.title} ????????`, "info");
+  return true;
 }
 
 /**

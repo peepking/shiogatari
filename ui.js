@@ -26,6 +26,7 @@ import {
   waitOneDay,
   getCurrentSettlement,
   resetEncounterMeter,
+  triggerWarAction,
 } from "./actions.js";
 import { wireMarketModals, openEventTrade } from "./marketUI.js";
 import { wireHireModal } from "./hireUI.js";
@@ -44,6 +45,7 @@ import {
   getAvailableNobleQuests,
   acceptNobleQuest,
   completeNobleBattleQuest,
+  completeWarBattleQuest,
   QUEST_TYPES,
 } from "./quests.js";
 import { FACTIONS } from "./lore.js";
@@ -51,6 +53,7 @@ import { buildEnemyFormation } from "./actions.js";
 import {
   addWarScore,
   getPlayerFactionId,
+  getRelation,
   adjustNobleFavor,
   adjustSupport,
   addHonorFaction,
@@ -280,7 +283,7 @@ function acceptHonorHere() {
  * 謁見中の貴族依頼受注（暫定プレースホルダー）。
  */
 function requestNobleQuest() {
-  pushToast("準備中", "貴族からの依頼は後で追加されます。", "info");
+  // 貴族依頼は別途モーダルから受注するため、ここでは処理なし
 }
 
 /**
@@ -691,6 +694,14 @@ function processBattleOutcome(resultCode, meta) {
       ) {
         completeNobleBattleQuest(questId, isWin, enemyTotal, questFightIdx);
         summary.push(isWin ? "貴族依頼: 戦闘達成" : "貴族依頼: 戦闘失敗");
+      } else if (
+        questType === QUEST_TYPES.WAR_DEFEND_RAID ||
+        questType === QUEST_TYPES.WAR_ATTACK_RAID ||
+        questType === QUEST_TYPES.WAR_SKIRMISH ||
+        questType === QUEST_TYPES.WAR_BLOCKADE
+      ) {
+        completeWarBattleQuest(questId, isWin, enemyTotal, questFightIdx);
+        summary.push(isWin ? "前線行動: 戦闘達成" : "前線行動: 戦闘失敗");
       }
     }
     if (eventTag === "merchant_attack") {
@@ -920,6 +931,44 @@ function updateModeControls(loc) {
   if (elements.modeWaitBtn) {
     elements.modeWaitBtn.hidden = lockActions || inAudience;
     elements.modeWaitBtn.disabled = lockActions || inAudience;
+  }
+  if (elements.warActionRow) {
+    const here = getCurrentSettlement();
+    const pf = getPlayerFactionId();
+    const fronts =
+      here && Array.isArray(state.warLedger?.entries)
+        ? state.warLedger.entries
+            .flatMap((e) => (e.activeFronts || []).map((f) => ({ entry: e, front: f })))
+            .filter((f) => f.front?.settlementId === here.id && (f.entry.factions || []).includes(pf))
+        : [];
+    const war =
+      !lockActions &&
+      !inAudience &&
+      here &&
+      pf &&
+      pf !== "player" &&
+      (getRelation(pf, here.factionId) === "war" || fronts.length > 0);
+    elements.warActionRow.hidden = !war;
+    const btns = [
+      elements.warDefendRaidBtn,
+      elements.warAttackRaidBtn,
+      elements.warSkirmishBtn,
+      elements.warSupplyFoodBtn,
+      elements.warEscortBtn,
+      elements.warBlockBtn,
+    ];
+    const isDefending = fronts.some((f) => f.front?.defender === pf);
+    const isAttacking = fronts.some((f) => f.front?.attacker === pf);
+    btns.forEach((b) => {
+      if (!b) return;
+      b.hidden = !war;
+      b.disabled = !war;
+    });
+    if (elements.warDefendRaidBtn) elements.warDefendRaidBtn.hidden = !isDefending;
+    if (elements.warEscortBtn) elements.warEscortBtn.hidden = !isDefending;
+    if (elements.warAttackRaidBtn) elements.warAttackRaidBtn.hidden = !isAttacking;
+    if (elements.warBlockBtn) elements.warBlockBtn.hidden = !isAttacking;
+    // 両陣営で使えるものは隠さない
   }
   if (elements.oracleBattleBtn) {
     const show = !lockActions && !!battleQuestMeta && !inAudience;
@@ -1277,6 +1326,12 @@ function wireButtons() {
   elements.audienceHonorBtn?.addEventListener("click", acceptHonorHere);
   elements.audienceRequestBtn?.addEventListener("click", requestNobleQuest);
   elements.audienceResignBtn?.addEventListener("click", resignHonorHere);
+  elements.warDefendRaidBtn?.addEventListener("click", () => triggerWarAction("defendRaid"));
+  elements.warAttackRaidBtn?.addEventListener("click", () => triggerWarAction("attackRaid"));
+  elements.warSkirmishBtn?.addEventListener("click", () => triggerWarAction("skirmish"));
+  elements.warSupplyFoodBtn?.addEventListener("click", () => triggerWarAction("supplyFood"));
+  elements.warEscortBtn?.addEventListener("click", () => triggerWarAction("escort"));
+  elements.warBlockBtn?.addEventListener("click", () => triggerWarAction("blockade"));
   document.addEventListener("map-move-request", () => {
     if (isAudienceMode()) state.modeLabel = MODE_LABEL.NORMAL;
     moveToSelected(showActionMessage, syncUI);

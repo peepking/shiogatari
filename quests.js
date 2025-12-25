@@ -3,7 +3,15 @@ import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 import { settlements, getSettlementAtPosition, getSettlementById } from "./map.js";
 import { pushLog, pushToast } from "./dom.js";
 import { enqueueEvent } from "./events.js";
-import { addWarScore, adjustSupport, getWarEntry, getWarScoreLabel, getPlayerFactionId, adjustNobleFavor } from "./faction.js";
+import {
+  addWarScore,
+  addFrontScore,
+  adjustSupport,
+  getWarEntry,
+  getWarScoreLabel,
+  getPlayerFactionId,
+  adjustNobleFavor,
+} from "./faction.js";
 import { TROOP_STATS } from "./troops.js";
 import {
   randInt,
@@ -38,6 +46,12 @@ const QUEST_TYPES = {
   NOBLE_REFUGEE: "noble_refugee",
   NOBLE_LOGISTICS: "noble_logistics",
   NOBLE_HUNT: "noble_hunt",
+  WAR_DEFEND_RAID: "war_defend_raid",
+  WAR_ATTACK_RAID: "war_attack_raid",
+  WAR_SKIRMISH: "war_skirmish",
+  WAR_SUPPLY: "war_supply",
+  WAR_ESCORT: "war_escort",
+  WAR_BLOCKADE: "war_blockade",
 };
 
 /**
@@ -822,6 +836,95 @@ function genNobleHuntQuest(settlement, noble) {
 }
 
 /**
+ * フロント行動用の依頼を生成する。
+ * @param {object} settlement
+ * @param {object} front
+ * @param {"defend"|"attack"} role
+ * @param {"defendRaid"|"attackRaid"|"skirmish"|"supplyFood"|"escort"|"blockade"} kind
+ * @returns {object|null}
+ */
+export function genWarFrontQuest(settlement, front, role, kind) {
+  if (!settlement || !front) return null;
+  const enemyFactionId = role === "defend" ? front.attacker : front.defender;
+  const playerFactionId = role === "defend" ? front.defender : front.attacker;
+  const now = absDay(state);
+  const deadlineAbs = Math.min(front.endAbs || now + 90, now + 90);
+  const common = {
+    id: nextNobleId(),
+    frontSettlementId: settlement.id,
+    frontRole: role,
+    factionId: playerFactionId,
+    enemyFactionId,
+    acceptedAbs: now,
+    deadlineAbs,
+  };
+  if (kind === "defendRaid" || kind === "attackRaid") {
+    return {
+      ...common,
+      type: kind === "defendRaid" ? QUEST_TYPES.WAR_DEFEND_RAID : QUEST_TYPES.WAR_ATTACK_RAID,
+      title: kind === "defendRaid" ? "補給路迎撃" : "補給路襲撃",
+      target: { ...settlement.coords },
+      strength: "elite",
+      desc: `${settlement.name} 周辺で敵の補給路を断つ。`,
+    };
+  }
+  if (kind === "skirmish") {
+    return {
+      ...common,
+      type: QUEST_TYPES.WAR_SKIRMISH,
+      title: "小規模戦闘",
+      target: { ...settlement.coords },
+      strength: "elite",
+      desc: `${settlement.name} 外縁で敵前衛を叩く。`,
+    };
+  }
+  if (kind === "supplyFood") {
+    const baseLogistics = genNobleLogisticsQuest(settlement, { id: settlement.nobleId, name: "" }) || {};
+    const items = baseLogistics.items || [{ id: "food", qty: Math.max(10, rollDice(5, 4)) }];
+    const foodItem = items.find((i) => i.id === "food");
+    return {
+      ...common,
+      type: QUEST_TYPES.WAR_SUPPLY,
+      title: "食糧搬入",
+      originId: settlement.id,
+      items,
+      desc: `${settlement.name} に食糧を搬入する。`,
+      foodNeed: foodItem?.qty || 0,
+    };
+  }
+  if (kind === "escort") {
+    const target = randomHuntTarget(settlement.coords, 3, 7, usedTargets());
+    if (!target) return null;
+    return {
+      ...common,
+      type: QUEST_TYPES.WAR_ESCORT,
+      title: "輸送護衛",
+      originId: settlement.id,
+      target,
+      picked: false,
+      desc: `${settlement.name} へ輸送隊を護衛する。`,
+    };
+  }
+  if (kind === "blockade") {
+    const avoid = usedTargets();
+    const first = randomHuntTarget(settlement.coords, 2, 5, avoid);
+    const second = randomHuntTarget(settlement.coords, 2, 5, avoid.concat(first ? [first] : []));
+    if (!first || !second) return null;
+    return {
+      ...common,
+      type: QUEST_TYPES.WAR_BLOCKADE,
+      title: "補給封鎖",
+      fights: [
+        { target: first, strength: "normal", done: false },
+        { target: second, strength: "normal", done: false },
+      ],
+      desc: `${settlement.name} への補給線を二箇所で断つ。`,
+    };
+  }
+  return null;
+}
+
+/**
  * 神託が受注中かどうかを判定する。
  * @returns {boolean}
  */
@@ -835,6 +938,52 @@ function hasActiveOracle() {
       q.type === QUEST_TYPES.ORACLE_HUNT ||
       q.type === QUEST_TYPES.ORACLE_ELITE
   );
+}
+
+/**
+ * フロント行動依頼を追加する（重複を避ける）
+ * @param {object} settlement
+ * @param {object} front
+ * @param {"defend"|"attack"} role
+ * @param {"defendRaid"|"attackRaid"|"skirmish"|"supplyFood"|"escort"|"blockade"} kind
+ * @returns {object|null}
+ */
+export function addWarFrontQuest(settlement, front, role, kind) {
+  ensureState();
+  if (!settlement || !front) return null;
+  const typeMap = {
+    defendRaid: QUEST_TYPES.WAR_DEFEND_RAID,
+    attackRaid: QUEST_TYPES.WAR_ATTACK_RAID,
+    skirmish: QUEST_TYPES.WAR_SKIRMISH,
+    supplyFood: QUEST_TYPES.WAR_SUPPLY,
+    escort: QUEST_TYPES.WAR_ESCORT,
+    blockade: QUEST_TYPES.WAR_BLOCKADE,
+  };
+  const tgtType = typeMap[kind];
+  if (!tgtType) return null;
+  const dup = state.quests.active.some((q) => q.frontSettlementId === settlement.id && q.type === tgtType);
+  if (dup) return null;
+  const q = genWarFrontQuest(settlement, front, role, kind);
+  if (!q) return null;
+  state.quests.active.push(q);
+  pushLog("依頼受注", q.title, "-");
+  return q;
+}
+
+function applyWarFrontScore(q, success) {
+  if (!q?.frontSettlementId || !q?.enemyFactionId) return;
+  const pf = getPlayerFactionId();
+  const deltaMap = {
+    [QUEST_TYPES.WAR_DEFEND_RAID]: 12,
+    [QUEST_TYPES.WAR_ATTACK_RAID]: 12,
+    [QUEST_TYPES.WAR_SKIRMISH]: 8,
+    [QUEST_TYPES.WAR_SUPPLY]: 5,
+    [QUEST_TYPES.WAR_ESCORT]: 8,
+    [QUEST_TYPES.WAR_BLOCKADE]: 8,
+  };
+  const base = deltaMap[q.type] || 0;
+  const delta = success ? base : base ? -base : 0;
+  if (delta) addFrontScore(pf, q.enemyFactionId, q.frontSettlementId, delta, absDay(state), 0, 0);
 }
 
 /**
@@ -900,6 +1049,21 @@ export function completeQuest(id) {
     state.supplies[q.itemId] -= q.qty;
     fameReward = rollDice(5, 2);
     state.fame += fameReward;
+  }
+  if (q.type === QUEST_TYPES.WAR_SUPPLY) {
+    if (!here || here.id !== q.originId) return false;
+    const ok = (q.items || []).every((it) => (state.supplies?.[it.id] ?? 0) >= it.qty);
+    if (!ok) return false;
+    (q.items || []).forEach((it) => {
+      state.supplies[it.id] = Math.max(0, (state.supplies[it.id] ?? 0) - it.qty);
+    });
+    applyWarFrontScore(q, true);
+  }
+  if (q.type === QUEST_TYPES.WAR_ESCORT) {
+    if (!here) return false;
+    if (!q.picked) return false;
+    if (here.id !== q.originId) return false;
+    applyWarFrontScore(q, true);
   }
   if (q.type === QUEST_TYPES.ORACLE_SUPPLY) {
     const ok = (q.items || []).every((it) => (state.supplies?.[it.id] ?? 0) >= it.qty);
@@ -1023,6 +1187,15 @@ export function canCompleteQuest(q) {
   if (q.type === QUEST_TYPES.NOBLE_LOGISTICS) {
     if (!here || here.id !== q.originId) return false;
     return (q.items || []).every((it) => (state.supplies?.[it.id] ?? 0) >= it.qty);
+  }
+  if (q.type === QUEST_TYPES.WAR_SUPPLY) {
+    if (!here || here.id !== q.originId) return false;
+    return (q.items || []).every((it) => (state.supplies?.[it.id] ?? 0) >= it.qty);
+  }
+  if (q.type === QUEST_TYPES.WAR_ESCORT) {
+    if (!q.picked) return false;
+    if (!here || here.id !== q.originId) return false;
+    return true;
   }
   if (q.type === QUEST_TYPES.NOBLE_SCOUT) {
     const herePos = state.position;
@@ -1191,6 +1364,60 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
 }
 
 /**
+ * フロント行動（戦闘系）の完了処理。
+ * @param {number} id
+ * @param {boolean} success
+ * @param {number} enemyTotal
+ * @param {number|null} fightIdx
+ * @returns {boolean}
+ */
+export function completeWarBattleQuest(id, success, enemyTotal, fightIdx = null) {
+  ensureState();
+  const idx = state.quests.active.findIndex(
+    (q) =>
+      q.id === id &&
+      (q.type === QUEST_TYPES.WAR_DEFEND_RAID ||
+        q.type === QUEST_TYPES.WAR_ATTACK_RAID ||
+        q.type === QUEST_TYPES.WAR_SKIRMISH ||
+        q.type === QUEST_TYPES.WAR_BLOCKADE)
+  );
+  if (idx === -1) return false;
+  const q = state.quests.active[idx];
+  if (q.type === QUEST_TYPES.WAR_BLOCKADE && Array.isArray(q.fights)) {
+    if (!success) {
+      applyWarFrontScore(q, false);
+      state.quests.active.splice(idx, 1);
+      pushLog("行動失敗", `${q.title} / 戦闘に敗北`, "-");
+      pushToast("行動失敗", `${q.title} / 戦闘に敗北`, "bad");
+      return true;
+    }
+    if (fightIdx != null && q.fights[fightIdx]) q.fights[fightIdx].done = true;
+    const remaining = (q.fights || []).some((f) => !f.done);
+    if (remaining) {
+      pushLog("行動進行", `${q.title} / 残り${q.fights.filter((f) => !f.done).length}箇所`, "-");
+      pushToast("行動進行", `${q.title} / まだ遮断箇所が残っています`, "info");
+      return true;
+    }
+    applyWarFrontScore(q, true);
+    state.quests.active.splice(idx, 1);
+    pushLog("行動達成", `${q.title} / 補給線を遮断`, "-");
+    pushToast("行動達成", `${q.title} を完了しました`, "good");
+    return true;
+  }
+  if (success) {
+    applyWarFrontScore(q, true);
+    pushLog("行動達成", `${q.title} / 戦闘勝利`, "-");
+    pushToast("行動達成", `${q.title} を完了しました`, "good");
+  } else {
+    applyWarFrontScore(q, false);
+    pushLog("行動失敗", `${q.title} / 戦闘に敗北`, "-");
+    pushToast("行動失敗", `${q.title} / 戦闘に敗北`, "bad");
+  }
+  state.quests.active.splice(idx, 1);
+  return true;
+}
+
+/**
  * 現在位置で討伐系の神託が発動可能か取得する。
  * @param {{x:number,y:number}} pos
  * @returns {object|null}
@@ -1257,6 +1484,30 @@ export function getBattleQuestAt(pos) {
         fightIdx: null,
       };
     }
+    if (
+      (q.type === QUEST_TYPES.WAR_DEFEND_RAID || q.type === QUEST_TYPES.WAR_ATTACK_RAID || q.type === QUEST_TYPES.WAR_SKIRMISH) &&
+      q.target &&
+      q.target.x === pos.x &&
+      q.target.y === pos.y
+    ) {
+      return {
+        quest: q,
+        strength: q.strength || "elite",
+        enemyFactionId: q.enemyFactionId || "pirates",
+        fightIdx: null,
+      };
+    }
+    if (q.type === QUEST_TYPES.WAR_BLOCKADE && Array.isArray(q.fights)) {
+      const idx = q.fights.findIndex((f) => f?.target && !f.done && f.target.x === pos.x && f.target.y === pos.y);
+      if (idx !== -1) {
+        return {
+          quest: q,
+          strength: q.fights[idx].strength || "normal",
+          enemyFactionId: q.enemyFactionId || "pirates",
+          fightIdx: idx,
+        };
+      }
+    }
   }
   return null;
 }
@@ -1306,6 +1557,16 @@ export function questTickDay(days = 1) {
           if (q.type === QUEST_TYPES.NOBLE_REFUGEE) {
             state.refugeeEscort = { active: false, targetId: null, factionId: null, nobleId: null, questId: null };
           }
+        }
+        if (
+          q.type === QUEST_TYPES.WAR_DEFEND_RAID ||
+          q.type === QUEST_TYPES.WAR_ATTACK_RAID ||
+          q.type === QUEST_TYPES.WAR_SKIRMISH ||
+          q.type === QUEST_TYPES.WAR_SUPPLY ||
+          q.type === QUEST_TYPES.WAR_ESCORT ||
+          q.type === QUEST_TYPES.WAR_BLOCKADE
+        ) {
+          applyWarFrontScore(q, false);
         }
       });
       state.quests.active = state.quests.active.filter(
@@ -1380,6 +1641,21 @@ export function markNobleRefugeePickup(pos) {
 }
 
 /**
+ * 戦争用輸送護衛のピックアップ地点に到達した際の処理。
+ * @param {{x:number,y:number}} pos
+ */
+export function markWarEscortPickup(pos) {
+  ensureState();
+  const q = state.quests.active.find(
+    (qq) => qq.type === QUEST_TYPES.WAR_ESCORT && !qq.picked && qq.target && qq.target.x === pos.x && qq.target.y === pos.y
+  );
+  if (!q) return;
+  q.picked = true;
+  pushLog("輸送護衛", `${q.title} / 輸送隊を合流させました。拠点へ護衛してください。`, "-");
+  pushToast("輸送護衛", "輸送隊と合流しました。拠点へ戻って完了してください。", "info");
+}
+
+/**
  * 貴族依頼の護送を完了する。
  * @param {object|null} settlement
  * @returns {boolean}
@@ -1406,4 +1682,22 @@ export function completeNobleRefugeeAt(settlement) {
   pushToast("護送完了", `${q.title} / ${rewardText}`, "good");
   enqueueEvent({ title: "護送完了", body: `${q.title} / ${rewardText}` });
   return true;
+}
+
+/**
+ * 戦争用輸送護衛を完了する。
+ * @param {object|null} settlement
+ */
+export function completeWarEscortAt(settlement) {
+  ensureState();
+  if (!settlement) return;
+  const idx = state.quests.active.findIndex(
+    (q) => q.type === QUEST_TYPES.WAR_ESCORT && q.picked && q.originId === settlement.id
+  );
+  if (idx === -1) return;
+  const q = state.quests.active[idx];
+  applyWarFrontScore(q, true);
+  state.quests.active.splice(idx, 1);
+  pushLog("護送完了", `${q.title} / ${settlement.name} に護送完了`, "-");
+  pushToast("護送完了", `${q.title} を完了しました`, "good");
 }

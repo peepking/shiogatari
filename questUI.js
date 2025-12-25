@@ -59,6 +59,13 @@ export function renderQuestUI(syncUI) {
                     q.type === QUEST_TYPES.NOBLE_LOGISTICS ||
                     q.type === QUEST_TYPES.NOBLE_HUNT
                   ? "貴族依頼"
+                : q.type === QUEST_TYPES.WAR_DEFEND_RAID ||
+                    q.type === QUEST_TYPES.WAR_ATTACK_RAID ||
+                    q.type === QUEST_TYPES.WAR_SKIRMISH ||
+                    q.type === QUEST_TYPES.WAR_SUPPLY ||
+                    q.type === QUEST_TYPES.WAR_ESCORT ||
+                    q.type === QUEST_TYPES.WAR_BLOCKADE
+                  ? "前線行動"
                 : "";
       const placeLabel =
         q.type === QUEST_TYPES.SUPPLY
@@ -90,7 +97,19 @@ export function renderQuestUI(syncUI) {
                       : q.type === QUEST_TYPES.NOBLE_SECURITY
                         ? `治安回復: 指定2戦 @${origin?.name ?? "拠点"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})`
                       : q.type === QUEST_TYPES.NOBLE_HUNT
-                        ? `敵軍討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                        ? `補給路迎撃 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                      : q.type === QUEST_TYPES.WAR_DEFEND_RAID
+                        ? `補給路襲撃 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                      : q.type === QUEST_TYPES.WAR_ATTACK_RAID
+                        ? `小規模戦闘 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                      : q.type === QUEST_TYPES.WAR_SKIRMISH
+                        ? `食糧搬入 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                      : q.type === QUEST_TYPES.WAR_SUPPLY
+                        ? `${origin?.name ?? "拠点"}輸送護衛`
+                      : q.type === QUEST_TYPES.WAR_ESCORT
+                        ? `補給封鎖 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                      : q.type === QUEST_TYPES.WAR_BLOCKADE
+                        ? `敵軍討伐 ??${(q.fights || []).filter((f) => !f.done).length}??`
                       : "";
       const canFinish = remain == null ? canCompleteQuest(q) : remain >= 0 && canCompleteQuest(q);
       const rewardExtra =

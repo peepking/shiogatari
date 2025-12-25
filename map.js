@@ -441,6 +441,7 @@ function questToPin(q, nowAbs) {
     case QUEST_TYPES.NOBLE_SECURITY: {
       const pins = [];
       (q.fights || []).forEach((f, idx) => {
+        if (f?.done) return; // クリア済みの戦闘はピンを出さない
         const styleKey = idx === 0 ? "hunt" : "bounty";
         const p = fromTarget(f?.target, styleKey);
         if (p) pins.push(p);
@@ -449,6 +450,24 @@ function questToPin(q, nowAbs) {
     }
     case QUEST_TYPES.NOBLE_HUNT:
       return [fromTarget(q.target, "bounty")].filter(Boolean);
+    case QUEST_TYPES.WAR_DEFEND_RAID:
+      return [fromTarget(q.target, "hunt")].filter(Boolean);
+    case QUEST_TYPES.WAR_ATTACK_RAID:
+    case QUEST_TYPES.WAR_SKIRMISH:
+      return [fromTarget(q.target, "bounty")].filter(Boolean);
+    case QUEST_TYPES.WAR_SUPPLY:
+      return [fromSettlementId(q.originId, "supply", "supply")].filter(Boolean);
+    case QUEST_TYPES.WAR_ESCORT:
+      return [fromTarget(q.target, "move")].filter(Boolean);
+    case QUEST_TYPES.WAR_BLOCKADE: {
+      const pins = [];
+      (q.fights || []).forEach((f) => {
+        if (f?.done) return;
+        const p = fromTarget(f?.target, "bounty");
+        if (p) pins.push(p);
+      });
+      return pins;
+    }
     default:
       return [];
   }
@@ -490,6 +509,24 @@ function refreshPinCache() {
   const nowAbs = absDay(state);
   const active = state.quests?.active || [];
   const pins = [];
+  // 防衛中ピン
+  if (state.warLedger?.entries) {
+    state.warLedger.entries.forEach((e) => {
+      (e.activeFronts || []).forEach((f) => {
+        const set = settlements.find((s) => s.id === f.settlementId);
+        if (!set) return;
+        pins.push({
+          x: set.coords.x,
+          y: set.coords.y,
+          color: "#ff7a7a",
+          shape: "shield",
+          labels: ["防衛中"],
+          info: `攻撃: ${f.attacker}, 防衛: ${f.defender}`,
+          priority: 1,
+        });
+      });
+    });
+  }
   active.forEach((q) => {
     const res = questToPin(q, nowAbs);
     if (Array.isArray(res)) {
@@ -529,6 +566,18 @@ function drawPin(ctx, pin, pad, cellSize, startX, startY) {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
+  } else if (pin.shape === "shield") {
+    const w = Math.max(r * 1.2, 5);
+    const h = Math.max(r * 1.6, 7);
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.6, cy - h * 0.4);
+    ctx.lineTo(cx + w * 0.6, cy - h * 0.4);
+    ctx.lineTo(cx + w * 0.6, cy + h * 0.1);
+    ctx.lineTo(cx, cy + h * 0.6);
+    ctx.lineTo(cx - w * 0.6, cy + h * 0.1);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
   } else if (pin.shape === "star") {
     ctx.beginPath();
     const spikes = 5;
@@ -560,12 +609,17 @@ function formatCellInfo(gx, gy) {
   const s = cell.settlement;
   const ctrl = nobleName(s.nobleId);
   const support = displaySupportLabel(supportLabel(s.support?.[s.factionId] ?? 0));
+  const underAttack = (state.warLedger?.entries || []).some((e) =>
+    (e.activeFronts || []).some((f) => f.settlementId === s.id)
+  );
   const war =
     s.warState?.label
       ? displayWarLabel(s.warState.label)
-      : s.warState?.frontline || s.warState?.contested
-        ? "前線"
-        : "平常";
+      : underAttack
+        ? "防衛中"
+        : s.warState?.frontline || s.warState?.contested
+          ? "前線"
+          : "平常";
   return `(${gx + 1}, ${gy + 1}) ${terr} / ${s.name}（${factionName(s.factionId)}） / 支配: ${ctrl} / 支持: ${support} / 戦況: ${war}`;
 }
 

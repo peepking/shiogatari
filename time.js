@@ -3,7 +3,7 @@ import { questTickDay } from "./quests.js";
 import { TROOP_STATS, totalTroops, applyTroopLosses } from "./troops.js";
 import { pushLog } from "./dom.js";
 import { absDay } from "./questUtils.js";
-import { tickDailyWar, maybeQueueHonorInvite, applySupportDrift } from "./faction.js";
+import { tickDailyWar, tickRelationDrift, maybeQueueHonorInvite, applySupportDrift } from "./faction.js";
 import { enqueueEvent } from "./events.js";
 import { startTravelEncounter } from "./actions.js";
 import { MODE_LABEL } from "./constants.js";
@@ -23,6 +23,7 @@ export function advanceDayWithEvents(days = 1) {
     }
     const today = absDay(state);
     tickDailyWar(today);
+    tickRelationDrift(today);
     maybeQueueHonorInvite(today);
     if (state.day % 7 === 0) {
       applySupportDrift();

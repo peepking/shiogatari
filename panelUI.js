@@ -12,6 +12,7 @@ import {
   getRelation,
   removeHonorFaction,
   getNobleFavor,
+  getSupportLabel,
 } from "./faction.js";
 import { displayWarLabel, displayRelationLabel } from "./util.js";
 import { pushToast } from "./dom.js";
@@ -72,7 +73,12 @@ export function renderFactions() {
     const attText = factionStatusText(f.id);
     const rel = getRelation(getPlayerFactionId(), f.id);
     const warEntry = rel === "war" && f.id !== "pirates" ? getWarEntry(getPlayerFactionId(), f.id) : null;
-    const warLabel = warEntry ? displayWarLabel(getWarScoreLabel(warEntry?.score || 0)) : "-";
+    const orientedScore = warEntry
+      ? warEntry.factions?.[0] === getPlayerFactionId()
+        ? warEntry.score
+        : -warEntry.score
+      : 0;
+    const warLabel = warEntry ? displayWarLabel(getWarScoreLabel(orientedScore)) : "-";
     const honor = isHonorFaction(f.id);
     return `
       <div class="faction-card" data-fid="${f.id}" data-fcolor="${f.color}">
@@ -103,6 +109,15 @@ export function renderNobles(fid) {
   if (!f) return;
   elements.noblePanel.hidden = false;
   elements.nobleFactionName.textContent = f.name;
+  const allies = FACTIONS.filter((x) => x.id !== f.id && x.id !== "pirates" && getRelation(f.id, x.id) === "ally");
+  const wars = FACTIONS.filter((x) => x.id !== f.id && x.id !== "pirates" && getRelation(f.id, x.id) === "war");
+  const allianceCard = `
+    <div class="sideBlock mb-8" style="grid-column: span 2;">
+      <div class="sbTitle">関係</div>
+      <div class="tiny">同盟: ${allies.length ? allies.map((a) => a.name).join(" / ") : "-"}</div>
+      <div class="tiny">戦争: ${wars.length ? wars.map((w) => w.name).join(" / ") : "-"}</div>
+    </div>
+  `;
   const homeMap = new Map(nobleHome.entries());
   const getStay = (nid) => {
     const hid = homeMap.get(nid);
@@ -119,12 +134,11 @@ export function renderNobles(fid) {
     if (fv > -50) return "警戒";
     return "敵対";
   };
-  elements.nobleListEl.innerHTML = f.nobles
-    .map(
-      (n) => {
-        const stayText = getStay(n.id);
-        const favorText = `好感度: ${favorLabel(n.id)}`;
-        return `
+  const nobleCards = f.nobles
+    .map((n) => {
+      const stayText = getStay(n.id);
+      const favorText = `好感度: ${favorLabel(n.id)}`;
+      return `
       <div class="noble-card" data-nid="${n.id}">
         <img src="${n.img}" alt="${n.name}">
         <div class="n-body">
@@ -134,9 +148,9 @@ export function renderNobles(fid) {
           <div class="n-title">${favorText}</div>
         </div>
       </div>`;
-      }
-    )
+    })
     .join("");
+  elements.nobleListEl.innerHTML = allianceCard + nobleCards;
   if (elements.nobleDetail) elements.nobleDetail.innerHTML = "";
 }
 
@@ -162,6 +176,13 @@ export function renderNobleDetail(nobleId) {
           <div class="tiny">座標 (${s.coords.x + 1}, ${s.coords.y + 1}) / 勢力 ${factionName(
             s.factionId
           )}</div>
+          <div class="tiny">支持: ${getSupportLabel(s.id, s.factionId)} / 戦況: ${
+            getWarEntry(s.factionId, getPlayerFactionId())
+              ? displayWarLabel(getWarScoreLabel(getWarEntry(s.factionId, getPlayerFactionId()).score || 0))
+              : "-"
+          } / ${state.warLedger?.entries?.some((e) => (e.activeFronts || []).some((f) => f.settlementId === s.id))
+            ? "防衛中"
+            : "平時"} </div>
           <div class="tiny">雇用可能: ${
             (s.recruitSlots || [])
               .map((slot) => TROOP_STATS[slot.type]?.name || slot.type)

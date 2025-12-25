@@ -18,8 +18,10 @@ const createState = () => ({
   silence: 0,
   factionState: {},
   warLedger: { entries: [] },
+  relationScores: {}, // 戦争外での緊張度累積（pair key -> score）
   encounterProgress: 0,
   encounterThreshold: 12,
+  travelEventCooldown: 0,
   pendingEncounter: {
     active: false,
     enemyFormation: [],
