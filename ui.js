@@ -11,6 +11,7 @@ import {
   settlements,
   resetSettlementSupport,
   refreshMapInfo,
+  nobleHome,
 } from "./map.js";
 import {
   formatTroopDisplay,
@@ -113,7 +114,9 @@ const formatModeLabel = () => {
  */
 function getAudienceContext() {
   const settlement = getCurrentSettlement();
-  return { settlement: settlement || null, nobleId: settlement?.nobleId || null };
+  const nobleId = settlement?.nobleId || null;
+  const staying = nobleId && nobleHome.get(nobleId) === settlement?.id ? nobleId : null;
+  return { settlement: settlement || null, nobleId: staying };
 }
 
 /**

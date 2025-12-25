@@ -17,6 +17,7 @@ import {
   getFrontForSettlement,
   getFrontById,
   isSettlementUnderSiege,
+  getRelation,
 } from "./faction.js";
 import { warScoreLabel } from "./util.js";
 import { FACTIONS } from "./lore.js";
@@ -43,8 +44,9 @@ const ENCOUNTER_MAX = 15;
  */
 const STRONG_POOL_CHANCE = 0.25;
 const ENCOUNTER_RADIUS = 5;
+const FRONT_ENCOUNTER_RADIUS = 2;
 const TRAVEL_EVENT_RADIUS = 5;
-const TRAVEL_EVENT_COOLDOWN_DAYS = 5;
+const TRAVEL_EVENT_COOLDOWN_DAYS = 7;
 const MERCHANT_EVENT_RATE = 0.02;
 const RESCUE_EVENT_RATE = 0.02;
 const SMUGGLE_EVENT_RATE = 0.03;
@@ -68,7 +70,7 @@ function pickFrontEncounter(pos) {
       const set = settlements.find((s) => s.id === front.settlementId);
       if (!set?.coords) return;
       const d = manhattan(set.coords, pos);
-      if (d <= 3 && (!best || d < best.d)) {
+      if (d <= FRONT_ENCOUNTER_RADIUS && (!best || d < best.d)) {
         const enemy = front.attacker === pf ? front.defender : front.attacker;
         best = { enemyFactionId: enemy, frontId: front.id, d };
       }
@@ -148,10 +150,14 @@ function pickEncounterFaction(pos, terrain) {
   settlements.forEach((s) => {
     if (!s?.factionId) return;
     const dist = manhattan(s.coords, pos);
-    if (dist > ENCOUNTER_RADIUS) return;
-    const w = ENCOUNTER_RADIUS - dist + 1;
+    if (dist > FRONT_ENCOUNTER_RADIUS) return;
+    const w = FRONT_ENCOUNTER_RADIUS - dist + 1;
     regionWeight.set(s.factionId, (regionWeight.get(s.factionId) || 0) + w);
   });
+  const pf = getPlayerFactionId();
+  const warNearby = FACTIONS.filter(
+    (f) => f.id !== "pirates" && f.id !== pf && getRelation(pf, f.id) === "war" && regionWeight.has(f.id)
+  );
   const warFactor = (fid) => {
     const entry = getWarEntry(getPlayerFactionId(), fid);
     const label = warScoreLabel(entry?.score || 0);
@@ -171,8 +177,8 @@ function pickEncounterFaction(pos, terrain) {
     entries.push({ fid, w });
   };
   pushFaction("pirates", pirateBase);
-  FACTIONS.filter((f) => f.id !== "pirates").forEach((f) => {
-    const base = regionWeight.has(f.id) ? 1.0 : 0.4;
+  warNearby.forEach((f) => {
+    const base = 1.0; // 近傍の交戦勢力のみ
     pushFaction(f.id, base);
   });
   const total = entries.reduce((s, e) => s + e.w, 0);

@@ -326,7 +326,7 @@ const goods = [
  * 勢力内で均等に貴族を拠点へ割り振る（拠点数 < 貴族数の場合は再利用）。
  */
 export function ensureNobleHomes() {
-  nobleHome.clear();
+  if (nobleHome.size > 0) return;
   const fallbackSet = settlements[0] || null;
   const shuffle = (arr) => {
     const copy = [...arr];
