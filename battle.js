@@ -1673,7 +1673,8 @@ function scheduleBattleTimer() {
   if (!battleState.running) return;
   const interval = Math.max(50, Math.floor(BASE_TICK_MS / Math.max(1, battleState.speed)));
   battleState.timer = setInterval(() => {
-    const ended = advanceBattleTick(interval);
+    const scaledMs = interval * Math.max(1, battleState.speed);
+    const ended = advanceBattleTick(scaledMs);
     renderBattle();
     updateBattleStatus();
     updateBattleInfo();
