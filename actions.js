@@ -520,22 +520,22 @@ export function triggerWarAction(kind) {
   const here = getSettlementAtPosition(state.position.x, state.position.y);
   const pf = getPlayerFactionId();
   if (!here || !here.factionId || !pf || pf === "player") {
-    pushToast("????", "?????????????", "warn");
+    pushToast("行動不可", "拠点上でのみ実行できます。", "warn");
     return false;
   }
   const frontInfo = getFrontForSettlement(pf, here.id);
   if (!frontInfo?.front) {
-    pushToast("????", "???????????????", "warn");
+    pushToast("行動不可", "この拠点は前線ではありません。", "warn");
     return false;
   }
   const role = frontInfo.front.defender === pf ? "defend" : "attack";
   const q = addWarFrontQuest(here, frontInfo.front, role, kind);
   if (!q) {
-    pushToast("????", "?????????????????", "info");
+    pushToast("依頼重複", "同じ前線で進行中の行動があります。", "info");
     return false;
   }
-  pushLog("????", `${q.title} ???????`, "-");
-  pushToast("????", `${q.title} ????????`, "info");
+  pushLog("前線行動", `${q.title} を受注しました`, "-");
+  pushToast("前線行動", `${q.title} を受注しました。`, "info");
   return true;
 }
 

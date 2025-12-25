@@ -1,4 +1,4 @@
-﻿import { state } from "./state.js";
+import { state } from "./state.js";
 import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 import { settlements, getSettlementAtPosition, getSettlementById } from "./map.js";
 import { pushLog, pushToast } from "./dom.js";
