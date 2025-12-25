@@ -1,4 +1,4 @@
-import { elements } from "./dom.js";
+import { elements, pushToast } from "./dom.js";
 import { state } from "./state.js";
 import { SUPPLY_ITEMS } from "./supplies.js";
 import {
@@ -14,10 +14,139 @@ import { getCurrentSettlement } from "./actions.js";
 import { TROOP_STATS } from "./troops.js";
 import { absDay } from "./questUtils.js";
 
-/**
- * 受注中の依頼一覧を描画する。
- * @param {Function} syncUI
- */
+const TYPE_LABEL = {
+  [QUEST_TYPES.SUPPLY]: "調達",
+  [QUEST_TYPES.DELIVERY]: "配達",
+  [QUEST_TYPES.REFUGEE_ESCORT]: "護送",
+  [QUEST_TYPES.ORACLE_SUPPLY]: "神託",
+  [QUEST_TYPES.ORACLE_MOVE]: "神託",
+  [QUEST_TYPES.ORACLE_TROOP]: "神託",
+  [QUEST_TYPES.ORACLE_HUNT]: "神託",
+  [QUEST_TYPES.ORACLE_ELITE]: "神託",
+  [QUEST_TYPES.PIRATE_HUNT]: "討伐",
+  [QUEST_TYPES.BOUNTY_HUNT]: "討伐",
+  [QUEST_TYPES.NOBLE_SUPPLY]: "貴族依頼",
+  [QUEST_TYPES.NOBLE_SCOUT]: "貴族依頼",
+  [QUEST_TYPES.NOBLE_SECURITY]: "貴族依頼",
+  [QUEST_TYPES.NOBLE_REFUGEE]: "貴族依頼",
+  [QUEST_TYPES.NOBLE_LOGISTICS]: "貴族依頼",
+  [QUEST_TYPES.NOBLE_HUNT]: "貴族依頼",
+  [QUEST_TYPES.WAR_DEFEND_RAID]: "前線行動",
+  [QUEST_TYPES.WAR_ATTACK_RAID]: "前線行動",
+  [QUEST_TYPES.WAR_SKIRMISH]: "前線行動",
+  [QUEST_TYPES.WAR_SUPPLY]: "前線行動",
+  [QUEST_TYPES.WAR_ESCORT]: "前線行動",
+  [QUEST_TYPES.WAR_BLOCKADE]: "前線行動",
+};
+
+const ORACLE_TYPES = new Set([
+  QUEST_TYPES.ORACLE_SUPPLY,
+  QUEST_TYPES.ORACLE_MOVE,
+  QUEST_TYPES.ORACLE_TROOP,
+  QUEST_TYPES.ORACLE_HUNT,
+  QUEST_TYPES.ORACLE_ELITE,
+]);
+
+function formatCoords(pos) {
+  if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return "(不明)";
+  return `(${pos.x + 1}, ${pos.y + 1})`;
+}
+
+function formatSettlement(s) {
+  if (!s) return `不明${formatCoords({ x: 0, y: 0 })}`;
+  return `${s.name}${formatCoords(s.coords)}`;
+}
+
+function formatItems(items = []) {
+  return items
+    .map((it) => `${SUPPLY_ITEMS.find((i) => i.id === it.id)?.name || it.id} x${it.qty}`)
+    .join(" / ");
+}
+
+function buildPlaceLabel(q, ctx) {
+  const { origin, target, supplyInfo, blockadeTarget, blockadeLeft, blockadeEstimate, estText } = ctx;
+  switch (q.type) {
+    case QUEST_TYPES.SUPPLY:
+      return `${formatSettlement(origin)}で納品`;
+    case QUEST_TYPES.DELIVERY:
+      return `${formatSettlement(target)}へ配送`;
+    case QUEST_TYPES.REFUGEE_ESCORT:
+      return `護送 ${formatCoords(target?.coords || q.target)}`;
+    case QUEST_TYPES.ORACLE_SUPPLY:
+      return "神託 加工品を捧げよ";
+    case QUEST_TYPES.ORACLE_MOVE:
+      return `神託 ${formatCoords(q.target)}へ移動`;
+    case QUEST_TYPES.ORACLE_TROOP:
+      return "神託 人身を捧げよ";
+    case QUEST_TYPES.ORACLE_HUNT:
+      return "神託 討伐（通常編成）";
+    case QUEST_TYPES.ORACLE_ELITE:
+      return "神託 討伐（強編成）";
+    case QUEST_TYPES.PIRATE_HUNT:
+    case QUEST_TYPES.BOUNTY_HUNT:
+      return `討伐 ${formatCoords(q.target)}`;
+    case QUEST_TYPES.NOBLE_SUPPLY:
+      return `${formatSettlement(origin)}で納品`;
+    case QUEST_TYPES.NOBLE_LOGISTICS:
+      return `兵站調達: ${formatSettlement(origin)}`;
+    case QUEST_TYPES.NOBLE_SCOUT:
+      return `地点偵察 ${formatCoords(q.target)}`;
+    case QUEST_TYPES.NOBLE_REFUGEE:
+      return `難民受け入れ ${formatCoords(q.target)} → ${formatSettlement(origin)}`;
+    case QUEST_TYPES.NOBLE_SECURITY:
+      return `治安回復: 残り${blockadeLeft ?? (q.fights || []).filter((f) => !f.done).length}戦 @${formatSettlement(origin)}${estText}`;
+    case QUEST_TYPES.NOBLE_HUNT:
+      return `敵軍討伐 ${formatCoords(q.target)}${estText}`;
+    case QUEST_TYPES.WAR_DEFEND_RAID:
+      return `補給路迎撃 ${formatCoords(q.target)}${estText}`;
+    case QUEST_TYPES.WAR_ATTACK_RAID:
+      return `補給路襲撃 ${formatCoords(q.target)}${estText}`;
+    case QUEST_TYPES.WAR_SKIRMISH:
+      return `小規模戦闘 ${formatCoords(q.target)}${estText}`;
+    case QUEST_TYPES.WAR_SUPPLY:
+      return `${formatSettlement(origin)}で食糧搬入（${supplyInfo || "必要物資不明"}）`;
+    case QUEST_TYPES.WAR_ESCORT:
+      return `輸送護衛 ${formatCoords(q.target)}から輸送隊を回収`;
+    case QUEST_TYPES.WAR_BLOCKADE: {
+      const left = blockadeLeft ?? (q.fights || []).filter((f) => !f.done).length;
+      return `補給封鎖 ${formatCoords(blockadeTarget)} 残り${left}箇所${blockadeEstimate ? ` / 推定${blockadeEstimate}人` : ""}`;
+    }
+    default:
+      return "";
+  }
+}
+
+function buildBodyText(q, itemName, supplyInfo) {
+  if (q.type === QUEST_TYPES.ORACLE_SUPPLY) return supplyInfo || q.desc || "";
+  if (q.type === QUEST_TYPES.ORACLE_MOVE) return q.desc || "";
+  if (q.type === QUEST_TYPES.ORACLE_TROOP) return `${TROOP_STATS[q.troopType]?.name || q.troopType} x1`;
+  if (q.type === QUEST_TYPES.WAR_SUPPLY) return supplyInfo || q.desc || "";
+  if (q.type === QUEST_TYPES.NOBLE_LOGISTICS || q.type === QUEST_TYPES.WAR_SUPPLY) return supplyInfo || q.desc || "";
+  return q.desc || `${itemName} x${q.qty ?? 0}`;
+}
+
+function buildEstimateText(q) {
+  if (
+    (q.type === QUEST_TYPES.WAR_DEFEND_RAID ||
+      q.type === QUEST_TYPES.WAR_ATTACK_RAID ||
+      q.type === QUEST_TYPES.WAR_SKIRMISH ||
+      q.type === QUEST_TYPES.WAR_BLOCKADE ||
+      q.type === QUEST_TYPES.NOBLE_HUNT ||
+      q.type === QUEST_TYPES.NOBLE_SECURITY) &&
+    q.estimatedTotal
+  ) {
+    return ` / 推定${q.estimatedTotal}人`;
+  }
+  return "";
+}
+
+function rewardExtraLabel(q) {
+  if (ORACLE_TYPES.has(q.type)) {
+    return `信仰+${q.rewardFaith ?? 0}`;
+  }
+  return "";
+}
+
 export function renderQuestUI(syncUI) {
   const quests = getQuests();
   if (elements.questBody) elements.questBody.hidden = Boolean(quests.collapsed);
@@ -29,7 +158,6 @@ export function renderQuestUI(syncUI) {
     return;
   }
   const now = absDay(state);
-  // 受注中の依頼のみ一覧に表示する。
   listEl.innerHTML = active
     .map((q) => {
       const origin = getSettlementById(q.originId);
@@ -37,89 +165,28 @@ export function renderQuestUI(syncUI) {
       const itemName = SUPPLY_ITEMS.find((i) => i.id === q.itemId)?.name || q.itemId;
       const remain = q.deadlineAbs != null ? Math.max(0, q.deadlineAbs - now) : null;
       const remainText = remain == null ? "期限なし" : `残り${remain}日`;
-      const typeLabel =
-        q.type === QUEST_TYPES.SUPPLY
-          ? "調達"
-          : q.type === QUEST_TYPES.DELIVERY
-            ? "配達"
-            : q.type === QUEST_TYPES.REFUGEE_ESCORT
-              ? "護送"
-            : q.type === QUEST_TYPES.ORACLE_SUPPLY ||
-                q.type === QUEST_TYPES.ORACLE_MOVE ||
-                q.type === QUEST_TYPES.ORACLE_TROOP ||
-                q.type === QUEST_TYPES.ORACLE_HUNT ||
-                q.type === QUEST_TYPES.ORACLE_ELITE
-              ? "神託"
-              : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
-                ? "討伐"
-                : q.type === QUEST_TYPES.NOBLE_SUPPLY ||
-                    q.type === QUEST_TYPES.NOBLE_SCOUT ||
-                    q.type === QUEST_TYPES.NOBLE_SECURITY ||
-                    q.type === QUEST_TYPES.NOBLE_REFUGEE ||
-                    q.type === QUEST_TYPES.NOBLE_LOGISTICS ||
-                    q.type === QUEST_TYPES.NOBLE_HUNT
-                  ? "貴族依頼"
-                : q.type === QUEST_TYPES.WAR_DEFEND_RAID ||
-                    q.type === QUEST_TYPES.WAR_ATTACK_RAID ||
-                    q.type === QUEST_TYPES.WAR_SKIRMISH ||
-                    q.type === QUEST_TYPES.WAR_SUPPLY ||
-                    q.type === QUEST_TYPES.WAR_ESCORT ||
-                    q.type === QUEST_TYPES.WAR_BLOCKADE
-                  ? "前線行動"
-                : "";
-      const placeLabel =
-        q.type === QUEST_TYPES.SUPPLY
-          ? `${origin?.name ?? "不明"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})で納品`
-          : q.type === QUEST_TYPES.DELIVERY
-            ? `${target?.name ?? "不明"}(${(target?.coords?.x ?? 0) + 1}, ${(target?.coords?.y ?? 0) + 1})へ配送`
-            : q.type === QUEST_TYPES.REFUGEE_ESCORT
-              ? `護送: (${(target?.coords?.x ?? 0) + 1}, ${(target?.coords?.y ?? 0) + 1})`
-            : q.type === QUEST_TYPES.ORACLE_SUPPLY
-              ? `神託: 加工品を捧げよ`
-            : q.type === QUEST_TYPES.ORACLE_MOVE
-              ? `神託: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})へ移動`
-            : q.type === QUEST_TYPES.ORACLE_TROOP
-              ? `神託: 人身を捧げよ`
-            : q.type === QUEST_TYPES.ORACLE_HUNT
-              ? `神託: 討伐（通常編成）`
-            : q.type === QUEST_TYPES.ORACLE_ELITE
-              ? `神託: 討伐（強編成）`
-            : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
-              ? `討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-              : q.type === QUEST_TYPES.NOBLE_SUPPLY
-                ? `${origin?.name ?? "不明"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})で納品`
-                : q.type === QUEST_TYPES.NOBLE_LOGISTICS
-                  ? `兵站納品: (${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})`
-                  : q.type === QUEST_TYPES.NOBLE_SCOUT
-                    ? `偵察: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-                    : q.type === QUEST_TYPES.NOBLE_REFUGEE
-                      ? `難民受け入れ: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})→${origin?.name ?? "拠点"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})`
-                      : q.type === QUEST_TYPES.NOBLE_SECURITY
-                        ? `治安回復: 指定2戦 @${origin?.name ?? "拠点"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})`
-                      : q.type === QUEST_TYPES.NOBLE_HUNT
-                        ? `敵軍討伐 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-                      : q.type === QUEST_TYPES.WAR_DEFEND_RAID
-                        ? `補給路迎撃 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-                      : q.type === QUEST_TYPES.WAR_ATTACK_RAID
-                        ? `補給路襲撃 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-                      : q.type === QUEST_TYPES.WAR_SKIRMISH
-                        ? `小規模戦闘 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-                      : q.type === QUEST_TYPES.WAR_SUPPLY
-                        ? `${origin?.name ?? "拠点"}食糧搬入`
-                      : q.type === QUEST_TYPES.WAR_ESCORT
-                        ? `輸送護衛 (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-                      : q.type === QUEST_TYPES.WAR_BLOCKADE
-                        ? `補給封鎖 残り${(q.fights || []).filter((f) => !f.done).length}箇所`
-                      : "";
+      const supplyInfo = formatItems(q.items || []);
+      const blockadeTarget =
+        (q.fights || []).find((f) => !f.done)?.target || (q.fights || [])[0]?.target || q.target || null;
+      const blockadeLeft = (q.fights || []).filter((f) => !f.done).length;
+      const blockadeEstimate =
+        q.type === QUEST_TYPES.WAR_BLOCKADE && (q.fights || []).find((f) => !f.done)?.estimatedTotal
+          ? (q.fights || []).find((f) => !f.done)?.estimatedTotal
+          : null;
+      const estText = buildEstimateText(q);
+      const typeLabel = TYPE_LABEL[q.type] || "";
+      const placeLabel = buildPlaceLabel(q, {
+        origin,
+        target,
+        supplyInfo,
+        blockadeTarget,
+        blockadeLeft,
+        blockadeEstimate,
+        estText,
+      });
       const canFinish = remain == null ? canCompleteQuest(q) : remain >= 0 && canCompleteQuest(q);
-      const rewardExtra =
-        q.type === QUEST_TYPES.ORACLE_HUNT ||
-        q.type === QUEST_TYPES.ORACLE_ELITE ||
-        q.type === QUEST_TYPES.ORACLE_SUPPLY ||
-        q.type === QUEST_TYPES.ORACLE_MOVE ||
-        q.type === QUEST_TYPES.ORACLE_TROOP
-          ? `信仰+${q.rewardFaith ?? 0}`
-          : "";
+      const rewardExtra = rewardExtraLabel(q);
+      const bodyText = buildBodyText(q, itemName, supplyInfo);
       return `
         <div class="sideBlock mb-8">
           <div class="sbTitle sbTitle-quest">
@@ -131,20 +198,10 @@ export function renderQuestUI(syncUI) {
               <span class="pill">報酬 <b>${q.reward ?? 0}</b></span>
               ${rewardExtra ? `<span class="pill">${rewardExtra}</span>` : ""}
               <span class="pill">${remainText}</span>
-              <button class="btn good quest-complete" data-id="${q.id}" ${canFinish ? "" : "disabled"
-        } aria-disabled="${canFinish ? "false" : "true"}">完了</button>
+              <button class="btn good quest-complete" data-id="${q.id}" ${canFinish ? "" : "disabled"} aria-disabled="${canFinish ? "false" : "true"}">完了</button>
             </div>
           </div>
-          <div class="sbBody">${q.type === QUEST_TYPES.ORACLE_SUPPLY
-          ? (q.items || [])
-            .map((it) => `${SUPPLY_ITEMS.find((i) => i.id === it.id)?.name || it.id} x${it.qty}`)
-            .join(" / ")
-          : q.type === QUEST_TYPES.ORACLE_MOVE
-            ? q.desc || ""
-            : q.type === QUEST_TYPES.ORACLE_TROOP
-              ? `${TROOP_STATS[q.troopType]?.name || q.troopType} x1`
-              : q.desc || `${itemName} x${q.qty ?? 0}`
-        }</div>
+          <div class="sbBody">${bodyText}</div>
         </div>
       `;
     })
@@ -161,11 +218,6 @@ export function renderQuestUI(syncUI) {
   });
 }
 
-/**
- * 依頼モーダルを描画する。
- * @param {object} settlement
- * @param {Function} syncUI
- */
 export function renderQuestModal(settlement, syncUI) {
   const body = elements.questModalBody;
   if (!body) return;
@@ -184,48 +236,33 @@ export function renderQuestModal(settlement, syncUI) {
       const origin = getSettlementById(q.originId);
       const target = getSettlementById(q.targetId);
       const itemName = SUPPLY_ITEMS.find((i) => i.id === q.itemId)?.name || q.itemId;
-      const typeLabel =
-        q.type === QUEST_TYPES.SUPPLY
-          ? "調達"
-          : q.type === QUEST_TYPES.DELIVERY
-            ? "配達"
-            : q.type === QUEST_TYPES.ORACLE_SUPPLY ||
-                q.type === QUEST_TYPES.ORACLE_MOVE ||
-                q.type === QUEST_TYPES.ORACLE_TROOP ||
-                q.type === QUEST_TYPES.ORACLE_HUNT ||
-                q.type === QUEST_TYPES.ORACLE_ELITE
-              ? "神託"
-              : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
-                ? "討伐"
-                : "";
-      const placeLabel =
-        q.type === QUEST_TYPES.SUPPLY
-          ? `${origin?.name ?? "不明"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})で納品`
-          : q.type === QUEST_TYPES.DELIVERY
-            ? `${target?.name ?? "不明"}(${(target?.coords?.x ?? 0) + 1}, ${(target?.coords?.y ?? 0) + 1})へ配送`
-            : q.type === QUEST_TYPES.ORACLE_SUPPLY
-              ? `神託: 加工品を捧げよ`
-              : q.type === QUEST_TYPES.ORACLE_MOVE
-                ? `神託: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})へ移動`
-                : q.type === QUEST_TYPES.ORACLE_TROOP
-                  ? `神託: 人身を捧げよ`
-                  : q.type === QUEST_TYPES.ORACLE_HUNT
-                    ? `神託: 討伐（通常編成）`
-                    : q.type === QUEST_TYPES.ORACLE_ELITE
-                      ? `神託: 討伐（強編成）`
-                      : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
-                        ? `討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-                        : "";
-      const deadlineText = q.deadlineAbs ? `残り${Math.max(0, q.deadlineAbs - now)}日` : "受注から30日";
+      const supplyInfo = formatItems(q.items || []);
+      const blockadeTarget =
+        (q.fights || []).find((f) => !f.done)?.target || (q.fights || [])[0]?.target || q.target || null;
+      const blockadeLeft = (q.fights || []).filter((f) => !f.done).length;
+      const blockadeEstimate =
+        q.type === QUEST_TYPES.WAR_BLOCKADE && (q.fights || []).find((f) => !f.done)?.estimatedTotal
+          ? (q.fights || []).find((f) => !f.done)?.estimatedTotal
+          : null;
+      const estText = buildEstimateText(q);
+      const typeLabel = TYPE_LABEL[q.type] || "";
+      const placeLabel = buildPlaceLabel(q, {
+        origin,
+        target,
+        supplyInfo,
+        blockadeTarget,
+        blockadeLeft,
+        blockadeEstimate,
+        estText,
+      });
+      const deadlineText = q.deadlineAbs != null ? `残り${Math.max(0, q.deadlineAbs - now)}日` : "期限なし";
+      const bodyText = buildBodyText(q, itemName, supplyInfo);
       return `
         <tr>
           <td>
             <div class="tiny">${typeLabel} / ${placeLabel}</div>
             <div><b>${q.title || itemName}</b></div>
-            <div class="tiny">${q.type === QUEST_TYPES.ORACLE_TROOP
-            ? `${TROOP_STATS[q.troopType]?.name || q.troopType} x1`
-            : q.desc || `${itemName} x${q.qty ?? 0}`
-          }</div>
+            <div class="tiny">${bodyText}</div>
           </td>
           <td class="ta-center">${q.reward ?? 0}</td>
           <td class="ta-center">${deadlineText}</td>
@@ -239,7 +276,10 @@ export function renderQuestModal(settlement, syncUI) {
       const id = Number(btn.getAttribute("data-id"));
       if (!id) return;
       const current = getCurrentSettlement();
-      if (!current) return;
+      if (!current) {
+        pushToast("受注不可", "街・村の中でのみ受注できます。", "warn");
+        return;
+      }
       acceptQuest(id, current);
       renderQuestModal(current, syncUI);
       renderQuestUI(syncUI);

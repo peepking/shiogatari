@@ -947,7 +947,7 @@ function updateModeControls(loc) {
       here &&
       pf &&
       pf !== "player" &&
-      (getRelation(pf, here.factionId) === "war" || fronts.length > 0);
+      fronts.length > 0; // 前線が存在する拠点でのみ表示
     elements.warActionRow.hidden = !war;
     const btns = [
       elements.warDefendRaidBtn,

@@ -523,7 +523,13 @@ export function triggerWarAction(kind) {
     pushToast("行動不可", "拠点上でのみ実行できます。", "warn");
     return false;
   }
-  const frontInfo = getFrontForSettlement(pf, here.id);
+  const fronts =
+    here && Array.isArray(state.warLedger?.entries)
+      ? state.warLedger.entries
+          .flatMap((e) => (e.activeFronts || []).map((f) => ({ entry: e, front: f })))
+          .filter((f) => f.front?.settlementId === here.id && (f.entry.factions || []).includes(pf))
+      : [];
+  const frontInfo = fronts[0] || null;
   if (!frontInfo?.front) {
     pushToast("行動不可", "この拠点は前線ではありません。", "warn");
     return false;
@@ -536,6 +542,9 @@ export function triggerWarAction(kind) {
   }
   pushLog("前線行動", `${q.title} を受注しました`, "-");
   pushToast("前線行動", `${q.title} を受注しました。`, "info");
+  if (typeof document !== "undefined") {
+    document.dispatchEvent(new CustomEvent("quests-updated"));
+  }
   return true;
 }
 

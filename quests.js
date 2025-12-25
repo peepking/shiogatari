@@ -859,29 +859,32 @@ export function genWarFrontQuest(settlement, front, role, kind) {
     deadlineAbs,
   };
   if (kind === "defendRaid" || kind === "attackRaid") {
+    const estimatedTotal = predictEnemyTotal("elite");
     return {
       ...common,
       type: kind === "defendRaid" ? QUEST_TYPES.WAR_DEFEND_RAID : QUEST_TYPES.WAR_ATTACK_RAID,
       title: kind === "defendRaid" ? "補給路迎撃" : "補給路襲撃",
       target: { ...settlement.coords },
       strength: "elite",
+      estimatedTotal,
       desc: `${settlement.name} 周辺で敵の補給路を断つ。`,
     };
   }
   if (kind === "skirmish") {
+    const estimatedTotal = predictEnemyTotal("elite");
     return {
       ...common,
       type: QUEST_TYPES.WAR_SKIRMISH,
       title: "小規模戦闘",
       target: { ...settlement.coords },
       strength: "elite",
+      estimatedTotal,
       desc: `${settlement.name} 外縁で敵前衛を叩く。`,
     };
   }
   if (kind === "supplyFood") {
-    const baseLogistics = genNobleLogisticsQuest(settlement, { id: settlement.nobleId, name: "" }) || {};
-    const items = baseLogistics.items || [{ id: "food", qty: Math.max(10, rollDice(5, 4)) }];
-    const foodItem = items.find((i) => i.id === "food");
+    const foodQty = rollDice(5, 8); // 8D5 相当
+    const items = [{ id: "food", qty: foodQty }];
     return {
       ...common,
       type: QUEST_TYPES.WAR_SUPPLY,
@@ -889,7 +892,7 @@ export function genWarFrontQuest(settlement, front, role, kind) {
       originId: settlement.id,
       items,
       desc: `${settlement.name} に食糧を搬入する。`,
-      foodNeed: foodItem?.qty || 0,
+      foodNeed: foodQty,
     };
   }
   if (kind === "escort") {
@@ -907,16 +910,22 @@ export function genWarFrontQuest(settlement, front, role, kind) {
   }
   if (kind === "blockade") {
     const avoid = usedTargets();
-    const first = randomHuntTarget(settlement.coords, 2, 5, avoid);
-    const second = randomHuntTarget(settlement.coords, 2, 5, avoid.concat(first ? [first] : []));
+    let first = randomHuntTarget(settlement.coords, 2, 5, avoid);
+    let second = randomHuntTarget(settlement.coords, 2, 5, avoid.concat(first ? [first] : []));
+    // 近傍に空きがない場合は回避なしで再抽選して必ず座標を取る
+    if (!first || !second) {
+      first = randomHuntTarget(settlement.coords, 2, 5, []);
+      second = randomHuntTarget(settlement.coords, 2, 5, first ? [first] : []);
+    }
     if (!first || !second) return null;
+    const estNormal = predictEnemyTotal("normal");
     return {
       ...common,
       type: QUEST_TYPES.WAR_BLOCKADE,
       title: "補給封鎖",
       fights: [
-        { target: first, strength: "normal", done: false },
-        { target: second, strength: "normal", done: false },
+        { target: first, strength: "normal", done: false, estimatedTotal: estNormal },
+        { target: second, strength: "normal", done: false, estimatedTotal: estNormal },
       ],
       desc: `${settlement.name} への補給線を二箇所で断つ。`,
     };

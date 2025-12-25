@@ -643,6 +643,10 @@ option {
   column-gap: 8px;
 }
 
+#warActionRow {
+  margin-top: 12px;
+}
+
 #battlePrepRow {
   margin-top: 12px;
 }
