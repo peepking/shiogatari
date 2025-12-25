@@ -15,7 +15,12 @@ import { SUPPLY_ITEMS } from "./supplies.js";
 import { enqueueEvent } from "./events.js";
 import { addTroops } from "./troops.js";
 import { addWarScore } from "./faction.js";
-import { addRefugeeEscortQuest, completeRefugeeEscortAt } from "./quests.js";
+import {
+  addRefugeeEscortQuest,
+  completeRefugeeEscortAt,
+  markNobleRefugeePickup,
+  completeNobleRefugeeAt,
+} from "./quests.js";
 import { getSettlementById } from "./map.js";
 
 /**
@@ -284,6 +289,7 @@ export function moveToSelected(showActionMessage, syncUI) {
     state.modeLabel = MODE_LABEL.NORMAL;
   }
   state.position = { ...dest };
+  markNobleRefugeePickup(state.position);
   advanceDayWithEvents(1);
   setOutput("移動", `(${dest.x + 1}, ${dest.y + 1}) へ移動しました。`, [
     { text: "移動", kind: "" },
@@ -300,6 +306,7 @@ export function moveToSelected(showActionMessage, syncUI) {
     if (enc) notifyAutoMoveStop();
   }
   checkRefugeeEscortArrival();
+  completeNobleRefugeeAt(getSettlementAtPosition(state.position.x, state.position.y));
   syncUI?.();
   return true;
 }
@@ -975,7 +982,7 @@ function enqueueRefugeeEvent(terrain) {
     actions: [
       { id: "refugee-leave", label: "立ち去る", type: "merchant_leave" },
       { id: "refugee-feed", label: "食糧を分け与える", type: "refugee_feed" },
-      { id: "refugee-escort", label: "護送依頼を受ける", type: "refugee_escort", payload: info || {} },
+      { id: "refugee-escort", label: "護送依頼受注", type: "refugee_escort", payload: info || {} },
       { id: "refugee-raid", label: "襲撃する", type: "refugee_attack" },
     ],
   });

@@ -7,6 +7,7 @@ export const MODE_LABEL = {
   SAILING: "航海中",
   IN_VILLAGE: "村の中",
   IN_TOWN: "街の中",
+  AUDIENCE: "謁見中",
 };
 
 export const BATTLE_RESULT = {

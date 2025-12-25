@@ -3,10 +3,11 @@ import { settlements } from "./map.js";
 import { clamp, relationLabel, supportLabel, warScoreLabel, displayWarLabel } from "./util.js";
 import { enqueueEvent } from "./events.js";
 import { FACTIONS } from "./lore.js";
+import { absDay } from "./questUtils.js";
 
 const HONOR_COOLDOWN_DAYS = 30;
 const HONOR_ROLL_RATE = 0.12; // 1日あたり12%で来訪。クールダウン付き。
-const HONOR_FAVOR_THRESHOLD = 30;
+export const HONOR_FAVOR_THRESHOLD = 30;
 
 /**
  * 名誉家臣として仕えている勢力IDリストを返す。
@@ -23,8 +24,7 @@ export function honorFactions() {
  */
 export function addHonorFaction(factionId) {
   if (!factionId) return;
-  const list = honorFactions();
-  if (!list.includes(factionId)) list.push(factionId);
+  state.honorFactions = [factionId];
 }
 
 /**
@@ -34,6 +34,16 @@ export function addHonorFaction(factionId) {
  */
 export function isHonorFaction(factionId) {
   return honorFactions().includes(factionId);
+}
+
+/**
+ * 名誉家臣フラグを解除する。
+ * @param {string} factionId
+ */
+export function removeHonorFaction(factionId) {
+  if (!factionId) return;
+  state.honorFactions = honorFactions().filter((id) => id !== factionId);
+  if (state.playerFactionId === factionId) state.playerFactionId = null;
 }
 
 /**
@@ -76,6 +86,7 @@ export function adjustNobleFavor(nobleId, delta) {
  */
 export function maybeQueueHonorInvite(absDay) {
   if (!state.honorInviteLog) state.honorInviteLog = {};
+  if (honorFactions().length > 0) return;
   (FACTIONS || [])
     .filter((f) => f.id !== "pirates")
     .forEach((f) => {
@@ -110,6 +121,35 @@ export function ensureFactionState() {
   if (!state.factionState) state.factionState = {};
   // 既存のfactionStateが空ならresetState側で初期化済みの値を保持
   return state.factionState;
+}
+
+/**
+ * 初期の同盟/戦争関係を設定し、戦況エントリを作成する。
+ */
+export function seedWarDefaults() {
+  ensureFactionState();
+  if (state.warLedger?.entries?.length) return;
+  state.warLedger ||= { entries: [] };
+  const setRel = (a, b, rel) => {
+    if (state.factionState?.[a]?.relations) state.factionState[a].relations[b] = rel;
+    if (state.factionState?.[b]?.relations) state.factionState[b].relations[a] = rel;
+  };
+  setRel("north", "archipelago", "ally");
+  setRel("north", "citadel", "war");
+  setRel("archipelago", "citadel", "war");
+  setRel("north", "pirates", "war");
+  setRel("archipelago", "pirates", "war");
+  setRel("citadel", "pirates", "war");
+  const wars = [
+    ["north", "citadel"],
+    ["archipelago", "citadel"],
+    ["north", "pirates"],
+    ["archipelago", "pirates"],
+    ["citadel", "pirates"],
+  ];
+  wars.forEach(([a, b]) => {
+    addWarScore(a, b, 0, absDay(state), 0, 0);
+  });
 }
 
 /**

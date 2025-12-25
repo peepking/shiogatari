@@ -52,6 +52,13 @@ export function renderQuestUI(syncUI) {
               ? "神託"
               : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
                 ? "討伐"
+                : q.type === QUEST_TYPES.NOBLE_SUPPLY ||
+                    q.type === QUEST_TYPES.NOBLE_SCOUT ||
+                    q.type === QUEST_TYPES.NOBLE_SECURITY ||
+                    q.type === QUEST_TYPES.NOBLE_REFUGEE ||
+                    q.type === QUEST_TYPES.NOBLE_LOGISTICS ||
+                    q.type === QUEST_TYPES.NOBLE_HUNT
+                  ? "貴族依頼"
                 : "";
       const placeLabel =
         q.type === QUEST_TYPES.SUPPLY
@@ -62,17 +69,29 @@ export function renderQuestUI(syncUI) {
               ? `護送: (${(target?.coords?.x ?? 0) + 1}, ${(target?.coords?.y ?? 0) + 1})`
             : q.type === QUEST_TYPES.ORACLE_SUPPLY
               ? `神託: 加工品を捧げよ`
-              : q.type === QUEST_TYPES.ORACLE_MOVE
-                ? `神託: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})へ移動`
-                : q.type === QUEST_TYPES.ORACLE_TROOP
-                  ? `神託: 人身を捧げよ`
-                  : q.type === QUEST_TYPES.ORACLE_HUNT
-                    ? `神託: 討伐（通常編成）`
-                    : q.type === QUEST_TYPES.ORACLE_ELITE
-                      ? `神託: 討伐（強編成）`
-                      : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
-                        ? `討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-                        : "";
+            : q.type === QUEST_TYPES.ORACLE_MOVE
+              ? `神託: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})へ移動`
+            : q.type === QUEST_TYPES.ORACLE_TROOP
+              ? `神託: 人身を捧げよ`
+            : q.type === QUEST_TYPES.ORACLE_HUNT
+              ? `神託: 討伐（通常編成）`
+            : q.type === QUEST_TYPES.ORACLE_ELITE
+              ? `神託: 討伐（強編成）`
+            : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
+              ? `討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+              : q.type === QUEST_TYPES.NOBLE_SUPPLY
+                ? `${origin?.name ?? "不明"}で納品`
+                : q.type === QUEST_TYPES.NOBLE_LOGISTICS
+                  ? `${origin?.name ?? "不明"}で兵站納品`
+                  : q.type === QUEST_TYPES.NOBLE_SCOUT
+                    ? `偵察: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                    : q.type === QUEST_TYPES.NOBLE_REFUGEE
+                      ? `難民受け入れ: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})→${origin?.name ?? "拠点"}`
+                      : q.type === QUEST_TYPES.NOBLE_SECURITY
+                        ? `治安回復: 指定2戦`
+                        : q.type === QUEST_TYPES.NOBLE_HUNT
+                          ? `敵軍討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                      : "";
       const canFinish = remain == null ? canCompleteQuest(q) : remain >= 0 && canCompleteQuest(q);
       const rewardExtra =
         q.type === QUEST_TYPES.ORACLE_HUNT ||

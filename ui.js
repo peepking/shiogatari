@@ -36,14 +36,31 @@ import {
   seedInitialQuests,
   receiveOracle,
   canReceiveOracle,
-  getOracleBattleAt,
+  getBattleQuestAt,
   completeOracleBattleQuest,
   failOracleBattleQuest,
   completeHuntBattleQuest,
+  ensureNobleQuests,
+  getAvailableNobleQuests,
+  acceptNobleQuest,
+  completeNobleBattleQuest,
   QUEST_TYPES,
 } from "./quests.js";
+import { FACTIONS } from "./lore.js";
 import { buildEnemyFormation } from "./actions.js";
-import { addWarScore, getPlayerFactionId, adjustNobleFavor, adjustSupport } from "./faction.js";
+import {
+  addWarScore,
+  getPlayerFactionId,
+  adjustNobleFavor,
+  adjustSupport,
+  addHonorFaction,
+  isHonorFaction,
+  getNobleFavor,
+  honorFactions,
+  removeHonorFaction,
+  HONOR_FAVOR_THRESHOLD,
+  seedWarDefaults,
+} from "./faction.js";
 import { absDay, manhattan } from "./questUtils.js";
 import {
   wireBattleUI,
@@ -69,6 +86,46 @@ const formatModeLabel = () => {
   if (loc?.faction) parts.push(loc.faction);
   return parts.join("/");
 };
+
+/**
+ * 現在位置で謁見可能な拠点情報を返す。
+ * @returns {{settlement: any|null, nobleId: string|null}}
+ */
+function getAudienceContext() {
+  const settlement = getCurrentSettlement();
+  return { settlement: settlement || null, nobleId: settlement?.nobleId || null };
+}
+
+/**
+ * 貴族IDから貴族データを取得する。
+ * @param {string} nobleId
+ * @returns {object|null}
+ */
+function getNobleById(nobleId) {
+  if (!nobleId) return null;
+  return FACTIONS.flatMap((f) => f.nobles || []).find((n) => n.id === nobleId) || null;
+}
+
+/**
+ * 謁見モードかどうかを判定する。
+ * @returns {boolean}
+ */
+function isAudienceMode() {
+  return state.modeLabel === MODE_LABEL.AUDIENCE;
+}
+
+/**
+ * 名誉家臣の誘いを受けられる条件を満たしているか判定する。
+ * @param {{settlement:any|null,nobleId:string|null}} ctx
+ * @returns {boolean}
+ */
+function canHonorHere(ctx) {
+  if (!ctx?.settlement || !ctx.nobleId) return false;
+  if (honorFactions().length > 0) return false;
+  if (isHonorFaction(ctx.settlement.factionId)) return false;
+  if ((state.fame || 0) < 100) return false;
+  return getNobleFavor(ctx.nobleId) >= HONOR_FAVOR_THRESHOLD;
+}
 
 /**
  * 行動メッセージをトーストで表示する。
@@ -118,6 +175,126 @@ function setInlineMessage(el, msg) {
  */
 function setTradeError(msg) {
   setInlineMessage(elements.tradeError, msg);
+}
+
+/**
+ * 謁見モードに入る。
+ */
+function enterAudience() {
+  const ctx = getAudienceContext();
+  if (!ctx.nobleId) {
+    pushToast("謁見不可", "ここで謁見できる貴族がいません。", "warn");
+    return;
+  }
+  state.modeLabel = MODE_LABEL.AUDIENCE;
+  syncUI();
+}
+
+/**
+ * 謁見モードを終了して拠点表示に戻る。
+ */
+function exitAudience() {
+  const here = getCurrentSettlement();
+  if (here?.kind === "town") {
+    state.modeLabel = MODE_LABEL.IN_TOWN;
+  } else if (here?.kind === "village") {
+    state.modeLabel = MODE_LABEL.IN_VILLAGE;
+  } else {
+    state.modeLabel = MODE_LABEL.NORMAL;
+  }
+  syncUI();
+}
+
+/**
+ * 賄賂モーダルを開く。
+ */
+function openBribeModal() {
+  const ctx = getAudienceContext();
+  if (!ctx.nobleId) {
+    pushToast("賄賂不可", "ここで渡せる相手がいません。", "warn");
+    return;
+  }
+  if (elements.bribeFunds) elements.bribeFunds.textContent = String(state.funds || 0);
+  if (elements.bribeInput) {
+    const suggested = Math.min(state.funds || 0, Math.max(0, Number(elements.bribeInput.value) || 0));
+    elements.bribeInput.value = String(suggested);
+  }
+  setInlineMessage(elements.bribeError, "");
+  openModal(elements.bribeModal);
+}
+
+/**
+ * 賄賂の確定処理を行う。
+ */
+function submitBribe() {
+  const ctx = getAudienceContext();
+  if (!ctx.nobleId) {
+    closeModal(elements.bribeModal);
+    return;
+  }
+  const raw = Number(elements.bribeInput?.value || 0);
+  const amount = Math.max(0, Math.floor(raw));
+  if (!amount) {
+    setInlineMessage(elements.bribeError, "金額を入力してください。");
+    return;
+  }
+  if (amount > (state.funds || 0)) {
+    setInlineMessage(elements.bribeError, "資金が足りません。");
+    return;
+  }
+  const currentFavor = getNobleFavor(ctx.nobleId);
+  const remaining = HONOR_FAVOR_THRESHOLD - currentFavor;
+  if (remaining <= 0) {
+    setInlineMessage(elements.bribeError, "これ以上の賄賂は不要です。");
+    return;
+  }
+  const favorGain = Math.min(Math.max(1, Math.floor(amount / 100)), remaining);
+  if (favorGain <= 0) {
+    setInlineMessage(elements.bribeError, "額が少なすぎます。");
+    return;
+  }
+  state.funds = (state.funds || 0) - amount;
+  adjustNobleFavor(ctx.nobleId, favorGain);
+  pushLog("賄賂", `${ctx.settlement?.name || "拠点"}で賄賂を渡した。好感度が上昇した。`);
+  pushToast("賄賂", "好感度が上がった。", "info");
+  closeModal(elements.bribeModal);
+  syncUI();
+}
+
+/**
+ * 現在の勢力から名誉家臣の誘いを受ける。
+ */
+function acceptHonorHere() {
+  const ctx = getAudienceContext();
+  if (!canHonorHere(ctx)) {
+    pushToast("名誉家臣", "条件を満たしていません。", "warn");
+    return;
+  }
+  addHonorFaction(ctx.settlement.factionId);
+  state.playerFactionId = ctx.settlement.factionId;
+  pushToast("名誉家臣", "この勢力の名誉家臣となりました。", "info");
+  syncUI();
+}
+
+/**
+ * 謁見中の貴族依頼受注（暫定プレースホルダー）。
+ */
+function requestNobleQuest() {
+  pushToast("準備中", "貴族からの依頼は後で追加されます。", "info");
+}
+
+/**
+ * 名誉家臣を辞める。
+ */
+function resignHonorHere() {
+  const ctx = getAudienceContext();
+  if (!ctx?.settlement?.factionId) {
+    pushToast("名誉家臣", "辞められる勢力がありません。", "warn");
+    return;
+  }
+  removeHonorFaction(ctx.settlement.factionId);
+  pushToast("名誉家臣", "名誉家臣を辞めました。", "warn");
+  syncUI();
 }
 
 /**
@@ -358,6 +535,7 @@ function processBattleOutcome(resultCode, meta) {
   const isWin = resultCode === BATTLE_RESULT.WIN;
   const questId = pending.questId;
   const questType = pending.questType;
+  const questFightIdx = pending.questFightIdx ?? null;
   const summary = [];
   /**
    * 行商人関連の追加戦利品を付与する。
@@ -507,6 +685,12 @@ function processBattleOutcome(resultCode, meta) {
           completeHuntBattleQuest(questId, false, "戦闘に敗北しました");
           summary.push(`討伐失敗: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "賞金首" : "海賊"}`);
         }
+      } else if (
+        questType === QUEST_TYPES.NOBLE_SECURITY ||
+        questType === QUEST_TYPES.NOBLE_HUNT
+      ) {
+        completeNobleBattleQuest(questId, isWin, enemyTotal, questFightIdx);
+        summary.push(isWin ? "貴族依頼: 戦闘達成" : "貴族依頼: 戦闘失敗");
       }
     }
     if (eventTag === "merchant_attack") {
@@ -633,10 +817,10 @@ function startPrepBattle() {
  */
 function startOracleBattle() {
   if (state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE) return;
-  const quest = getOracleBattleAt(state.position);
-  if (!quest) return;
-  const force =
-    quest.type === QUEST_TYPES.ORACLE_ELITE || quest.type === QUEST_TYPES.BOUNTY_HUNT ? "elite" : "normal";
+  const meta = getBattleQuestAt(state.position);
+  if (!meta) return;
+  const quest = meta.quest;
+  const force = meta.strength === "elite" ? "elite" : "normal";
   const { formation, total, strength } = buildEnemyFormation(force);
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   state.pendingEncounter = {
@@ -647,7 +831,8 @@ function startOracleBattle() {
     terrain,
     questId: quest.id,
     questType: quest.type,
-    enemyFactionId: quest.enemyFactionId || "pirates",
+    enemyFactionId: meta.enemyFactionId || quest.enemyFactionId || "pirates",
+    questFightIdx: meta.fightIdx ?? null,
   };
   state.modeLabel = MODE_LABEL.PREP;
   resetEncounterMeter();
@@ -698,46 +883,58 @@ function surrenderBattle() {
 function updateModeControls(loc) {
   const prep = battlePrepActive();
   const inBattle = state.modeLabel === MODE_LABEL.BATTLE;
+  const inAudience = isAudienceMode();
   const battleVisible = Boolean(elements.battleBlock && elements.battleBlock.hidden === false);
   const lockActions = prep || inBattle || battleVisible;
   const prepActive = prep && !!state.pendingEncounter?.active;
-  const oracleBattle = getOracleBattleAt(state.position);
+  const battleQuestMeta = getBattleQuestAt(state.position);
   const visible = state.modeLabel === MODE_LABEL.IN_TOWN || state.modeLabel === MODE_LABEL.IN_VILLAGE;
-  if (elements.tradeBtn) elements.tradeBtn.hidden = !visible;
+  const audienceCtx = getAudienceContext();
+  const audienceReady = visible && !!audienceCtx.nobleId;
+  const honorHere = audienceCtx.settlement?.factionId
+    ? isHonorFaction(audienceCtx.settlement.factionId)
+    : false;
+  if (elements.tradeBtn) elements.tradeBtn.hidden = !visible || inAudience;
   if (elements.shipTradeBtn)
-    elements.shipTradeBtn.hidden = state.modeLabel !== MODE_LABEL.IN_TOWN;
-  if (elements.questOpenBtn) elements.questOpenBtn.hidden = !visible;
-  if (elements.hireBtn) elements.hireBtn.hidden = !visible;
+    elements.shipTradeBtn.hidden = state.modeLabel !== MODE_LABEL.IN_TOWN || inAudience;
+  if (elements.questOpenBtn) elements.questOpenBtn.hidden = !visible || inAudience;
+  if (elements.hireBtn) elements.hireBtn.hidden = !visible || inAudience;
   if (elements.oracleBtn) {
-    elements.oracleBtn.hidden = lockActions;
-    elements.oracleBtn.disabled = lockActions || !canReceiveOracle();
+    elements.oracleBtn.hidden = lockActions || inAudience;
+    elements.oracleBtn.disabled = lockActions || inAudience || !canReceiveOracle();
   }
   if (elements.modePrayBtn) {
-    elements.modePrayBtn.hidden = lockActions;
-    elements.modePrayBtn.disabled = lockActions || !canPray();
+    elements.modePrayBtn.hidden = lockActions || inAudience;
+    elements.modePrayBtn.disabled = lockActions || inAudience || !canPray();
   }
   if (elements.enterVillageBtn)
-    elements.enterVillageBtn.hidden = !(loc?.place === PLACE.VILLAGE && state.modeLabel !== MODE_LABEL.IN_VILLAGE);
+    elements.enterVillageBtn.hidden =
+      !(loc?.place === PLACE.VILLAGE && state.modeLabel !== MODE_LABEL.IN_VILLAGE) || inAudience;
   if (elements.enterTownBtn)
-    elements.enterTownBtn.hidden = !(loc?.place === PLACE.TOWN && state.modeLabel !== MODE_LABEL.IN_TOWN);
+    elements.enterTownBtn.hidden =
+      !(loc?.place === PLACE.TOWN && state.modeLabel !== MODE_LABEL.IN_TOWN) || inAudience;
   if (elements.exitVillageBtn)
     elements.exitVillageBtn.hidden = state.modeLabel !== MODE_LABEL.IN_VILLAGE;
   if (elements.exitTownBtn)
     elements.exitTownBtn.hidden = state.modeLabel !== MODE_LABEL.IN_TOWN;
   if (elements.modeWaitBtn) {
-    elements.modeWaitBtn.hidden = lockActions;
-    elements.modeWaitBtn.disabled = lockActions;
+    elements.modeWaitBtn.hidden = lockActions || inAudience;
+    elements.modeWaitBtn.disabled = lockActions || inAudience;
   }
   if (elements.oracleBattleBtn) {
-    const show = !lockActions && !!oracleBattle;
+    const show = !lockActions && !!battleQuestMeta && !inAudience;
     elements.oracleBattleBtn.hidden = !show;
     elements.oracleBattleBtn.disabled = !show;
-    elements.oracleBattleBtn.title = show
-      ? `${oracleBattle.title}（${oracleBattle.type === QUEST_TYPES.ORACLE_ELITE ? "強編成" : "通常編成"}）`
-      : "";
+    if (show) {
+      const strength =
+        battleQuestMeta.strength === "elite" || battleQuestMeta.quest.type === QUEST_TYPES.BOUNTY_HUNT ? "強編成" : "通常編成";
+      elements.oracleBattleBtn.title = `${battleQuestMeta.quest.title}（${strength}）`;
+    } else {
+      elements.oracleBattleBtn.title = "";
+    }
   }
   if (elements.battlePrepRow) {
-    const showPrepRow = prepActive && !inBattle && !battleVisible;
+    const showPrepRow = prepActive && !inBattle && !battleVisible && !inAudience;
     elements.battlePrepRow.hidden = !showPrepRow;
     if (!showPrepRow) {
       elements.battlePrepFightBtn && (elements.battlePrepFightBtn.hidden = true);
@@ -758,10 +955,10 @@ function updateModeControls(loc) {
       elements.battlePrepRunBtn.title = "";
     }
   }
-  if (elements.tradeBtn) elements.tradeBtn.disabled = lockActions;
-  if (elements.shipTradeBtn) elements.shipTradeBtn.disabled = lockActions;
-  if (elements.questOpenBtn) elements.questOpenBtn.disabled = lockActions;
-  if (elements.hireBtn) elements.hireBtn.disabled = lockActions;
+  if (elements.tradeBtn) elements.tradeBtn.disabled = lockActions || inAudience;
+  if (elements.shipTradeBtn) elements.shipTradeBtn.disabled = lockActions || inAudience;
+  if (elements.questOpenBtn) elements.questOpenBtn.disabled = lockActions || inAudience;
+  if (elements.hireBtn) elements.hireBtn.disabled = lockActions || inAudience;
   if (elements.battlePrepPrayBtn) elements.battlePrepPrayBtn.disabled = !prepActive || !canPray();
   if (elements.battlePrepInfo) {
     const showInfo = prepActive && !inBattle && !battleVisible;
@@ -773,6 +970,31 @@ function updateModeControls(loc) {
       elements.battlePrepInfo.hidden = false;
       elements.battlePrepInfo.textContent = `敵推定: ${total}人${strong ? "（強編成）" : ""}`;
     }
+  }
+  if (elements.audienceBtn) {
+    elements.audienceBtn.hidden = !audienceReady || lockActions || inAudience;
+    elements.audienceBtn.disabled = lockActions || inAudience;
+  }
+  if (elements.audienceRow) elements.audienceRow.hidden = !inAudience;
+  if (elements.audienceBribeBtn) elements.audienceBribeBtn.hidden = !inAudience || honorHere;
+  if (elements.audienceHonorBtn) {
+    const showHonor = inAudience && canHonorHere(audienceCtx);
+    elements.audienceHonorBtn.hidden = !showHonor;
+    elements.audienceHonorBtn.disabled = !showHonor;
+  }
+  if (elements.audienceRequestBtn) {
+    const showReq = inAudience && honorHere;
+    elements.audienceRequestBtn.hidden = !showReq;
+    elements.audienceRequestBtn.disabled = !showReq;
+  }
+  if (elements.audienceResignBtn) {
+    const showResign = inAudience && honorHere;
+    elements.audienceResignBtn.hidden = !showResign;
+    elements.audienceResignBtn.disabled = !showResign;
+  }
+  if (elements.audienceExitBtn) {
+    elements.audienceExitBtn.hidden = !inAudience;
+    elements.audienceExitBtn.disabled = !inAudience;
   }
 }
 
@@ -914,6 +1136,80 @@ function bindModal(modal, closeBtn) {
 }
 
 /**
+ * 貴族依頼モーダルを描画する。
+ * @param {object} noble
+ * @param {object} settlement
+ * @param {Function} syncUI
+ */
+function renderNobleQuestModal(noble, settlement, syncUI) {
+  const body = elements.nobleQuestModalBody;
+  if (!body) return;
+  if (!noble || !settlement) {
+    body.innerHTML = `<tr><td colspan="4" class="ta-center pad-10">謁見中のみ受注できます。</td></tr>`;
+    return;
+  }
+  ensureNobleQuests(noble, settlement);
+  const list = getAvailableNobleQuests(noble.id);
+  if (!list.length) {
+    body.innerHTML = `<tr><td colspan="4" class="ta-center pad-10">受注可能な貴族依頼はありません。</td></tr>`;
+    return;
+  }
+  const now = absDay(state);
+  const typeLabel = (q) => {
+    switch (q.type) {
+      case QUEST_TYPES.NOBLE_SUPPLY:
+        return "加工品調達";
+      case QUEST_TYPES.NOBLE_SCOUT:
+        return "偵察";
+      case QUEST_TYPES.NOBLE_SECURITY:
+        return "治安回復";
+      case QUEST_TYPES.NOBLE_REFUGEE:
+        return "難民受け入れ";
+      case QUEST_TYPES.NOBLE_LOGISTICS:
+        return "兵站調達";
+      case QUEST_TYPES.NOBLE_HUNT:
+        return "敵軍討伐";
+      default:
+        return "依頼";
+    }
+  };
+  body.innerHTML = list
+    .map((q) => {
+      const remain = q.deadlineAbs != null ? Math.max(0, q.deadlineAbs - now) : null;
+      const remainText = remain == null ? "期限なし" : `残り${remain}日`;
+      const rewardText = q.reward ? `${q.reward}` : "-";
+      return `
+        <tr>
+          <td class="ta-left">
+            <div class="tiny">${typeLabel(q)} / ${settlement.name}</div>
+            <b>${q.title}</b>
+            <div class="tiny">${q.desc || ""}</div>
+          </td>
+          <td class="ta-center">${rewardText}</td>
+          <td class="ta-center">${remainText}</td>
+          <td class="ta-center">
+            <button class="btn good quest-accept noble-accept" data-id="${q.id}">受注</button>
+          </td>
+        </tr>
+      `;
+    })
+    .join("");
+  body.querySelectorAll(".noble-accept").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = Number(btn.getAttribute("data-id"));
+      if (!id) return;
+      const accepted = acceptNobleQuest(id, noble, settlement);
+      if (accepted && typeof document !== "undefined") {
+        document.dispatchEvent(new CustomEvent("quests-updated", { detail: { questId: accepted.id } }));
+      }
+      renderNobleQuestModal(noble, settlement, syncUI);
+      renderQuestUI(syncUI);
+      syncUI?.();
+    });
+  });
+}
+
+/**
  * UIボタンのイベントを設定する。
  */
 function wireButtons() {
@@ -928,6 +1224,8 @@ function wireButtons() {
   bindModal(elements.loreModal, elements.loreModalClose);
   bindModal(elements.endingsModal, elements.endingsModalClose);
   bindModal(elements.battleResultModal, elements.battleResultClose);
+  bindModal(elements.bribeModal, elements.bribeModalClose);
+  bindModal(elements.nobleQuestModal, elements.nobleQuestModalClose);
 
   document.getElementById("modeBattleAlert")?.addEventListener("click", () => {
     state.modeLabel = MODE_LABEL.ALERT;
@@ -955,7 +1253,16 @@ function wireButtons() {
   elements.exitTownBtn?.addEventListener("click", () => {
     attemptExit("town", elements, clearActionMessage, setTradeError, syncUI);
   });
+  elements.audienceBtn?.addEventListener("click", enterAudience);
+  elements.audienceExitBtn?.addEventListener("click", exitAudience);
+  elements.audienceBribeBtn?.addEventListener("click", openBribeModal);
+  elements.bribeConfirm?.addEventListener("click", submitBribe);
+  elements.bribeCancel?.addEventListener("click", () => closeModal(elements.bribeModal));
+  elements.audienceHonorBtn?.addEventListener("click", acceptHonorHere);
+  elements.audienceRequestBtn?.addEventListener("click", requestNobleQuest);
+  elements.audienceResignBtn?.addEventListener("click", resignHonorHere);
   document.addEventListener("map-move-request", () => {
+    if (isAudienceMode()) state.modeLabel = MODE_LABEL.NORMAL;
     moveToSelected(showActionMessage, syncUI);
   });
   document.addEventListener("map-wait-request", () => {
@@ -1140,6 +1447,13 @@ function wireButtons() {
     openModal(elements.questModal);
   };
   elements.questOpenBtn?.addEventListener("click", openQuestModal);
+  elements.audienceRequestBtn?.addEventListener("click", () => {
+    const here = getCurrentSettlement();
+    if (!here?.nobleId) return;
+    const noble = getNobleById(here.nobleId);
+    renderNobleQuestModal(noble, here, syncUI);
+    openModal(elements.nobleQuestModal);
+  });
   elements.oracleBtn?.addEventListener("click", () => {
     const res = receiveOracle();
     if (!res) {
@@ -1161,6 +1475,7 @@ function wireButtons() {
 export function initUI() {
   const restored = loadGameFromStorage();
   ensureFactionState();
+  seedWarDefaults();
   seedInitialQuests();
   ensureSeasonalQuests(getCurrentSettlement());
   ensureNobleHomes();

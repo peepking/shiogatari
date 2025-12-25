@@ -280,6 +280,7 @@
                 <button class="btn good" id="shipTradeBtn" hidden>船取引</button>
                 <button class="btn good" id="questOpenBtn" hidden>依頼受注</button>
                 <button class="btn good" id="hireBtn" hidden>部隊員雇用</button>
+                <button class="btn good" id="audienceBtn" hidden>謁見する</button>
                 <button class="btn primary" id="oracleBtn">神託を授かる</button>
                 <button class="btn primary" id="oracleBattleBtn" hidden>討伐</button>
                 <button class="btn" id="modeWaitBtn">1日待機</button>
@@ -295,6 +296,13 @@
                 <button class="btn good" id="battlePrepPrayBtn">海に祈る</button>
                 <button class="btn bad" id="battlePrepSurrenderBtn">降伏する</button>
                 <span class="pill" id="battlePrepInfo" hidden>敵推定: - 人</span>
+              </div>
+              <div class="mode-actions" id="audienceRow" hidden>
+                <button class="btn" id="audienceBribeBtn">賄賂を渡す</button>
+                <button class="btn primary" id="audienceHonorBtn" hidden>仕官する</button>
+                <button class="btn good" id="audienceRequestBtn" hidden>貴族依頼受注</button>
+                <button class="btn ghost" id="audienceResignBtn" hidden>勢力を去る</button>
+                <button class="btn ghost" id="audienceExitBtn">村/街に戻る</button>
               </div>
             </div>
           </section>
@@ -389,6 +397,30 @@
         <div id="eventModalBody" class="event-body"></div>
       </div>
       <div class="modal-ft" id="eventModalActions"></div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="bribeModal" hidden>
+    <div class="modal modal-sm">
+      <div class="modal-hd">
+        <div>賄賂</div>
+        <button class="modal-close" id="bribeModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd with-footer">
+        <div class="modal-scroll">
+          <div class="row flex-wrap gap-12 align-center">
+            <label class="tiny" for="bribeInput">賄賂の額</label>
+            <input type="number" id="bribeInput" min="0" step="100" value="0" />
+            <span class="pill">所持金: <b id="bribeFunds">0</b></span>
+          </div>
+          <div class="tiny mt-8">名誉家臣の誘いが届く水準までのみ上昇します。</div>
+          <div id="bribeError" class="msg error mt-10" hidden></div>
+        </div>
+        <div class="row mt-12 justify-end gap-12">
+          <button class="btn" id="bribeCancel">キャンセル</button>
+          <button class="btn primary" id="bribeConfirm">渡す</button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -639,6 +671,30 @@
               </tr>
             </thead>
             <tbody id="questModalBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="nobleQuestModal" hidden>
+    <div class="modal">
+      <div class="modal-hd">
+        <div>貴族依頼</div>
+        <button class="modal-close" id="nobleQuestModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd">
+        <div class="table mt-10">
+          <table class="trade-table">
+            <thead>
+              <tr>
+                <th class="ta-left">依頼</th>
+                <th class="ta-center">報酬</th>
+                <th class="ta-center">期限</th>
+                <th class="ta-center">操作</th>
+              </tr>
+            </thead>
+            <tbody id="nobleQuestModalBody"></tbody>
           </table>
         </div>
       </div>

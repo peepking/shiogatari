@@ -4,8 +4,9 @@ import { ASSETS, FACTIONS } from "./lore.js";
 import { formatTroopDisplay, TROOP_STATS } from "./troops.js";
 import { formatSupplyDisplay, SUPPLY_ITEMS } from "./supplies.js";
 import { getSettlementsByNoble, nobleHome, refreshMapInfo, settlements } from "./map.js";
-import { getWarEntry, getWarScoreLabel, isHonorFaction, getPlayerFactionId, getRelation } from "./faction.js";
+import { getWarEntry, getWarScoreLabel, isHonorFaction, getPlayerFactionId, getRelation, removeHonorFaction } from "./faction.js";
 import { displayWarLabel, displayRelationLabel } from "./util.js";
+import { pushToast } from "./dom.js";
 
 /**
  * 勢力IDから名称を取得する。
@@ -160,6 +161,16 @@ export function wireFactionPanel() {
     elements.factionListEl.addEventListener("click", (e) => {
       const card = e.target.closest(".faction-card");
       if (!card) return;
+      const leaveBtn = e.target.closest(".honor-leave");
+      if (leaveBtn) {
+        const fid = leaveBtn.dataset.fid;
+        removeHonorFaction(fid);
+        pushToast("離脱", "名誉家臣をやめました。", "info");
+        renderFactions();
+        renderNobles(fid);
+        refreshMapInfo();
+        return;
+      }
       const fid = card.dataset.fid;
       renderNobles(fid);
     });

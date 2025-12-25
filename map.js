@@ -412,18 +412,35 @@ function questToPin(q, nowAbs) {
   switch (q.type) {
     case QUEST_TYPES.PIRATE_HUNT:
     case QUEST_TYPES.ORACLE_HUNT:
-      return fromTarget(q.target, "hunt");
+      return [fromTarget(q.target, "hunt")].filter(Boolean);
     case QUEST_TYPES.BOUNTY_HUNT:
     case QUEST_TYPES.ORACLE_ELITE:
-      return fromTarget(q.target, "bounty");
+      return [fromTarget(q.target, "bounty")].filter(Boolean);
     case QUEST_TYPES.ORACLE_MOVE:
-      return fromTarget(q.target, "move");
+      return [fromTarget(q.target, "move")].filter(Boolean);
     case QUEST_TYPES.SUPPLY:
     case QUEST_TYPES.DELIVERY:
     case QUEST_TYPES.REFUGEE_ESCORT:
-      return fromSettlementId(q.targetId || q.originId, "supply", "supply");
+      return [fromSettlementId(q.targetId || q.originId, "supply", "supply")].filter(Boolean);
+    case QUEST_TYPES.NOBLE_SUPPLY:
+    case QUEST_TYPES.NOBLE_LOGISTICS:
+      return [fromSettlementId(q.originId, "supply", "supply")].filter(Boolean);
+    case QUEST_TYPES.NOBLE_SCOUT:
+    case QUEST_TYPES.NOBLE_REFUGEE:
+      return [fromTarget(q.target, "move")].filter(Boolean);
+    case QUEST_TYPES.NOBLE_SECURITY: {
+      const pins = [];
+      (q.fights || []).forEach((f, idx) => {
+        const styleKey = idx === 0 ? "hunt" : "bounty";
+        const p = fromTarget(f?.target, styleKey);
+        if (p) pins.push(p);
+      });
+      return pins;
+    }
+    case QUEST_TYPES.NOBLE_HUNT:
+      return [fromTarget(q.target, "bounty")].filter(Boolean);
     default:
-      return null;
+      return [];
   }
 }
 
@@ -462,9 +479,17 @@ function refreshPinCache() {
   if (state.mapPinsVisible === false) return;
   const nowAbs = absDay(state);
   const active = state.quests?.active || [];
-  const pins = active
-    .map((q) => questToPin(q, nowAbs))
-    .filter((p) => p && typeof p.x === "number" && typeof p.y === "number");
+  const pins = [];
+  active.forEach((q) => {
+    const res = questToPin(q, nowAbs);
+    if (Array.isArray(res)) {
+      res.forEach((p) => {
+        if (p && typeof p.x === "number" && typeof p.y === "number") pins.push(p);
+      });
+    } else if (res && typeof res.x === "number" && typeof res.y === "number") {
+      pins.push(res);
+    }
+  });
   pinCache = buildPinCache(pins);
 }
 
