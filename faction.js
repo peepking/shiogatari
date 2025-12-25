@@ -679,37 +679,38 @@ function endWar(entry) {
  * @param {object} entry
  */
 function queueLogisticsRequest(entry) {
-  const factions = entry?.factions || [];
-  const pf = getPlayerFactionId();
-  const targetFaction = factions.find((f) => f !== pf) || factions[0];
-  if (!targetFaction) return;
-  const owned = settlements.filter((s) => s.factionId === targetFaction);
-  const set = owned[0];
-  const place = set ? set.name : "前線";
-  const support = set ? getSupportLabel(set.id, targetFaction) : "mid";
-  const rate = support === "low" ? 1 : support === "high" ? 0.6 : 0.85;
-  if (Math.random() > rate) return;
-  const patterns = ["support", "fortify", "truce"];
-  const pick = patterns[Math.floor(Math.random() * patterns.length)];
-  const body =
-    pick === "fortify"
-      ? `${place} から籠城準備の支援要請が届いています。物資を送りますか？`
-      : pick === "truce"
-        ? `${place} から停戦交渉の打診が届いています。動きを後押ししますか？`
-        : `${place} から兵站支援要請が届いています。支援しますか？`;
-  enqueueEvent({
-    title: pick === "truce" ? "停戦の打診" : "兵站要請",
-    body,
-    actions: [
-      {
-        id: pick,
-        label: pick === "fortify" ? "物資を送る" : pick === "truce" ? "後押しする" : "支援する",
-        type: pick,
-        payload: { settlementId: set?.id, factionId: targetFaction },
-      },
-      { id: "ignore", label: "無視する", type: "ignore", payload: { settlementId: set?.id, factionId: targetFaction } },
-    ],
-  });
+  // ※サンプルだが後々のために取っておく
+  // const factions = entry?.factions || [];
+  // const pf = getPlayerFactionId();
+  // const targetFaction = factions.find((f) => f !== pf) || factions[0];
+  // if (!targetFaction) return;
+  // const owned = settlements.filter((s) => s.factionId === targetFaction);
+  // const set = owned[0];
+  // const place = set ? set.name : "前線";
+  // const support = set ? getSupportLabel(set.id, targetFaction) : "mid";
+  // const rate = support === "low" ? 1 : support === "high" ? 0.6 : 0.85;
+  // if (Math.random() > rate) return;
+  // const patterns = ["support", "fortify", "truce"];
+  // const pick = patterns[Math.floor(Math.random() * patterns.length)];
+  // const body =
+  //   pick === "fortify"
+  //     ? `${place} から籠城準備の支援要請が届いています。物資を送りますか？`
+  //     : pick === "truce"
+  //       ? `${place} から停戦交渉の打診が届いています。動きを後押ししますか？`
+  //       : `${place} から兵站支援要請が届いています。支援しますか？`;
+  // enqueueEvent({
+  //   title: pick === "truce" ? "停戦の打診" : "兵站要請",
+  //   body,
+  //   actions: [
+  //     {
+  //       id: pick,
+  //       label: pick === "fortify" ? "物資を送る" : pick === "truce" ? "後押しする" : "支援する",
+  //       type: pick,
+  //       payload: { settlementId: set?.id, factionId: targetFaction },
+  //     },
+  //     { id: "ignore", label: "無視する", type: "ignore", payload: { settlementId: set?.id, factionId: targetFaction } },
+  //   ],
+  // });
 }
 
 function queueFrontActionRequest(entry, front) {
