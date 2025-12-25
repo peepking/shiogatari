@@ -800,7 +800,13 @@ function processBattleOutcome(resultCode, meta) {
     const body = summary.join("\n");
     setOutput("戦後処理", body, [
       { text: resultLabel, kind: isWin ? "good" : "warn" },
-      { text: `敵推定${enemyTotal}人`, kind: "" },
+      {
+        text:
+          enemyFactionId !== "pirates" && pending.strength === "elite"
+            ? `敵推定${enemyTotal}人（正規軍）`
+            : `敵推定${enemyTotal}人${pending.strength === "elite" ? "（強編成）" : ""}`,
+        kind: "",
+      },
     ]);
     pushLog("戦闘結果", body, "-");
     pushToast("戦闘結果", resultLabel, isWin ? "good" : "warn");
@@ -1008,13 +1014,17 @@ function updateModeControls(loc) {
     elements.oracleBattleBtn.hidden = !show;
     elements.oracleBattleBtn.disabled = !show;
     if (show) {
-      const strength =
-        battleQuestMeta.strength === "elite" || battleQuestMeta.quest.type === QUEST_TYPES.BOUNTY_HUNT ? "強編成" : "通常編成";
-      elements.oracleBattleBtn.title = `${battleQuestMeta.quest.title}（${strength}）`;
-    } else {
-      elements.oracleBattleBtn.title = "";
-    }
+    const strength =
+      battleQuestMeta.strength === "elite" || battleQuestMeta.quest.type === QUEST_TYPES.BOUNTY_HUNT
+        ? "強編成"
+        : battleQuestMeta.quest.type === QUEST_TYPES.WAR_TRUCE || battleQuestMeta.quest.type?.startsWith("war_")
+          ? "正規軍"
+          : "通常編成";
+    elements.oracleBattleBtn.title = `${battleQuestMeta.quest.title}（${strength}）`;
+  } else {
+    elements.oracleBattleBtn.title = "";
   }
+}
   if (elements.battlePrepRow) {
     const showPrepRow = prepActive && !inBattle && !battleVisible && !inAudience;
     elements.battlePrepRow.hidden = !showPrepRow;
@@ -1049,8 +1059,11 @@ function updateModeControls(loc) {
     } else {
       const total = state.pendingEncounter.enemyTotal || "-";
       const strong = state.pendingEncounter.strength === "elite";
+      const enemyFactionId = state.pendingEncounter?.enemyFactionId || "pirates";
       elements.battlePrepInfo.hidden = false;
-      elements.battlePrepInfo.textContent = `敵推定: ${total}人${strong ? "（強編成）" : ""}`;
+      elements.battlePrepInfo.textContent = `敵推定: ${total}人${
+        strong ? (enemyFactionId !== "pirates" ? "（正規軍）" : "（強編成）") : ""
+      }`;
     }
   }
   if (elements.audienceBtn) {

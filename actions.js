@@ -208,7 +208,7 @@ function triggerEncounter(syncUI) {
   const enemyName = FACTIONS.find((f) => f.id === enemyFactionId)?.name || "敵勢力";
   setOutput(
     "敵襲",
-    `${enemyName} と遭遇しました（推定${total}人 / ${strength === "elite" ? "強編成" : "通常編成"}）。行動を選んでください。`,
+    `${enemyName} と遭遇しました（推定${total}人 / ${strength === "elite" ? "正規軍" : "通常編成"}）。行動を選んでください。`,
     [
       { text: "戦闘準備", kind: "warn" },
       { text: "行動選択", kind: "warn" },
@@ -216,7 +216,7 @@ function triggerEncounter(syncUI) {
   );
   pushLog(
     "敵襲",
-    `${enemyName} と遭遇（推定${total}人 / ${strength === "elite" ? "強編成" : "通常編成"}）。`,
+    `${enemyName} と遭遇（推定${total}人 / ${strength === "elite" ? (enemyFactionId !== "pirates" ? "正規軍" : "強編成") : "通常編成"}）。`,
     state.lastRoll ?? "-"
   );
   syncUI?.();
@@ -234,14 +234,16 @@ function maybeTriggerEncounter(syncUI) {
   if (loc?.place === PLACE.VILLAGE || loc?.place === PLACE.TOWN) return false;
   const threshold = clamp(state.encounterThreshold || ENCOUNTER_MIN, ENCOUNTER_MIN, ENCOUNTER_MAX);
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
-  const enemyFactionId = pickEncounterFaction(state.position, terrain);
+  const frontHint = pickFrontEncounter(state.position);
+  const enemyFactionId = frontHint?.enemyFactionId || pickEncounterFaction(state.position, terrain);
   const playerFid = getPlayerFactionId();
   const nearbyEnemyBoost = enemyFactionId !== "pirates" && enemyFactionId !== playerFid ? 1.3 : 1;
   const escortBoost = state.refugeeEscort?.active ? 3 : 1;
   state.encounterProgress = (state.encounterProgress || 0) + nearbyEnemyBoost * escortBoost;
   if (state.encounterProgress >= threshold) {
     triggerEncounter(syncUI);
-    pushToast("敵襲", "外洋海賊が接近中！ 戦闘準備をしてください。", "warn");
+    const enemyName = enemyFactionId === "pirates" ? "外洋海賊" : "正規軍";
+    pushToast("敵襲", `${enemyName}が接近中！ 戦闘準備をしてください。`, "warn");
     return true;
   }
   return false;
