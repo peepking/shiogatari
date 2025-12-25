@@ -1150,10 +1150,18 @@ export function completeQuest(id) {
   if (q.reward && q.reward > 0) rewards.push(`資金+${q.reward}`);
   if (q.rewardFaith && q.rewardFaith > 0) rewards.push(`信仰+${q.rewardFaith}`);
   if (fameReward > 0) rewards.push(`名声+${fameReward}`);
-  const rewardText = rewards.length ? rewards.join(" / ") : "報酬なし";
+  const impact =
+    q.type === QUEST_TYPES.WAR_SUPPLY ? "戦況が少し有利に傾きました" : null;
+  const rewardTextBase = rewards.length ? rewards.join(" / ") : "報酬なし";
+  const rewardText = impact ? `${rewardTextBase}${rewardTextBase ? " / " : ""}${impact}` : rewardTextBase;
+  const silent = q.type === QUEST_TYPES.WAR_SUPPLY || q.type === QUEST_TYPES.WAR_ESCORT;
   pushLog("依頼完了", `${q.title} / ${rewardText}`, "-");
-  pushToast("依頼完了", `${q.title} / ${rewardText}`, "good");
-  enqueueEvent({ title: "依頼完了", body: `${q.title} / ${rewardText}` });
+  if (!silent) {
+    pushToast("依頼完了", `${q.title} / ${rewardText}`, "good");
+    enqueueEvent({ title: "依頼完了", body: `${q.title} / ${rewardText}` });
+  } else {
+    pushToast("依頼完了", `${q.title} / ${rewardText}`, "info");
+  }
   return true;
 }
 
@@ -1402,8 +1410,8 @@ export function completeWarBattleQuest(id, success, enemyTotal, fightIdx = null)
     if (!success) {
       applyWarFrontScore(q, false);
       state.quests.active.splice(idx, 1);
-      pushLog("行動失敗", `${q.title} / 戦闘に敗北`, "-");
-      pushToast("行動失敗", `${q.title} / 戦闘に敗北`, "bad");
+      pushLog("行動失敗", `${q.title} / 戦闘に敗北 / 戦況が不利に傾きました`, "-");
+      pushToast("行動失敗", `${q.title} / 戦闘に敗北（戦況が不利に傾きました）`, "bad");
       return true;
     }
     if (fightIdx != null && q.fights[fightIdx]) q.fights[fightIdx].done = true;
@@ -1415,18 +1423,18 @@ export function completeWarBattleQuest(id, success, enemyTotal, fightIdx = null)
     }
     applyWarFrontScore(q, true);
     state.quests.active.splice(idx, 1);
-    pushLog("行動達成", `${q.title} / 補給線を遮断`, "-");
-    pushToast("行動達成", `${q.title} を完了しました`, "good");
+    pushLog("行動達成", `${q.title} / 補給線を遮断 / 戦況が有利に傾きました`, "-");
+    pushToast("行動達成", `${q.title} を完了しました（戦況が有利に傾きました）`, "good");
     return true;
   }
   if (success) {
     applyWarFrontScore(q, true);
-    pushLog("行動達成", `${q.title} / 戦闘勝利`, "-");
-    pushToast("行動達成", `${q.title} を完了しました`, "good");
+    pushLog("行動達成", `${q.title} / 戦闘勝利 / 戦況が少し有利に傾きました`, "-");
+    pushToast("行動達成", `${q.title} を完了しました（戦況が少し有利に傾きました）`, "good");
   } else {
     applyWarFrontScore(q, false);
-    pushLog("行動失敗", `${q.title} / 戦闘に敗北`, "-");
-    pushToast("行動失敗", `${q.title} / 戦闘に敗北`, "bad");
+    pushLog("行動失敗", `${q.title} / 戦闘に敗北 / 戦況が不利に傾きました`, "-");
+    pushToast("行動失敗", `${q.title} / 戦闘に敗北（戦況が不利に傾きました）`, "bad");
   }
   state.quests.active.splice(idx, 1);
   return true;
@@ -1713,6 +1721,7 @@ export function completeWarEscortAt(settlement) {
   const q = state.quests.active[idx];
   applyWarFrontScore(q, true);
   state.quests.active.splice(idx, 1);
-  pushLog("護送完了", `${q.title} / ${settlement.name} に護送完了`, "-");
-  pushToast("護送完了", `${q.title} を完了しました`, "good");
+  const impact = "戦況が有利に傾きました";
+  pushLog("護送完了", `${q.title} / ${settlement.name} に護送完了 / ${impact}`, "-");
+  pushToast("護送完了", `${q.title} を完了しました（${impact}）`, "good");
 }

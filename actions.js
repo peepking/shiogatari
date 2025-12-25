@@ -35,13 +35,14 @@ const ENCOUNTER_MAX = 15;
 const STRONG_POOL_CHANCE = 0.25;
 const ENCOUNTER_RADIUS = 5;
 const TRAVEL_EVENT_RADIUS = 5;
-const MERCHANT_EVENT_RATE = 0.03;
-const RESCUE_EVENT_RATE = 0.03;
-const SMUGGLE_EVENT_RATE = 0.05;
-const REFUGEE_EVENT_RATE = 0.03;
+const TRAVEL_EVENT_COOLDOWN_DAYS = 5;
+const MERCHANT_EVENT_RATE = 0.02;
+const RESCUE_EVENT_RATE = 0.02;
+const SMUGGLE_EVENT_RATE = 0.03;
+const REFUGEE_EVENT_RATE = 0.02;
 const CHECKPOINT_EVENT_RATE = 0.01;
 const OMEN_EVENT_RATE = 0.01;
-const WRECK_EVENT_RATE = 0.05;
+const WRECK_EVENT_RATE = 0.03;
 const TRAITOR_EVENT_RATE = 0.02;
 
 let travelSync = null;
@@ -454,28 +455,28 @@ export function rollTravelEvents() {
   if (Math.random() < RESCUE_EVENT_RATE) {
     const queued = enqueueMerchantRescueEvent(terrain);
     if (queued) {
-      state.travelEventCooldown = 5;
+      state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
       return true;
     }
   }
   if (Math.random() < MERCHANT_EVENT_RATE) {
     const queued = enqueueMerchantEvent(terrain);
     if (queued) {
-      state.travelEventCooldown = 5;
+      state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
       return true;
     }
   }
   if (Math.random() < SMUGGLE_EVENT_RATE && (terrain === "sea" || terrain === "shoal")) {
     const queued = enqueueSmuggleEvent(terrain);
     if (queued) {
-      state.travelEventCooldown = 5;
+      state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
       return true;
     }
   }
   if (!state.refugeeEscort?.active && Math.random() < REFUGEE_EVENT_RATE) {
     const queued = enqueueRefugeeEvent(terrain);
     if (queued) {
-      state.travelEventCooldown = 5;
+      state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
       return true;
     }
   }
@@ -483,7 +484,7 @@ export function rollTravelEvents() {
     if (Math.random() < WRECK_EVENT_RATE) {
       const queued = enqueueWreckEvent(terrain);
       if (queued) {
-        state.travelEventCooldown = 5;
+        state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
         return true;
       }
     }
@@ -491,21 +492,21 @@ export function rollTravelEvents() {
   if (Math.random() < OMEN_EVENT_RATE) {
     const queued = enqueueOmenEvent();
     if (queued) {
-      state.travelEventCooldown = 5;
+      state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
       return true;
     }
   }
   if (Math.random() < TRAITOR_EVENT_RATE) {
     const queued = enqueueTraitorEvent();
     if (queued) {
-      state.travelEventCooldown = 5;
+      state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
       return true;
     }
   }
   if (Math.random() < CHECKPOINT_EVENT_RATE) {
     const queued = enqueueCheckpointEvent();
     if (queued) {
-      state.travelEventCooldown = 5;
+      state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
       return true;
     }
   }
