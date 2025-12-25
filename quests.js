@@ -693,6 +693,9 @@ function genNobleSecurityQuest(settlement, noble) {
   if (!first || !second) return null;
   const firstEstimate = predictEnemyTotal("normal");
   const secondEstimate = predictEnemyTotal("elite");
+  const totalEstimate = firstEstimate + secondEstimate;
+  const estimatedReward = totalEstimate * 150;
+  const estimatedFame = Math.floor(totalEstimate / 2);
   return {
     id: nextNobleId(),
     type: QUEST_TYPES.NOBLE_SECURITY,
@@ -702,9 +705,9 @@ function genNobleSecurityQuest(settlement, noble) {
       { target: second, strength: "elite", done: false, estimatedTotal: secondEstimate },
     ],
     fightTotals: [],
-    estimatedTotal: firstEstimate + secondEstimate,
-    reward: 0,
-    rewardFame: 0,
+    estimatedTotal: totalEstimate,
+    reward: estimatedReward,
+    rewardFame: estimatedFame,
     nobleId: noble.id,
     factionId: settlement.factionId,
     originId: settlement.id,
@@ -798,6 +801,8 @@ function genNobleHuntQuest(settlement, noble) {
   const target = randomHuntTarget(settlement.coords, 3, 7, avoid);
   if (!target) return null;
   const estimatedTotal = predictEnemyTotal("elite");
+  const estimatedReward = estimatedTotal * 200;
+  const estimatedFame = estimatedTotal;
   return {
     id: nextNobleId(),
     type: QUEST_TYPES.NOBLE_HUNT,
@@ -805,8 +810,8 @@ function genNobleHuntQuest(settlement, noble) {
     target,
     enemyFactionId: opponent,
     estimatedTotal,
-    reward: 0,
-    rewardFame: 0,
+    reward: estimatedReward,
+    rewardFame: estimatedFame,
     nobleId: noble.id,
     factionId: settlement.factionId,
     originId: settlement.id,
