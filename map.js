@@ -328,8 +328,18 @@ const goods = [
 export function ensureNobleHomes() {
   nobleHome.clear();
   const fallbackSet = settlements[0] || null;
+  const shuffle = (arr) => {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  };
   FACTIONS.forEach((f) => {
-    const sets = settlements.filter((s) => s.factionId === f.id);
+    const towns = settlements.filter((s) => s.factionId === f.id && s.kind === "town");
+    const villages = settlements.filter((s) => s.factionId === f.id && s.kind === "village");
+    const sets = [...shuffle(towns), ...shuffle(villages)];
     const nobles = f.nobles || [];
     if (!sets.length || !nobles.length) return;
     sets.forEach((s, idx) => {

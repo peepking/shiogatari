@@ -4,7 +4,15 @@ import { ASSETS, FACTIONS } from "./lore.js";
 import { formatTroopDisplay, TROOP_STATS } from "./troops.js";
 import { formatSupplyDisplay, SUPPLY_ITEMS } from "./supplies.js";
 import { getSettlementsByNoble, nobleHome, refreshMapInfo, settlements } from "./map.js";
-import { getWarEntry, getWarScoreLabel, isHonorFaction, getPlayerFactionId, getRelation, removeHonorFaction } from "./faction.js";
+import {
+  getWarEntry,
+  getWarScoreLabel,
+  isHonorFaction,
+  getPlayerFactionId,
+  getRelation,
+  removeHonorFaction,
+  getNobleFavor,
+} from "./faction.js";
 import { displayWarLabel, displayRelationLabel } from "./util.js";
 import { pushToast } from "./dom.js";
 
@@ -103,10 +111,19 @@ export function renderNobles(fid) {
     if (!set) return "滞在中: -";
     return `滞在中: ${set.name} (${set.coords.x + 1}, ${set.coords.y + 1})`;
   };
+  const favorLabel = (nid) => {
+    const fv = getNobleFavor(nid);
+    if (fv >= 50) return "厚遇";
+    if (fv >= 10) return "好意";
+    if (fv > -10) return "中立";
+    if (fv > -50) return "警戒";
+    return "敵対";
+  };
   elements.nobleListEl.innerHTML = f.nobles
     .map(
       (n) => {
         const stayText = getStay(n.id);
+        const favorText = `好感度: ${favorLabel(n.id)}`;
         return `
       <div class="noble-card" data-nid="${n.id}">
         <img src="${n.img}" alt="${n.name}">
@@ -114,6 +131,7 @@ export function renderNobles(fid) {
           <div class="n-name">${n.name}</div>
           <div class="n-title">${n.title}</div>
           <div class="n-title">${stayText}</div>
+          <div class="n-title">${favorText}</div>
         </div>
       </div>`;
       }
