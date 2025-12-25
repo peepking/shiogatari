@@ -72,6 +72,7 @@ import {
   removeHonorFaction,
   HONOR_FAVOR_THRESHOLD,
   seedWarDefaults,
+  isSettlementUnderSiege,
 } from "./faction.js";
 import { absDay, manhattan } from "./questUtils.js";
 import {
@@ -85,6 +86,13 @@ import {
 import { loadGameFromStorage } from "./storage.js";
 import { initEventQueueUI } from "./events.js";
 import { ensureFactionState } from "./faction.js";
+
+const BONUS_CAPTURE_EVENT_TAGS = new Set([
+  "merchant_attack",
+  "merchant_rescue_raid",
+  "smuggle_raid",
+  "refugee_raid",
+]);
 
 /**
  * モード表示用のラベルを組み立てる。
@@ -504,14 +512,16 @@ function calcLosses(meta) {
   return { losses, lossProb };
 }
 
-function calcCaptures(meta) {
+function calcCaptures(meta, eventTag = null) {
   const units = meta?.units || [];
   const enemies = units.filter((u) => u.side === "enemy" && u.hp <= 0);
+  const bonusRolls = BONUS_CAPTURE_EVENT_TAGS.has(eventTag) ? 3 : 0;
   const captured = {};
   enemies.forEach((u) => {
     const cnt = Math.max(0, Math.round(u.count || 0));
     let got = 0;
-    for (let i = 0; i < cnt; i++) {
+    const rolls = cnt + bonusRolls;
+    for (let i = 0; i < rolls; i++) {
       if (Math.random() < 0.05) got += 1;
     }
     if (got > 0) {
@@ -657,7 +667,7 @@ function processBattleOutcome(resultCode, meta) {
       .join(" / ") || NONE_LABEL;
     summary.push(`損耗:${lossText === NONE_LABEL ? lossText : " " + lossText}`);
 
-    const captured = calcCaptures(meta);
+    const captured = calcCaptures(meta, eventTag);
     Object.entries(captured).forEach(([key, qty]) => {
       const [type, lvlStr] = key.split("|");
       addTroops(type, Number(lvlStr) || 1, qty);
@@ -670,6 +680,13 @@ function processBattleOutcome(resultCode, meta) {
       }) || [];
     const capText = capEntries.length ? capEntries.join(" / ") : NONE_LABEL;
     summary.push(`拿捕:${capText === NONE_LABEL ? capText : " " + capText}`);
+
+    const extraShip =
+      isWin && BONUS_CAPTURE_EVENT_TAGS.has(eventTag) && Math.random() < 0.3;
+    if (extraShip) {
+      state.ships = Math.max(0, (state.ships || 0) + 1);
+      summary.push("船 +1");
+    }
 
     const killed = killedEnemyCount(meta);
     const leveled = levelUpTroopsRandom(killed);
@@ -919,6 +936,8 @@ function updateModeControls(loc) {
   const prepActive = prep && !!state.pendingEncounter?.active;
   const battleQuestMeta = getBattleQuestAt(state.position);
   const visible = state.modeLabel === MODE_LABEL.IN_TOWN || state.modeLabel === MODE_LABEL.IN_VILLAGE;
+  const hereSettlement = getCurrentSettlement();
+  const underSiege = hereSettlement ? isSettlementUnderSiege(hereSettlement.id) : false;
   const audienceCtx = getAudienceContext();
   const audienceReady = visible && !!audienceCtx.nobleId;
   const honorHere = audienceCtx.settlement?.factionId
@@ -940,9 +959,17 @@ function updateModeControls(loc) {
   if (elements.enterVillageBtn)
     elements.enterVillageBtn.hidden =
       !(loc?.place === PLACE.VILLAGE && state.modeLabel !== MODE_LABEL.IN_VILLAGE) || inAudience;
+  if (elements.enterVillageBtn)
+    elements.enterVillageBtn.disabled =
+      !(loc?.place === PLACE.VILLAGE && state.modeLabel !== MODE_LABEL.IN_VILLAGE) ||
+      inAudience ||
+      underSiege;
   if (elements.enterTownBtn)
     elements.enterTownBtn.hidden =
       !(loc?.place === PLACE.TOWN && state.modeLabel !== MODE_LABEL.IN_TOWN) || inAudience;
+  if (elements.enterTownBtn)
+    elements.enterTownBtn.disabled =
+      !(loc?.place === PLACE.TOWN && state.modeLabel !== MODE_LABEL.IN_TOWN) || inAudience || underSiege;
   if (elements.exitVillageBtn)
     elements.exitVillageBtn.hidden = state.modeLabel !== MODE_LABEL.IN_VILLAGE;
   if (elements.exitTownBtn)

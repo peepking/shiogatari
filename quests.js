@@ -1120,9 +1120,19 @@ export function completeQuest(id) {
     if (q.frontId && q.extendDays) extendFrontDuration(q.frontId, q.extendDays);
     const set = getSettlementById(q.originId);
     if (set?.nobleId) adjustNobleFavor(set.nobleId, 2);
+    const fameGain = rollDice(5, 3);
+    if (fameGain) state.fame = Math.max(0, (state.fame || 0) + fameGain);
+    state.ships = Math.max(0, (state.ships || 0) + 1);
     state.quests.active.splice(idx, 1);
-    pushLog("停戦工作完了", `${q.title} / 戦況が有利に傾きました`, "-");
-    pushToast("停戦工作完了", `${q.title} を完了しました（戦況が有利に傾きました）`, "good");
+    const rewardNote = [
+      "戦況が有利に傾きました",
+      fameGain ? `名声+${fameGain}` : null,
+      "船+1",
+    ]
+      .filter(Boolean)
+      .join(" / ");
+    pushLog("停戦工作完了", `${q.title} / ${rewardNote}`, "-");
+    pushToast("停戦工作完了", `${q.title} を完了しました（${rewardNote}）`, "good");
     return true;
   }
   if (q.type === QUEST_TYPES.ORACLE_SUPPLY) {

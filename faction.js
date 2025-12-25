@@ -298,6 +298,18 @@ export function getFrontForSettlement(factionId, settlementId) {
 }
 
 /**
+ * 拠点が攻撃を受けて防衛中か判定する。
+ * @param {string} settlementId 拠点ID
+ * @returns {boolean} 防衛中ならtrue
+ */
+export function isSettlementUnderSiege(settlementId) {
+  if (!state?.warLedger?.entries || !settlementId) return false;
+  return state.warLedger.entries.some((entry) =>
+    (entry.activeFronts || []).some((front) => front && !front.resolved && front.settlementId === settlementId)
+  );
+}
+
+/**
  * 勢力間の戦況エントリを取得する（存在しなければnull）。
  * @param {string} a
  * @param {string} b

@@ -16,6 +16,7 @@ import {
   adjustNobleFavor,
   getFrontForSettlement,
   getFrontById,
+  isSettlementUnderSiege,
 } from "./faction.js";
 import { warScoreLabel } from "./util.js";
 import { FACTIONS } from "./lore.js";
@@ -379,6 +380,14 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
     setOutput("入場できません", `${targetPlace}にいません。`, [
       { text: targetPlace, kind: "warn" },
       { text: "移動が必要", kind: "warn" },
+    ]);
+    return false;
+  }
+  const hereSettlement = getSettlementAtPosition(state.position.x, state.position.y);
+  if (hereSettlement && isSettlementUnderSiege(hereSettlement.id)) {
+    setOutput("入場できません", "防衛中の拠点には入れません。戦闘の行方を見守りましょう。", [
+      { text: "防衛中", kind: "warn" },
+      { text: "入場不可", kind: "warn" },
     ]);
     return false;
   }
