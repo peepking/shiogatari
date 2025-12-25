@@ -1,7 +1,7 @@
 import { state } from "./state.js";
 import { MODE_LABEL, PLACE } from "./constants.js";
 import { setOutput, pushLog, pushToast } from "./dom.js";
-import { getSettlementAtPosition, getLocationStatus, getTerrainAt, settlements } from "./map.js";
+import { getSettlementAtPosition, getLocationStatus, getTerrainAt, settlements, getSettlementById } from "./map.js";
 import { calcSupplyCap, totalSupplies, createSettlementDemand } from "./supplies.js";
 import { calcTroopCap, totalTroops } from "./troops.js";
 import { advanceDayWithEvents } from "./time.js";
@@ -23,7 +23,6 @@ import {
   markWarEscortPickup,
   completeWarEscortAt,
 } from "./quests.js";
-import { getSettlementById } from "./map.js";
 
 /**
  * エンカウント歩数
@@ -617,6 +616,35 @@ export function handleTravelEventAction(action) {
     case "merchant_rescue_leave":
     case "merchant_leave":
       return true;
+    case "front_request_accept": {
+      const frontId = action.payload?.frontId;
+      const settlementId = action.payload?.settlementId;
+      const kind = action.payload?.kind;
+      if (!frontId || !settlementId || !kind) return true;
+      const pf = getPlayerFactionId();
+      const entryFront =
+        state.warLedger?.entries
+          ?.flatMap((e) => (e.activeFronts || []).map((f) => ({ entry: e, front: f })))
+          .find((p) => p.front?.id === frontId) || null;
+      if (!entryFront) return true;
+      const front = entryFront.front;
+      const set = getSettlementById(settlementId);
+      if (!set) return true;
+      const role = front.defender === pf ? "defend" : front.attacker === pf ? "attack" : null;
+      if (!role) return true;
+      const q = addWarFrontQuest(set, front, role, kind);
+      if (q) {
+        pushLog("前線要請", `${q.title} を受注しました`, "-");
+        pushToast("前線要請", `${q.title} を受注しました。`, "info");
+        if (typeof document !== "undefined") document.dispatchEvent(new CustomEvent("quests-updated"));
+      }
+      return true;
+    }
+    case "front_request_ignore": {
+      pushLog("前線要請", "要請を断りました", "-");
+      pushToast("前線要請", "要請を断りました。", "info");
+      return true;
+    }
     case "smuggle_trade": {
       const ctx = action.payload || {};
       const deals = ctx.deals || [];

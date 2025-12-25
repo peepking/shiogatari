@@ -499,6 +499,7 @@ function maybeStartFront(entry, absDay, duration) {
     resolved: false,
     baseScore,
     usedKinds: [],
+    requestAttempted: false,
   };
   if (!entry.activeFronts) entry.activeFronts = [];
   entry.activeFronts.push(front);
@@ -645,6 +646,55 @@ function queueLogisticsRequest(entry) {
   });
 }
 
+function queueFrontActionRequest(entry, front) {
+  const pf = getPlayerFactionId();
+  if (!pf || pf === "player") return false;
+  const role = front.defender === pf ? "defend" : front.attacker === pf ? "attack" : null;
+  if (!role) return false;
+  const used = new Set(front.usedKinds || []);
+  const kindPool =
+    role === "defend"
+      ? ["defendRaid", "escort", "skirmish", "supplyFood"]
+      : ["attackRaid", "blockade", "skirmish", "supplyFood"];
+  const remaining = kindPool.filter((k) => !used.has(k));
+  if (!remaining.length) return false;
+  // 1回の街攻めにつき1度だけ試行
+  if (front.requestAttempted) return false;
+  front.requestAttempted = true;
+  // ランダムで要請を行う（50%）
+  if (Math.random() >= 0.5) return false;
+  const kind = remaining[Math.floor(Math.random() * remaining.length)];
+  const set = settlements.find((s) => s.id === front.settlementId);
+  const setName = set?.name || "拠点";
+  const kindLabel = {
+    defendRaid: "補給路迎撃",
+    attackRaid: "補給路襲撃",
+    skirmish: "小規模戦闘",
+    supplyFood: "食糧搬入",
+    escort: "輸送護衛",
+    blockade: "補給封鎖",
+  }[kind];
+  enqueueEvent({
+    title: "前線要請",
+    body: `${setName} で「${kindLabel}」を実施してほしいと要請が届きました。受けますか？`,
+    actions: [
+      {
+        id: "accept-front",
+        label: "受ける",
+        type: "front_request_accept",
+        payload: { frontId: front.id, settlementId: front.settlementId, kind },
+      },
+      {
+        id: "ignore-front",
+        label: "断る",
+        type: "front_request_ignore",
+        payload: { frontId: front.id, settlementId: front.settlementId, kind },
+      },
+    ],
+  });
+  return true;
+}
+
 /**
  * 戦況を日次で確認し、劣勢なら兵站要請イベントを積む。
  * 7日間は再送しないクールダウンでスパムを抑止する。
@@ -674,6 +724,12 @@ export function tickDailyWar(absDay) {
       const attackerWins = overThreshold ? delta > 0 : delta >= 0;
       resolveFront(entry, front, attackerWins);
       return false;
+    });
+
+    // 前線要請（1街攻め1回まで）
+    (entry.activeFronts || []).forEach((front) => {
+      if (!front || front.resolved) return;
+      queueFrontActionRequest(entry, front);
     });
 
     // 劣勢時の兵站要請
