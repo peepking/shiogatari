@@ -137,15 +137,9 @@ export function seedWarDefaults() {
   setRel("north", "archipelago", "ally");
   setRel("north", "citadel", "war");
   setRel("archipelago", "citadel", "war");
-  setRel("north", "pirates", "war");
-  setRel("archipelago", "pirates", "war");
-  setRel("citadel", "pirates", "war");
   const wars = [
     ["north", "citadel"],
     ["archipelago", "citadel"],
-    ["north", "pirates"],
-    ["archipelago", "pirates"],
-    ["citadel", "pirates"],
   ];
   wars.forEach(([a, b]) => {
     addWarScore(a, b, 0, absDay(state), 0, 0);
@@ -243,6 +237,9 @@ export function getWarScoreLabel(score) {
  */
 export function getWarEntry(a, b) {
   if (!a || !b || a === b) return null;
+  if (a === "pirates" || b === "pirates") return null;
+  if (a === "player" || b === "player") return null;
+  if (getRelation(a, b) !== "war") return null;
   if (!state.warLedger) state.warLedger = { entries: [] };
   const key = makeWarKey(a, b);
   return state.warLedger.entries.find((e) => e.id === key) || null;
@@ -260,6 +257,9 @@ export function getWarEntry(a, b) {
  */
 export function addWarScore(a, b, scoreDelta, startedAt = null, supplyDelta = 0, faithDelta = 0) {
   if (!a || !b || a === b) return null;
+  if (a === "pirates" || b === "pirates") return null;
+  if (a === "player" || b === "player") return null;
+  if (getRelation(a, b) !== "war") return null;
   if (!state.warLedger) state.warLedger = { entries: [] };
   const key = makeWarKey(a, b);
   let entry = state.warLedger.entries.find((e) => e.id === key);
@@ -360,7 +360,9 @@ function queueLogisticsRequest(entry) {
  */
 export function tickDailyWar(absDay) {
   if (!state.warLedger?.entries) return;
-  state.warLedger.entries.forEach((entry) => {
+state.warLedger.entries.forEach((entry) => {
+    if ((entry.factions || []).includes("pirates")) return;
+    if ((entry.factions || []).includes("player")) return;
     const label = warScoreLabel(entry.score);
     const disadvantage = label === "disadvantage" || label === "losing";
     const since = entry.lastRequestAbs != null ? absDay - entry.lastRequestAbs : Infinity;

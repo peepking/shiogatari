@@ -62,8 +62,9 @@ export function renderFactions() {
   if (!elements.factionListEl) return;
   elements.factionListEl.innerHTML = FACTIONS.map((f) => {
     const attText = factionStatusText(f.id);
-    const warEntry = getWarEntry(getPlayerFactionId(), f.id);
-    const warLabel = displayWarLabel(getWarScoreLabel(warEntry?.score || 0));
+    const rel = getRelation(getPlayerFactionId(), f.id);
+    const warEntry = rel === "war" && f.id !== "pirates" ? getWarEntry(getPlayerFactionId(), f.id) : null;
+    const warLabel = warEntry ? displayWarLabel(getWarScoreLabel(warEntry?.score || 0)) : "-";
     const honor = isHonorFaction(f.id);
     return `
       <div class="faction-card" data-fid="${f.id}" data-fcolor="${f.color}">
