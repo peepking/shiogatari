@@ -459,6 +459,8 @@ function questToPin(q, nowAbs) {
       return [fromSettlementId(q.originId, "supply", "supply")].filter(Boolean);
     case QUEST_TYPES.WAR_ESCORT:
       return [fromTarget(q.target, "move")].filter(Boolean);
+    case QUEST_TYPES.WAR_TRUCE:
+      return [fromSettlementId(q.originId, "supply", "supply")].filter(Boolean);
     case QUEST_TYPES.WAR_BLOCKADE: {
       const pins = [];
       (q.fights || []).forEach((f) => {

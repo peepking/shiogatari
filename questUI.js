@@ -37,6 +37,7 @@ const TYPE_LABEL = {
   [QUEST_TYPES.WAR_SUPPLY]: "前線行動",
   [QUEST_TYPES.WAR_ESCORT]: "前線行動",
   [QUEST_TYPES.WAR_BLOCKADE]: "前線行動",
+  [QUEST_TYPES.WAR_TRUCE]: "前線行動",
 };
 
 const ORACLE_TYPES = new Set([
@@ -107,6 +108,8 @@ function buildPlaceLabel(q, ctx) {
       return `${formatSettlement(origin)}で食糧搬入（${supplyInfo || "必要物資不明"}）`;
     case QUEST_TYPES.WAR_ESCORT:
       return `輸送護衛 ${formatCoords(q.target)}から輸送隊を回収`;
+    case QUEST_TYPES.WAR_TRUCE:
+      return `停戦工作 ${formatSettlement(origin)}`;
     case QUEST_TYPES.WAR_BLOCKADE: {
       const left = blockadeLeft ?? (q.fights || []).filter((f) => !f.done).length;
       return `補給封鎖 ${formatCoords(blockadeTarget)} 残り${left}箇所${blockadeEstimate ? ` / 推定${blockadeEstimate}人` : ""}`;

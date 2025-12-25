@@ -8,7 +8,15 @@ import { advanceDayWithEvents } from "./time.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
 import { randInt, absDay, rollDice, manhattan, pickRandomProcessed, randomSeaTarget, randomHuntTarget, NORMAL_ANCHORS, STRONG_ANCHORS, pickAnchorRange } from "./questUtils.js";
-import { addWarScore, getPlayerFactionId, getWarEntry, adjustSupport, adjustNobleFavor, getFrontForSettlement } from "./faction.js";
+import {
+  addWarScore,
+  getPlayerFactionId,
+  getWarEntry,
+  adjustSupport,
+  adjustNobleFavor,
+  getFrontForSettlement,
+  getFrontById,
+} from "./faction.js";
 import { warScoreLabel } from "./util.js";
 import { FACTIONS } from "./lore.js";
 import { SUPPLY_ITEMS } from "./supplies.js";
@@ -634,7 +642,7 @@ export function handleTravelEventAction(action) {
       if (!set) return true;
       const role = front.defender === pf ? "defend" : front.attacker === pf ? "attack" : null;
       if (!role) return true;
-      const q = addWarFrontQuest(set, front, role, kind);
+      const q = addWarFrontQuest(set, front, role, kind, action.payload || {});
       if (q) {
         pushLog("前線要請", `${q.title} を受注しました`, "-");
         pushToast("前線要請", `${q.title} を受注しました。`, "info");
@@ -648,6 +656,31 @@ export function handleTravelEventAction(action) {
     case "front_request_ignore": {
       pushLog("前線要請", "要請を断りました", "-");
       pushToast("前線要請", "要請を断りました。", "info");
+      return true;
+    }
+    case "truce_request_accept": {
+      const frontId = action.payload?.frontId;
+      const settlementId = action.payload?.settlementId;
+      if (!frontId || !settlementId) return true;
+      const pf = getPlayerFactionId();
+      const front = getFrontById(frontId);
+      if (!front || front.defender !== pf) return true;
+      const set = getSettlementById(settlementId);
+      if (!set) return true;
+      const q = addWarFrontQuest(set, front, "defend", "truce", action.payload || {});
+      if (q) {
+        pushLog("停戦工作", `${q.title} を受注しました`, "-");
+        pushToast("停戦工作", `${q.title} を受注しました。`, "info");
+        if (typeof document !== "undefined") {
+          document.dispatchEvent(new CustomEvent("quests-updated"));
+          document.dispatchEvent(new CustomEvent("map-changed"));
+        }
+      }
+      return true;
+    }
+    case "truce_request_ignore": {
+      pushLog("停戦工作", "要請を断りました", "-");
+      pushToast("停戦工作", "要請を断りました。", "info");
       return true;
     }
     case "smuggle_trade": {

@@ -2,7 +2,7 @@ import { state } from "./state.js";
 import { settlements, nobleHome } from "./map.js";
 import { clamp, relationLabel, supportLabel, warScoreLabel, displayWarLabel } from "./util.js";
 import { enqueueEvent } from "./events.js";
-import { pushLog } from "./dom.js";
+import { pushLog, pushToast } from "./dom.js";
 import { FACTIONS } from "./lore.js";
 import { absDay, manhattan, randInt } from "./questUtils.js";
 
@@ -57,6 +57,26 @@ export function removeHonorFaction(factionId) {
  */
 export function getPlayerFactionId() {
   return state.playerFactionId || "player";
+}
+
+export function getFrontById(frontId) {
+  if (!frontId || !state.warLedger?.entries) return null;
+  for (const entry of state.warLedger.entries) {
+    const hit = (entry.activeFronts || []).find((f) => f?.id === frontId);
+    if (hit) return hit;
+  }
+  return null;
+}
+
+export function extendFrontDuration(frontId, days) {
+  if (!frontId || !state.warLedger?.entries || !Number.isFinite(days) || days <= 0) return;
+  state.warLedger.entries.forEach((entry) => {
+    (entry.activeFronts || []).forEach((f) => {
+      if (f?.id === frontId && f.endAbs != null) {
+        f.endAbs += days;
+      }
+    });
+  });
 }
 
 /**
@@ -518,6 +538,7 @@ function maybeStartFront(entry, absDay, duration) {
     baseScore,
     usedKinds: [],
     requestAttempted: false,
+    truceRequested: false,
   };
   if (!entry.activeFronts) entry.activeFronts = [];
   entry.activeFronts.push(front);
@@ -598,7 +619,15 @@ function resolveFront(entry, front, attackerWins) {
   }
   pushLog("攻防決着", `${setName} ${setPos} が ${winnerName} に占領されました`, "-");
   if (state?.quests?.active) {
-    const warTypes = new Set(["war_defend_raid", "war_attack_raid", "war_skirmish", "war_supply", "war_escort", "war_blockade"]);
+    const warTypes = new Set([
+      "war_defend_raid",
+      "war_attack_raid",
+      "war_skirmish",
+      "war_supply",
+      "war_escort",
+      "war_blockade",
+      "war_truce",
+    ]);
     state.quests.active = state.quests.active.filter(
       (q) => !(warTypes.has(q.type) && q.frontSettlementId === front.settlementId)
     );
@@ -611,7 +640,15 @@ function endWar(entry) {
   const aName = FACTIONS.find((f) => f.id === a)?.name || a;
   const bName = FACTIONS.find((f) => f.id === b)?.name || b;
   // warLedger から削除し、関係を中立へ戻す
-  const warTypes = new Set(["war_defend_raid", "war_attack_raid", "war_skirmish", "war_supply", "war_escort", "war_blockade"]);
+  const warTypes = new Set([
+    "war_defend_raid",
+    "war_attack_raid",
+    "war_skirmish",
+    "war_supply",
+    "war_escort",
+    "war_blockade",
+    "war_truce",
+  ]);
   const frontSettlementIds = (entry.activeFronts || []).map((f) => f?.settlementId).filter(Boolean);
   if (state?.quests?.active && warTypes.size) {
     state.quests.active = state.quests.active.filter((q) => {
@@ -724,6 +761,48 @@ function queueFrontActionRequest(entry, front) {
   return true;
 }
 
+function queueTruceRequest(entry, front, absDay) {
+  const pf = getPlayerFactionId();
+  if (!pf || pf === "player") return false;
+  if (front.defender !== pf) return false;
+  if (front.truceRequested) return false;
+  const duration = Math.max(1, (front.endAbs || absDay) - (front.startAbs || absDay));
+  const elapsed = absDay - (front.startAbs || absDay);
+  if (elapsed < duration / 2) return false;
+  const orientedScore = front.attacker === entry.factions[0] ? entry.score : -entry.score;
+  const base = front.baseScore ?? 0;
+  const local = front.localScore || 0;
+  const delta = orientedScore + local - base;
+  const label = warScoreLabel(delta);
+  if (label !== "losing") return false;
+  front.truceRequested = true;
+  const set = settlements.find((s) => s.id === front.settlementId);
+  const setName = set?.name || "拠点";
+  const setPos = `(${(set?.coords?.x ?? 0) + 1}, ${(set?.coords?.y ?? 0) + 1})`;
+  const costFunds = 500;
+  const extendDays = Math.max(3, Math.floor(duration * 0.15));
+  const scoreDelta = 6;
+  enqueueEvent({
+    title: "停戦工作の打診",
+    body: `${setName} ${setPos} で停戦工作の相談が来ています。資金${costFunds}を支払い時間を稼ぎますか？`,
+    actions: [
+      {
+        id: "truce-accept",
+        label: "受ける",
+        type: "truce_request_accept",
+        payload: { frontId: front.id, settlementId: front.settlementId, costFunds, extendDays, scoreDelta },
+      },
+      {
+        id: "truce-ignore",
+        label: "断る",
+        type: "truce_request_ignore",
+        payload: { frontId: front.id, settlementId: front.settlementId },
+      },
+    ],
+  });
+  return true;
+}
+
 /**
  * 戦況を日次で確認し、劣勢なら兵站要請イベントを積む。
  * 7日間は再送しないクールダウンでスパムを抑止する。
@@ -759,6 +838,7 @@ export function tickDailyWar(absDay) {
     (entry.activeFronts || []).forEach((front) => {
       if (!front || front.resolved) return;
       queueFrontActionRequest(entry, front);
+      queueTruceRequest(entry, front, absDay);
     });
 
     // 劣勢時の兵站要請

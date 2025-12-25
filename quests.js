@@ -11,6 +11,8 @@ import {
   getWarScoreLabel,
   getPlayerFactionId,
   adjustNobleFavor,
+  getFrontById,
+  extendFrontDuration,
 } from "./faction.js";
 import { TROOP_STATS } from "./troops.js";
 import {
@@ -52,6 +54,7 @@ const QUEST_TYPES = {
   WAR_SUPPLY: "war_supply",
   WAR_ESCORT: "war_escort",
   WAR_BLOCKADE: "war_blockade",
+  WAR_TRUCE: "war_truce",
 };
 
 /**
@@ -841,7 +844,7 @@ function genNobleHuntQuest(settlement, noble) {
  * @param {object} settlement
  * @param {object} front
  * @param {"defend"|"attack"} role
- * @param {"defendRaid"|"attackRaid"|"skirmish"|"supplyFood"|"escort"|"blockade"} kind
+ * @param {"defendRaid"|"attackRaid"|"skirmish"|"supplyFood"|"escort"|"blockade"|"truce"} kind
  * @returns {object|null}
  */
 export function genWarFrontQuest(settlement, front, role, kind) {
@@ -850,6 +853,7 @@ export function genWarFrontQuest(settlement, front, role, kind) {
   const playerFactionId = role === "defend" ? front.defender : front.attacker;
   const now = absDay(state);
   const deadlineAbs = Math.min(front.endAbs || now + 90, now + 90);
+  const duration = Math.max(1, (front.endAbs || now) - (front.startAbs || now));
   const common = {
     id: nextNobleId(),
     frontSettlementId: settlement.id,
@@ -871,6 +875,22 @@ export function genWarFrontQuest(settlement, front, role, kind) {
       strength: "elite",
       estimatedTotal,
       desc: `${settlement.name} 周辺で敵の補給路を断つ。`,
+    };
+  }
+  if (kind === "truce") {
+    if (role !== "defend") return null;
+    const costFunds = 500;
+    const extendDays = Math.max(3, Math.floor(duration * 0.15));
+    const scoreDelta = 6;
+    return {
+      ...common,
+      type: QUEST_TYPES.WAR_TRUCE,
+      title: "停戦工作",
+      originId: settlement.id,
+      costFunds,
+      extendDays,
+      scoreDelta,
+      desc: `${settlement.name} で停戦工作を行う。資金${costFunds}を支払い、時間を稼ぐ。`,
     };
   }
   if (kind === "skirmish") {
@@ -957,10 +977,10 @@ function hasActiveOracle() {
  * @param {object} settlement
  * @param {object} front
  * @param {"defend"|"attack"} role
- * @param {"defendRaid"|"attackRaid"|"skirmish"|"supplyFood"|"escort"|"blockade"} kind
+ * @param {"defendRaid"|"attackRaid"|"skirmish"|"supplyFood"|"escort"|"blockade"|"truce"} kind
  * @returns {object|null}
  */
-export function addWarFrontQuest(settlement, front, role, kind) {
+export function addWarFrontQuest(settlement, front, role, kind, opts = {}) {
   ensureState();
   if (!settlement || !front) return null;
   const typeMap = {
@@ -970,6 +990,7 @@ export function addWarFrontQuest(settlement, front, role, kind) {
     supplyFood: QUEST_TYPES.WAR_SUPPLY,
     escort: QUEST_TYPES.WAR_ESCORT,
     blockade: QUEST_TYPES.WAR_BLOCKADE,
+    truce: QUEST_TYPES.WAR_TRUCE,
   };
   const tgtType = typeMap[kind];
   if (!tgtType) return null;
@@ -980,6 +1001,11 @@ export function addWarFrontQuest(settlement, front, role, kind) {
   if (!q) return null;
   if (!Array.isArray(front.usedKinds)) front.usedKinds = [];
   front.usedKinds.push(kind);
+  if (opts.costFunds != null) q.costFunds = opts.costFunds;
+  if (opts.extendDays != null) q.extendDays = opts.extendDays;
+  if (opts.scoreDelta != null) q.scoreDelta = opts.scoreDelta;
+  if (opts.frontId) q.frontId = opts.frontId;
+  if (opts.nobleId) q.nobleId = opts.nobleId;
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
   return q;
@@ -995,8 +1021,9 @@ function applyWarFrontScore(q, success) {
     [QUEST_TYPES.WAR_SUPPLY]: 5,
     [QUEST_TYPES.WAR_ESCORT]: 8,
     [QUEST_TYPES.WAR_BLOCKADE]: 18,
+    [QUEST_TYPES.WAR_TRUCE]: 6,
   };
-  const base = deltaMap[q.type] || 0;
+  const base = q.scoreDelta != null ? q.scoreDelta : deltaMap[q.type] || 0;
   const delta = success ? base : base ? -Math.round(base * 2 / 3) : 0;
   if (delta) addFrontScore(pf, q.enemyFactionId, q.frontSettlementId, delta, absDay(state), 0, 0);
 }
@@ -1079,6 +1106,23 @@ export function completeQuest(id) {
     if (!q.picked) return false;
     if (here.id !== q.originId) return false;
     applyWarFrontScore(q, true);
+    state.quests.active.splice(idx, 1);
+    pushLog("護送完了", `${q.title} / 戦況が有利に傾きました`, "-");
+    pushToast("護送完了", `${q.title} を完了しました（戦況が有利に傾きました）`, "good");
+    return true;
+  }
+  if (q.type === QUEST_TYPES.WAR_TRUCE) {
+    if (!here || here.id !== q.originId) return false;
+    if (q.costFunds != null && (state.funds || 0) < q.costFunds) return false;
+    if (q.costFunds != null) state.funds = Math.max(0, (state.funds || 0) - q.costFunds);
+    applyWarFrontScore(q, true);
+    if (q.frontId && q.extendDays) extendFrontDuration(q.frontId, q.extendDays);
+    const set = getSettlementById(q.originId);
+    if (set?.nobleId) adjustNobleFavor(set.nobleId, 2);
+    state.quests.active.splice(idx, 1);
+    pushLog("停戦工作完了", `${q.title} / 戦況が有利に傾きました`, "-");
+    pushToast("停戦工作完了", `${q.title} を完了しました（戦況が有利に傾きました）`, "good");
+    return true;
   }
   if (q.type === QUEST_TYPES.ORACLE_SUPPLY) {
     const ok = (q.items || []).every((it) => (state.supplies?.[it.id] ?? 0) >= it.qty);
@@ -1214,6 +1258,11 @@ export function canCompleteQuest(q) {
   if (q.type === QUEST_TYPES.WAR_SUPPLY) {
     if (!here || here.id !== q.originId) return false;
     return (q.items || []).every((it) => (state.supplies?.[it.id] ?? 0) >= it.qty);
+  }
+  if (q.type === QUEST_TYPES.WAR_TRUCE) {
+    if (!here || here.id !== q.originId) return false;
+    if (q.costFunds != null && (state.funds || 0) < q.costFunds) return false;
+    return true;
   }
   if (q.type === QUEST_TYPES.WAR_ESCORT) {
     if (!q.picked) return false;
