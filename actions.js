@@ -546,6 +546,7 @@ export function triggerWarAction(kind) {
   pushToast("前線行動", `${q.title} を受注しました。`, "info");
   if (typeof document !== "undefined") {
     document.dispatchEvent(new CustomEvent("quests-updated"));
+    document.dispatchEvent(new CustomEvent("map-changed"));
   }
   return true;
 }
@@ -637,7 +638,10 @@ export function handleTravelEventAction(action) {
       if (q) {
         pushLog("前線要請", `${q.title} を受注しました`, "-");
         pushToast("前線要請", `${q.title} を受注しました。`, "info");
-        if (typeof document !== "undefined") document.dispatchEvent(new CustomEvent("quests-updated"));
+        if (typeof document !== "undefined") {
+          document.dispatchEvent(new CustomEvent("quests-updated"));
+          document.dispatchEvent(new CustomEvent("map-changed"));
+        }
       }
       return true;
     }

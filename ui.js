@@ -1370,6 +1370,10 @@ function wireButtons() {
   document.addEventListener("quests-updated", () => {
     renderQuestUI(syncUI);
   });
+  document.addEventListener("map-changed", () => {
+    renderMap();
+    refreshMapInfo();
+  });
 
   document.getElementById("syncBtn")?.addEventListener("click", () => {
     state.ships = Math.max(0, Number(elements.shipsIn?.value) || 0);
