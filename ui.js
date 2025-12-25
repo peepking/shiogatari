@@ -1175,20 +1175,36 @@ function renderNobleQuestModal(noble, settlement, syncUI) {
   };
   body.innerHTML = list
     .map((q) => {
+      const baseDuration =
+        q.type === QUEST_TYPES.NOBLE_SUPPLY || q.type === QUEST_TYPES.NOBLE_SCOUT ? 30 : 60;
       const remain = q.deadlineAbs != null ? Math.max(0, q.deadlineAbs - now) : null;
-      const remainText = remain == null ? "期限なし" : `残り${remain}日`;
+      const remainText = remain == null ? `受注から${baseDuration}日` : `残り${remain}日`;
       const rewardText = q.reward ? `${q.reward}` : "-";
+      const placeLabel =
+        q.type === QUEST_TYPES.NOBLE_SUPPLY
+          ? `${settlement.name}(${(settlement.coords.x || 0) + 1}, ${(settlement.coords.y || 0) + 1})で納品`
+        : q.type === QUEST_TYPES.NOBLE_LOGISTICS
+          ? `兵站納品: (${(settlement.coords.x || 0) + 1}, ${(settlement.coords.y || 0) + 1})`
+          : q.type === QUEST_TYPES.NOBLE_SCOUT
+            ? `偵察: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+            : q.type === QUEST_TYPES.NOBLE_REFUGEE
+              ? `難民受け入れ: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})→${settlement.name}(${(settlement.coords.x || 0) + 1}, ${(settlement.coords.y || 0) + 1})`
+              : q.type === QUEST_TYPES.NOBLE_SECURITY
+                  ? `治安回復 @${settlement.name}(${(settlement.coords.x || 0) + 1}, ${(settlement.coords.y || 0) + 1})`
+                  : q.type === QUEST_TYPES.NOBLE_HUNT
+                    ? `敵軍討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                    : settlement.name;
       return `
         <tr>
           <td class="ta-left">
-            <div class="tiny">${typeLabel(q)} / ${settlement.name}</div>
+            <div class="tiny">${typeLabel(q)} / ${placeLabel}</div>
             <b>${q.title}</b>
             <div class="tiny">${q.desc || ""}</div>
           </td>
           <td class="ta-center">${rewardText}</td>
           <td class="ta-center">${remainText}</td>
           <td class="ta-center">
-            <button class="btn good quest-accept noble-accept" data-id="${q.id}">受注</button>
+            <button class="btn primary quest-accept noble-accept" data-id="${q.id}">受注</button>
           </td>
         </tr>
       `;

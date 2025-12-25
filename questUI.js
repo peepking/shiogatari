@@ -80,17 +80,17 @@ export function renderQuestUI(syncUI) {
             : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
               ? `討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
               : q.type === QUEST_TYPES.NOBLE_SUPPLY
-                ? `${origin?.name ?? "不明"}で納品`
+                ? `${origin?.name ?? "不明"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})で納品`
                 : q.type === QUEST_TYPES.NOBLE_LOGISTICS
-                  ? `${origin?.name ?? "不明"}で兵站納品`
+                  ? `兵站納品: (${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})`
                   : q.type === QUEST_TYPES.NOBLE_SCOUT
                     ? `偵察: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
                     : q.type === QUEST_TYPES.NOBLE_REFUGEE
-                      ? `難民受け入れ: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})→${origin?.name ?? "拠点"}`
+                      ? `難民受け入れ: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})→${origin?.name ?? "拠点"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})`
                       : q.type === QUEST_TYPES.NOBLE_SECURITY
-                        ? `治安回復: 指定2戦`
-                        : q.type === QUEST_TYPES.NOBLE_HUNT
-                          ? `敵軍討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
+                        ? `治安回復: 指定2戦 @${origin?.name ?? "拠点"}(${(origin?.coords?.x ?? 0) + 1}, ${(origin?.coords?.y ?? 0) + 1})`
+                      : q.type === QUEST_TYPES.NOBLE_HUNT
+                        ? `敵軍討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
                       : "";
       const canFinish = remain == null ? canCompleteQuest(q) : remain >= 0 && canCompleteQuest(q);
       const rewardExtra =
@@ -143,7 +143,7 @@ export function renderQuestUI(syncUI) {
 }
 
 /**
- * 依頼受注モーダルを描画する。
+ * 依頼モーダルを描画する。
  * @param {object} settlement
  * @param {Function} syncUI
  */

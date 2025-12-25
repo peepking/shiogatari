@@ -638,14 +638,14 @@ function genNobleSupplyQuest(settlement, noble) {
   return {
     id: nextNobleId(),
     type: QUEST_TYPES.NOBLE_SUPPLY,
-    title: `加工品調達 (${settlement.name})`,
+    title: `加工品調達`,
     items,
     reward: totalPrice * 2 + 100,
     rewardFame,
     nobleId: noble.id,
     factionId: settlement.factionId,
     originId: settlement.id,
-    deadlineAbs: absDay(state) + 30,
+    deadlineAbs: null,
     acceptedAbs: null,
     desc: `加工品を2種納品せよ（各${items.map((i) => `${i.name}x${i.qty}`).join(" / ")}）。報酬: 資金${totalPrice * 2 + 100}`,
   };
@@ -666,14 +666,14 @@ function genNobleScoutQuest(settlement, noble) {
   return {
     id: nextNobleId(),
     type: QUEST_TYPES.NOBLE_SCOUT,
-    title: `指定地点偵察: (${target.x + 1}, ${target.y + 1})`,
+    title: `指定地点偵察`,
     target,
     reward: dist * 100,
     rewardFame,
     nobleId: noble.id,
     factionId: settlement.factionId,
     originId: settlement.id,
-    deadlineAbs: absDay(state) + 30,
+    deadlineAbs: null,
     acceptedAbs: null,
     desc: `指定座標 (${target.x + 1}, ${target.y + 1}) まで移動し偵察せよ。報酬: 資金${dist * 100}`,
   };
@@ -691,23 +691,26 @@ function genNobleSecurityQuest(settlement, noble) {
   avoid.push(first);
   const second = randomHuntTarget(settlement.coords, 2, 5, avoid);
   if (!first || !second) return null;
+  const firstEstimate = predictEnemyTotal("normal");
+  const secondEstimate = predictEnemyTotal("elite");
   return {
     id: nextNobleId(),
     type: QUEST_TYPES.NOBLE_SECURITY,
-    title: `治安回復 (${settlement.name})`,
+    title: `治安回復`,
     fights: [
-      { target: first, strength: "normal", done: false },
-      { target: second, strength: "elite", done: false },
+      { target: first, strength: "normal", done: false, estimatedTotal: firstEstimate },
+      { target: second, strength: "elite", done: false, estimatedTotal: secondEstimate },
     ],
     fightTotals: [],
+    estimatedTotal: firstEstimate + secondEstimate,
     reward: 0,
     rewardFame: 0,
     nobleId: noble.id,
     factionId: settlement.factionId,
     originId: settlement.id,
-    deadlineAbs: absDay(state) + 60,
+    deadlineAbs: null,
     acceptedAbs: null,
-    desc: `指定2地点で敵を撃破せよ（通常/強編成各1、期限60日）。`,
+    desc: `指定2地点で敵を撃破せよ（通常/強編成 各）。推定${firstEstimate}人 / ${secondEstimate}人程度`,
   };
 }
 
@@ -726,7 +729,7 @@ function genNobleRefugeeQuest(settlement, noble) {
   return {
     id: nextNobleId(),
     type: QUEST_TYPES.NOBLE_REFUGEE,
-    title: `難民受け入れ (${settlement.name})`,
+    title: `難民受け入れ`,
     target,
     reward: dist * 200,
     rewardFame,
@@ -734,7 +737,7 @@ function genNobleRefugeeQuest(settlement, noble) {
     factionId: settlement.factionId,
     originId: settlement.id,
     picked: false,
-    deadlineAbs: absDay(state) + 60,
+    deadlineAbs: null,
     acceptedAbs: null,
     desc: `難民を収容し、${settlement.name}まで護送せよ。`,
   };
@@ -753,6 +756,7 @@ function genNobleLogisticsQuest(settlement, noble) {
   const demand = settlement.demand || {};
   const pick = pickMaxDemand(demand, SUPPLY_TYPES.raw) || pickMaxDemand(demand, SUPPLY_TYPES.processed);
   if (!pick) return null;
+  const pickName = SUPPLY_ITEMS.find((i) => i.id === pick.id)?.name || pick.id;
   const qty = Math.max(3, rollDice(4, 1));
   const foodQty = rollDice(5, 4);
   const price =
@@ -763,7 +767,7 @@ function genNobleLogisticsQuest(settlement, noble) {
   return {
     id: nextNobleId(),
     type: QUEST_TYPES.NOBLE_LOGISTICS,
-    title: `兵站調達 (${settlement.name})`,
+    title: `兵站調達`,
     items: [
       { id: "food", qty: foodQty },
       { id: pick.id, qty },
@@ -774,9 +778,9 @@ function genNobleLogisticsQuest(settlement, noble) {
     factionId: settlement.factionId,
     targetFactionId: opponent,
     originId: settlement.id,
-    deadlineAbs: absDay(state) + 60,
+    deadlineAbs: null,
     acceptedAbs: null,
-    desc: `食料${foodQty}と物資(${pick.id})x${qty}を納品せよ。報酬: 資金${totalPrice * 2 + 500}`,
+    desc: `食料${foodQty}と物資${pickName}x${qty}を納品せよ。報酬: 資金${totalPrice * 2 + 500}`,
   };
 }
 
@@ -793,20 +797,22 @@ function genNobleHuntQuest(settlement, noble) {
   const avoid = usedTargets();
   const target = randomHuntTarget(settlement.coords, 3, 7, avoid);
   if (!target) return null;
+  const estimatedTotal = predictEnemyTotal("elite");
   return {
     id: nextNobleId(),
     type: QUEST_TYPES.NOBLE_HUNT,
-    title: `敵軍討伐 (${settlement.name})`,
+    title: `敵軍討伐`,
     target,
     enemyFactionId: opponent,
+    estimatedTotal,
     reward: 0,
     rewardFame: 0,
     nobleId: noble.id,
     factionId: settlement.factionId,
     originId: settlement.id,
-    deadlineAbs: absDay(state) + 60,
+    deadlineAbs: null,
     acceptedAbs: null,
-    desc: `指定座標 (${target.x + 1}, ${target.y + 1}) で敵軍を討伐せよ。`,
+    desc: `指定座標 (${target.x + 1}, ${target.y + 1}) で敵軍を討伐せよ（推定${estimatedTotal}人程度）。`,
   };
 }
 
@@ -1303,14 +1309,17 @@ export function questTickDay(days = 1) {
       expired.forEach((q) => pushToast("依頼失敗", `${q.title} の期限切れ`, "bad"));
     }
     // 依頼は毎季節の1日で全拠点ぶん一括更新する。
-    if (state.day === 1) {
-      state.quests.availableBySettlement = {};
-      state.quests.lastSeasonBySettlement = {};
-      settlements.forEach((s) => generateSeasonQuestsForSettlement(s));
-      pushToast("季節が変わりました", `新しい依頼が各拠点に追加されました`, "warn");
-      // 神託の受領リセットは lastOracleSeason で管理する。
-    }
+  if (state.day === 1) {
+    state.quests.availableBySettlement = {};
+    state.quests.lastSeasonBySettlement = {};
+    settlements.forEach((s) => generateSeasonQuestsForSettlement(s));
+    pushToast("季節が変わりました", `新しい依頼が各拠点に追加されました`, "warn");
+    // 神託の受領リセットは lastOracleSeason で管理する。
+    state.nobleQuests = state.nobleQuests || { availableByNoble: {}, nextId: 1, lastSeasonByNoble: {} };
+    state.nobleQuests.availableByNoble = {};
+    state.nobleQuests.lastSeasonByNoble = {};
   }
+}
 }
 
 export { QUEST_TYPES };

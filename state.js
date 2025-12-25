@@ -54,6 +54,7 @@ const createState = () => ({
     seeded: false,
     lastOracleSeason: null,
   },
+  nobleQuests: { availableByNoble: {}, nextId: 1, lastSeasonByNoble: {} },
   lastPrayerSeason: null,
   factionAttitudes: Object.fromEntries(
     FACTIONS.map((f) => [f.id, f.attitude || "neutral"])
@@ -108,6 +109,7 @@ export function resetState() {
   Object.assign(state, createState());
   state.factionState = initFactionState();
   state.warLedger = { entries: [] };
+  state.nobleQuests = { availableByNoble: {}, nextId: 1, lastSeasonByNoble: {} };
   Object.assign(pending, createPending());
 }
 
