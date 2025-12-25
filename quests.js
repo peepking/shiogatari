@@ -1026,6 +1026,7 @@ function applyWarFrontScore(q, success) {
   const base = q.scoreDelta != null ? q.scoreDelta : deltaMap[q.type] || 0;
   const delta = success ? base : base ? -Math.round(base * 2 / 3) : 0;
   if (delta) addFrontScore(pf, q.enemyFactionId, q.frontSettlementId, delta, absDay(state), 0, 0);
+  if (delta) state.fame = Math.max(0, (state.fame || 0) + (success ? base : -Math.abs(base)));
 }
 
 /**
@@ -1455,6 +1456,7 @@ export function completeWarBattleQuest(id, success, enemyTotal, fightIdx = null)
   );
   if (idx === -1) return false;
   const q = state.quests.active[idx];
+  const fameDeltaBase = q.scoreDelta != null ? Math.abs(q.scoreDelta) : 0;
   if (q.type === QUEST_TYPES.WAR_BLOCKADE && Array.isArray(q.fights)) {
     if (!success) {
       applyWarFrontScore(q, false);
@@ -1472,18 +1474,24 @@ export function completeWarBattleQuest(id, success, enemyTotal, fightIdx = null)
     }
     applyWarFrontScore(q, true);
     state.quests.active.splice(idx, 1);
-    pushLog("行動達成", `${q.title} / 補給線を遮断 / 戦況が有利に傾きました`, "-");
-    pushToast("行動達成", `${q.title} を完了しました（戦況が有利に傾きました）`, "good");
+    const fameGain = fameDeltaBase || Math.abs(q.fights?.[0]?.estimatedTotal || 0);
+    if (fameGain) state.fame = Math.max(0, (state.fame || 0) + fameGain);
+    pushLog("行動達成", `${q.title} / 補給線を遮断 / 戦況が有利に傾きました${fameGain ? ` / 名声+${fameGain}` : ""}`, "-");
+    pushToast("行動達成", `${q.title} を完了しました（戦況が有利に傾きました${fameGain ? ` / 名声+${fameGain}` : ""}）`, "good");
     return true;
   }
   if (success) {
     applyWarFrontScore(q, true);
-    pushLog("行動達成", `${q.title} / 戦闘勝利 / 戦況が少し有利に傾きました`, "-");
-    pushToast("行動達成", `${q.title} を完了しました（戦況が少し有利に傾きました）`, "good");
+    const fameGain = fameDeltaBase || Math.abs(q.estimatedTotal || 0);
+    if (fameGain) state.fame = Math.max(0, (state.fame || 0) + fameGain);
+    pushLog("行動達成", `${q.title} / 戦闘勝利 / 戦況が少し有利に傾きました${fameGain ? ` / 名声+${fameGain}` : ""}`, "-");
+    pushToast("行動達成", `${q.title} を完了しました（戦況が少し有利に傾きました${fameGain ? ` / 名声+${fameGain}` : ""}）`, "good");
   } else {
     applyWarFrontScore(q, false);
-    pushLog("行動失敗", `${q.title} / 戦闘に敗北 / 戦況が不利に傾きました`, "-");
-    pushToast("行動失敗", `${q.title} / 戦闘に敗北（戦況が不利に傾きました）`, "bad");
+    const fameLoss = fameDeltaBase || Math.abs(q.estimatedTotal || 0);
+    if (fameLoss) state.fame = Math.max(0, (state.fame || 0) - fameLoss);
+    pushLog("行動失敗", `${q.title} / 戦闘に敗北 / 戦況が不利に傾きました${fameLoss ? ` / 名声-${fameLoss}` : ""}`, "-");
+    pushToast("行動失敗", `${q.title} / 戦闘に敗北（戦況が不利に傾きました${fameLoss ? ` / 名声-${fameLoss}` : ""}）`, "bad");
   }
   state.quests.active.splice(idx, 1);
   return true;

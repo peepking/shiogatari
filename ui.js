@@ -2,7 +2,16 @@ import { state, resetState } from "./state.js";
 import { MODE_LABEL, BATTLE_RESULT, BATTLE_RESULT_LABEL, PLACE, NONE_LABEL } from "./constants.js";
 import { nowStr, formatGameTime, clamp } from "./util.js";
 import { elements, setOutput, pushLog, pushToast } from "./dom.js";
-import { renderMap, wireMapHover, getLocationStatus, getTerrainAt, ensureNobleHomes, settlements, resetSettlementSupport } from "./map.js";
+import {
+  renderMap,
+  wireMapHover,
+  getLocationStatus,
+  getTerrainAt,
+  ensureNobleHomes,
+  settlements,
+  resetSettlementSupport,
+  refreshMapInfo,
+} from "./map.js";
 import {
   formatTroopDisplay,
   renderTroopModal,
@@ -780,10 +789,13 @@ function processBattleOutcome(resultCode, meta) {
       }
     }
     // 戦況スコア反映（敵勢力ID必須化）
-    const delta = isWin ? 8 : resultCode === BATTLE_RESULT.LOSE ? -6 : 0;
-    if (delta !== 0) {
-      addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
+    let delta = isWin ? 8 : resultCode === BATTLE_RESULT.LOSE ? -6 : 0;
+    if (!questId && !questType && enemyFactionId !== "pirates") {
+      delta = isWin ? 3 : resultCode === BATTLE_RESULT.LOSE ? -2 : 0;
+      if (delta > 0) summary.push("戦況がわずかに有利に傾いた");
+      if (delta < 0) summary.push("戦況がわずかに不利に傾いた");
     }
+    if (delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
 
     const body = summary.join("\n");
     setOutput("戦後処理", body, [
@@ -1369,6 +1381,7 @@ function wireButtons() {
   });
   document.addEventListener("quests-updated", () => {
     renderQuestUI(syncUI);
+    syncUI?.();
   });
   document.addEventListener("map-changed", () => {
     renderMap();

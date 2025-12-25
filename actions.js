@@ -56,6 +56,26 @@ const TRAITOR_EVENT_RATE = 0.02;
 let travelSync = null;
 const travelEventTags = new Set(["merchant_attack", "merchant_rescue_help", "merchant_rescue_raid", "smuggle_raid", "refugee_raid", "checkpoint_force", "omen_attack", "wreck_attack"]);
 
+function pickFrontEncounter(pos) {
+  const pf = getPlayerFactionId();
+  if (!pf || pf === "player" || !state.warLedger?.entries) return null;
+  let best = null;
+  state.warLedger.entries.forEach((entry) => {
+    if (!(entry.factions || []).includes(pf)) return;
+    (entry.activeFronts || []).forEach((front) => {
+      if (!front || front.resolved) return;
+      const set = settlements.find((s) => s.id === front.settlementId);
+      if (!set?.coords) return;
+      const d = manhattan(set.coords, pos);
+      if (d <= 3 && (!best || d < best.d)) {
+        const enemy = front.attacker === pf ? front.defender : front.attacker;
+        best = { enemyFactionId: enemy, frontId: front.id, d };
+      }
+    });
+  });
+  return best;
+}
+
 /** エンカウント進捗と閾値をリセットする。 */
 export function resetEncounterMeter() {
   state.encounterProgress = 0;
@@ -171,7 +191,8 @@ function pickEncounterFaction(pos, terrain) {
  */
 function triggerEncounter(syncUI) {
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
-  const enemyFactionId = pickEncounterFaction(state.position, terrain);
+  const frontHint = pickFrontEncounter(state.position);
+  const enemyFactionId = frontHint?.enemyFactionId || pickEncounterFaction(state.position, terrain);
   const { formation, total, strength } = buildEnemyFormation(null, enemyFactionId);
   state.pendingEncounter = {
     active: true,
@@ -180,12 +201,14 @@ function triggerEncounter(syncUI) {
     strength,
     terrain,
     enemyFactionId,
+    frontId: frontHint?.frontId || null,
   };
   state.modeLabel = MODE_LABEL.PREP;
   resetEncounterMeter();
+  const enemyName = FACTIONS.find((f) => f.id === enemyFactionId)?.name || "敵勢力";
   setOutput(
     "敵襲",
-    `外洋海賊と遭遇しました（推定${total}人 / ${strength === "elite" ? "強編成" : "通常編成"}）。行動を選んでください。`,
+    `${enemyName} と遭遇しました（推定${total}人 / ${strength === "elite" ? "強編成" : "通常編成"}）。行動を選んでください。`,
     [
       { text: "戦闘準備", kind: "warn" },
       { text: "行動選択", kind: "warn" },
@@ -193,7 +216,7 @@ function triggerEncounter(syncUI) {
   );
   pushLog(
     "敵襲",
-    `外洋海賊と遭遇（推定${total}人 / ${strength === "elite" ? "強編成" : "通常編成"}）。`,
+    `${enemyName} と遭遇（推定${total}人 / ${strength === "elite" ? "強編成" : "通常編成"}）。`,
     state.lastRoll ?? "-"
   );
   syncUI?.();
