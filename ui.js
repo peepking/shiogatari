@@ -11,6 +11,7 @@ import {
   settlements,
   resetSettlementSupport,
   refreshMapInfo,
+  resetWorld,
   nobleHome,
 } from "./map.js";
 import {
@@ -1464,7 +1465,10 @@ function wireButtons() {
   document.getElementById("resetBtn")?.addEventListener("click", () => {
     if (!confirm("状態とログをリセットしますか？")) return;
     resetState();
+    resetWorld();
     resetSettlementSupport();
+    ensureFactionState();
+    seedWarDefaults();
     ensureNobleHomes();
     seedInitialQuests();
     ensureSeasonalQuests(getCurrentSettlement());

@@ -57,6 +57,7 @@ const settlementNames = {
 };
 
 const goodsPool = ["食料", "木材", "石材", "鉄", "繊維", "塩", "織物", "酒", "武具", "香辛料", "なめし革"];
+let initialWorldSnapshot = null;
 
 /** @type {Array} 生成済み拠点の一覧 */
 export const settlements = [];
@@ -321,6 +322,9 @@ const goods = [
   }
   lastDemandSeason = { year: state.year, season: state.season };
 })();
+
+// ワールド初期状態を保存（リセット用）
+initialWorldSnapshot = snapshotWorld();
 
 /**
  * 勢力内で均等に貴族を拠点へ割り振る（拠点数 < 貴族数の場合は再利用）。
@@ -877,6 +881,19 @@ export function restoreWorld(snapshot) {
     console.error("restoreWorld failed", e);
     return false;
   }
+}
+
+/**
+ * ワールドを初期スナップショットへリセットする。
+ * @returns {boolean} リセット成功ならtrue
+ */
+export function resetWorld() {
+  if (!initialWorldSnapshot) return false;
+  const ok = restoreWorld(initialWorldSnapshot);
+  if (ok) {
+    lastDemandSeason = { year: state.year, season: state.season };
+  }
+  return ok;
 }
 
 /**
