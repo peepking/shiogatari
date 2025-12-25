@@ -19,6 +19,9 @@ export function enqueueEvent(evt) {
     actions: normalizeActions(evt?.actions, id),
   };
   state.eventQueue.push(normalized);
+  if (typeof document !== "undefined") {
+    document.dispatchEvent(new CustomEvent("auto-move-stop"));
+  }
   showNextEvent();
 }
 
