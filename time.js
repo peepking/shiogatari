@@ -100,7 +100,7 @@ function applyPeriodicFood() {
   if (deficit > 0) {
     const unfed = deficit * 4;
     lossCount = Math.floor(unfed * 0.5);
-    lossCount = Math.min(lossCount, totalTroops()); // safety cap
+    lossCount = Math.min(lossCount, totalTroops()); // 安全上の上限を設ける
     applyTroopLosses(buildLossesMap(lossCount));
   }
 

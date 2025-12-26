@@ -1,7 +1,7 @@
 import { state, resetState } from "./state.js";
 import { MODE_LABEL, BATTLE_RESULT, BATTLE_RESULT_LABEL, PLACE, NONE_LABEL } from "./constants.js";
 import { nowStr, formatGameTime, clamp } from "./util.js";
-import { elements, setOutput, pushLog, pushToast } from "./dom.js";
+import { elements, setOutput, pushLog, pushToast, setInlineMessage } from "./dom.js";
 import {
   renderMap,
   wireMapHover,
@@ -300,22 +300,6 @@ function handleMoveResult(res, syncUI) {
     default:
       return !!res.ok;
   }
-}
-
-/**
- * インラインメッセージ表示を更新する。
- * @param {HTMLElement|null} el
- * @param {string} msg
- */
-function setInlineMessage(el, msg) {
-  if (!el) return;
-  if (!msg) {
-    el.hidden = true;
-    el.textContent = "";
-    return;
-  }
-  el.textContent = msg;
-  el.hidden = false;
 }
 
 /**
@@ -1532,213 +1516,16 @@ function renderNobleQuestModal(noble, settlement, syncUI) {
  * UIボタンのイベントを設定する。
  */
 function wireButtons() {
-  const openManualModal = () => openModal(elements.manualModal);
-  elements.manualModalBtn?.addEventListener("click", openManualModal);
-  bindModal(elements.manualModal, elements.manualModalClose);
-
-  const openHelpModal = () => openModal(elements.helpModal);
-  const openLoreModal = () => openModal(elements.loreModal);
-  const openEndingsModal = () => openModal(elements.endingsModal);
-  bindModal(elements.helpModal, elements.helpModalClose);
-  bindModal(elements.loreModal, elements.loreModalClose);
-  bindModal(elements.endingsModal, elements.endingsModalClose);
-  bindModal(elements.battleResultModal, elements.battleResultClose);
-  bindModal(elements.bribeModal, elements.bribeModalClose);
-  bindModal(elements.nobleQuestModal, elements.nobleQuestModalClose);
-
-  document.getElementById("modeBattleAlert")?.addEventListener("click", () => {
-    state.modeLabel = MODE_LABEL.ALERT;
-    syncUI();
-  });
-  document.getElementById("modeBattle")?.addEventListener("click", () => {
-    state.modeLabel = MODE_LABEL.BATTLE;
-    syncUI();
-  });
-  elements.modeWaitBtn?.addEventListener("click", () => {
-    waitOneDay(elements, clearActionMessage, syncUI);
-  });
-  elements.modePrayBtn?.addEventListener("click", () => {
-    performPrayer();
-  });
-  elements.enterVillageBtn?.addEventListener("click", () => {
-    attemptEnter("village", clearActionMessage, syncUI);
-  });
-  elements.enterTownBtn?.addEventListener("click", () => {
-    attemptEnter("town", clearActionMessage, syncUI);
-  });
-  elements.exitVillageBtn?.addEventListener("click", () => {
-    attemptExit("village", elements, clearActionMessage, setTradeError, syncUI);
-  });
-  elements.exitTownBtn?.addEventListener("click", () => {
-    attemptExit("town", elements, clearActionMessage, setTradeError, syncUI);
-  });
-  elements.audienceBtn?.addEventListener("click", enterAudience);
-  elements.audienceExitBtn?.addEventListener("click", exitAudience);
-  elements.audienceBribeBtn?.addEventListener("click", openBribeModal);
-  elements.bribeConfirm?.addEventListener("click", submitBribe);
-  elements.bribeCancel?.addEventListener("click", () => closeModal(elements.bribeModal));
-  elements.audienceHonorBtn?.addEventListener("click", acceptHonorHere);
-  elements.audienceRequestBtn?.addEventListener("click", requestNobleQuest);
-  elements.audienceResignBtn?.addEventListener("click", resignHonorHere);
-  elements.warDefendRaidBtn?.addEventListener("click", () => triggerWarAction("defendRaid"));
-  elements.warAttackRaidBtn?.addEventListener("click", () => triggerWarAction("attackRaid"));
-  elements.warSkirmishBtn?.addEventListener("click", () => triggerWarAction("skirmish"));
-  elements.warSupplyFoodBtn?.addEventListener("click", () => triggerWarAction("supplyFood"));
-  elements.warEscortBtn?.addEventListener("click", () => triggerWarAction("escort"));
-  elements.warBlockBtn?.addEventListener("click", () => triggerWarAction("blockade"));
-  document.addEventListener("map-move-request", () => {
-    if (isAudienceMode()) state.modeLabel = MODE_LABEL.NORMAL;
-    const res = moveToSelected(syncUI);
-    handleMoveResult(res, syncUI);
-  });
-  document.addEventListener("map-wait-request", () => {
-    waitOneDay(elements, clearActionMessage, syncUI);
-  });
-  document.addEventListener("map-auto-move-request", (e) => {
-    const tgt = e.detail?.target;
-    if (tgt) startAutoMove(tgt);
-  });
-  document.addEventListener("auto-move-stop", () => {
-    stopAutoMove();
-  });
-  document.addEventListener("quests-updated", () => {
-    renderQuestUI(syncUI);
-    syncUI?.();
-  });
-  document.addEventListener("map-changed", () => {
-    renderMap();
-    refreshMapInfo();
-  });
-
-  document.getElementById("syncBtn")?.addEventListener("click", () => {
-    state.ships = Math.max(0, Number(elements.shipsIn?.value) || 0);
-    state.faith = Math.max(0, Number(elements.faithIn?.value) || 0);
-    state.funds = Math.max(0, Number(elements.fundsIn?.value) || 0);
-    state.fame = Math.max(0, Number(elements.fameIn?.value) || 0);
-    syncUI();
-    const troopDisplay = formatTroopDisplay();
-    const supplyDisplay = formatSupplyDisplay();
-    pushLog(
-      "手動更新",
-      `従船=${state.ships} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame}`,
-      state.lastRoll ?? "-"
-    );
-  });
-
-  document.getElementById("helpBtn")?.addEventListener("click", () => {
-    openHelpModal();
-  });
-  document.getElementById("loreBtn")?.addEventListener("click", () => {
-    openLoreModal();
-  });
-  document.getElementById("endingsBtn")?.addEventListener("click", () => {
-    openEndingsModal();
-  });
-
-  document.getElementById("clearLog")?.addEventListener("click", () => {
-    if (!confirm("ログを消去しますか？")) return;
-    if (elements.logEl) elements.logEl.innerHTML = "";
-  });
-
-  document.getElementById("resetBtn")?.addEventListener("click", () => {
-    if (!confirm("状態とログをリセットしますか？")) return;
-    resetAndSeedAll();
-    if (elements.logEl) elements.logEl.innerHTML = "";
-    setOutput("次の操作", "状況を選んで、1D6を振ってください", [
-      { text: "-", kind: "" },
-      { text: "-", kind: "" },
-    ]);
-    syncUI();
-    pushLog("起動", "潮語り航海録を開始。");
-  });
-
-  document.getElementById("logMark")?.addEventListener("click", () => {
-    if (elements.memoBox) elements.memoBox.hidden = false;
-    elements.memo?.focus();
-  });
-  document.getElementById("cancelMemo")?.addEventListener("click", () => {
-    if (elements.memoBox) elements.memoBox.hidden = true;
-    if (elements.memo) elements.memo.value = "";
-  });
-  document.getElementById("saveMemo")?.addEventListener("click", () => {
-    if (!elements.memo) return;
-    const t = elements.memo.value.trim();
-    if (!t) {
-      alert("メモが空です。");
-      return;
-    }
-    pushLog("航海日誌メモ", t, state.lastRoll ?? "-");
-    elements.memo.value = "";
-    if (elements.memoBox) elements.memoBox.hidden = true;
-  });
-
-  document.getElementById("journalBtn")?.addEventListener("click", () => {
-    const ctxText = elements.ctxEl?.selectedOptions?.[0]?.textContent ?? "";
-    const rollText = state.lastRoll == null ? "-" : String(state.lastRoll);
-    const troopDisplay = formatTroopDisplay();
-    const supplyDisplay = formatSupplyDisplay();
-    const base = [
-      "【航海日誌】",
-      `日時：${nowStr()}`,
-      `状況：${ctxText}`,
-      `直近の出目：${rollText}`,
-      `状態：従船=${state.ships} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame} / 沈黙=${state.silence}日`,
-      "",
-      "所感：",
-      "",
-      "次の方針：",
-      "",
-    ].join("\n");
-    if (elements.memoBox) elements.memoBox.hidden = false;
-    if (elements.memo) {
-      elements.memo.value = base;
-      elements.memo.focus();
-    }
-  });
-
-  document.getElementById("exportBtn")?.addEventListener("click", () => {
-    const txt = [...(elements.logEl?.querySelectorAll(".logitem") ?? [])]
-      .reverse()
-      .map((li) => {
-        const what = li.querySelector(".what")?.textContent ?? "";
-        const when = li.querySelector(".when")?.textContent ?? "";
-        const body = li.querySelector(".txt")?.textContent ?? "";
-        return `# ${what}\n${when}\n${body}\n`;
-      })
-      .join("\n");
-
-    const blob = new Blob([txt || "(log empty)"], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "shiogatari-log.txt";
-    a.click();
-    URL.revokeObjectURL(url);
-  });
-
-  document.getElementById("copyBtn")?.addEventListener("click", async () => {
-    const text =
-      state.lastResultText ||
-      `${elements.outTitle?.textContent ?? ""}\n${elements.outText?.textContent ?? ""}`;
-    try {
-      await navigator.clipboard.writeText(text);
-      pushLog("コピー", "直近の結果をクリップボードにコピーしました", state.lastRoll ?? "-");
-    } catch {
-      alert("コピーに失敗しました。ブラウザの許可設定をご確認ください。");
-    }
-  });
-
-  elements.battlePrepFightBtn?.addEventListener("click", startPrepBattle);
-  elements.battlePrepRunBtn?.addEventListener("click", tryRunFromEncounter);
-  elements.battlePrepPrayBtn?.addEventListener("click", tryPrayEscape);
-  elements.battlePrepSurrenderBtn?.addEventListener("click", surrenderBattle);
-  elements.battleResultBack?.addEventListener("click", () => {
-    closeModal(elements.battleResultModal);
-    elements.battleBackBtn?.click();
-  });
-  elements.battleBackBtn?.addEventListener("click", () => {
-    setTimeout(() => syncUI(), 0);
-  });
+  bindBaseModals();
+  bindModeControls();
+  bindAudienceControls();
+  bindWarControls();
+  bindMapShortcuts();
+  bindCoreUtilityButtons();
+  bindMemoButtons();
+  bindJournalButtons();
+  bindExportButtons();
+  bindBattlePrepButtons();
 
   wireFactionPanel();
   wireMapToggle(renderMap);
@@ -1793,6 +1580,258 @@ function wireButtons() {
     syncUI();
   });
   elements.oracleBattleBtn?.addEventListener("click", startOracleBattle);
+}
+
+/**
+ * モーダルをまとめてバインドする。
+ */
+function bindBaseModals() {
+  const openManualModal = () => openModal(elements.manualModal);
+  elements.manualModalBtn?.addEventListener("click", openManualModal);
+  bindModal(elements.manualModal, elements.manualModalClose);
+  bindModal(elements.helpModal, elements.helpModalClose);
+  bindModal(elements.loreModal, elements.loreModalClose);
+  bindModal(elements.endingsModal, elements.endingsModalClose);
+  bindModal(elements.battleResultModal, elements.battleResultClose);
+  bindModal(elements.bribeModal, elements.bribeModalClose);
+  bindModal(elements.nobleQuestModal, elements.nobleQuestModalClose);
+}
+
+/**
+ * モード切替と移動の基本操作をバインドする。
+ */
+function bindModeControls() {
+  document.getElementById("modeBattleAlert")?.addEventListener("click", () => {
+    state.modeLabel = MODE_LABEL.ALERT;
+    syncUI();
+  });
+  document.getElementById("modeBattle")?.addEventListener("click", () => {
+    state.modeLabel = MODE_LABEL.BATTLE;
+    syncUI();
+  });
+  elements.modeWaitBtn?.addEventListener("click", () => {
+    waitOneDay(elements, clearActionMessage, syncUI);
+  });
+  elements.modePrayBtn?.addEventListener("click", () => {
+    performPrayer();
+  });
+  elements.enterVillageBtn?.addEventListener("click", () => {
+    attemptEnter("village", clearActionMessage, syncUI);
+  });
+  elements.enterTownBtn?.addEventListener("click", () => {
+    attemptEnter("town", clearActionMessage, syncUI);
+  });
+  elements.exitVillageBtn?.addEventListener("click", () => {
+    attemptExit("village", elements, clearActionMessage, setTradeError, syncUI);
+  });
+  elements.exitTownBtn?.addEventListener("click", () => {
+    attemptExit("town", elements, clearActionMessage, setTradeError, syncUI);
+  });
+}
+
+/**
+ * 謁見・賄賂系の操作をバインドする。
+ */
+function bindAudienceControls() {
+  const openBribeModal = () => openModal(elements.bribeModal);
+  elements.audienceBtn?.addEventListener("click", enterAudience);
+  elements.audienceExitBtn?.addEventListener("click", exitAudience);
+  elements.audienceBribeBtn?.addEventListener("click", openBribeModal);
+  elements.bribeConfirm?.addEventListener("click", submitBribe);
+  elements.bribeCancel?.addEventListener("click", () => closeModal(elements.bribeModal));
+  elements.audienceHonorBtn?.addEventListener("click", acceptHonorHere);
+  elements.audienceRequestBtn?.addEventListener("click", requestNobleQuest);
+  elements.audienceResignBtn?.addEventListener("click", resignHonorHere);
+}
+
+/**
+ * 戦時行動ボタンをバインドする。
+ */
+function bindWarControls() {
+  elements.warDefendRaidBtn?.addEventListener("click", () => triggerWarAction("defendRaid"));
+  elements.warAttackRaidBtn?.addEventListener("click", () => triggerWarAction("attackRaid"));
+  elements.warSkirmishBtn?.addEventListener("click", () => triggerWarAction("skirmish"));
+  elements.warSupplyFoodBtn?.addEventListener("click", () => triggerWarAction("supplyFood"));
+  elements.warEscortBtn?.addEventListener("click", () => triggerWarAction("escort"));
+  elements.warBlockBtn?.addEventListener("click", () => triggerWarAction("blockade"));
+}
+
+/**
+ * マップからのショートカット操作をバインドする。
+ */
+function bindMapShortcuts() {
+  document.addEventListener("map-move-request", () => {
+    if (isAudienceMode()) state.modeLabel = MODE_LABEL.NORMAL;
+    const res = moveToSelected(syncUI);
+    handleMoveResult(res, syncUI);
+  });
+  document.addEventListener("map-wait-request", () => {
+    waitOneDay(elements, clearActionMessage, syncUI);
+  });
+  document.addEventListener("map-auto-move-request", (e) => {
+    const tgt = e.detail?.target;
+    if (tgt) startAutoMove(tgt);
+  });
+  document.addEventListener("auto-move-stop", () => {
+    stopAutoMove();
+  });
+  document.addEventListener("quests-updated", () => {
+    renderQuestUI(syncUI);
+    syncUI?.();
+  });
+  document.addEventListener("map-changed", () => {
+    renderMap();
+    refreshMapInfo();
+  });
+}
+
+/**
+ * 手動同期やヘルプなどユーティリティ系ボタンをバインドする。
+ */
+function bindCoreUtilityButtons() {
+  document.getElementById("syncBtn")?.addEventListener("click", () => {
+    state.ships = Math.max(0, Number(elements.shipsIn?.value) || 0);
+    state.faith = Math.max(0, Number(elements.faithIn?.value) || 0);
+    state.funds = Math.max(0, Number(elements.fundsIn?.value) || 0);
+    state.fame = Math.max(0, Number(elements.fameIn?.value) || 0);
+    syncUI();
+    const troopDisplay = formatTroopDisplay();
+    const supplyDisplay = formatSupplyDisplay();
+    pushLog(
+      "手動更新",
+      `従船=${state.ships} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame}`,
+      state.lastRoll ?? "-"
+    );
+  });
+
+  document.getElementById("helpBtn")?.addEventListener("click", () => openModal(elements.helpModal));
+  document.getElementById("loreBtn")?.addEventListener("click", () => openModal(elements.loreModal));
+  document.getElementById("endingsBtn")?.addEventListener("click", () => openModal(elements.endingsModal));
+
+  document.getElementById("clearLog")?.addEventListener("click", () => {
+    if (!confirm("ログを消去しますか？")) return;
+    if (elements.logEl) elements.logEl.innerHTML = "";
+  });
+
+  document.getElementById("resetBtn")?.addEventListener("click", () => {
+    if (!confirm("状態とログをリセットしますか？")) return;
+    resetAndSeedAll();
+    if (elements.logEl) elements.logEl.innerHTML = "";
+    setOutput("次の操作", "状況を選んで、1D6を振ってください", [
+      { text: "-", kind: "" },
+      { text: "-", kind: "" },
+    ]);
+    syncUI();
+    pushLog("起動", "潮語り航海録を開始。");
+  });
+}
+
+/**
+ * メモ関連のボタンをバインドする。
+ */
+function bindMemoButtons() {
+  document.getElementById("logMark")?.addEventListener("click", () => {
+    if (elements.memoBox) elements.memoBox.hidden = false;
+    elements.memo?.focus();
+  });
+  document.getElementById("cancelMemo")?.addEventListener("click", () => {
+    if (elements.memoBox) elements.memoBox.hidden = true;
+    if (elements.memo) elements.memo.value = "";
+  });
+  document.getElementById("saveMemo")?.addEventListener("click", () => {
+    if (!elements.memo) return;
+    const t = elements.memo.value.trim();
+    if (!t) {
+      alert("メモが空です。");
+      return;
+    }
+    pushLog("航海日誌メモ", t, state.lastRoll ?? "-");
+    elements.memo.value = "";
+    if (elements.memoBox) elements.memoBox.hidden = true;
+  });
+}
+
+/**
+ * 航海日誌テンプレート生成のボタンをバインドする。
+ */
+function bindJournalButtons() {
+  document.getElementById("journalBtn")?.addEventListener("click", () => {
+    const ctxText = elements.ctxEl?.selectedOptions?.[0]?.textContent ?? "";
+    const rollText = state.lastRoll == null ? "-" : String(state.lastRoll);
+    const troopDisplay = formatTroopDisplay();
+    const supplyDisplay = formatSupplyDisplay();
+    const base = [
+      "【航海日誌】",
+      `日時：${nowStr()}`,
+      `状況：${ctxText}`,
+      `直近の出目：${rollText}`,
+      `状態：従船=${state.ships} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame} / 沈黙=${state.silence}日`,
+      "",
+      "所感：",
+      "",
+      "次の方針：",
+      "",
+    ].join("\n");
+    if (elements.memoBox) elements.memoBox.hidden = false;
+    if (elements.memo) {
+      elements.memo.value = base;
+      elements.memo.focus();
+    }
+  });
+}
+
+/**
+ * ログ出力のエクスポートやコピーをバインドする。
+ */
+function bindExportButtons() {
+  document.getElementById("exportBtn")?.addEventListener("click", () => {
+    const txt = [...(elements.logEl?.querySelectorAll(".logitem") ?? [])]
+      .reverse()
+      .map((li) => {
+        const what = li.querySelector(".what")?.textContent ?? "";
+        const when = li.querySelector(".when")?.textContent ?? "";
+        const body = li.querySelector(".txt")?.textContent ?? "";
+        return `# ${what}\n${when}\n${body}\n`;
+      })
+      .join("\n");
+
+    const blob = new Blob([txt || "(log empty)"], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "shiogatari-log.txt";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById("copyBtn")?.addEventListener("click", async () => {
+    const text =
+      state.lastResultText ||
+      `${elements.outTitle?.textContent ?? ""}\n${elements.outText?.textContent ?? ""}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      pushLog("コピー", "直近の結果をクリップボードにコピーしました", state.lastRoll ?? "-");
+    } catch {
+      alert("コピーに失敗しました。ブラウザの許可設定をご確認ください。");
+    }
+  });
+}
+
+/**
+ * 戦闘準備関連のボタンをバインドする。
+ */
+function bindBattlePrepButtons() {
+  elements.battlePrepFightBtn?.addEventListener("click", startPrepBattle);
+  elements.battlePrepRunBtn?.addEventListener("click", tryRunFromEncounter);
+  elements.battlePrepPrayBtn?.addEventListener("click", tryPrayEscape);
+  elements.battlePrepSurrenderBtn?.addEventListener("click", surrenderBattle);
+  elements.battleResultBack?.addEventListener("click", () => {
+    closeModal(elements.battleResultModal);
+    elements.battleBackBtn?.click();
+  });
+  elements.battleBackBtn?.addEventListener("click", () => {
+    setTimeout(() => syncUI(), 0);
+  });
 }
 
 /**

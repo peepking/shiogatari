@@ -1,4 +1,4 @@
-import { elements, setOutput, pushLog, confirmAction, pushToast } from "./dom.js";
+import { elements, setOutput, pushLog, confirmAction, pushToast, setInlineMessage } from "./dom.js";
 import { state } from "./state.js";
 import { MODE_LABEL } from "./constants.js";
 import { SUPPLY_ITEMS, calcSupplyPrice, calcSupplyCap, totalSupplies } from "./supplies.js";
@@ -20,22 +20,6 @@ const SUPPLY_ICONS = {
   brew: "\u{1F376}",
   leather: "\u{1F45E}",
 };
-
-/**
- * モーダル内のエラーメッセージ表示を更新する。
- * @param {HTMLElement|null} el
- * @param {string} msg
- */
-function setInlineMessage(el, msg) {
-  if (!el) return;
-  if (!msg) {
-    el.hidden = true;
-    el.textContent = "";
-    return;
-  }
-  el.textContent = msg;
-  el.hidden = false;
-}
 
 /**
  * 物資取引モーダルのエラー表示を更新する。

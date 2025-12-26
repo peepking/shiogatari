@@ -1,24 +1,8 @@
-import { elements, setOutput, pushLog } from "./dom.js";
+import { elements, setOutput, pushLog, setInlineMessage } from "./dom.js";
 import { state } from "./state.js";
 import { MODE_LABEL } from "./constants.js";
 import { getCurrentSettlement } from "./actions.js";
 import { TROOP_STATS } from "./troops.js";
-
-/**
- * モーダル内のエラーメッセージ表示を更新する。
- * @param {HTMLElement|null} el
- * @param {string} msg
- */
-function setInlineMessage(el, msg) {
-  if (!el) return;
-  if (!msg) {
-    el.hidden = true;
-    el.textContent = "";
-    return;
-  }
-  el.textContent = msg;
-  el.hidden = false;
-}
 
 /**
  * 雇用モーダルのエラー表示を更新する。

@@ -146,7 +146,7 @@ const battleRoster = {
 const battleStrategy = {
   targetMode: "type", // "type" = 兵種準拠
   kiteMode: "kite", // "kite" | "retreat" | "none"
-  retreatThreshold: 30, // percent
+  retreatThreshold: 30, // 退却判定に使う残HP割合
   chargeMode: "cavalry", // "cavalry" | "all" | "none"
   speed: 1,
 };

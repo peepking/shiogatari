@@ -565,20 +565,19 @@ export function triggerWarAction(kind) {
 }
 
 /**
- * イベントモーダルのアクションを処理する。
+ * 行商人関連の移動イベントを処理する。
  * @param {object} action
- * @returns {boolean} 処理した場合true
+ * @returns {boolean}
  */
-export function handleTravelEventAction(action) {
-  if (!action?.type) return false;
+function handleMerchantAction(action) {
   switch (action.type) {
     case "merchant_trade": {
       const deals = action.payload?.deals || [];
       if (!deals.length) return true;
       state.eventTrade = {
-    source: "merchant",
-    title: "行商人との取引",
-    note: "相場より高めの価格です。",
+        source: "merchant",
+        title: "行商人との取引",
+        note: "相場より高めの価格です。",
         deals: deals.map((d) => ({
           id: d.id,
           name: SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id,
@@ -631,6 +630,18 @@ export function handleTravelEventAction(action) {
     case "merchant_rescue_leave":
     case "merchant_leave":
       return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * 前線依頼や停戦依頼のイベントを処理する。
+ * @param {object} action
+ * @returns {boolean}
+ */
+function handleFrontAction(action) {
+  switch (action.type) {
     case "front_request_accept": {
       const frontId = action.payload?.frontId;
       const settlementId = action.payload?.settlementId;
@@ -688,18 +699,30 @@ export function handleTravelEventAction(action) {
       pushToast("停戦工作", "要請を断りました。", "info");
       return true;
     }
+    default:
+      return false;
+  }
+}
+
+/**
+ * 密輸関連の移動イベントを処理する。
+ * @param {object} action
+ * @returns {boolean}
+ */
+function handleSmuggleAction(action) {
+  switch (action.type) {
     case "smuggle_trade": {
       const ctx = action.payload || {};
       const deals = ctx.deals || [];
       state.eventTrade = {
-    source: "smuggle",
-    title: "密輸船との取引",
-    note: "相場より高めの価格です。",
-    deals: deals.map((d) => ({
-      id: d.id,
-      name: SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id,
-      price: Math.max(1, Math.round((d.cost || 0) / Math.max(1, d.qty || 1))),
-      stock: d.qty || 0,
+        source: "smuggle",
+        title: "密輸船との取引",
+        note: "相場より高めの価格です。",
+        deals: deals.map((d) => ({
+          id: d.id,
+          name: SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id,
+          price: Math.max(1, Math.round((d.cost || 0) / Math.max(1, d.qty || 1))),
+          stock: d.qty || 0,
         })),
         settlementId: ctx.settlementId || null,
         factionId: ctx.factionId || null,
@@ -746,6 +769,18 @@ export function handleTravelEventAction(action) {
       pushLog("密輸船襲撃", "密輸船を襲撃することにしました。", "-");
       return true;
     }
+    default:
+      return false;
+  }
+}
+
+/**
+ * 難民イベントを処理する。
+ * @param {object} action
+ * @returns {boolean}
+ */
+function handleRefugeeAction(action) {
+  switch (action.type) {
     case "refugee_feed": {
       const need = Math.max(5, Math.floor(totalSupplies(state.supplies) * 0.05));
       const pay = Math.min(state.supplies?.food || 0, need);
@@ -788,6 +823,18 @@ export function handleTravelEventAction(action) {
       pushLog("難民襲撃", "難民旅団を襲撃することにしました。", "-");
       return true;
     }
+    default:
+      return false;
+  }
+}
+
+/**
+ * 検問イベントを処理する。
+ * @param {object} action
+ * @returns {boolean}
+ */
+function handleCheckpointAction(action) {
+  switch (action.type) {
     case "checkpoint_ok": {
       const info = nearestSettlementInfo();
       if (info?.settlementId && info?.factionId) adjustSupport(info.settlementId, info.factionId, 2);
@@ -824,6 +871,18 @@ export function handleTravelEventAction(action) {
       pushLog("検問突破", "検問を強行突破しようとしています。", "-");
       return true;
     }
+    default:
+      return false;
+  }
+}
+
+/**
+ * 兆しイベントを処理する。
+ * @param {object} action
+ * @returns {boolean}
+ */
+function handleOmenAction(action) {
+  switch (action.type) {
     case "omen_pray": {
       if ((state.faith || 0) < 10) {
         // 信仰不足なら無視と同じ扱い（災いのスケジュール）
@@ -857,35 +916,54 @@ export function handleTravelEventAction(action) {
       pushToast("兆しを無視", "30日後に何かが起こるかもしれません。", "warn");
       return true;
     }
-    case "wreck_probe": {
-      const roll = Math.random();
-      if (roll < 0.1) {
-        startTravelEncounter({
-          forceStrength: "elite",
-          enemyFactionId: "pirates",
-          title: "廃船の罠",
-          flavor: "廃船を装った待ち伏せです。",
-          eventTag: "wreck_attack",
-          eventContext: {},
-        });
-      } else {
-        const loot = Math.random();
-        if (loot < 0.3) {
-          state.ships = Math.max(0, (state.ships || 0) + 1);
-          pushLog("廃船調査", "船を回収しました。", "-");
-          pushToast("廃船調査", "船を回収しました。", "good");
-        } else {
-          const id = SUPPLY_ITEMS[randInt(0, SUPPLY_ITEMS.length - 1)].id;
-          const qty = randInt(2, 6);
-          state.supplies[id] = (state.supplies[id] || 0) + qty;
-          const name = supplyName(id);
-          pushLog("廃船調査", `${name} +${qty}`, "-");
-          pushToast("廃船調査", `${name} +${qty}`, "info");
-        }
-        travelSync?.();
-      }
-      return true;
+    default:
+      return false;
+  }
+}
+
+/**
+ * 廃船イベントを処理する。
+ * @param {object} action
+ * @returns {boolean}
+ */
+function handleWreckAction(action) {
+  if (action.type !== "wreck_probe") return false;
+  const roll = Math.random();
+  if (roll < 0.1) {
+    startTravelEncounter({
+      forceStrength: "elite",
+      enemyFactionId: "pirates",
+      title: "廃船の罠",
+      flavor: "廃船を装った待ち伏せです。",
+      eventTag: "wreck_attack",
+      eventContext: {},
+    });
+  } else {
+    const loot = Math.random();
+    if (loot < 0.3) {
+      state.ships = Math.max(0, (state.ships || 0) + 1);
+      pushLog("廃船調査", "船を回収しました。", "-");
+      pushToast("廃船調査", "船を回収しました。", "good");
+    } else {
+      const id = SUPPLY_ITEMS[randInt(0, SUPPLY_ITEMS.length - 1)].id;
+      const qty = randInt(2, 6);
+      state.supplies[id] = (state.supplies[id] || 0) + qty;
+      const name = supplyName(id);
+      pushLog("廃船調査", `${name} +${qty}`, "-");
+      pushToast("廃船調査", `${name} +${qty}`, "info");
     }
+    travelSync?.();
+  }
+  return true;
+}
+
+/**
+ * 内通者イベントを処理する。
+ * @param {object} action
+ * @returns {boolean}
+ */
+function handleTraitorAction(action) {
+  switch (action.type) {
     case "traitor_buy": {
       const info = nearestSettlementInfo();
       const cost = 80;
@@ -916,6 +994,29 @@ export function handleTravelEventAction(action) {
     default:
       return false;
   }
+}
+
+/**
+ * イベントモーダルのアクションを処理する。
+ * @param {object} action
+ * @returns {boolean} 処理した場合true
+ */
+export function handleTravelEventAction(action) {
+  if (!action?.type) return false;
+  const handlers = [
+    handleMerchantAction,
+    handleFrontAction,
+    handleSmuggleAction,
+    handleRefugeeAction,
+    handleCheckpointAction,
+    handleOmenAction,
+    handleWreckAction,
+    handleTraitorAction,
+  ];
+  for (const h of handlers) {
+    if (h(action)) return true;
+  }
+  return false;
 }
 
 /**

@@ -325,7 +325,7 @@ export function applyTroopLosses(losses) {
       remain -= 1;
       if (levels[lvl] <= 0) delete levels[lvl];
     }
-    // safety: if remain still >0 but no levels, clear type
+    // 安全策: 残数があってもレベル情報が尽きたら種別を削除する
     if (!Object.keys(levels).length) delete state.troops[type];
   });
 }

@@ -198,6 +198,22 @@ export const elements = {
 };
 
 /**
+ * インラインメッセージを更新し、非表示/表示を切り替える。
+ * @param {HTMLElement|null} el
+ * @param {string} msg
+ */
+export function setInlineMessage(el, msg) {
+  if (!el) return;
+  if (!msg) {
+    el.hidden = true;
+    el.textContent = "";
+    return;
+  }
+  el.textContent = msg;
+  el.hidden = false;
+}
+
+/**
  * 出力欄のタグ表示を更新する。
  * @param {{text:string,kind?:string}|undefined} tag1Data
  * @param {{text:string,kind?:string}|undefined} tag2Data
