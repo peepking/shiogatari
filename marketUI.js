@@ -392,7 +392,7 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
     target.value = String(v);
     // 購入/売却は同一品目で排他的に扱う（片方入力で反対は0）。
     const counterpartClass = isBuy ? ".trade-sell" : ".trade-buy";
-    const counterpart = elements.tradeTableBody?.querySelector(`${counterpartClass}[data-id=\"${id}\"]`);
+    const counterpart = elements.tradeTableBody?.querySelector(`${counterpartClass}[data-id="${id}"]`);
     if (counterpart) counterpart.value = "0";
     recalcTradeDelta();
   });

@@ -65,7 +65,6 @@ import { buildEnemyFormation } from "./actions.js";
 import {
   addWarScore,
   getPlayerFactionId,
-  getRelation,
   adjustNobleFavor,
   adjustSupport,
   addHonorFaction,
@@ -519,7 +518,6 @@ function performPrayer() {
   return true;
 }
 
-const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const battlePrepActive = () => state.modeLabel === MODE_LABEL.PREP;
 
 /**
@@ -835,7 +833,7 @@ function processBattleOutcome(resultCode, meta) {
       if (foodLost) summary.push(`食料 -${foodLost}`);
     }
 
-    const { losses, lossProb } = calcLosses(meta);
+    const { losses } = calcLosses(meta);
     applyTroopLosses(losses);
     const lossEntries = Object.entries(losses || {}).map(([t, n]) => `${t} -${n}`);
     const lossText = lossEntries
@@ -1308,7 +1306,6 @@ function syncUI() {
     shipsEl,
     troopsEl,
     faithEl,
-    suppliesEl,
     fundsEl,
     fameEl,
     modeLabelEl,
@@ -1317,7 +1314,6 @@ function syncUI() {
     shipsIn,
     troopsIn,
     faithIn,
-    suppliesIn,
     fundsIn,
     fameIn,
   } = elements;

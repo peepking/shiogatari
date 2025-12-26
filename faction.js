@@ -371,7 +371,6 @@ export function addWarScore(a, b, scoreDelta, startedAt = null, supplyDelta = 0,
       faith: 0,
       startedAt: startedAt ?? null,
       lastAlert: null,
-      lastRequestAbs: null,
       elapsedDays: 0,
       activeFronts: [],
     };
@@ -395,9 +394,6 @@ export function addWarScore(a, b, scoreDelta, startedAt = null, supplyDelta = 0,
       body: `戦況が「${displayWarLabel(afterLabel)}」に変化しました。`,
     });
     entry.lastAlert = afterLabel;
-    if (afterLabel === "disadvantage" || afterLabel === "losing") {
-      queueLogisticsRequest(entry);
-    }
   }
   return entry;
 }
@@ -449,17 +445,6 @@ function sortPair(a, b) {
 function makeWarKey(a, b) {
   const [x, y] = sortPair(a, b);
   return `${x}__${y}`;
-}
-
-/**
- * 勢力IDに応じた符号付き戦況スコアを返す。
- * @param {object} entry warLedgerエントリ
- * @param {string} factionId 勢力ID
- * @returns {number} スコア
- */
-function warScoreFor(entry, factionId) {
-  if (!entry) return 0;
-  return factionId === entry.factions?.[0] ? entry.score : -entry.score;
 }
 
 /** 勢力IDの全ペアを生成する（海賊除外）。 */
@@ -647,7 +632,6 @@ function resolveFront(entry, front, attackerWins) {
   const winner = attackerWins ? front.attacker : front.defender;
   const loser = attackerWins ? front.defender : front.attacker;
   const winnerName = FACTIONS.find((f) => f.id === winner)?.name || winner;
-  const loserName = FACTIONS.find((f) => f.id === loser)?.name || loser;
   const set = settlements.find((s) => s.id === front.settlementId);
   if (!set) return;
   const prevNoble = set.nobleId;
@@ -758,50 +742,6 @@ function endWar(entry) {
     body: `${aName} と ${bName} の戦争が終結しました。`,
   });
   pushLog("戦争終結", `${aName} と ${bName} の戦争が終結しました`, "-");
-}
-
-/**
- * 兵站支援要請イベントを生成する（劣勢時のサンプル）。
- * @param {object} entry
- */
-/**
- * 劣勢時に兵站要請イベントをキューする。
- * @param {object} entry warLedgerエントリ
- * @returns {void}
- */
-function queueLogisticsRequest(entry) {
-  // ※サンプルだが後々のために取っておく
-  // const factions = entry?.factions || [];
-  // const pf = getPlayerFactionId();
-  // const targetFaction = factions.find((f) => f !== pf) || factions[0];
-  // if (!targetFaction) return;
-  // const owned = settlements.filter((s) => s.factionId === targetFaction);
-  // const set = owned[0];
-  // const place = set ? set.name : "前線";
-  // const support = set ? getSupportLabel(set.id, targetFaction) : "mid";
-  // const rate = support === "low" ? 1 : support === "high" ? 0.6 : 0.85;
-  // if (Math.random() > rate) return;
-  // const patterns = ["support", "fortify", "truce"];
-  // const pick = patterns[Math.floor(Math.random() * patterns.length)];
-  // const body =
-  //   pick === "fortify"
-  //     ? `${place} から籠城準備の支援要請が届いています。物資を送りますか？`
-  //     : pick === "truce"
-  //       ? `${place} から停戦交渉の打診が届いています。動きを後押ししますか？`
-  //       : `${place} から兵站支援要請が届いています。支援しますか？`;
-  // enqueueEvent({
-  //   title: pick === "truce" ? "停戦の打診" : "兵站要請",
-  //   body,
-  //   actions: [
-  //     {
-  //       id: pick,
-  //       label: pick === "fortify" ? "物資を送る" : pick === "truce" ? "後押しする" : "支援する",
-  //       type: pick,
-  //       payload: { settlementId: set?.id, factionId: targetFaction },
-  //     },
-  //     { id: "ignore", label: "無視する", type: "ignore", payload: { settlementId: set?.id, factionId: targetFaction } },
-  //   ],
-  // });
 }
 
 /**
@@ -945,15 +885,6 @@ export function tickDailyWar(absDay) {
       queueFrontActionRequest(entry, front);
       queueTruceRequest(entry, front, absDay);
     });
-
-    // 劣勢時の兵站要請
-    const label = warScoreLabel(entry.score);
-    const disadvantage = label === "disadvantage" || label === "losing";
-    const since = entry.lastRequestAbs != null ? absDay - entry.lastRequestAbs : Infinity;
-    if (disadvantage && since >= 7) {
-      queueLogisticsRequest(entry);
-      entry.lastRequestAbs = absDay;
-    }
 
     // 戦争終結判定（経過日 or 閾値）
     const WAR_END_THRESHOLD = 120;

@@ -176,10 +176,9 @@ function applyRoster() {
 
 /**
  * 戦闘マップの一辺サイズを計算する。
- * @param {number} unitCount
  * @returns {number}
  */
-function calcBattleSize(unitCount) {
+function calcBattleSize() {
   return FIXED_BATTLE_SIZE;
 }
 
@@ -333,18 +332,6 @@ function pushToStandby(type, count, level) {
  */
 function getSortieEntries() {
   return battleRoster.sortie.slice(0, MAX_SQUADS);
-}
-
-/**
- * 待機+出撃の合計を返す。
- * @returns {Record<string, number>}
- */
-function combinedRosterTotals() {
-  const totals = standbyTotals();
-  battleRoster.sortie.forEach((s) => {
-    totals[s.type] = (totals[s.type] || 0) + s.count;
-  });
-  return totals;
 }
 
 /**
@@ -766,20 +753,6 @@ function assignSlots(units, slots, customMap = {}, keepExisting = false) {
 }
 
 /**
- * 敵の配置をランダムにする。
- * @param {object[]} units
- * @param {{x:number,y:number}[]} slots
- */
-function assignRandomSlots(units, slots) {
-  const pool = [...slots];
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
-  assignSlots(units, pool);
-}
-
-/**
  * 配置を適用する（味方は指定フォーメーション、敵はランダム）。
  * @param {Record<string, number>} [customOverride]
  */
@@ -807,14 +780,6 @@ function applyFormations(customOverride) {
  */
 function renderCustomEditor() {
   // 旧UI削除済み。現在はキャンバス上で直接選択・配置するため処理なし。
-}
-
-/**
- * カスタムフォームからスロット割当を読み取る。
- * @returns {Record<string, number>}
- */
-function readCustomSlots() {
-  return battleState.customSlots || {};
 }
 
 /**
@@ -912,24 +877,6 @@ function getUnitById(id, allowDead = false) {
   if (!u) return null;
   if (!allowDead && u.hp <= 0) return null;
   return u;
-}
-
-/**
- * スロットの表示ラベルを返す。
- * @param {object} slot
- * @param {"ally"|"enemy"} side
- * @returns {string}
- */
-function slotLabel(slot, side) {
-  const colLabel =
-    side === "ally"
-      ? slot.x === 0
-        ? "前列1"
-        : "前列2"
-      : slot.x === battleState.size - 1
-        ? "前列1"
-        : "前列2";
-  return `${colLabel} - 行${slot.y + 1} (${slot.x + 1},${slot.y + 1})`;
 }
 
 /**
@@ -1767,7 +1714,7 @@ export function wireBattleUI() {
     if (slider) slider.value = String(val);
     if (number) number.value = String(val);
   });
-  elements.rosterSortie?.addEventListener("input", (e) => {
+  elements.rosterSortie?.addEventListener("input", () => {
     // 出撃側の数値変更UIは無し
   });
   elements.rosterStandby?.addEventListener("click", (e) => {
@@ -1885,7 +1832,6 @@ export function wireBattleUI() {
           battleState.customSlotsDraft[unitAt.id] = selSlot;
           applyCustomDraftToAllies(battleState.customSlotsDraft);
         }
-        battleState.selectedUnitId = battleState.selectedUnitId;
         renderCustomEditor();
         renderBattle();
         updateBattleInfo();

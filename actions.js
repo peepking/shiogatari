@@ -14,7 +14,6 @@ import {
   getWarEntry,
   adjustSupport,
   adjustNobleFavor,
-  getFrontForSettlement,
   getFrontById,
   isSettlementUnderSiege,
   getRelation,
@@ -23,7 +22,6 @@ import { warScoreLabel } from "./util.js";
 import { FACTIONS } from "./lore.js";
 import { SUPPLY_ITEMS } from "./supplies.js";
 import { enqueueEvent } from "./events.js";
-import { addTroops } from "./troops.js";
 import {
   addRefugeeEscortQuest,
   completeRefugeeEscortAt,
@@ -43,7 +41,6 @@ const ENCOUNTER_MAX = 15;
  * 強プール確率
  */
 const STRONG_POOL_CHANCE = 0.25;
-const ENCOUNTER_RADIUS = 5;
 const FRONT_ENCOUNTER_RADIUS = 2;
 const TRAVEL_EVENT_RADIUS = 5;
 const TRAVEL_EVENT_COOLDOWN_DAYS = 7;
@@ -694,7 +691,6 @@ export function handleTravelEventAction(action) {
     case "smuggle_trade": {
       const ctx = action.payload || {};
       const deals = ctx.deals || [];
-      const discounted = ctx.discounted || Math.max(1, Math.floor((ctx.totalCost || 0) * 0.7));
       state.eventTrade = {
     source: "smuggle",
     title: "密輸船との取引",
@@ -1028,21 +1024,6 @@ function pickDeals() {
     deals.push({ id: item.id, qty, cost });
   }
   return deals;
-}
-
-/**
- * 取引リストを表示用テキストに整形する。
- * @param {Array<{id:string,qty:number,cost:number}>} deals
- * @returns {string}
- */
-function formatDeals(deals) {
-  if (!Array.isArray(deals) || deals.length === 0) return "なし";
-  return deals
-    .map((d) => {
-      const name = SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id;
-      return `${name} x${d.qty}（${d.cost}）`;
-    })
-    .join(" / ");
 }
 
 /**

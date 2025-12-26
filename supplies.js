@@ -61,10 +61,9 @@ const rollDice = (times, faces) => {
 /**
  * 戦況ラベルに応じた価格倍率を返す。
  * @param {string|null} factionId
- * @param {string|null} settlementId
  * @returns {number}
  */
-function priceWarMultiplier(factionId, settlementId) {
+function priceWarMultiplier(factionId) {
   if (!factionId) return 1;
   const entry = getWarEntry(getPlayerFactionId(), factionId);
   const label = getWarScoreLabel(entry?.score || 0);

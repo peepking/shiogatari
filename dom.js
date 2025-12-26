@@ -230,7 +230,7 @@ export function setOutput(title, text, tags) {
  * @param {string} body
  * @param {string} lastRollDisplay
  */
-export function pushLog(title, body, lastRollDisplay = "-") {
+export function pushLog(title, body) {
   if (!elements.logEl) return;
   const gameTime = formatGameTime(state);
   const realTime = nowStr();

@@ -161,8 +161,6 @@ export function renderNobles(fid) {
 export function renderNobleDetail(nobleId) {
   if (!elements.nobleDetail) return;
   const owned = getSettlementsByNoble(nobleId);
-  const homeId = nobleHome.get(nobleId);
-  const home = owned.find((s) => s.id === homeId) || owned[0];
   if (!owned.length) {
     elements.nobleDetail.textContent = "保有する街や村はありません。";
     return;

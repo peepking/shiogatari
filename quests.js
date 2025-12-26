@@ -11,7 +11,6 @@ import {
   getWarScoreLabel,
   getPlayerFactionId,
   adjustNobleFavor,
-  getFrontById,
   extendFrontDuration,
 } from "./faction.js";
 import { TROOP_STATS } from "./troops.js";
@@ -571,7 +570,6 @@ function genPirateHuntQuest(settlement) {
   const estimatedTotal = predictEnemyTotal("normal");
   const reward = estimatedTotal * 50 + 100;
   const rewardFame = Math.floor(estimatedTotal / 2) + 5;
-  const targetLabel = `(${target.x + 1}, ${target.y + 1})`;
   return {
     id: nextId(),
     type: QUEST_TYPES.PIRATE_HUNT,
@@ -602,7 +600,6 @@ function genBountyHuntQuest(settlement) {
   const estimatedTotal = predictEnemyTotal("elite");
   const reward = estimatedTotal * 100 + 100;
   const rewardFame = Math.floor(estimatedTotal / 2) + 5;
-  const targetLabel = `(${target.x + 1}, ${target.y + 1})`;
   return {
     id: nextId(),
     type: QUEST_TYPES.BOUNTY_HUNT,
