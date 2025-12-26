@@ -187,6 +187,29 @@ function renderEncounterPrep(info) {
 }
 
 /**
+ * 戦闘結果サマリをUIに反映する。
+ * @param {string[]} summary 結果の各行
+ * @param {string} resultLabel 表示用の結果ラベル
+ * @param {object} pending ペンディング中のエンカウント情報
+ * @param {number} enemyTotal 敵推定人数
+ * @param {boolean} isWin 勝利したか
+ */
+function renderBattleSummary(summary, resultLabel, pending, enemyTotal, isWin) {
+  const body = summary.join("\n");
+  const strengthText =
+    pending.enemyFactionId !== "pirates" && pending.strength === "elite"
+      ? `敵推定${enemyTotal}人（正規軍）`
+      : `敵推定${enemyTotal}人${pending.strength === "elite" ? "（強編成）" : ""}`;
+  setOutput("戦後処理", body, [
+    { text: resultLabel, kind: isWin ? "good" : "warn" },
+    { text: strengthText, kind: "" },
+  ]);
+  pushLog("戦闘結果", body, "-");
+  pushToast("戦闘結果", resultLabel, isWin ? "good" : "warn");
+  showBattleResultModal(summary, resultLabel);
+}
+
+/**
  * 行動メッセージ表示をクリアする。
  */
 function clearActionMessage() {
@@ -953,20 +976,7 @@ function processBattleOutcome(resultCode, meta) {
     }
     if (delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
 
-    const body = summary.join("\n");
-    setOutput("戦後処理", body, [
-      { text: resultLabel, kind: isWin ? "good" : "warn" },
-      {
-        text:
-          enemyFactionId !== "pirates" && pending.strength === "elite"
-            ? `敵推定${enemyTotal}人（正規軍）`
-            : `敵推定${enemyTotal}人${pending.strength === "elite" ? "（強編成）" : ""}`,
-        kind: "",
-      },
-    ]);
-    pushLog("戦闘結果", body, "-");
-    pushToast("戦闘結果", resultLabel, isWin ? "good" : "warn");
-    showBattleResultModal(summary, resultLabel);
+    renderBattleSummary(summary, resultLabel, pending, enemyTotal, isWin);
     syncUI();
   } finally {
     clearBattlePrep(true);
