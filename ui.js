@@ -28,8 +28,9 @@ import {
   syncSuppliesUI,
   wireSupplyModal,
   wireSupplyDiscard,
+  SUPPLY_ITEMS,
+  SUPPLY_TYPES,
 } from "./supplies.js";
-import { SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 import {
   moveToSelected,
   attemptEnter,
@@ -88,6 +89,23 @@ import {
 import { loadGameFromStorage } from "./storage.js";
 import { initEventQueueUI } from "./events.js";
 import { ensureFactionState } from "./faction.js";
+
+/**
+ * 
+ * @returns {void}
+ */
+function resetAndSeedAll() {
+  resetWorld();
+  resetState();
+  resetSettlementSupport();
+  ensureFactionState();
+  seedWarDefaults();
+  ensureNobleHomes();
+  seedInitialQuests();
+  ensureSeasonalQuests(getCurrentSettlement());
+  resetEncounterMeter();
+}
+
 
 const BONUS_CAPTURE_EVENT_TAGS = new Set([
   "merchant_attack",
@@ -1628,15 +1646,7 @@ function wireButtons() {
 
   document.getElementById("resetBtn")?.addEventListener("click", () => {
     if (!confirm("状態とログをリセットしますか？")) return;
-    resetState();
-    resetWorld();
-    resetSettlementSupport();
-    ensureFactionState();
-    seedWarDefaults();
-    ensureNobleHomes();
-    seedInitialQuests();
-    ensureSeasonalQuests(getCurrentSettlement());
-    resetEncounterMeter();
+    resetAndSeedAll();
     if (elements.logEl) elements.logEl.innerHTML = "";
     setOutput("次の操作", "状況を選んで、1D6を振ってください", [
       { text: "-", kind: "" },
@@ -1794,13 +1804,13 @@ function wireButtons() {
  */
 export function initUI() {
   const restored = loadGameFromStorage();
-  ensureFactionState();
-  seedWarDefaults();
-  seedInitialQuests();
-  ensureSeasonalQuests(getCurrentSettlement());
-  ensureNobleHomes();
   if (!restored) {
-    resetEncounterMeter();
+    resetAndSeedAll();
+  } else {
+    ensureFactionState();
+    seedWarDefaults();
+    ensureNobleHomes();
+    ensureSeasonalQuests(getCurrentSettlement());
   }
   wireButtons();
   wireBattleUI();

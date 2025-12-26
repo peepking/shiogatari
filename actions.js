@@ -7,7 +7,7 @@ import { calcTroopCap, totalTroops } from "./troops.js";
 import { advanceDayWithEvents } from "./time.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
-import { randInt, absDay, rollDice, manhattan, pickRandomProcessed, randomSeaTarget, randomHuntTarget, NORMAL_ANCHORS, STRONG_ANCHORS, pickAnchorRange } from "./questUtils.js";
+import { randInt, absDay, manhattan, NORMAL_ANCHORS, STRONG_ANCHORS, pickAnchorRange } from "./questUtils.js";
 import {
   addWarScore,
   getPlayerFactionId,
