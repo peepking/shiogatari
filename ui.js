@@ -162,10 +162,30 @@ function showActionMessage(msg, kind = "error") {
     return;
   }
   const toastKind = kind === "error" ? "bad" : kind === "warn" ? "warn" : "info";
-  const title = kind === "error" ? "移動不可" : kind === "warn" ? "注意" : "情報";
+  const title = kind === "error" ? "移動不可" : kind === "warn" ? "注意" : "完了";
   pushToast(title, msg, toastKind);
   clearActionMessage();
 }
+
+/**
+ * エンカウント描写の準備。
+ * @param {{title:string,message:string,log:string,detail:object}} info
+ * @returns {void}
+ */
+function renderEncounterPrep(info) {
+  if (!info) return;
+  pushToast(
+    "敵襲",
+    `${info.detail?.enemyFactionId === "pirates" ? "外洋海賊" : "正規軍"}が接近中！ 戦闘準備をしてください。`,
+    "warn"
+  );
+  setOutput(info.title, info.message, [
+    { text: "戦闘準備", kind: "warn" },
+    { text: "行動選択", kind: "warn" },
+  ]);
+  pushLog(info.title, info.log, state.lastRoll ?? "-");
+}
+
 /**
  * 行動メッセージ表示をクリアする。
  */
@@ -222,16 +242,7 @@ function handleMoveResult(res, syncUI) {
       syncUI?.();
       return false;
     case "encounter":
-      // 戦闘準備メッセージは受け取ったinfoで表示
-      if (res.detail) {
-        const info = res.detail;
-        pushToast("敵襲", `${info.enemyFactionId === "pirates" ? "外洋海賊" : "正規軍"}が接近中！ 戦闘準備をしてください。`, "warn");
-        setOutput(info.title, info.message, [
-          { text: "戦闘準備", kind: "warn" },
-          { text: "行動選択", kind: "warn" },
-        ]);
-        pushLog(info.title, info.log, state.lastRoll ?? "-");
-      }
+      if (res.detail) renderEncounterPrep(res.detail);
       syncUI?.();
       return false;
     case "moved": {

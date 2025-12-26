@@ -238,7 +238,7 @@ function maybeTriggerEncounter() {
   if (state.pendingEncounter?.active) return { ok: false };
   const loc = getLocationStatus();
   // 村/街タイル上ではエンカウントしないが、リセットもしない（入場時のみリセット）
-  if (loc?.place === PLACE.VILLAGE || loc?.place === PLACE.TOWN) return false;
+  if (loc?.place === PLACE.VILLAGE || loc?.place === PLACE.TOWN) return { ok: false };
   const threshold = clamp(state.encounterThreshold || ENCOUNTER_MIN, ENCOUNTER_MIN, ENCOUNTER_MAX);
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   const frontHint = pickFrontEncounter(state.position);
