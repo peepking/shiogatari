@@ -180,9 +180,10 @@ function clearActionMessage() {
 /**
  * 移動結果コードに応じてUIメッセージを表示する。
  * @param {{ok:boolean,code:string,detail?:object}} res 結果オブジェクト
+ * @param {Function} [syncUI] 画面同期コールバック
  * @returns {boolean} 自動移動を続行してよいか
  */
-function handleMoveResult(res) {
+function handleMoveResult(res, syncUI) {
   if (!res) return false;
   switch (res.code) {
     case "prep-active":
@@ -211,11 +212,14 @@ function handleMoveResult(res) {
     }
     case "no-destination":
       showActionMessage("移動先を選択してください。", "error");
+      syncUI?.();
       return false;
     case "invalid-move":
       showActionMessage("移動できるのは上下左右1マス以内です。", "error");
+      syncUI?.();
       return false;
     case "travel-event":
+      syncUI?.();
       return false;
     case "encounter":
       // 戦闘準備メッセージは受け取ったinfoで表示
@@ -228,6 +232,7 @@ function handleMoveResult(res) {
         ]);
         pushLog(info.title, info.log, state.lastRoll ?? "-");
       }
+      syncUI?.();
       return false;
     case "moved": {
       const pos = res.detail?.pos;
@@ -238,6 +243,7 @@ function handleMoveResult(res) {
         ]);
       }
       showActionMessage("", "info");
+      syncUI?.();
       return true;
     }
     default:
@@ -560,7 +566,7 @@ function stepAutoMove() {
   };
   state.selectedPosition = { ...next };
   const res = moveToSelected(syncUI);
-  const cont = handleMoveResult(res);
+  const cont = handleMoveResult(res, syncUI);
   if (!cont || state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE || state.modeLabel === MODE_LABEL.PREP) {
     stopAutoMove();
     return;
@@ -1548,7 +1554,7 @@ function wireButtons() {
   document.addEventListener("map-move-request", () => {
     if (isAudienceMode()) state.modeLabel = MODE_LABEL.NORMAL;
     const res = moveToSelected(syncUI);
-    handleMoveResult(res);
+    handleMoveResult(res, syncUI);
   });
   document.addEventListener("map-wait-request", () => {
     waitOneDay(elements, clearActionMessage, syncUI);
