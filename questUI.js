@@ -48,22 +48,43 @@ const ORACLE_TYPES = new Set([
   QUEST_TYPES.ORACLE_ELITE,
 ]);
 
+/**
+ * 座標を表示用の文字列に整形する。
+ * @param {{x:number,y:number}} pos 座標
+ * @returns {string} "(x, y)"形式の文字列
+ */
 function formatCoords(pos) {
   if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return "(不明)";
   return `(${pos.x + 1}, ${pos.y + 1})`;
 }
 
+/**
+ * 拠点情報を表示用の文字列に整形する。
+ * @param {object|null} s 拠点
+ * @returns {string} 拠点名と座標
+ */
 function formatSettlement(s) {
   if (!s) return `不明${formatCoords({ x: 0, y: 0 })}`;
   return `${s.name}${formatCoords(s.coords)}`;
 }
 
+/**
+ * 物資リストを「名称 x数量」に整形する。
+ * @param {Array} items 物資配列
+ * @returns {string} 整形後文字列
+ */
 function formatItems(items = []) {
   return items
     .map((it) => `${SUPPLY_ITEMS.find((i) => i.id === it.id)?.name || it.id} x${it.qty}`)
     .join(" / ");
 }
 
+/**
+ * 依頼の種類に応じて場所ラベルを組み立てる。
+ * @param {object} q 依頼オブジェクト
+ * @param {object} ctx 付随情報（origin/targetなど）
+ * @returns {string} 場所の説明文
+ */
 function buildPlaceLabel(q, ctx) {
   const { origin, target, supplyInfo, blockadeTarget, blockadeLeft, blockadeEstimate, estText } = ctx;
   switch (q.type) {
@@ -119,6 +140,13 @@ function buildPlaceLabel(q, ctx) {
   }
 }
 
+/**
+ * 依頼本文の表示テキストを組み立てる。
+ * @param {*} q 依頼
+ * @param {string} itemName 物資名
+ * @param {string} supplyInfo 物資説明文
+ * @returns {string} 本文テキスト
+ */
 function buildBodyText(q, itemName, supplyInfo) {
   if (q.type === QUEST_TYPES.ORACLE_SUPPLY) return supplyInfo || q.desc || "";
   if (q.type === QUEST_TYPES.ORACLE_MOVE) return q.desc || "";
@@ -128,6 +156,11 @@ function buildBodyText(q, itemName, supplyInfo) {
   return q.desc || `${itemName} x${q.qty ?? 0}`;
 }
 
+/**
+ * 推定人数などの補足テキストを組み立てる。
+ * @param {*} q 依頼
+ * @returns {string} 補足テキスト
+ */
 function buildEstimateText(q) {
   if (
     (q.type === QUEST_TYPES.WAR_DEFEND_RAID ||
@@ -143,6 +176,11 @@ function buildEstimateText(q) {
   return "";
 }
 
+/**
+ * 追加報酬ラベル（神託など）を返す。
+ * @param {*} q 依頼
+ * @returns {string} 追加ラベル
+ */
 function rewardExtraLabel(q) {
   if (ORACLE_TYPES.has(q.type)) {
     return `信仰+${q.rewardFaith ?? 0}`;
@@ -150,6 +188,11 @@ function rewardExtraLabel(q) {
   return "";
 }
 
+/**
+ * 依頼一覧UIを最新状態に描画する。
+ * @param {Function} syncUI 依頼完了後などに呼ぶ同期処理
+ * @returns {void}
+ */
 export function renderQuestUI(syncUI) {
   const quests = getQuests();
   if (elements.questBody) elements.questBody.hidden = Boolean(quests.collapsed);

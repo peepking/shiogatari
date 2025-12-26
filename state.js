@@ -76,6 +76,10 @@ const createPending = () => ({
   forceDirection: null,
 });
 
+/**
+ * 勢力ステートを初期化する。
+ * @returns {Object} 勢力IDをキーにしたステートマップ
+ */
 function initFactionState() {
   const map = {};
   (FACTIONS || []).forEach((f) => {

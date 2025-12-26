@@ -59,6 +59,7 @@ const QUEST_TYPES = {
 
 /**
  * 依頼用の状態を初期化/補完する。
+ * @returns {void}
  */
 function ensureState() {
   if (!state.quests) {
@@ -295,6 +296,7 @@ export function ensureSeasonalQuests(settlement) {
 
 /**
  * 全拠点の初期依頼を作成する（一度だけ）。
+ * @returns {void}
  */
 export function seedInitialQuests() {
   ensureState();
@@ -305,8 +307,9 @@ export function seedInitialQuests() {
 
 /**
  * 貴族専用依頼を生成する。
- * @param {object} noble
- * @param {object} settlement
+ * @param {object} noble 対象貴族
+ * @param {object} settlement 拠点
+ * @returns {void}
  */
 function generateNobleQuestsForNoble(noble, settlement) {
   ensureState();
@@ -326,8 +329,9 @@ function generateNobleQuestsForNoble(noble, settlement) {
 
 /**
  * 貴族専用依頼を季節ごとに生成する（謁見で表示する前に呼ぶ）。
- * @param {object} noble
- * @param {object} settlement
+ * @param {object} noble 対象貴族
+ * @param {object} settlement 拠点
+ * @returns {void}
  */
 export function ensureNobleQuests(noble, settlement) {
   ensureState();
@@ -341,7 +345,7 @@ export function ensureNobleQuests(noble, settlement) {
 /**
  * 難民護送依頼を追加する（移動イベント専用）。
  * @param {object} targetSet 拠点
- * @returns {object|null}
+ * @returns {object|null} 生成した依頼
  */
 export function addRefugeeEscortQuest(targetSet) {
   ensureState();
@@ -1011,6 +1015,12 @@ export function addWarFrontQuest(settlement, front, role, kind, opts = {}) {
   return q;
 }
 
+/**
+ * 前線依頼の結果を戦況スコアに反映する。
+ * @param {object} q 依頼オブジェクト
+ * @param {boolean} success 成功した場合はtrue
+ * @returns {void}
+ */
 function applyWarFrontScore(q, success) {
   if (!q?.frontSettlementId || !q?.enemyFactionId) return;
   const pf = getPlayerFactionId();
@@ -1043,8 +1053,8 @@ export function canReceiveOracle() {
 }
 
 /**
- * 神託を1件受注する（ランダム）。
- * @returns {object|null}
+ * 神託を1件受注する（ランダム生成）。
+ * @returns {object|null} 生成した神託（受注できなければnull）
  */
 export function receiveOracle() {
   ensureState();
@@ -1061,8 +1071,8 @@ export function receiveOracle() {
 
 /**
  * 条件を満たした依頼を完了し、報酬/消費を反映する。
- * @param {number} id
- * @returns {boolean}
+ * @param {number} id 依頼ID
+ * @returns {boolean} 完了できたらtrue
  */
 export function completeQuest(id) {
   ensureState();
@@ -1377,10 +1387,11 @@ export function completeHuntBattleQuest(id, success, reason = "") {
 
 /**
  * 貴族依頼の戦闘を処理する（治安回復/敵軍討伐）。
- * @param {number} id
- * @param {boolean} success
- * @param {number} enemyTotal
- * @param {number|null} fightIdx
+ * @param {number} id 依頼ID
+ * @param {boolean} success 勝敗
+ * @param {number} enemyTotal 推定敵人数
+ * @param {number|null} fightIdx 複数戦の何戦目か（単戦ならnull）
+ * @returns {boolean} 処理できたらtrue
  */
 export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = null) {
   ensureState();

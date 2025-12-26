@@ -59,6 +59,11 @@ const TRAITOR_EVENT_RATE = 0.02;
 let travelSync = null;
 const travelEventTags = new Set(["merchant_attack", "merchant_rescue_help", "merchant_rescue_raid", "smuggle_raid", "refugee_raid", "checkpoint_force", "omen_attack", "wreck_attack"]);
 
+/**
+ * 前線拠点からの距離を見て、交戦中フロントの情報を返す。
+ * @param {{x:number,y:number}} pos 現在位置
+ * @returns {{enemyFactionId:string,frontId:string,d:number}|null}
+ */
 function pickFrontEncounter(pos) {
   const pf = getPlayerFactionId();
   if (!pf || pf === "player" || !state.warLedger?.entries) return null;
@@ -139,10 +144,9 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null) {
 }
 
 /**
- * 現在位置・地形に応じてエンカウント勢力を決める。
- * 近傍拠点で最頻出の勢力を優先し、戦況・地形で重み付けする。
- * @param {{x:number,y:number}} pos
- * @param {string} terrain
+ * エンカウント時に出現する勢力IDを選ぶ。前線近傍なら交戦勢力のみ、それ以外は海賊固定。
+ * @param {{x:number,y:number}} pos 現在位置
+ * @param {string} terrain 地形ID
  * @returns {string} 勢力ID
  */
 function pickEncounterFaction(pos, terrain) {

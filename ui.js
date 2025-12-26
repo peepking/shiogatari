@@ -202,7 +202,8 @@ function setTradeError(msg) {
 }
 
 /**
- * 謁見モードに入る。
+ * 謁見モードに入る。滞在中の貴族がいない場合は何もしない。
+ * @returns {void}
  */
 function enterAudience() {
   const ctx = getAudienceContext();
@@ -216,6 +217,7 @@ function enterAudience() {
 
 /**
  * 謁見モードを終了して拠点表示に戻る。
+ * @returns {void}
  */
 function exitAudience() {
   const here = getCurrentSettlement();
@@ -394,6 +396,11 @@ function performPrayer() {
 const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
 const battlePrepActive = () => state.modeLabel === MODE_LABEL.PREP;
 
+/**
+ * 指定兵種の総数をレベル合算で取得する。
+ * @param {*} type 兵種ID
+ * @returns {number} 総数
+ */
 function totalTypeCount(type) {
   const levels = state.troops?.[type];
   if (!levels) return 0;
@@ -401,6 +408,11 @@ function totalTypeCount(type) {
   return Object.values(levels).reduce((s, v) => s + Number(v || 0), 0);
 }
 
+/**
+ * 敵編成情報から総兵数を推定する。
+ * @param {*} meta 戦闘メタ情報
+ * @returns {number} 推定総兵数
+ */
 function enemyTotalEstimate(meta) {
   if (state.pendingEncounter?.enemyTotal) return state.pendingEncounter.enemyTotal;
   const fromMeta =
@@ -411,12 +423,21 @@ function enemyTotalEstimate(meta) {
   return fromMeta || 0;
 }
 
+/**
+ * 逃走成功率を算出する（斥候数に比例）。
+ * @returns {number} 成功率(0-1)
+ */
 function escapeSuccessRate() {
   const scouts = Math.min(10, totalTypeCount("scout"));
   const bonus = 70 * (1 - Math.pow(0.6, scouts)); // 初手が大きく、漸減しつつ10人でほぼ+70%
   return clamp(30 + bonus, 0, 100);
 }
 
+/**
+ * 戦闘準備状態をリセットし、必要なら通常モードへ戻す。
+ * @param {boolean} [resetMode=true] モードをNORMALへ戻すか
+ * @returns {void}
+ */
 function clearBattlePrep(resetMode = true) {
   state.pendingEncounter = {
     active: false,
@@ -435,6 +456,7 @@ function clearBattlePrep(resetMode = true) {
   setBattleTerrain("plain");
 }
 
+/** 自動移動を即座に停止する。 */
 function stopAutoMove() {
   if (autoMoveTimer) {
     clearTimeout(autoMoveTimer);
@@ -443,6 +465,10 @@ function stopAutoMove() {
   autoMoveTarget = null;
 }
 
+/**
+ * 自動移動を1ステップ進め、到達や戦闘発生で停止する。
+ * @returns {void}
+ */
 function stepAutoMove() {
   if (!autoMoveTarget) {
     stopAutoMove();
@@ -481,6 +507,11 @@ function stepAutoMove() {
   autoMoveTimer = setTimeout(stepAutoMove, 500);
 }
 
+/**
+ * 指定座標までの自動移動を開始する。
+ * @param {{x:number,y:number}} target 目的地
+ * @returns {boolean} 開始できたらtrue
+ */
 function startAutoMove(target) {
   stopAutoMove();
   if (!target) return;
@@ -488,6 +519,11 @@ function startAutoMove(target) {
   stepAutoMove();
 }
 
+/**
+ * 戦闘からの離脱に成功した際の後処理を行う。
+ * @param {string} reason 成功理由のメッセージ
+ * @returns {void}
+ */
 function escapeBattleSuccess(reason) {
   const text = reason || "敵との接触を回避しました。";
   clearBattlePrep();
@@ -499,6 +535,11 @@ function escapeBattleSuccess(reason) {
   syncUI();
 }
 
+/**
+ * 戦闘結果から味方の損耗を算出する（衛生兵で軽減）。
+ * @param {*} meta 戦闘メタ情報
+ * @returns {{losses:Object,lossProb:number}} 損耗マップと発生確率
+ */
 function calcLosses(meta) {
   const units = meta?.units || [];
   const allies = units.filter((u) => u.side === "ally");
@@ -516,6 +557,12 @@ function calcLosses(meta) {
   return { losses, lossProb };
 }
 
+/**
+ * 敵撃破ユニットから捕虜数を試行計算する（イベントでボーナス判定あり）。
+ * @param {*} meta 戦闘メタ情報
+ * @param {*} eventTag イベントタグ
+ * @returns {Object} 捕虜マップ (key: "type|level")
+ */
 function calcCaptures(meta, eventTag = null) {
   const units = meta?.units || [];
   const enemies = units.filter((u) => u.side === "enemy" && u.hp <= 0);
@@ -536,6 +583,11 @@ function calcCaptures(meta, eventTag = null) {
   return captured;
 }
 
+/**
+ * 撃破した敵兵の総数を返す。
+ * @param {*} meta 戦闘メタ情報
+ * @returns {number} 撃破数
+ */
 function killedEnemyCount(meta) {
   const units = meta?.units || [];
   return units
@@ -544,9 +596,10 @@ function killedEnemyCount(meta) {
 }
 
 /**
- * 戦闘結果を処理し、報酬/損耗/依頼・神託の完了/失敗を反映する。
- * @param {"win"|"lose"|"draw"} resultCode
- * @param {object} meta
+ * 戦闘結果を処理し、報酬・損耗・依頼/神託の成否を反映する。
+ * @param {"win"|"lose"|"draw"} resultCode 戦闘結果
+ * @param {object} meta 戦闘メタ情報
+ * @returns {void}
  */
 function processBattleOutcome(resultCode, meta) {
   const pending = state.pendingEncounter || {};
@@ -899,6 +952,10 @@ function startOracleBattle() {
   startPrepBattle();
 }
 
+/**
+ * エンカウントからの逃走を試みる。
+ * @returns {void}
+ */
 function tryRunFromEncounter() {
   if (!state.pendingEncounter?.active) return;
   const rate = escapeSuccessRate();
@@ -914,12 +971,21 @@ function tryRunFromEncounter() {
   startPrepBattle();
 }
 
+/**
+ * 祈りを使って安全に離脱する。
+ * 信仰が足りない場合は何も起こらない。
+ * @returns {void}
+ */
 function tryPrayEscape() {
   const ok = performPrayer();
   if (!ok) return;
   escapeBattleSuccess("海に祈り、敵を退けました。");
 }
 
+/**
+ * 降伏して戦闘を即座に終了させる。
+ * @returns {void}
+ */
 function surrenderBattle() {
   if (!state.pendingEncounter?.active) return;
   processBattleOutcome("敗北", { enemyFormation: state.pendingEncounter.enemyFormation });
@@ -1218,6 +1284,11 @@ function closeModal(el) {
   if (el) el.hidden = true;
 }
 
+/**
+ * 戦果報告モーダルを組み立てて表示する。
+ * @param {string[]|string} lines 表示する本文（配列なら各要素をli化）
+ * @param {string} [resultLabel=""] 見出しラベル
+ */
 function showBattleResultModal(lines, resultLabel = "") {
   const esc = (s) =>
     String(s ?? "")

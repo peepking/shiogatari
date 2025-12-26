@@ -59,15 +59,19 @@ export function resolveCurrentEvent() {
   showNextEvent();
 }
 
+/**
+ * イベントキューの初期化を保証する。
+ */
 function ensureQueue() {
   if (!Array.isArray(state.eventQueue)) state.eventQueue = [];
   if (!state.eventSeq || Number.isNaN(state.eventSeq)) state.eventSeq = 1;
 }
 
 /**
- * @param {Array<{id?:string,label?:string,type?:string,payload?:any}>|undefined} actions
- * @param {number} baseId
- * @returns {Array<{id:string,label:string,type:string,payload:any}>}
+ * イベントのアクション配列を安全な形に正規化する。
+ * @param {Array<{id?:string,label?:string,type?:string,payload?:any}>|undefined} actions 元のアクション配列
+ * @param {number} baseId 連番生成のベースID
+ * @returns {Array<{id:string,label:string,type:string,payload:any}>} 正規化したアクション配列
  */
 function normalizeActions(actions, baseId) {
   const list = Array.isArray(actions) && actions.length ? actions : [{ label: "閉じる", type: "close" }];
@@ -79,6 +83,11 @@ function normalizeActions(actions, baseId) {
   }));
 }
 
+/**
+ * イベントアクションを処理し、必要なら現在のイベントを解決する。
+ * @param {*} action イベントアクション
+ * @returns {void}
+ */
 function handleAction(action) {
   if (!action) {
     resolveCurrentEvent();
@@ -144,6 +153,10 @@ function handleAction(action) {
   resolveCurrentEvent();
 }
 
+/**
+ * 次のイベントをモーダルに表示する。
+ * @returns {void}
+ */
 function showNextEvent() {
   const modal = elements.eventModal;
   if (!modal) return;

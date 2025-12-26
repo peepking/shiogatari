@@ -15,8 +15,8 @@ const RELATION_MULTIPLIER = 1.2;
 const BORDER_DIST = 5;
 
 /**
- * 名誉家臣として仕えている勢力IDリストを返す。
- * @returns {string[]}
+ * 名誉家臣として仕えている勢力ID一覧を返す。
+ * @returns {string[]} 勢力ID配列
  */
 export function honorFactions() {
   if (!Array.isArray(state.honorFactions)) state.honorFactions = [];
@@ -25,7 +25,8 @@ export function honorFactions() {
 
 /**
  * 名誉家臣フラグを付与する。
- * @param {string} factionId
+ * @param {string} factionId 勢力ID
+ * @returns {void}
  */
 export function addHonorFaction(factionId) {
   if (!factionId) return;
@@ -34,8 +35,8 @@ export function addHonorFaction(factionId) {
 
 /**
  * 名誉家臣かどうかを判定する。
- * @param {string} factionId
- * @returns {boolean}
+ * @param {string} factionId 勢力ID
+ * @returns {boolean} 名誉家臣ならtrue
  */
 export function isHonorFaction(factionId) {
   return honorFactions().includes(factionId);
@@ -43,7 +44,8 @@ export function isHonorFaction(factionId) {
 
 /**
  * 名誉家臣フラグを解除する。
- * @param {string} factionId
+ * @param {string} factionId 勢力ID
+ * @returns {void}
  */
 export function removeHonorFaction(factionId) {
   if (!factionId) return;
@@ -53,12 +55,17 @@ export function removeHonorFaction(factionId) {
 
 /**
  * 現在所属している勢力IDを返す（未所属なら"player"）。
- * @returns {string}
+ * @returns {string} 勢力ID
  */
 export function getPlayerFactionId() {
   return state.playerFactionId || "player";
 }
 
+/**
+ * 前線IDから前線情報を取得する。
+ * @param {string} frontId 前線ID
+ * @returns {object|null} 前線オブジェクト
+ */
 export function getFrontById(frontId) {
   if (!frontId || !state.warLedger?.entries) return null;
   for (const entry of state.warLedger.entries) {
@@ -68,6 +75,12 @@ export function getFrontById(frontId) {
   return null;
 }
 
+/**
+ * 前線の終了予定日を延長する。
+ * @param {string} frontId 前線ID
+ * @param {number} days 延長日数
+ * @returns {void}
+ */
 export function extendFrontDuration(frontId, days) {
   if (!frontId || !state.warLedger?.entries || !Number.isFinite(days) || days <= 0) return;
   state.warLedger.entries.forEach((entry) => {
@@ -81,8 +94,9 @@ export function extendFrontDuration(frontId, days) {
 
 /**
  * プレイヤー所属勢力と指定勢力の緊張度を加減する。
- * @param {string} otherFactionId
+ * @param {string} otherFactionId 相手勢力ID
  * @param {number} delta 正で開戦方向、負で同盟方向
+ * @returns {void}
  */
 export function adjustPlayerTension(otherFactionId, delta) {
   const pf = getPlayerFactionId();
@@ -151,7 +165,7 @@ export function maybeQueueHonorInvite(absDay) {
 
 /**
  * 勢力状態を初期化/補完する。
- * @returns {object}
+ * @returns {object} 勢力ステート
  */
 export function ensureFactionState() {
   if (!state.factionState) state.factionState = {};
@@ -162,6 +176,7 @@ export function ensureFactionState() {
 
 /**
  * 初期の同盟/戦争関係を設定し、戦況エントリを作成する。
+ * @returns {void}
  */
 export function seedWarDefaults() {
   ensureFactionState();
@@ -282,10 +297,10 @@ export function getWarScoreLabel(score) {
 }
 
 /**
- * ??????????????????
- * @param {string} factionId
- * @param {string} settlementId
- * @returns {{entry: object, front: object}|null}
+ * 勢力IDと拠点IDから、該当拠点で進行中の前線情報を取得する。
+ * @param {string} factionId 勢力ID
+ * @param {string} settlementId 拠点ID
+ * @returns {{entry: object, front: object}|null} 該当前線（なければnull）
  */
 export function getFrontForSettlement(factionId, settlementId) {
   if (!state?.warLedger?.entries || !factionId || !settlementId) return null;
@@ -387,6 +402,17 @@ export function addWarScore(a, b, scoreDelta, startedAt = null, supplyDelta = 0,
   return entry;
 }
 
+/**
+ * 前線スコアを加算する（ settlementId 指定時は局地、未指定なら全体戦況にフォールバック）。
+ * @param {string} a 勢力ID
+ * @param {string} b 勢力ID
+ * @param {string|null} settlementId 前線の拠点ID（nullなら全体）
+ * @param {number} scoreDelta 戦況スコア加算
+ * @param {number|null} startedAt 開始日(absDay)
+ * @param {number} supplyDelta 兵站加算
+ * @param {number} faithDelta 信仰加算
+ * @returns {object|null} 更新後エントリ（なければnull）
+ */
 export function addFrontScore(a, b, settlementId, scoreDelta, startedAt = null, supplyDelta = 0, faithDelta = 0) {
   if (!settlementId) return addWarScore(a, b, scoreDelta, startedAt, supplyDelta, faithDelta);
   const entry = getWarEntry(a, b);
@@ -400,6 +426,13 @@ export function addFrontScore(a, b, settlementId, scoreDelta, startedAt = null, 
   return entry;
 }
 
+/**
+ * 戦争フラグを有効化する（warLedgerエントリ生成時に呼ぶ）。
+ * @param {string} a 勢力ID
+ * @param {string} b 勢力ID
+ * @param {number|null} startedAt 開始日(absDay)
+ * @returns {void}
+ */
 function activateWarFlag(a, b, startedAt) {
   const fa = state.factionState?.[a];
   const fb = state.factionState?.[b];
@@ -407,20 +440,29 @@ function activateWarFlag(a, b, startedAt) {
   if (fb) fb.warFlags = { active: true, startedAt: startedAt ?? fb?.warFlags?.startedAt ?? null, fronts: fb?.warFlags?.fronts || [] };
 }
 
+/** 2要素をソートしてペアを返す。 */
 function sortPair(a, b) {
   return [a, b].sort((x, y) => (x > y ? 1 : x < y ? -1 : 0));
 }
 
+/** 戦況エントリのキーを生成する。 */
 function makeWarKey(a, b) {
   const [x, y] = sortPair(a, b);
   return `${x}__${y}`;
 }
 
+/**
+ * 勢力IDに応じた符号付き戦況スコアを返す。
+ * @param {object} entry warLedgerエントリ
+ * @param {string} factionId 勢力ID
+ * @returns {number} スコア
+ */
 function warScoreFor(entry, factionId) {
   if (!entry) return 0;
   return factionId === entry.factions?.[0] ? entry.score : -entry.score;
 }
 
+/** 勢力IDの全ペアを生成する（海賊除外）。 */
 function factionPairs() {
   const ids = FACTIONS.map((f) => f.id).filter((id) => id !== "pirates");
   const pairs = [];
@@ -432,6 +474,12 @@ function factionPairs() {
   return pairs;
 }
 
+/**
+ * 2勢力の拠点間最短距離を返す（拠点が無ければInfinity）。
+ * @param {string} a 勢力ID
+ * @param {string} b 勢力ID
+ * @returns {number} マンハッタン距離
+ */
 function minSettlementDistance(a, b) {
   const aSets = settlements.filter((s) => s.factionId === a);
   const bSets = settlements.filter((s) => s.factionId === b);
@@ -446,6 +494,13 @@ function minSettlementDistance(a, b) {
   return best;
 }
 
+/**
+ * 戦争でない関係の緊張度を調整し、閾値で同盟/開戦に遷移させる。
+ * @param {string} a 勢力ID
+ * @param {string} b 勢力ID
+ * @param {number} delta 加算値（正で敵対、負で友好）
+ * @returns {object|null} warLedgerエントリ（開戦した場合）またはnull
+ */
 function adjustRelationTension(a, b, delta) {
   if (!a || !b || a === b) return null;
   if (a === "pirates" || b === "pirates") return null;
@@ -514,6 +569,13 @@ function adjustRelationTension(a, b, delta) {
   return null;
 }
 
+/**
+ * 開戦中の勢力ペアに対し、新たな前線を開始する（最大2本）。
+ * @param {object} entry warLedgerエントリ
+ * @param {number} absDay 現在absDay
+ * @param {number} duration 前線の継続日数
+ * @returns {boolean} 生成したらtrue
+ */
 function maybeStartFront(entry, absDay, duration) {
   const factions = entry.factions || [];
   if (factions.length !== 2) return;
@@ -572,6 +634,13 @@ function maybeStartFront(entry, absDay, duration) {
   pushLog("攻撃開始", `${attackerName} が ${defenderName} の ${setName} ${setPos} を攻撃開始`, "-");
 }
 
+/**
+ * 前線を決着させる。
+ * @param {object} entry warLedgerエントリ
+ * @param {object} front 前線
+ * @param {boolean} attackerWins 攻撃側勝利ならtrue
+ * @returns {void}
+ */
 function resolveFront(entry, front, attackerWins) {
   if (!front || front.resolved) return;
   front.resolved = true;
@@ -646,6 +715,11 @@ function resolveFront(entry, front, attackerWins) {
   }
 }
 
+/**
+ * 戦争を終結させ、中立に戻す。
+ * @param {object} entry warLedgerエントリ
+ * @returns {void}
+ */
 function endWar(entry) {
   if (!entry) return;
   const [a, b] = entry.factions || [];
@@ -690,6 +764,11 @@ function endWar(entry) {
  * 兵站支援要請イベントを生成する（劣勢時のサンプル）。
  * @param {object} entry
  */
+/**
+ * 劣勢時に兵站要請イベントをキューする。
+ * @param {object} entry warLedgerエントリ
+ * @returns {void}
+ */
 function queueLogisticsRequest(entry) {
   // ※サンプルだが後々のために取っておく
   // const factions = entry?.factions || [];
@@ -725,6 +804,12 @@ function queueLogisticsRequest(entry) {
   // });
 }
 
+/**
+ * 前線行動の要請イベントをキューする。
+ * @param {object} entry warLedgerエントリ
+ * @param {object} front 前線
+ * @returns {void}
+ */
 function queueFrontActionRequest(entry, front) {
   const pf = getPlayerFactionId();
   if (!pf || pf === "player") return false;
@@ -774,6 +859,13 @@ function queueFrontActionRequest(entry, front) {
   return true;
 }
 
+/**
+ * 停戦工作の要請イベントをキューする。
+ * @param {object} entry warLedgerエントリ
+ * @param {object} front 前線
+ * @param {number} absDay 現在absDay
+ * @returns {void}
+ */
 function queueTruceRequest(entry, front, absDay) {
   const pf = getPlayerFactionId();
   if (!pf || pf === "player") return false;
@@ -817,9 +909,9 @@ function queueTruceRequest(entry, front, absDay) {
 }
 
 /**
- * 戦況を日次で確認し、劣勢なら兵站要請イベントを積む。
- * 7日間は再送しないクールダウンでスパムを抑止する。
- * @param {number} absDay 現在の通算日数
+ * 日次で戦況を進行させる（前線処理・開戦チェック）。
+ * @param {number} absDay 現在absDay
+ * @returns {void}
  */
 export function tickDailyWar(absDay) {
   if (!state.warLedger?.entries) return;
@@ -879,8 +971,9 @@ export function tickDailyWar(absDay) {
 }
 
 /**
- * NPC間の緊張度を日次で揺らし、開戦/同盟を自動で発生させる。
- * @param {number} absDay
+ * 日次で緊張度ドリフトを適用する。
+ * @param {number} absDay 現在absDay
+ * @returns {void}
  */
 export function tickRelationDrift(absDay) {
   factionPairs().forEach(([a, b]) => {
