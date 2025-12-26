@@ -737,10 +737,16 @@ function endWar(entry) {
   const fb = state.factionState?.[b];
   if (fa?.warFlags) fa.warFlags = { active: false, fronts: [] };
   if (fb?.warFlags) fb.warFlags = { active: false, fronts: [] };
-  enqueueEvent({
-    title: "戦争終結",
-    body: `${aName} と ${bName} の戦争が終結しました。`,
-  });
+  const pf = getPlayerFactionId();
+  const related = pf && pf !== "player" && (entry.factions || []).includes(pf);
+  if (related) {
+    enqueueEvent({
+      title: "戦争終結",
+      body: `${aName} と ${bName} の戦争が終結しました。`,
+    });
+  } else {
+    pushToast("戦争終結", `${aName} と ${bName} の戦争が終結しました。`, "info");
+  }
   pushLog("戦争終結", `${aName} と ${bName} の戦争が終結しました`, "-");
 }
 
