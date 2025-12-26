@@ -264,6 +264,12 @@ export function renderQuestUI(syncUI) {
   });
 }
 
+/**
+ * 依頼受注モーダルを描画する。
+ * @param {object|null} settlement 対象拠点
+ * @param {Function} syncUI 受注後などに呼ぶ同期処理
+ * @returns {void}
+ */
 export function renderQuestModal(settlement, syncUI) {
   const body = elements.questModalBody;
   if (!body) return;

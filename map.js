@@ -398,11 +398,22 @@ function factionName(id) {
   return FACTIONS.find((f) => f.id === id)?.name || id;
 }
 
+/**
+ * 貴族IDから表示名を取得する。
+ * @param {string} nobleId 貴族ID
+ * @returns {string} 貴族名（見つからない場合はIDをそのまま返す）
+ */
 function nobleName(nobleId) {
   const nob = FACTIONS.flatMap((f) => f.nobles || []).find((n) => n.id === nobleId);
   return nob?.name || nobleId;
 }
 
+/**
+ * 依頼オブジェクトからマップピン情報を生成する。
+ * @param {object} q 依頼データ
+ * @param {number} nowAbs 現在日（絶対日）
+ * @returns {Array<object>} ピン情報の配列
+ */
 function questToPin(q, nowAbs) {
   const title = q.title || "依頼";
   const deadlineText =
@@ -479,6 +490,11 @@ function questToPin(q, nowAbs) {
   }
 }
 
+/**
+ * ピン配列をマージ・優先度ソートし、座標インデックス付きのキャッシュを作る。
+ * @param {Array} pins ピン配列
+ * @returns {{list:Array,byPos:Map<string,Array>}} キャッシュ情報
+ */
 function buildPinCache(pins) {
   const merged = [];
   const mergeMap = new Map();
@@ -509,6 +525,10 @@ function buildPinCache(pins) {
   return { list: merged, byPos };
 }
 
+/**
+ * 防衛ピンと依頼ピンを統合してキャッシュを再構築する。
+ * @returns {void}
+ */
 function refreshPinCache() {
   pinCache = { list: [], byPos: new Map() };
   if (state.mapPinsVisible === false) return;
@@ -546,10 +566,25 @@ function refreshPinCache() {
   pinCache = buildPinCache(pins);
 }
 
+/**
+ * 指定座標に存在するピン一覧を取得する。
+ * @param {number} x X座標
+ * @param {number} y Y座標
+ * @returns {Array} ピン配列
+ */
 function pinsAt(x, y) {
   return pinCache.byPos.get(`${x},${y}`) || [];
 }
 
+/**
+ * ピンをキャンバスに描画する。
+ * @param {CanvasRenderingContext2D} ctx 描画コンテキスト
+ * @param {object} pin ピン情報
+ * @param {number} pad キャンバスパディング
+ * @param {number} cellSize セルサイズ
+ * @param {number} startX 描画開始X座標
+ * @param {number} startY 描画開始Y座標
+ */
 function drawPin(ctx, pin, pad, cellSize, startX, startY) {
   const cx = pad + (pin.x - startX) * cellSize + cellSize / 2;
   const cy = pad + (pin.y - startY) * cellSize + cellSize / 2;

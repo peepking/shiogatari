@@ -1981,19 +1981,34 @@ export function setBattleEnemyFaction(factionId) {
   battleState.enemyFactionId = factionId || null;
 }
 
+/**
+ * 敵編成をセットする。
+ * @param {Array} entries 部隊スロットの配列
+ */
 export function setEnemyFormation(entries) {
   battleState.enemyFormation = Array.isArray(entries) ? [...entries] : null;
   battleState.enemySlotOrder = null;
 }
 
+/**
+ * 戦闘終了時に呼ぶコールバックを設定する。
+ * @param {Function|null} handler 終了ハンドラ
+ */
 export function setBattleEndHandler(handler) {
   battleState.onEnd = typeof handler === "function" ? handler : null;
 }
 
+/**
+ * 戦闘画面を開く。
+ */
 export function openBattle() {
   openBattleView();
 }
 
+/**
+ * 戦闘用の地形キーを設定する。
+ * @param {string} key 地形ID（例: plain/forest など）
+ */
 export function setBattleTerrain(key) {
   battleState.battleTerrain = key || "plain";
 }
