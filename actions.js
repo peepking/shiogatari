@@ -196,11 +196,10 @@ function pickEncounterFaction(pos, terrain) {
 }
 
 /**
- * エンカウントを発火し、戦闘準備モードへ遷移する。
- * @param {Function} syncUI UI同期関数
- * @returns {void}
+ * エンカウントを生成し、戦闘準備用のメタデータを返す（UIは呼び出し側で処理）。
+ * @returns {{title:string,message:string,log:string,detail:object}} UI表示用の情報
  */
-function triggerEncounter(syncUI) {
+function triggerEncounter() {
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   const frontHint = pickFrontEncounter(state.position);
   const enemyFactionId = frontHint?.enemyFactionId || pickEncounterFaction(state.position, terrain);
@@ -217,29 +216,26 @@ function triggerEncounter(syncUI) {
   state.modeLabel = MODE_LABEL.PREP;
   resetEncounterMeter();
   const enemyName = FACTIONS.find((f) => f.id === enemyFactionId)?.name || "敵勢力";
-  setOutput(
-    "敵襲",
-    `${enemyName} と遭遇しました（推定${total}人 / ${strength === "elite" ? "正規軍" : "通常編成"}）。行動を選んでください。`,
-    [
-      { text: "戦闘準備", kind: "warn" },
-      { text: "行動選択", kind: "warn" },
-    ]
-  );
-  pushLog(
-    "敵襲",
-    `${enemyName} と遭遇（推定${total}人 / ${strength === "elite" ? (enemyFactionId !== "pirates" ? "正規軍" : "強編成") : "通常編成"}）。`,
-    state.lastRoll ?? "-"
-  );
-  syncUI?.();
+  const strengthLabel =
+    strength === "elite"
+      ? enemyFactionId !== "pirates"
+        ? "正規軍"
+        : "強編成"
+      : "通常編成";
+  return {
+    title: "敵襲",
+    message: `${enemyName} と遭遇しました（推定${total}人 / ${strengthLabel}）。行動を選んでください。`,
+    log: `${enemyName} と遭遇（推定${total}人 / ${strengthLabel}）。`,
+    detail: { enemyName, total, strengthLabel, enemyFactionId, frontId: frontHint?.frontId || null },
+  };
 }
 
 /**
  * 移動進捗に応じてエンカウントをチェックする。
- * @param {Function} syncUI UI同期関数
- * @returns {boolean} 発生したか
+ * @returns {{ok:boolean, info?:object}} 発生した場合はinfoを含む
  */
-function maybeTriggerEncounter(syncUI) {
-  if (state.pendingEncounter?.active) return false;
+function maybeTriggerEncounter() {
+  if (state.pendingEncounter?.active) return { ok: false };
   const loc = getLocationStatus();
   // 村/街タイル上ではエンカウントしないが、リセットもしない（入場時のみリセット）
   if (loc?.place === PLACE.VILLAGE || loc?.place === PLACE.TOWN) return false;
@@ -252,12 +248,10 @@ function maybeTriggerEncounter(syncUI) {
   const escortBoost = state.refugeeEscort?.active ? 3 : 1;
   state.encounterProgress = (state.encounterProgress || 0) + nearbyEnemyBoost * escortBoost;
   if (state.encounterProgress >= threshold) {
-    triggerEncounter(syncUI);
-    const enemyName = enemyFactionId === "pirates" ? "外洋海賊" : "正規軍";
-    pushToast("敵襲", `${enemyName}が接近中！ 戦闘準備をしてください。`, "warn");
-    return true;
+    const info = triggerEncounter();
+    return { ok: true, info: { ...info, enemyFactionId } };
   }
-  return false;
+  return { ok: false };
 }
 
 /**
@@ -282,62 +276,35 @@ export function isValidMove(from, to) {
  * @param {Function} syncUI UI同期関数
  * @returns {boolean} 移動成功か
  */
-export function moveToSelected(showActionMessage, syncUI) {
+export function moveToSelected(syncUI) {
   // 謁見モードのまま移動した場合は通常モードに戻す
   if (state.modeLabel === MODE_LABEL.AUDIENCE) {
     state.modeLabel = MODE_LABEL.NORMAL;
   }
   if (state.pendingEncounter?.active) {
-    showActionMessage?.("戦闘準備中は移動できません。行動を選んでください。", "warn");
-    return false;
+    return { ok: false, code: "prep-active" };
   }
   if (state.modeLabel === MODE_LABEL.BATTLE) {
-    showActionMessage?.("戦闘中は移動できません。地図に戻ってください。", "warn");
-    return false;
+    return { ok: false, code: "in-battle" };
   }
-  // 物資/部隊が上限を超えている場合は移動を封じ、破棄/解雇を促す。
   const supplyTotal = totalSupplies();
   const supplyCap = calcSupplyCap(state.ships);
   if (supplyTotal > supplyCap) {
-    setOutput("移動不可", `物資が上限を超えています（${supplyTotal}/${supplyCap}）。`, [
-      { text: "物資超過", kind: "warn" },
-      { text: "破棄が必要", kind: "warn" },
-    ]);
-    showActionMessage?.("物資が上限を超えています。破棄してください。", "error");
-    return false;
+    return { ok: false, code: "over-supply", detail: { supplyTotal, supplyCap } };
   }
   const troopTotal = totalTroops();
   const troopCap = calcTroopCap(state.ships);
   if (troopTotal > troopCap) {
-    setOutput("移動不可", `部隊が上限を超えています（${troopTotal}/${troopCap}）。`, [
-      { text: "部隊超過", kind: "warn" },
-      { text: "解雇が必要", kind: "warn" },
-    ]);
-    showActionMessage?.("部隊が上限を超えています。解雇してください。", "error");
-    return false;
+    return { ok: false, code: "over-troop", detail: { troopTotal, troopCap } };
   }
   const dest = state.selectedPosition;
   if (!dest) {
-    setOutput("移動不可", "移動先が選択されていません。", [
-      { text: "移動", kind: "warn" },
-      { text: "選択必須", kind: "warn" },
-    ]);
-    showActionMessage?.("移動先を選択してください。", "error");
-    return false;
+    return { ok: false, code: "no-destination" };
   }
   if (!isValidMove(state.position, dest)) {
-    setOutput("移動不可", "現在地の上下左右1マスのみ移動できます。", [
-      { text: "範囲外", kind: "warn" },
-      { text: "移動", kind: "" },
-    ]);
-    showActionMessage?.("移動できるのは上下左右1マス以内です。", "error");
-    return false;
+    return { ok: false, code: "invalid-move" };
   }
-  // 拠点内なら自動で外へ出る
-  if (state.modeLabel === MODE_LABEL.IN_VILLAGE) {
-    state.modeLabel = MODE_LABEL.NORMAL;
-  }
-  if (state.modeLabel === MODE_LABEL.IN_TOWN) {
+  if (state.modeLabel === MODE_LABEL.IN_VILLAGE || state.modeLabel === MODE_LABEL.IN_TOWN) {
     state.modeLabel = MODE_LABEL.NORMAL;
   }
   state.position = { ...dest };
@@ -348,24 +315,21 @@ export function moveToSelected(showActionMessage, syncUI) {
     completeWarEscortAt(arrivedSet);
   }
   advanceDayWithEvents(1);
-  setOutput("移動", `(${dest.x + 1}, ${dest.y + 1}) へ移動しました。`, [
-    { text: "移動", kind: "" },
-    { text: "日数+1", kind: "" },
-  ]);
-  // pushLog("移動", `選択マスへ移動 (${dest.x + 1}, ${dest.y + 1})`, state.lastRoll ?? "-");
-  showActionMessage?.("", "info");
   setTravelEventSync(syncUI);
   const travelEventHit = rollTravelEvents();
   if (travelEventHit) {
     notifyAutoMoveStop();
-  } else {
-    const enc = maybeTriggerEncounter(syncUI);
-    if (enc) notifyAutoMoveStop();
+    return { ok: false, code: "travel-event" };
+  }
+  const enc = maybeTriggerEncounter();
+  if (enc?.ok) {
+    notifyAutoMoveStop();
+    return { ok: true, code: "encounter", detail: enc.info };
   }
   checkRefugeeEscortArrival();
   completeNobleRefugeeAt(getSettlementAtPosition(state.position.x, state.position.y));
   syncUI?.();
-  return true;
+  return { ok: true, code: "moved", detail: { pos: { ...state.position } } };
 }
 
 /**

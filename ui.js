@@ -178,6 +178,74 @@ function clearActionMessage() {
 }
 
 /**
+ * 移動結果コードに応じてUIメッセージを表示する。
+ * @param {{ok:boolean,code:string,detail?:object}} res 結果オブジェクト
+ * @returns {boolean} 自動移動を続行してよいか
+ */
+function handleMoveResult(res) {
+  if (!res) return false;
+  switch (res.code) {
+    case "prep-active":
+      showActionMessage("戦闘準備中は移動できません。行動を選んでください。", "warn");
+      return false;
+    case "in-battle":
+      showActionMessage("戦闘中は移動できません。地図に戻ってください。", "warn");
+      return false;
+    case "over-supply": {
+      const { supplyTotal, supplyCap } = res.detail || {};
+      setOutput("移動不可", `物資が上限を超えています。${supplyTotal ?? ""}/${supplyCap ?? ""}`, [
+        { text: "物資確認", kind: "warn" },
+        { text: "破棄・整理", kind: "warn" },
+      ]);
+      showActionMessage("物資が上限を超えています。破棄してください。", "error");
+      return false;
+    }
+    case "over-troop": {
+      const { troopTotal, troopCap } = res.detail || {};
+      setOutput("移動不可", `部隊が上限を超えています。${troopTotal ?? ""}/${troopCap ?? ""}`, [
+        { text: "部隊確認", kind: "warn" },
+        { text: "解雇・整理", kind: "warn" },
+      ]);
+      showActionMessage("部隊が上限を超えています。解雇してください。", "error");
+      return false;
+    }
+    case "no-destination":
+      showActionMessage("移動先を選択してください。", "error");
+      return false;
+    case "invalid-move":
+      showActionMessage("移動できるのは上下左右1マス以内です。", "error");
+      return false;
+    case "travel-event":
+      return false;
+    case "encounter":
+      // 戦闘準備メッセージは受け取ったinfoで表示
+      if (res.detail) {
+        const info = res.detail;
+        pushToast("敵襲", `${info.enemyFactionId === "pirates" ? "外洋海賊" : "正規軍"}が接近中！ 戦闘準備をしてください。`, "warn");
+        setOutput(info.title, info.message, [
+          { text: "戦闘準備", kind: "warn" },
+          { text: "行動選択", kind: "warn" },
+        ]);
+        pushLog(info.title, info.log, state.lastRoll ?? "-");
+      }
+      return false;
+    case "moved": {
+      const pos = res.detail?.pos;
+      if (pos) {
+        setOutput("移動", `(${pos.x + 1}, ${pos.y + 1}) へ移動しました。`, [
+          { text: "移動完了", kind: "" },
+          { text: "日数+1", kind: "" },
+        ]);
+      }
+      showActionMessage("", "info");
+      return true;
+    }
+    default:
+      return !!res.ok;
+  }
+}
+
+/**
  * インラインメッセージ表示を更新する。
  * @param {HTMLElement|null} el
  * @param {string} msg
@@ -491,12 +559,9 @@ function stepAutoMove() {
     y: cy + (dx === 0 ? Math.sign(dy || 0) : 0),
   };
   state.selectedPosition = { ...next };
-  const moved = moveToSelected(showActionMessage, syncUI);
-  if (!moved) {
-    stopAutoMove();
-    return;
-  }
-  if (state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE || state.modeLabel === MODE_LABEL.PREP) {
+  const res = moveToSelected(syncUI);
+  const cont = handleMoveResult(res);
+  if (!cont || state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE || state.modeLabel === MODE_LABEL.PREP) {
     stopAutoMove();
     return;
   }
@@ -1482,7 +1547,8 @@ function wireButtons() {
   elements.warBlockBtn?.addEventListener("click", () => triggerWarAction("blockade"));
   document.addEventListener("map-move-request", () => {
     if (isAudienceMode()) state.modeLabel = MODE_LABEL.NORMAL;
-    moveToSelected(showActionMessage, syncUI);
+    const res = moveToSelected(syncUI);
+    handleMoveResult(res);
   });
   document.addEventListener("map-wait-request", () => {
     waitOneDay(elements, clearActionMessage, syncUI);
