@@ -1,9 +1,9 @@
-import { elements, setOutput, pushLog, confirmAction, pushToast, setInlineMessage } from "./dom.js";
-import { state } from "./state.js";
-import { MODE_LABEL } from "./constants.js";
-import { SUPPLY_ITEMS, calcSupplyPrice, calcSupplyCap, totalSupplies } from "./supplies.js";
 import { getCurrentSettlement } from "./actions.js";
+import { MODE_LABEL } from "./constants.js";
+import { confirmAction, elements, pushLog, pushToast, setInlineMessage, setOutput } from "./dom.js";
 import { adjustSupport } from "./faction.js";
+import { state } from "./state.js";
+import { SUPPLY_ITEMS, calcSupplyCap, calcSupplyPrice, totalSupplies } from "./supplies.js";
 
 // 船の単価は固定（1隻=5000資金）。
 const SHIP_PRICE = 5000;

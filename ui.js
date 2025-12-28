@@ -1,93 +1,93 @@
-import { state, resetState } from "./state.js";
-import { MODE_LABEL, BATTLE_RESULT, BATTLE_RESULT_LABEL, PLACE, NONE_LABEL } from "./constants.js";
-import { nowStr, formatGameTime, clamp } from "./util.js";
-import { elements, setOutput, pushLog, pushToast, setInlineMessage } from "./dom.js";
 import {
-  renderMap,
-  wireMapHover,
-  getLocationStatus,
-  getTerrainAt,
-  ensureNobleHomes,
-  settlements,
-  resetSettlementSupport,
-  refreshMapInfo,
-  resetWorld,
-  nobleHome,
-} from "./map.js";
-import {
-  formatTroopDisplay,
-  renderTroopModal,
-  wireTroopDismiss,
-  applyTroopLosses,
-  addTroops,
-  levelUpTroopsRandom,
-  TROOP_STATS,
-} from "./troops.js";
-import {
-  formatSupplyDisplay,
-  syncSuppliesUI,
-  wireSupplyModal,
-  wireSupplyDiscard,
-  SUPPLY_ITEMS,
-  SUPPLY_TYPES,
-} from "./supplies.js";
-import {
-  moveToSelected,
   attemptEnter,
   attemptExit,
-  waitOneDay,
+  buildEnemyFormation,
   getCurrentSettlement,
+  moveToSelected,
   resetEncounterMeter,
   triggerWarAction,
+  waitOneDay,
 } from "./actions.js";
-import { wireMarketModals, openEventTrade } from "./marketUI.js";
-import { wireHireModal } from "./hireUI.js";
-import { renderAssets, renderFactions, wireFactionPanel, wireMapToggle } from "./panelUI.js";
-import { renderQuestUI, renderQuestModal } from "./questUI.js";
 import {
-  ensureSeasonalQuests,
-  seedInitialQuests,
-  receiveOracle,
-  canReceiveOracle,
-  getBattleQuestAt,
-  completeOracleBattleQuest,
-  failOracleBattleQuest,
-  completeHuntBattleQuest,
-  ensureNobleQuests,
-  getAvailableNobleQuests,
-  acceptNobleQuest,
-  completeNobleBattleQuest,
-  completeWarBattleQuest,
-  QUEST_TYPES,
-} from "./quests.js";
-import { FACTIONS } from "./lore.js";
-import { buildEnemyFormation } from "./actions.js";
+  openBattle,
+  setBattleEndHandler,
+  setBattleEnemyFaction,
+  setBattleTerrain,
+  setEnemyFormation,
+  wireBattleUI,
+} from "./battle.js";
+import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL, NONE_LABEL, PLACE } from "./constants.js";
+import { elements, pushLog, pushToast, setInlineMessage, setOutput } from "./dom.js";
+import { initEventQueueUI } from "./events.js";
 import {
+  addHonorFaction,
   addWarScore,
-  getPlayerFactionId,
   adjustNobleFavor,
   adjustSupport,
-  addHonorFaction,
-  isHonorFaction,
+  ensureFactionState,
   getNobleFavor,
-  honorFactions,
-  removeHonorFaction,
+  getPlayerFactionId,
   HONOR_FAVOR_THRESHOLD,
-  seedWarDefaults,
+  honorFactions,
+  isHonorFaction,
   isSettlementUnderSiege,
+  removeHonorFaction,
+  seedWarDefaults,
 } from "./faction.js";
+import { wireHireModal } from "./hireUI.js";
+import { FACTIONS } from "./lore.js";
+import {
+  ensureNobleHomes,
+  getLocationStatus,
+  getTerrainAt,
+  nobleHome,
+  refreshMapInfo,
+  renderMap,
+  resetSettlementSupport,
+  resetWorld,
+  settlements,
+  wireMapHover,
+} from "./map.js";
+import { openEventTrade, wireMarketModals } from "./marketUI.js";
+import { renderAssets, renderFactions, wireFactionPanel, wireMapToggle } from "./panelUI.js";
+import { renderQuestModal, renderQuestUI } from "./questUI.js";
 import { absDay, manhattan } from "./questUtils.js";
 import {
-  wireBattleUI,
-  setEnemyFormation,
-  setBattleEndHandler,
-  openBattle,
-  setBattleTerrain,
-  setBattleEnemyFaction,
-} from "./battle.js";
+  acceptNobleQuest,
+  canReceiveOracle,
+  completeHuntBattleQuest,
+  completeNobleBattleQuest,
+  completeOracleBattleQuest,
+  completeWarBattleQuest,
+  ensureNobleQuests,
+  ensureSeasonalQuests,
+  failOracleBattleQuest,
+  getAvailableNobleQuests,
+  getBattleQuestAt,
+  QUEST_TYPES,
+  receiveOracle,
+  seedInitialQuests,
+} from "./quests.js";
+import { resetState, state } from "./state.js";
 import { loadGameFromStorage } from "./storage.js";
-import { initEventQueueUI } from "./events.js";
-import { ensureFactionState } from "./faction.js";
+import {
+  formatSupplyDisplay,
+  SUPPLY_ITEMS,
+  SUPPLY_TYPES,
+  syncSuppliesUI,
+  wireSupplyDiscard,
+  wireSupplyModal,
+} from "./supplies.js";
+import {
+  addTroops,
+  applyTroopLosses,
+  formatTroopDisplay,
+  levelUpTroopsRandom,
+  renderTroopModal,
+  TROOP_STATS,
+  wireTroopDismiss,
+} from "./troops.js";
+import { clamp, formatGameTime, nowStr } from "./util.js";
 
 /**
  * 
@@ -340,23 +340,6 @@ function exitAudience() {
   syncUI();
 }
 
-/**
- * 賄賂モーダルを開く。
- */
-function openBribeModal() {
-  const ctx = getAudienceContext();
-  if (!ctx.nobleId) {
-    pushToast("賄賂不可", "ここで渡せる相手がいません。", "warn");
-    return;
-  }
-  if (elements.bribeFunds) elements.bribeFunds.textContent = String(state.funds || 0);
-  if (elements.bribeInput) {
-    const suggested = Math.min(state.funds || 0, Math.max(0, Number(elements.bribeInput.value) || 0));
-    elements.bribeInput.value = String(suggested);
-  }
-  setInlineMessage(elements.bribeError, "");
-  openModal(elements.bribeModal);
-}
 
 /**
  * 賄賂の確定処理を行う。
@@ -1802,18 +1785,6 @@ function bindExportButtons() {
     a.download = "shiogatari-log.txt";
     a.click();
     URL.revokeObjectURL(url);
-  });
-
-  document.getElementById("copyBtn")?.addEventListener("click", async () => {
-    const text =
-      state.lastResultText ||
-      `${elements.outTitle?.textContent ?? ""}\n${elements.outText?.textContent ?? ""}`;
-    try {
-      await navigator.clipboard.writeText(text);
-      pushLog("コピー", "直近の結果をクリップボードにコピーしました", state.lastRoll ?? "-");
-    } catch {
-      alert("コピーに失敗しました。ブラウザの許可設定をご確認ください。");
-    }
   });
 }
 

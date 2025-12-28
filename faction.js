@@ -1,10 +1,10 @@
-import { state } from "./state.js";
-import { settlements, nobleHome } from "./map.js";
-import { clamp, relationLabel, supportLabel, warScoreLabel, displayWarLabel } from "./util.js";
-import { enqueueEvent } from "./events.js";
 import { pushLog, pushToast } from "./dom.js";
+import { enqueueEvent } from "./events.js";
 import { FACTIONS } from "./lore.js";
+import { nobleHome, settlements } from "./map.js";
 import { absDay, manhattan, randInt } from "./questUtils.js";
+import { state } from "./state.js";
+import { clamp, displayWarLabel, relationLabel, supportLabel, warScoreLabel } from "./util.js";
 
 const HONOR_COOLDOWN_DAYS = 30;
 const HONOR_ROLL_RATE = 0.12; // 1日あたり12%で来訪。クールダウン付き。
@@ -621,12 +621,12 @@ function maybeStartFront(entry, absDay, duration) {
 
 /**
  * 前線を決着させる。
- * @param {object} entry warLedgerエントリ
+ * @param {object} _entry warLedgerエントリ
  * @param {object} front 前線
  * @param {boolean} attackerWins 攻撃側勝利ならtrue
  * @returns {void}
  */
-function resolveFront(entry, front, attackerWins) {
+function resolveFront(_entry, front, attackerWins) {
   if (!front || front.resolved) return;
   front.resolved = true;
   const winner = attackerWins ? front.attacker : front.defender;
@@ -752,11 +752,11 @@ function endWar(entry) {
 
 /**
  * 前線行動の要請イベントをキューする。
- * @param {object} entry warLedgerエントリ
+ * @param {object} _entry warLedgerエントリ
  * @param {object} front 前線
  * @returns {void}
  */
-function queueFrontActionRequest(entry, front) {
+function queueFrontActionRequest(_entry, front) {
   const pf = getPlayerFactionId();
   if (!pf || pf === "player") return false;
   const role = front.defender === pf ? "defend" : front.attacker === pf ? "attack" : null;

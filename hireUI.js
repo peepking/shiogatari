@@ -1,7 +1,7 @@
-import { elements, setOutput, pushLog, setInlineMessage } from "./dom.js";
-import { state } from "./state.js";
-import { MODE_LABEL } from "./constants.js";
 import { getCurrentSettlement } from "./actions.js";
+import { MODE_LABEL } from "./constants.js";
+import { elements, pushLog, setInlineMessage, setOutput } from "./dom.js";
+import { state } from "./state.js";
 import { TROOP_STATS } from "./troops.js";
 
 /**

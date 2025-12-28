@@ -1,12 +1,12 @@
-import { advanceDay as baseAdvanceDay, state } from "./state.js";
-import { questTickDay } from "./quests.js";
-import { TROOP_STATS, totalTroops, applyTroopLosses } from "./troops.js";
-import { pushLog } from "./dom.js";
-import { absDay } from "./questUtils.js";
-import { tickDailyWar, tickRelationDrift, maybeQueueHonorInvite, applySupportDrift } from "./faction.js";
-import { enqueueEvent } from "./events.js";
 import { startTravelEncounter } from "./actions.js";
 import { MODE_LABEL } from "./constants.js";
+import { pushLog } from "./dom.js";
+import { enqueueEvent } from "./events.js";
+import { applySupportDrift, maybeQueueHonorInvite, tickDailyWar, tickRelationDrift } from "./faction.js";
+import { questTickDay } from "./quests.js";
+import { absDay } from "./questUtils.js";
+import { advanceDay as baseAdvanceDay, state } from "./state.js";
+import { TROOP_STATS, applyTroopLosses, totalTroops } from "./troops.js";
 
 /**
  * 日付更新と、それに連動するイベント処理を進める。

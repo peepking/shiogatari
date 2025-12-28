@@ -1,5 +1,5 @@
+import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { state } from "./state.js";
-import { pushLog, pushToast, confirmAction } from "./dom.js";
 
 /** @type {number} 基本の部隊上限 */
 export const BASE_TROOP_CAP = 30;

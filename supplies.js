@@ -1,7 +1,7 @@
+import { confirmAction, pushLog, pushToast } from "./dom.js";
+import { getPlayerFactionId, getSupportLabel, getWarEntry, getWarScoreLabel } from "./faction.js";
 import { state } from "./state.js";
 import { sumValues } from "./util.js";
-import { pushLog, pushToast, confirmAction } from "./dom.js";
-import { getWarEntry, getWarScoreLabel, getSupportLabel, getPlayerFactionId } from "./faction.js";
 
 /** @type {number} 基本の物資上限 */
 export const BASE_SUPPLY_CAP = 60;

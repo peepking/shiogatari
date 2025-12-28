@@ -1,6 +1,6 @@
-import { state, resetState } from "./state.js";
 import { MODE_LABEL } from "./constants.js";
-import { snapshotWorld, restoreWorld } from "./map.js";
+import { restoreWorld, snapshotWorld } from "./map.js";
+import { resetState, state } from "./state.js";
 
 const SAVE_KEY = "shiogatari-save";
 

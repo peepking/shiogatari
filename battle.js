@@ -1,9 +1,9 @@
+import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL } from "./constants.js";
 import { elements, pushLog, pushToast } from "./dom.js";
+import { getTerrainAt } from "./map.js";
+import { state } from "./state.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
-import { state } from "./state.js";
-import { MODE_LABEL, BATTLE_RESULT, BATTLE_RESULT_LABEL } from "./constants.js";
-import { getTerrainAt } from "./map.js";
 
 const BASE_TICK_MS = 1000;
 const MAX_TICKS = 60;

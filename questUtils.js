@@ -1,5 +1,5 @@
-import { SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 import { mapData } from "./map.js";
+import { SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 
 /** @type {number} 1季節あたりの日数 */
 export const DAY_PER_SEASON = 30;

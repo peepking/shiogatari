@@ -1,32 +1,32 @@
-import { state } from "./state.js";
-import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
-import { settlements, getSettlementAtPosition, getSettlementById } from "./map.js";
 import { pushLog, pushToast } from "./dom.js";
 import { enqueueEvent } from "./events.js";
 import {
-  addWarScore,
   addFrontScore,
+  addWarScore,
+  adjustNobleFavor,
   adjustSupport,
+  extendFrontDuration,
+  getPlayerFactionId,
   getWarEntry,
   getWarScoreLabel,
-  getPlayerFactionId,
-  adjustNobleFavor,
-  extendFrontDuration,
 } from "./faction.js";
-import { TROOP_STATS } from "./troops.js";
-import {
-  randInt,
-  absDay,
-  rollDice,
-  manhattan,
-  pickRandomProcessed,
-  randomSeaTarget,
-  randomHuntTarget,
-  NORMAL_ANCHORS,
-  STRONG_ANCHORS,
-  pickAnchorRange,
-} from "./questUtils.js";
 import { FACTIONS } from "./lore.js";
+import { getSettlementAtPosition, getSettlementById, settlements } from "./map.js";
+import {
+  absDay,
+  manhattan,
+  NORMAL_ANCHORS,
+  pickAnchorRange,
+  pickRandomProcessed,
+  randInt,
+  randomHuntTarget,
+  randomSeaTarget,
+  rollDice,
+  STRONG_ANCHORS,
+} from "./questUtils.js";
+import { state } from "./state.js";
+import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
+import { TROOP_STATS } from "./troops.js";
 
 
 /** @enum {string} 依頼種別 */
@@ -1462,7 +1462,7 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
  * @param {number|null} fightIdx
  * @returns {boolean}
  */
-export function completeWarBattleQuest(id, success, enemyTotal, fightIdx = null) {
+export function completeWarBattleQuest(id, success, fightIdx = null) {
   ensureState();
   const idx = state.quests.active.findIndex(
     (q) =>

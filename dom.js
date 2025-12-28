@@ -1,6 +1,6 @@
-import { nowStr, escapeHtml, formatGameTime } from "./util.js";
 import { state } from "./state.js";
 import { saveGameToStorage } from "./storage.js";
+import { escapeHtml, formatGameTime, nowStr } from "./util.js";
 
 /**
  * 指定IDの要素を取得する。

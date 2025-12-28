@@ -1,17 +1,16 @@
-import { clamp } from "./util.js";
-import { state } from "./state.js";
 import { elements } from "./dom.js";
 import { FACTIONS } from "./lore.js";
 import { QUEST_TYPES } from "./quests.js";
 import { absDay } from "./questUtils.js";
-import { supportLabel, displaySupportLabel, displayWarLabel } from "./util.js";
+import { state } from "./state.js";
 import {
+  randomSupplyIdByType,
   refreshSettlementDemand,
   refreshSettlementStock,
   SUPPLY_TYPES,
-  randomSupplyIdByType,
 } from "./supplies.js";
 import { initSettlementRecruitment, refreshSettlementRecruitment } from "./troops.js";
+import { clamp, displaySupportLabel, displayWarLabel, supportLabel } from "./util.js";
 
 /** @type {number} マップの一辺サイズ */
 export const MAP_SIZE = 50;
@@ -57,7 +56,7 @@ const settlementNames = {
 };
 
 const goodsPool = ["食料", "木材", "石材", "鉄", "繊維", "塩", "織物", "酒", "武具", "香辛料", "なめし革"];
-let initialWorldSnapshot = null;
+const DEFAULT_WORLD_SEED = 2025;
 
 /** @type {Array} 生成済み拠点の一覧 */
 export const settlements = [];
@@ -202,14 +201,12 @@ function generateMap(seed = 1) {
       const r = rnd();
       let building = "none";
 
-      // 生成比は「街1 : 村2」くらいになるように閾値を調整。
+      // 生成比は「街1 : 村2」くらいになるように閾値を調整（城は生成しない）。
       if (coast) {
-        if (r > 0.995) building = "castle";
-        else if (r > 0.9567) building = "town";
+        if (r > 0.9567) building = "town";
         else if (r > 0.88) building = "village";
       } else {
-        if (r > 0.995) building = "castle";
-        else if (r > 0.9833) building = "town";
+        if (r > 0.9833) building = "town";
         else if (r > 0.96) building = "village";
       }
 
@@ -221,13 +218,17 @@ function generateMap(seed = 1) {
 }
 
 /** @type {Array} マップの地形/建物データ */
-export const mapData = generateMap(2025);
+export let mapData = [];
 let lastDemandSeason = { year: state.year, season: state.season };
 
 /**
- * 拠点を貴族・勢力に割り当てる。
+ * マップと拠点を再生成する。
+ * @param {number} [seed=DEFAULT_WORLD_SEED]
  */
-(function assignSettlements() {
+export function buildWorld(seed = DEFAULT_WORLD_SEED) {
+  mapData = generateMap(seed);
+  settlements.length = 0;
+  nobleHome.clear();
   const usedNames = new Set();
   const noblesByFaction = new Map();
   FACTIONS.forEach((f) => noblesByFaction.set(f.id, (f.nobles || []).map((n) => ({ ...n, factionId: f.id }))));
@@ -235,12 +236,6 @@ let lastDemandSeason = { year: state.year, season: state.season };
   const fallbackList = Array.from(noblesByFaction.values()).flat();
   let fallbackCursor = 0;
   // 拠点の所属は島ごとの勢力偏りを持たせる（左上/右上/下の島）。
-  /**
-   * 座標ごとの優先勢力を返す。
-   * @param {number} x
-   * @param {number} y
-   * @returns {string|null}
-   */
   const preferredFactionForCell = (x, y) => {
     const xRatio = x / MAP_SIZE;
     const yRatio = y / MAP_SIZE;
@@ -255,8 +250,6 @@ let lastDemandSeason = { year: state.year, season: state.season };
   for (let y = 0; y < MAP_SIZE; y++) {
     for (let x = 0; x < MAP_SIZE; x++) {
       const cell = mapData[y][x];
-      // 砦は村として扱う。
-      if (cell.building === "castle") cell.building = "village";
       if (cell.building !== "town" && cell.building !== "village") continue;
 
       const tooClose = settlements.some((s) => {
@@ -284,7 +277,7 @@ let lastDemandSeason = { year: state.year, season: state.season };
         fallbackCursor += 1;
       }
       const id = `set-${settlements.length + 1}`;
-const goods = [
+      const goods = [
         goodsPool[Math.floor(Math.random() * goodsPool.length)],
         goodsPool[Math.floor(Math.random() * goodsPool.length)],
       ];
@@ -315,16 +308,56 @@ const goods = [
       cell.settlement = settlement;
       cell.factionId = settlement.factionId;
       if (!nobleHome.has(owner.id)) nobleHome.set(owner.id, id);
-      // 貴族のhomeSettlementIdを設定（既存のnobleHomeマップと合わせて持つ）
       const nobleObj = FACTIONS.find((f) => f.id === owner.factionId)?.nobles?.find((n) => n.id === owner.id);
       if (nobleObj && !nobleObj.homeSettlementId) nobleObj.homeSettlementId = id;
     }
   }
-  lastDemandSeason = { year: state.year, season: state.season };
-})();
 
-// ワールド初期状態を保存（リセット用）
-initialWorldSnapshot = snapshotWorld();
+  // 街を優先して貴族を再割当（街が不足する場合のみ村へ）。
+  const townsByFaction = new Map();
+  const villagesByFaction = new Map();
+  settlements.forEach((s) => {
+    if (s.kind === "town") {
+      if (!townsByFaction.has(s.factionId)) townsByFaction.set(s.factionId, []);
+      townsByFaction.get(s.factionId).push(s);
+    } else if (s.kind === "village") {
+      if (!villagesByFaction.has(s.factionId)) villagesByFaction.set(s.factionId, []);
+      villagesByFaction.get(s.factionId).push(s);
+    }
+  });
+  const assignedNobles = new Set();
+  FACTIONS.filter((f) => f.id !== "pirates").forEach((f) => {
+    const nobles = f.nobles || [];
+    const towns = townsByFaction.get(f.id) || [];
+    const villages = villagesByFaction.get(f.id) || [];
+    if (towns.length) {
+      nobles.forEach((n, idx) => {
+        const t = towns[idx % towns.length];
+        const prev = t.nobleId;
+        if (prev && prev !== n.id) nobleHome.delete(prev);
+        t.nobleId = n.id;
+        t.controllerId = n.id;
+        nobleHome.set(n.id, t.id);
+        assignedNobles.add(n.id);
+      });
+    }
+    nobles.forEach((n, idx) => {
+      if (assignedNobles.has(n.id)) return;
+      const fallback = villages[idx % (villages.length || 1)];
+      if (!fallback) return;
+      const prev = fallback.nobleId;
+      if (prev && prev !== n.id) nobleHome.delete(prev);
+      fallback.nobleId = n.id;
+      fallback.controllerId = n.id;
+      nobleHome.set(n.id, fallback.id);
+      assignedNobles.add(n.id);
+    });
+  });
+  lastDemandSeason = { year: state.year, season: state.season };
+}
+
+// 初期ワールド生成
+buildWorld();
 
 /**
  * 勢力内で均等に貴族を拠点へ割り振る（拠点数 < 貴族数の場合は再利用）。
@@ -922,13 +955,9 @@ export function restoreWorld(snapshot) {
  * ワールドを初期スナップショットへリセットする。
  * @returns {boolean} リセット成功ならtrue
  */
-export function resetWorld() {
-  if (!initialWorldSnapshot) return false;
-  const ok = restoreWorld(initialWorldSnapshot);
-  if (ok) {
-    lastDemandSeason = { year: state.year, season: state.season };
-  }
-  return ok;
+export function resetWorld(seed = DEFAULT_WORLD_SEED) {
+  buildWorld(seed);
+  return true;
 }
 
 /**

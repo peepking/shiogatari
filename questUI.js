@@ -1,18 +1,18 @@
+import { getCurrentSettlement } from "./actions.js";
 import { elements, pushToast } from "./dom.js";
-import { state } from "./state.js";
-import { SUPPLY_ITEMS } from "./supplies.js";
+import { getSettlementById } from "./map.js";
 import {
-  getQuests,
-  getAvailableQuestsForSettlement,
   acceptQuest,
   canCompleteQuest,
   completeQuest,
+  getAvailableQuestsForSettlement,
+  getQuests,
   QUEST_TYPES,
 } from "./quests.js";
-import { getSettlementById } from "./map.js";
-import { getCurrentSettlement } from "./actions.js";
-import { TROOP_STATS } from "./troops.js";
 import { absDay } from "./questUtils.js";
+import { state } from "./state.js";
+import { SUPPLY_ITEMS } from "./supplies.js";
+import { TROOP_STATS } from "./troops.js";
 
 const TYPE_LABEL = {
   [QUEST_TYPES.SUPPLY]: "調達",
@@ -138,6 +138,32 @@ function buildPlaceLabel(q, ctx) {
     default:
       return "";
   }
+}
+
+/**
+ * 依頼モーダルに表示する期限ラベルを返す（受注からn日形式）。
+ * @param {object} q 依頼オブジェクト
+ * @param {number} nowAbs 現在の絶対日
+ * @returns {string} 表示用期限ラベル
+ */
+function modalDeadlineText(q, nowAbs) {
+  const nobleLongTypes = new Set([
+    QUEST_TYPES.NOBLE_SECURITY,
+    QUEST_TYPES.NOBLE_REFUGEE,
+    QUEST_TYPES.NOBLE_LOGISTICS,
+    QUEST_TYPES.NOBLE_HUNT,
+  ]);
+  const baseDays =
+    q.deadlineAbs != null
+      ? Math.max(0, q.deadlineAbs - nowAbs)
+      : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
+        ? 45
+        : q.type === QUEST_TYPES.NOBLE_SUPPLY || q.type === QUEST_TYPES.NOBLE_SCOUT
+          ? 30
+          : nobleLongTypes.has(q.type)
+            ? 60
+            : 30;
+  return `受注から${baseDays}日`;
 }
 
 /**
@@ -307,7 +333,7 @@ export function renderQuestModal(settlement, syncUI) {
         blockadeEstimate,
         estText,
       });
-      const deadlineText = q.deadlineAbs != null ? `残り${Math.max(0, q.deadlineAbs - now)}日` : "期限なし";
+      const deadlineText = modalDeadlineText(q, now);
       const bodyText = buildBodyText(q, itemName, supplyInfo);
       return `
         <tr>

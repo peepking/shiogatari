@@ -1,21 +1,20 @@
-import { elements } from "./dom.js";
-import { state } from "./state.js";
-import { ASSETS, FACTIONS } from "./lore.js";
-import { formatTroopDisplay, TROOP_STATS } from "./troops.js";
-import { formatSupplyDisplay, SUPPLY_ITEMS } from "./supplies.js";
-import { getSettlementsByNoble, nobleHome, refreshMapInfo, settlements } from "./map.js";
+import { elements, pushToast } from "./dom.js";
 import {
+  getNobleFavor,
+  getPlayerFactionId,
+  getRelation,
+  getSupportLabel,
   getWarEntry,
   getWarScoreLabel,
   isHonorFaction,
-  getPlayerFactionId,
-  getRelation,
   removeHonorFaction,
-  getNobleFavor,
-  getSupportLabel,
 } from "./faction.js";
-import { displayWarLabel, displayRelationLabel } from "./util.js";
-import { pushToast } from "./dom.js";
+import { ASSETS, FACTIONS } from "./lore.js";
+import { getSettlementsByNoble, nobleHome, refreshMapInfo, settlements } from "./map.js";
+import { state } from "./state.js";
+import { formatSupplyDisplay, SUPPLY_ITEMS } from "./supplies.js";
+import { formatTroopDisplay, TROOP_STATS } from "./troops.js";
+import { displayRelationLabel, displayWarLabel } from "./util.js";
 
 /**
  * 勢力IDから名称を取得する。

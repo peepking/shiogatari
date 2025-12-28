@@ -1,36 +1,33 @@
-import { state } from "./state.js";
 import { MODE_LABEL, PLACE } from "./constants.js";
-import { setOutput, pushLog, pushToast } from "./dom.js";
-import { getSettlementAtPosition, getLocationStatus, getTerrainAt, settlements, getSettlementById } from "./map.js";
-import { calcSupplyCap, totalSupplies, createSettlementDemand } from "./supplies.js";
-import { calcTroopCap, totalTroops } from "./troops.js";
-import { advanceDayWithEvents } from "./time.js";
-import { TROOP_STATS } from "./troops.js";
-import { clamp } from "./util.js";
-import { randInt, absDay, manhattan, NORMAL_ANCHORS, STRONG_ANCHORS, pickAnchorRange } from "./questUtils.js";
-import {
-  addWarScore,
-  getPlayerFactionId,
-  getWarEntry,
-  adjustSupport,
-  adjustNobleFavor,
-  getFrontById,
-  isSettlementUnderSiege,
-  getRelation,
-} from "./faction.js";
-import { warScoreLabel } from "./util.js";
-import { FACTIONS } from "./lore.js";
-import { SUPPLY_ITEMS } from "./supplies.js";
+import { pushLog, pushToast, setOutput } from "./dom.js";
 import { enqueueEvent } from "./events.js";
 import {
+  addWarScore,
+  adjustNobleFavor,
+  adjustSupport,
+  getFrontById,
+  getPlayerFactionId,
+  getRelation,
+  getWarEntry,
+  isSettlementUnderSiege,
+} from "./faction.js";
+import { FACTIONS } from "./lore.js";
+import { getLocationStatus, getSettlementAtPosition, getSettlementById, getTerrainAt, settlements } from "./map.js";
+import {
   addRefugeeEscortQuest,
-  completeRefugeeEscortAt,
-  markNobleRefugeePickup,
-  completeNobleRefugeeAt,
   addWarFrontQuest,
-  markWarEscortPickup,
+  completeNobleRefugeeAt,
+  completeRefugeeEscortAt,
   completeWarEscortAt,
+  markNobleRefugeePickup,
+  markWarEscortPickup,
 } from "./quests.js";
+import { absDay, manhattan, NORMAL_ANCHORS, pickAnchorRange, randInt, STRONG_ANCHORS } from "./questUtils.js";
+import { state } from "./state.js";
+import { calcSupplyCap, createSettlementDemand, SUPPLY_ITEMS, totalSupplies } from "./supplies.js";
+import { advanceDayWithEvents } from "./time.js";
+import { calcTroopCap, totalTroops, TROOP_STATS } from "./troops.js";
+import { clamp, warScoreLabel } from "./util.js";
 
 /**
  * エンカウント歩数
