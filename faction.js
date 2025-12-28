@@ -2,6 +2,7 @@ import { pushLog, pushToast } from "./dom.js";
 import { enqueueEvent } from "./events.js";
 import { FACTIONS } from "./lore.js";
 import { nobleHome, settlements } from "./map.js";
+import { FRONT_DURATION_DAYS } from "./constants.js";
 import { absDay, manhattan, randInt } from "./questUtils.js";
 import { state } from "./state.js";
 import { clamp, displayWarLabel, relationLabel, supportLabel, warScoreLabel } from "./util.js";
@@ -862,7 +863,6 @@ function queueTruceRequest(entry, front, absDay) {
 export function tickDailyWar(absDay) {
   if (!state.warLedger?.entries) return;
   const ATTACK_CHANCE = 0.05;
-  const FRONT_DURATION = 90;
   const FRONT_THRESHOLD = 60;
 
   state.warLedger.entries.forEach((entry) => {
@@ -894,7 +894,7 @@ export function tickDailyWar(absDay) {
 
     // 戦争終結判定（経過日 or 閾値）
     const WAR_END_THRESHOLD = 120;
-    if (entry.elapsedDays >= FRONT_DURATION || Math.abs(entry.score) >= WAR_END_THRESHOLD) {
+    if (entry.elapsedDays >= FRONT_DURATION_DAYS || Math.abs(entry.score) >= WAR_END_THRESHOLD) {
       endWar(entry);
       return;
     }
@@ -903,7 +903,7 @@ export function tickDailyWar(absDay) {
     const activeCount = (entry.activeFronts || []).length;
     if (activeCount >= 2) return;
     if (Math.random() > ATTACK_CHANCE) return;
-    maybeStartFront(entry, absDay, FRONT_DURATION);
+    maybeStartFront(entry, absDay, FRONT_DURATION_DAYS);
   });
 }
 

@@ -1,5 +1,6 @@
 import { elements } from "./dom.js";
 import { FACTIONS } from "./lore.js";
+import { FRONT_DURATION_DAYS } from "./constants.js";
 import { QUEST_TYPES } from "./quests.js";
 import { absDay } from "./questUtils.js";
 import { state } from "./state.js";
@@ -449,8 +450,9 @@ function nobleName(nobleId) {
  */
 function questToPin(q, nowAbs) {
   const title = q.title || "依頼";
-  const deadlineText =
-    typeof q.deadlineAbs === "number" ? `期限あと${Math.max(0, q.deadlineAbs - nowAbs)}日` : "期限不明";
+  // 期限未設定の依頼も安全側に30日を表示する
+  const remainDays = typeof q.deadlineAbs === "number" ? Math.max(0, q.deadlineAbs - nowAbs) : 30;
+  const deadlineText = `期限あと${remainDays}日`;
   const common = {
     labels: [title],
     deadlines: [deadlineText],
@@ -549,7 +551,7 @@ function buildPinCache(pins) {
   merged.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
   const byPos = new Map();
   merged.forEach((p) => {
-    const infoParts = (p.labels || []).map((lbl, idx) => `${lbl}（${p.deadlines?.[idx] || "期限不明"}）`);
+    const infoParts = (p.labels || []).map((lbl, idx) => `${lbl}（${p.deadlines?.[idx] || "期限あと30日"}）`);
     const entry = { ...p, info: infoParts.join(", ") };
     const key = `${p.x},${p.y}`;
     if (!byPos.has(key)) byPos.set(key, []);
@@ -574,12 +576,15 @@ function refreshPinCache() {
       (e.activeFronts || []).forEach((f) => {
         const set = settlements.find((s) => s.id === f.settlementId);
         if (!set) return;
+        const endAbs = typeof f.endAbs === "number" ? f.endAbs : nowAbs + FRONT_DURATION_DAYS;
+        const remain = Math.max(0, endAbs - nowAbs);
         pins.push({
           x: set.coords.x,
           y: set.coords.y,
           color: "#ff7a7a",
           shape: "shield",
           labels: ["防衛中"],
+          deadlines: [`期限あと${remain}日`],
           info: `攻撃: ${f.attacker}, 防衛: ${f.defender}`,
           priority: 1,
         });

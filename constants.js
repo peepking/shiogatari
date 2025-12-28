@@ -24,6 +24,9 @@ export const BATTLE_RESULT_LABEL = {
 
 export const NONE_LABEL = "なし";
 
+/** 前線存続期間（日数） */
+export const FRONT_DURATION_DAYS = 90;
+
 export const PLACE = {
   VILLAGE: "村",
   TOWN: "街",
