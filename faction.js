@@ -552,11 +552,27 @@ function adjustRelationTension(a, b, delta) {
     pushLog("開戦", `${aName} と ${bName} が交戦状態に入りました`, "-");
     return addWarScore(a, b, seedScore, absDay(state), 0, 0);
   }
-  return null;
+return null;
 }
 
 /**
- * 開戦中の勢力ペアに対し、新たな前線を開始する（最大2本）。
+ * 勢力の貴族数から開始できる前線本数の上限を求める。
+ * 参加勢力の貴族数の最大値を採用し、情報が欠ける場合でも最低1本は許容する。
+ * @param {object} entry warLedgerエントリ
+ * @returns {number} 前線本数の上限
+ */
+function frontLimitByNobles(entry) {
+  if (!entry?.factions?.length) return 0;
+  const counts = entry.factions.map((fid) => {
+    const faction = FACTIONS.find((f) => f.id === fid);
+    return faction?.nobles?.length ?? 0;
+  });
+  const maxCount = Math.max(0, ...counts);
+  return Math.max(1, maxCount);
+}
+
+/**
+ * 開戦中の勢力ペアに対し、新たな前線を開始する（上限判定は呼び出し元で実施）。
  * @param {object} entry warLedgerエントリ
  * @param {number} absDay 現在absDay
  * @param {number} duration 前線の継続日数
@@ -899,9 +915,11 @@ export function tickDailyWar(absDay) {
       return;
     }
 
-    // 新規攻撃開始（最大2拠点）
+    // 新規攻撃開始（貴族数に応じた上限まで）
     const activeCount = (entry.activeFronts || []).length;
-    if (activeCount >= 2) return;
+    const frontLimit = frontLimitByNobles(entry);
+    if (frontLimit <= 0) return;
+    if (activeCount >= frontLimit) return;
     if (Math.random() > ATTACK_CHANCE) return;
     maybeStartFront(entry, absDay, FRONT_DURATION_DAYS);
   });
