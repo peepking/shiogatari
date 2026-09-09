@@ -2,6 +2,7 @@ import { handleTravelEventAction } from "./actions.js";
 import { elements } from "./dom.js";
 import { addHonorFaction, addWarScore, adjustNobleFavor, adjustSupport, getPlayerFactionId } from "./faction.js";
 import { state } from "./state.js";
+import { scheduleGameSave } from "./storage.js";
 
 /**
  * イベントキューにイベントを追加し、未表示なら即座に表示する。
@@ -23,6 +24,7 @@ export function enqueueEvent(evt) {
     document.dispatchEvent(new CustomEvent("auto-move-stop"));
   }
   showNextEvent();
+  scheduleGameSave();
 }
 
 /**
@@ -57,6 +59,7 @@ export function resolveCurrentEvent() {
   ensureQueue();
   if (state.eventQueue.length) state.eventQueue.shift();
   showNextEvent();
+  scheduleGameSave();
 }
 
 /**

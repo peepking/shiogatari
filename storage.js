@@ -1,8 +1,29 @@
 import { MODE_LABEL } from "./constants.js";
 import { restoreWorld, snapshotWorld } from "./map.js";
 import { resetState, state } from "./state.js";
+import { normalizeLogs } from "./logStore.js";
 
 const SAVE_KEY = "shiogatari-save";
+let saveScheduled = false;
+
+/**
+ * 同期処理内の更新をまとめ、イベント解決などの処理完了後に保存する。
+ * @returns {void}
+ */
+export function scheduleGameSave() {
+  if (saveScheduled) return;
+  saveScheduled = true;
+  queueMicrotask(flushGameSave);
+}
+
+/**
+ * 予約済みの保存を実行する。
+ * @returns {void}
+ */
+function flushGameSave() {
+  saveScheduled = false;
+  saveGameToStorage();
+}
 
 /**
  * シンプルなハッシュ（32bit）を計算する。
@@ -19,16 +40,23 @@ function simpleHash(str) {
 
 /**
  * ゲーム状態をローカルストレージへ保存する。
- * 戦闘準備/戦闘中など不安定なタイミングではスキップする。
- * @param {boolean} [force=false] trueなら強制保存
+ * 戦闘準備・戦闘中は保存しない。戦後処理完了時だけ通常画面として保存する。
+ * @param {{battleComplete?:boolean}} [options] 戦後処理完了の指定
  * @returns {boolean}
  */
-export function saveGameToStorage(force = false) {
+export function saveGameToStorage({ battleComplete = false } = {}) {
   const unsafe = state.modeLabel === MODE_LABEL.BATTLE || state.pendingEncounter?.active;
-  if (!force && unsafe) return false;
+  if (!battleComplete && unsafe) return false;
   try {
     const data = {
-      state,
+      state: {
+        ...state,
+        logs: normalizeLogs(state.logs),
+        ...(battleComplete ? {
+          modeLabel: MODE_LABEL.NORMAL,
+          pendingEncounter: { ...state.pendingEncounter, active: false },
+        } : {}),
+      },
       world: snapshotWorld(),
     };
     const payload = JSON.stringify(data);
@@ -66,6 +94,7 @@ export function loadGameFromStorage() {
       restoreWorld(snapshot.world);
     }
     Object.assign(state, snapshot.state);
+    state.logs = normalizeLogs(state.logs);
     return true;
   } catch (e) {
     console.error("loadGameFromStorage failed", e);

@@ -17,7 +17,7 @@ import {
   wireBattleUI,
 } from "./battle.js";
 import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL, NONE_LABEL, PLACE } from "./constants.js";
-import { elements, pushLog, pushToast, setInlineMessage, setOutput } from "./dom.js";
+import { elements, pushLog, pushToast, renderLogs, setInlineMessage, setOutput } from "./dom.js";
 import { initEventQueueUI } from "./events.js";
 import {
   addHonorFaction,
@@ -69,7 +69,7 @@ import {
   seedInitialQuests,
 } from "./quests.js";
 import { resetState, state } from "./state.js";
-import { loadGameFromStorage } from "./storage.js";
+import { loadGameFromStorage, scheduleGameSave } from "./storage.js";
 import {
   formatSupplyDisplay,
   SUPPLY_ITEMS,
@@ -1339,6 +1339,7 @@ function syncUI() {
       elements.ctxEl.value = "move";
     }
   }
+  scheduleGameSave();
 }
 
 /**
@@ -1693,7 +1694,9 @@ function bindCoreUtilityButtons() {
 
   document.getElementById("clearLog")?.addEventListener("click", () => {
     if (!confirm("ログを消去しますか？")) return;
-    if (elements.logEl) elements.logEl.innerHTML = "";
+    state.logs = [];
+    renderLogs();
+    scheduleGameSave();
   });
 
   document.getElementById("resetBtn")?.addEventListener("click", () => {
@@ -1824,11 +1827,12 @@ export function initUI() {
   wireSupplyDiscard(elements.suppliesDetail, syncUI);
   wireMapHover();
   initEventQueueUI();
+  renderLogs();
   syncUI();
   openEventTrade(openModal);
   setOutput("次の操作", "状況を選んで、1D6を振ってください", [
     { text: "-", kind: "" },
     { text: "-", kind: "" },
   ]);
-  pushLog("起動", "潮語り航海録を開始。");
+  if (!restored) pushLog("起動", "潮語り航海録を開始。");
 }

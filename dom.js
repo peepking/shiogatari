@@ -1,5 +1,6 @@
 import { state } from "./state.js";
-import { saveGameToStorage } from "./storage.js";
+import { scheduleGameSave } from "./storage.js";
+import { MAX_LOG_ENTRIES, normalizeLogs } from "./logStore.js";
 import { escapeHtml, formatGameTime, nowStr } from "./util.js";
 
 /**
@@ -244,12 +245,37 @@ export function setOutput(title, text, tags) {
  * ログに新しい項目を追加する。
  * @param {string} title
  * @param {string} body
- * @param {string} lastRollDisplay
  */
 export function pushLog(title, body) {
+  state.logs = normalizeLogs([
+    { title, body, gameTime: formatGameTime(state), realTime: nowStr() },
+    ...(state.logs || []),
+  ]);
+  if (elements.logEl && state.logs.length) {
+    elements.logEl.prepend(createLogItem(state.logs[0]));
+    while (elements.logEl.children.length > MAX_LOG_ENTRIES) {
+      elements.logEl.lastElementChild.remove();
+    }
+  }
+  scheduleGameSave();
+}
+
+/**
+ * 保存済みログを新しい順で画面へ復元する。
+ * @returns {void}
+ */
+export function renderLogs() {
   if (!elements.logEl) return;
-  const gameTime = formatGameTime(state);
-  const realTime = nowStr();
+  state.logs = normalizeLogs(state.logs);
+  elements.logEl.replaceChildren(...state.logs.map(createLogItem));
+}
+
+/**
+ * 文字列をエスケープしてログ表示要素を生成する。
+ * @param {object} entry
+ * @returns {HTMLElement}
+ */
+function createLogItem({ title, body, gameTime, realTime }) {
   const item = document.createElement("div");
   item.className = "logitem";
   item.innerHTML = `
@@ -262,8 +288,7 @@ export function pushLog(title, body) {
     <div class="txt">${escapeHtml(body)}</div>
     <div class="when mt-6">${escapeHtml(realTime)}</div>
   `;
-  elements.logEl.prepend(item);
-  saveGameToStorage();
+  return item;
 }
 
 /**

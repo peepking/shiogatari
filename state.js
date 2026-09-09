@@ -34,6 +34,7 @@ const createState = () => ({
   },
   lastRoll: null,
   lastResultText: "",
+  logs: [],
   modeLabel: MODE_LABEL.NORMAL,
   mapPinsVisible: true,
   eventQueue: [],

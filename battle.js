@@ -2,6 +2,7 @@ import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL } from "./constants.js";
 import { elements, pushLog, pushToast } from "./dom.js";
 import { getTerrainAt } from "./map.js";
 import { state } from "./state.js";
+import { saveGameToStorage } from "./storage.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
 
@@ -1214,6 +1215,7 @@ function finishBattle(forceDraw = false) {
       resultLabel,
     });
   }
+  saveGameToStorage({ battleComplete: true });
 }
 
 /**
@@ -1674,6 +1676,7 @@ function closeBattleView() {
   battleState.battleTerrain = null;
   syncFormationUI();
   state.modeLabel = MODE_LABEL.NORMAL;
+  saveGameToStorage();
 }
 
 /**
