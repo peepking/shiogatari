@@ -13,6 +13,22 @@ import { absDay } from "./questUtils.js";
 import { state } from "./state.js";
 import { SUPPLY_ITEMS } from "./supplies.js";
 import { TROOP_STATS } from "./troops.js";
+import { getQuestProgress } from "./questProgress.js";
+import { escapeHtml } from "./util.js";
+
+const ITEM_NAMES = Object.fromEntries(SUPPLY_ITEMS.map(item => [item.id, item.name]));
+const TROOP_NAMES = Object.fromEntries(Object.entries(TROOP_STATS).map(([id, stat]) => [id, stat.name]));
+
+/**
+ * 数量の進捗と到着・合流の条件を読み上げ可能な行へ変換する。
+ * @param {object} row
+ * @returns {string}
+ */
+function renderProgressRow(row) {
+  const label = escapeHtml(row.label);
+  const text = escapeHtml(row.text);
+  return `<div class="quest-progress-row ${row.done ? "is-done" : ""}"><div class="quest-progress-label"><span>${label}</span><b>${text}</b></div>${row.total > 0 ? `<progress max="${row.total}" value="${row.current}" aria-label="${label} ${text}"></progress>` : ""}${row.note ? `<div class="tiny">${escapeHtml(row.note)}</div>` : ""}</div>`;
+}
 
 const TYPE_LABEL = {
   [QUEST_TYPES.SUPPLY]: "調達",
@@ -235,8 +251,6 @@ export function renderQuestUI(syncUI) {
       const origin = getSettlementById(q.originId);
       const target = getSettlementById(q.targetId);
       const itemName = SUPPLY_ITEMS.find((i) => i.id === q.itemId)?.name || q.itemId;
-      const remain = q.deadlineAbs != null ? Math.max(0, q.deadlineAbs - now) : null;
-      const remainText = remain == null ? "期限なし" : `残り${remain}日`;
       const supplyInfo = formatItems(q.items || []);
       const blockadeTarget =
         (q.fights || []).find((f) => !f.done)?.target || (q.fights || [])[0]?.target || q.target || null;
@@ -256,24 +270,18 @@ export function renderQuestUI(syncUI) {
         blockadeEstimate,
         estText,
       });
-      const canFinish = remain == null ? canCompleteQuest(q) : remain >= 0 && canCompleteQuest(q);
+      const progress = getQuestProgress(q, state, { now, canFinish: canCompleteQuest(q), origin, target, itemNames: ITEM_NAMES, troopNames: TROOP_NAMES });
       const rewardExtra = rewardExtraLabel(q);
       const bodyText = buildBodyText(q, itemName, supplyInfo);
       return `
-        <div class="sideBlock mb-8">
-          <div class="sbTitle sbTitle-quest">
-            <div>
-              <div class="tiny">${typeLabel} / ${placeLabel}</div>
-              <b>${q.title || itemName}</b>
-            </div>
-            <div class="row gap-6">
-              <span class="pill">報酬 <b>${q.reward ?? 0}</b></span>
-              ${rewardExtra ? `<span class="pill">${rewardExtra}</span>` : ""}
-              <span class="pill">${remainText}</span>
-              <button class="btn good quest-complete" data-id="${q.id}" ${canFinish ? "" : "disabled"} aria-disabled="${canFinish ? "false" : "true"}">完了</button>
-            </div>
-          </div>
-          <div class="sbBody">${bodyText}</div>
+        <div class="sideBlock mb-8 quest-progress-card quest-${progress.status}">
+          <div class="quest-card-meta"><span>${escapeHtml(typeLabel)}</span><span class="quest-deadline ${progress.urgent ? "is-urgent" : ""}">${progress.deadline}</span></div>
+          <h3>${escapeHtml(q.title || itemName || "依頼")}</h3>
+          <span class="quest-status">${progress.statusText}</span>
+          <div class="quest-progress-rows">${progress.rows.map(renderProgressRow).join("")}</div>
+          <p class="quest-next">${escapeHtml(progress.next)}</p>
+          <details class="quest-description"><summary>依頼の詳細・報酬</summary><div class="tiny">${escapeHtml(placeLabel)}</div><p class="tiny">${escapeHtml(bodyText)}</p><div class="tiny">資金 ${q.reward ?? 0}${rewardExtra ? ` / ${escapeHtml(rewardExtra)}` : ""}${q.rewardFame ? ` / 名声 +${q.rewardFame}` : ""}</div></details>
+          ${progress.automatic && !progress.ready ? `<div class="tiny quest-auto-note">${progress.automaticLabel}</div>` : `<button class="btn good quest-complete" data-id="${q.id}" ${progress.ready ? "" : "disabled"}>完了して報酬を受取</button>`}
         </div>
       `;
     })

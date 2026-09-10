@@ -9,7 +9,7 @@ import {
   isHonorFaction,
   removeHonorFaction,
 } from "./faction.js";
-import { ASSETS, FACTIONS } from "./lore.js";
+import { FACTIONS } from "./lore.js";
 import { getSettlementsByNoble, nobleHome, refreshMapInfo, settlements } from "./map.js";
 import { state } from "./state.js";
 import { formatSupplyDisplay, SUPPLY_ITEMS } from "./supplies.js";
@@ -43,12 +43,12 @@ export function renderAssets() {
   const troopDisplay = formatTroopDisplay();
   const supplyDisplay = formatSupplyDisplay();
   const defs = [
-    { key: "ships", card: "ships", sub: "聖船+", valueText: String(state.ships), img: ASSETS.ships },
-    { key: "troops", card: "companions", sub: "", valueHtml: troopDisplay.html, img: ASSETS.companions },
-    { key: "faith", card: "faith", sub: "", valueText: String(state.faith), img: ASSETS.faith },
-    { key: "supplies", card: "supplies", sub: "上限", valueHtml: supplyDisplay.html, img: ASSETS.supplies },
-    { key: "funds", card: "funds", sub: "", valueText: String(state.funds), img: ASSETS.funds },
-    { key: "fame", card: "fame", sub: "", valueText: String(state.fame), img: ASSETS.fame },
+    { key: "ships", card: "ships", sub: "聖船+", valueText: String(state.ships), img: "./image/ui/ship.svg" },
+    { key: "troops", card: "companions", sub: "", valueHtml: troopDisplay.html, img: "./image/ui/troops.svg" },
+    { key: "faith", card: "faith", sub: "", valueText: String(state.faith), img: "./image/ui/faith.svg" },
+    { key: "supplies", card: "supplies", sub: "上限", valueHtml: supplyDisplay.html, img: "./image/ui/supplies.svg" },
+    { key: "funds", card: "funds", sub: "", valueText: String(state.funds), img: "./image/ui/funds.svg" },
+    { key: "fame", card: "fame", sub: "", valueText: String(state.fame), img: "./image/ui/fame.svg" },
   ];
   defs.forEach((d) => {
     const cardKey = d.card || d.key;

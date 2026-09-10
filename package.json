@@ -15,7 +15,7 @@
   "type": "commonjs",
   "main": "main.js",
   "scripts": {
-    "test": "node --experimental-vm-modules tests/storage.test.cjs && node --experimental-vm-modules tests/rosterOptions.test.cjs"
+    "test": "node --experimental-vm-modules tests/storage.test.cjs && node --experimental-vm-modules tests/rosterOptions.test.cjs && node --experimental-vm-modules tests/questProgress.test.cjs"
   },
   "dependencies": {
     "@eslint/js": "^9.39.2",
