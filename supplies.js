@@ -3,6 +3,8 @@ import { getPlayerFactionId, getSupportLabel, getWarEntry, getWarScoreLabel } fr
 import { state } from "./state.js";
 import { sumValues } from "./util.js";
 import { resourceIcon } from "./resourceUI.js";
+import { renderUpkeepForecast } from "./upkeep.js";
+import { TROOP_STATS } from "./troops.js";
 
 /** @type {number} 基本の物資上限 */
 export const BASE_SUPPLY_CAP = 60;
@@ -160,6 +162,7 @@ export function renderSupplyModal(detailEl) {
     .join("");
 
   detailEl.innerHTML = `
+    ${renderUpkeepForecast(state, TROOP_STATS)}
     <div class="tiny mb-6">総数: ${total} / ${cap}</div>
     <table class="trade-table">
       <thead>

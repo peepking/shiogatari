@@ -842,9 +842,13 @@ function processBattleOutcome(resultCode, meta) {
     }
 
     const killed = killedEnemyCount(meta);
-    const leveled = levelUpTroopsRandom(killed);
+    const promotions = [];
+    const leveled = levelUpTroopsRandom(killed, promotions);
     if (leveled > 0) {
-      summary.push({ text: `練度上昇: ${leveled}人がLv+1`, icon: "troops" });
+      summary.push({ text: `練度上昇: 延べ${leveled}回（同じ兵の複数昇級を含む）`, icon: "troops" });
+      promotions.forEach(({ type, from, to, count }) => {
+        summary.push({ text: `${TROOP_STATS[type]?.name || type} Lv${from} → Lv${to}: ${count}人`, icon: type });
+      });
     }
     if (questId) {
       if (questType === QUEST_TYPES.ORACLE_HUNT || questType === QUEST_TYPES.ORACLE_ELITE) {

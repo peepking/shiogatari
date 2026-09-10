@@ -7,6 +7,7 @@ import { questTickDay } from "./quests.js";
 import { absDay } from "./questUtils.js";
 import { advanceDay as baseAdvanceDay, state } from "./state.js";
 import { TROOP_STATS, applyTroopLosses, totalTroops } from "./troops.js";
+import { FOOD_CONSUMPTION_DAYS, getUpkeepForecast } from "./upkeep.js";
 
 /**
  * 日付更新と、それに連動するイベント処理を進める。
@@ -18,7 +19,7 @@ export function advanceDayWithEvents(days = 1) {
   for (let i = 0; i < days; i++) {
     baseAdvanceDay(1);
     const d = state.day;
-    if (d === 10 || d === 30) {
+    if (FOOD_CONSUMPTION_DAYS.includes(d)) {
       applyPeriodicFood();
     }
     const today = absDay(state);
@@ -45,18 +46,7 @@ export function advanceDayWithEvents(days = 1) {
  * 季節の切り替わり時に維持費と食料消費を適用する。
  */
 function applySeasonUpkeep() {
-  let upkeepCost = 0;
-  Object.entries(state.troops || {}).forEach(([type, levels]) => {
-    const stat = TROOP_STATS[type];
-    const upkeep = stat?.upkeep ?? 0;
-    if (typeof levels === "number") {
-      upkeepCost += upkeep * levels;
-      return;
-    }
-    Object.values(levels || {}).forEach((cnt) => {
-      upkeepCost += upkeep * Number(cnt || 0);
-    });
-  });
+  const upkeepCost = getUpkeepForecast(state, TROOP_STATS).funds;
 
   const fundsBefore = state.funds || 0;
   const fundsPaid = Math.min(fundsBefore, upkeepCost);
@@ -89,7 +79,7 @@ function applyPeriodicFood() {
   const troopCount = totalTroops();
   if (troopCount <= 0) return;
   if (!state.supplies) state.supplies = {};
-  const need = Math.floor(troopCount / 4);
+  const need = getUpkeepForecast(state, TROOP_STATS).food;
   if (need <= 0) return;
   const foodBefore = state.supplies.food || 0;
   const foodPaid = Math.min(foodBefore, need);

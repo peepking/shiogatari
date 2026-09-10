@@ -1,6 +1,6 @@
 import { getCurrentSettlement } from "./actions.js";
 import { elements, pushToast } from "./dom.js";
-import { getSettlementById } from "./map.js";
+import { getSettlementById, renderMap, refreshMapInfo } from "./map.js";
 import {
   acceptQuest,
   canCompleteQuest,
@@ -9,7 +9,7 @@ import {
   getQuests,
   QUEST_TYPES,
 } from "./quests.js";
-import { absDay } from "./questUtils.js";
+import { absDay, manhattan } from "./questUtils.js";
 import { state } from "./state.js";
 import { SUPPLY_ITEMS } from "./supplies.js";
 import { TROOP_STATS } from "./troops.js";
@@ -261,12 +261,23 @@ export function renderQuestUI(syncUI) {
           <span class="quest-status">${progress.statusText}</span>
           <div class="quest-progress-rows">${progress.rows.map(renderProgressRow).join("")}</div>
           <p class="quest-next">${escapeHtml(progress.next)}</p>
+          ${q.type === QUEST_TYPES.DELIVERY && target ? `<button class="btn quest-location" data-x="${target.coords.x}" data-y="${target.coords.y}">配達先を地図で強調</button>` : ""}
           <details class="quest-description"><summary>依頼の詳細・報酬</summary><div class="tiny">${escapeHtml(placeLabel)}</div><div class="tiny">${renderQuestConditions(q)}${escapeHtml(bodyText)}</div><div class="tiny">${renderQuestRewards(q)}</div></details>
           ${progress.automatic && !progress.ready ? `<div class="tiny quest-auto-note">${progress.automaticLabel}</div>` : `<button class="btn good quest-complete" data-id="${q.id}" ${progress.ready ? "" : "disabled"}>完了して報酬を受取</button>`}
         </div>
       `;
     })
     .join("");
+  listEl.querySelectorAll(".quest-location").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      state.selectedPosition = { x: Number(btn.dataset.x), y: Number(btn.dataset.y) };
+      state.mapMode = "full";
+      state.mapPinsVisible = true;
+      renderMap();
+      refreshMapInfo();
+      elements.mapCanvas?.scrollIntoView({ block: "center", behavior: "smooth" });
+    });
+  });
   listEl.querySelectorAll(".quest-complete").forEach((btn) => {
     btn.addEventListener("click", () => {
       const id = Number(btn.getAttribute("data-id"));
@@ -328,6 +339,7 @@ export function renderQuestModal(settlement, syncUI) {
         <tr>
           <td>
             <div class="tiny">${typeLabel} / ${placeLabel}</div>
+            ${q.type === QUEST_TYPES.DELIVERY && target ? `<div class="tiny">最短距離: ${manhattan(settlement.coords, target.coords)}マス（移動のみで${manhattan(settlement.coords, target.coords)}日） / 基本報酬: 距離 × 50資金。寄り道・待機は別途日数が必要です。</div>` : ""}
             <div><b>${q.title || itemName}</b></div>
             <div class="tiny">${renderQuestConditions(q)}${escapeHtml(bodyText)}</div>
           </td>

@@ -1,5 +1,6 @@
 import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { state } from "./state.js";
+import { renderUpkeepForecast } from "./upkeep.js";
 
 /** @type {number} 基本の部隊上限 */
 export const BASE_TROOP_CAP = 30;
@@ -349,11 +350,12 @@ export function addTroops(type, level, qty) {
 }
 
 /**
- * 任意の兵をランダムに選んでLvを+1する。
+ * Lv5未満の兵を人数比で毎回抽選してLvを+1する。同じ兵が再選出される場合もある。
  * @param {number} upCount 上げる人数
+ * @param {Array} [promotions] 兵種・昇級前後のレベルごとの結果を追記する配列。
  * @returns {number} 実際に上がった人数
  */
-export function levelUpTroopsRandom(upCount) {
+export function levelUpTroopsRandom(upCount, promotions = []) {
   let remaining = Math.max(0, Math.floor(upCount));
   const randInt = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
   const pool = () => {
@@ -399,6 +401,9 @@ export function levelUpTroopsRandom(upCount) {
       bucket[nextLvl] = (bucket[nextLvl] || 0) + 1;
       if (!Object.keys(bucket).length) delete state.troops[target.type];
     }
+    const existing = promotions.find(row => row.type === target.type && row.from === target.lvl);
+    if (existing) existing.count += 1;
+    else promotions.push({ type: target.type, from: target.lvl, to: target.lvl + 1, count: 1 });
     remaining -= 1;
     leveled += 1;
   }
@@ -473,6 +478,7 @@ export function renderTroopModal(detailEl) {
     .join("");
 
   detailEl.innerHTML = `
+    ${renderUpkeepForecast(state, TROOP_STATS)}
     <div class="tiny mb-6">部隊数: ${total} / 上限 ${cap}</div>
     <div class="table-scroll">
       <table class="trade-table">
