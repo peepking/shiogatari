@@ -6,21 +6,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
   <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="layout.css" />
 </head>
 
 <body>
-  <header>
-    <div class="wrap">
-      <h1>潮語り航海録（β版）</h1>
-      <div class="sub">
-        海を信仰をする者「潮語り」が旅をする神託 &amp; 航海TRPG</div>
+  <header class="game-header" aria-label="航海の状況">
+    <div class="wrap game-toolbar" id="gameToolbar">
+      <details class="game-menu" id="gameMenu"><summary>メニュー</summary></details>
     </div>
   </header>
 
   <main>
     <div class="wrap">
       <div class="grid">
-        <!-- LEFT: strategy (battle only) + navigator -->
+        <!-- 編成・作戦と航海の情報 -->
         <div class="col-stack">
           <section class="card" aria-label="strategy" id="strategyCard" hidden>
             <div class="bd">
@@ -92,6 +91,21 @@
               </div>
             </div>
             <div class="bd">
+              <details class="roster-options">
+                <summary>おまかせ編成の条件</summary>
+                <fieldset id="rosterOptions">
+                  <legend class="tiny">初期編成・おまかせ編成に共通</legend>
+                  <label class="roster-option-check"><input type="checkbox" id="rosterExcludeSupport">斥候と衛生兵を編成しない</label>
+                  <label for="rosterSizeMode">1部隊の人数</label>
+                  <select id="rosterSizeMode" class="battle-select">
+                    <option value="any">制限なし（1〜10人）</option>
+                    <option value="min7">7人以上で均等に編成</option>
+                    <option value="full">10人の部隊のみ編成</option>
+                  </select>
+                  <p class="tiny">条件を満たさない兵は待機します。7人以上なら歩兵23人を7・8・8人に分けます。</p>
+                  <p class="tiny" id="rosterOptionsStatus" role="status">設定は自動保存され、次回の初期編成にも使われます。今の編成を変えるには「おまかせ編成」を押してください。</p>
+                </fieldset>
+              </details>
               <div class="roster-cols">
                 <div class="roster-col">
                   <div class="tiny mb-4">待機（兵種ごと）</div>
@@ -215,7 +229,7 @@
           </section>
         </div>
 
-        <!-- CENTER STACK: guides + map/log -->
+        <!-- 地図と行動 -->
         <div class="col-stack">
           <aside class="card" aria-label="log">
             <div class="bd">
@@ -332,7 +346,7 @@
           </section>
         </div>
 
-        <!-- THIRD: quests + factions -->
+        <!-- 依頼と勢力 -->
         <div class="col-stack">
           <section class="card" aria-label="quests" id="questCard">
             <div class="hd cursor-pointer" id="questToggle">

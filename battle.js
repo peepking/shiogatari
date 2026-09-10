@@ -2,6 +2,8 @@ import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL } from "./constants.js";
 import { elements, pushLog, pushToast } from "./dom.js";
 import { getTerrainAt } from "./map.js";
 import { state } from "./state.js";
+import { updateBattleLayout } from "./layout.js";
+import { rosterOptions, canAutoDeploy, splitRosterCounts } from "./rosterOptions.js";
 import { saveGameToStorage } from "./storage.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
@@ -15,6 +17,7 @@ const TARGET_SWITCH_RATIO = 1.5;
 const SPEED_OPTIONS = [1, 2, 4];
 const MAX_UNIT_COUNT = 10;
 const MAX_SQUADS = 20;
+let appliedRosterSignature = "";
 const ATTACK_FX_TTL = 2;
 const MOVE_FX_TTL = 3;
 const MOVE_COLORS = {
@@ -30,20 +33,16 @@ const ATTACK_COLORS = {
 const DECK_KEY = "deck";
 
 /**
- * バトルキャンバスを画面幅とDPRに合わせてリサイズする
+ * CSSで決めた表示幅に描画解像度を合わせ、縦横比を維持する。
+ * @returns {void}
  */
 function resizeBattleCanvas() {
   const canvas = elements.battleCanvas;
   if (!canvas) return;
   const size = battleState.size || FIXED_BATTLE_SIZE;
   const dpr = window.devicePixelRatio || 1;
-  const parentWidth =
-    canvas.parentElement?.clientWidth || canvas.clientWidth || canvas.width || 640;
-  // 親幅いっぱいに合わせ、ズーム/全体でサイズを変えない
-  const drawSize = parentWidth;
+  const drawSize = canvas.clientWidth || 640;
   const cellDisplay = Math.max(24, Math.floor(drawSize / size));
-  canvas.style.width = `${drawSize}px`;
-  canvas.style.height = `${drawSize}px`;
   canvas.width = Math.floor(drawSize * dpr);
   canvas.height = Math.floor(drawSize * dpr);
   if (!battleState.ctx) battleState.ctx = canvas.getContext("2d");
@@ -346,35 +345,32 @@ function autoWeight(type) {
 }
 
 /**
- * 自動配備を行う。
+ * 保存された条件で自動配備を行う。兵種ごとに人数を分配してから、
+ * 人数・兵種性能・平均Lvによる重みが大きい順に最大20部隊を選ぶ。
+ * 同じ重みなら人数の多い部隊を優先し、同兵種内では高Lvの兵から取り出す。
+ * 対象外の兵種・端数・上限超過の兵は待機に残す。
  */
 function autoDeployRoster() {
   resetRoster();
   const totals = standbyTotals();
-  // 部隊（最大10人）チャンク単位で重み付けし、強い順に詰める
   const chunks = Object.entries(totals)
-    .filter(([, cnt]) => cnt > 0)
+    .filter(([type, cnt]) => cnt > 0 && canAutoDeploy(type, rosterOptions))
     .flatMap(([type, cnt]) => {
       const avgLv = standbyAverageLevel(type);
       const base = autoWeight(type) * (1 + 0.1 * (avgLv - 1));
-      const slotCount = Math.ceil(cnt / MAX_UNIT_COUNT);
-      return Array.from({ length: slotCount }, (_, i) => {
-        const remain = cnt - i * MAX_UNIT_COUNT;
-        const chunk = Math.min(MAX_UNIT_COUNT, Math.max(1, remain));
+      return splitRosterCounts(cnt, rosterOptions.sizeMode).map((chunk) => {
         return { type, size: chunk, weight: base * chunk, avgLv };
       });
     })
     .sort((a, b) => b.weight - a.weight || b.size - a.size);
 
   battleRoster.sortie = [];
-  // standbyは takeFromStandby が直接更新するので既存を再利用
   for (const chunk of chunks) {
     if (battleRoster.sortie.length >= MAX_SQUADS) break;
     const pulled = takeFromStandby(chunk.type, chunk.size);
     if (pulled.count <= 0) continue;
     battleRoster.sortie.push({ type: chunk.type, count: pulled.count, level: pulled.level });
   }
-  // standby は takeFromStandby が既に減算済み
 }
 
 /**
@@ -392,7 +388,8 @@ function renderRosterUI() {
   const standbyEl = elements.rosterStandby;
   const sortieEl = elements.rosterSortie;
   const countEl = elements.rosterCount;
-  const disableAll = battleState.running || !!battleState.result;
+  const disableAll = battleState.started || !!battleState.result;
+  document.getElementById("rosterOptions").disabled = disableAll;
   const sortieCount = battleRoster.sortie.length;
   if (countEl) countEl.textContent = `${sortieCount}/${MAX_SQUADS}`;
   const sortieFull = sortieCount >= MAX_SQUADS;
@@ -450,6 +447,7 @@ function renderRosterUI() {
   [elements.rosterAuto, elements.rosterClear].forEach((btn) => {
     if (btn) btn.disabled = disableAll;
   });
+  updateBattleButtons();
 }
 
 /**
@@ -798,7 +796,7 @@ function applyCustomDraftToAllies(map) {
  * フォーメーションUIの表示状態を同期する。
  */
 function syncFormationUI() {
-  const lock = battleState.running || !!battleState.result;
+  const lock = battleState.started || !!battleState.result;
   if (elements.battleFormationSelect) {
     elements.battleFormationSelect.value = battleState.allyFormation;
     elements.battleFormationSelect.disabled = lock;
@@ -1245,7 +1243,7 @@ function updateBattleStatus() {
       ? `結果: ${battleState.result}`
       : battleState.running
         ? "戦闘中"
-        : "待機中";
+        : battleState.started ? "一時停止中" : "準備中";
     elements.battleStatus.textContent = status;
   }
 }
@@ -1315,11 +1313,21 @@ function updateSpeedUI() {
  */
 function updateBattleButtons() {
   const hasSortie = battleRoster.sortie.length > 0;
+  const applied = appliedRosterSignature === JSON.stringify(battleRoster.sortie);
   if (elements.battleStartBtn)
-    elements.battleStartBtn.disabled = battleState.running || battleState.editing || !hasSortie;
+    elements.battleStartBtn.disabled = battleState.running || !!battleState.result || battleState.editing || !hasSortie || !applied;
   if (elements.battlePauseBtn) elements.battlePauseBtn.disabled = !battleState.running;
   if (elements.battleBackBtn)
     elements.battleBackBtn.disabled = !battleState.result;
+  updateBattleLayout({
+    active: !elements.battleBlock?.hidden,
+    count: battleRoster.sortie.length,
+    applied,
+    editing: battleState.editing,
+    running: battleState.running,
+    started: battleState.started,
+    result: battleState.result,
+  });
   syncFormationUI();
 }
 
@@ -1493,15 +1501,17 @@ function findUnitAt(x, y) {
  * @returns {void}
  */
 function startBattle() {
-  if (battleState.running || !battleState.ready) return;
+  if (battleState.running || !battleState.ready || elements.battleStartBtn?.disabled) return;
   setBattleSpeed(battleStrategy.speed || 1);
   // 撃破済み選択をクリア
   const sel = getUnitById(battleState.selectedId, true);
   if (sel && sel.hp <= 0) battleState.selectedId = null;
   battleState.result = "";
-  battleState.elapsedMs = 0;
+  if (!battleState.started) battleState.elapsedMs = 0;
+  battleState.started = true;
   battleState.running = true;
   updateBattleButtons();
+  updateBattleStatus();
   renderRosterUI();
   scheduleBattleTimer();
   addBattleLog("戦闘開始。");
@@ -1518,6 +1528,7 @@ function pauseBattle() {
     battleState.timer = null;
   }
   updateBattleButtons();
+  updateBattleStatus();
   renderRosterUI();
 }
 
@@ -1567,6 +1578,7 @@ function resetBattle(useDraft = false, preserveField = true) {
   applyFormations(override);
   battleState.logLines = [];
   battleState.ready = true;
+  appliedRosterSignature = JSON.stringify(battleRoster.sortie);
   syncFormationUI();
   updateSpeedUI();
   updateBattleStatus();
@@ -1640,6 +1652,7 @@ function scheduleBattleTimer() {
  * @returns {void}
  */
 function openBattleView() {
+  battleState.started = false;
   if (elements.mapBlock) elements.mapBlock.hidden = true;
   if (elements.battleBlock) elements.battleBlock.hidden = false;
   if (elements.battleInfoCard) elements.battleInfoCard.hidden = false;
@@ -1654,6 +1667,7 @@ function openBattleView() {
   battleState.result = "";
   battleState.editing = false;
   resetRoster();
+  autoDeployRoster();
   renderRosterUI();
   renderStrategyUI();
   resetBattle(false, false);
@@ -1676,6 +1690,7 @@ function closeBattleView() {
   battleState.battleTerrain = null;
   syncFormationUI();
   state.modeLabel = MODE_LABEL.NORMAL;
+  updateBattleButtons();
   saveGameToStorage();
 }
 
@@ -1901,6 +1916,7 @@ export function wireBattleUI() {
     battleState.customSlotsDraft = {};
     battleState.selectedUnitId = null;
     syncFormationUI();
+    elements.battleFormationApply?.click();
   });
   elements.battleFormationSave?.addEventListener("click", () => {
     if (battleState.running || battleState.result) return;

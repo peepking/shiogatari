@@ -1,0 +1,131 @@
+/* 日付と資産を常時確認できるコンパクトなヘッダ */
+.game-header { background: #0e162a; }
+.game-toolbar { display: flex; align-items: center; gap: 16px; padding: 8px 0; }
+#gameTime { --season-color: #a7e8c2; --season-bg: #1b3834; display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; min-width: 142px; box-sizing: border-box; padding: 3px 12px 3px 4px; border-right: 1px solid var(--line); white-space: nowrap; }
+#gameTime[data-season="1"] { --season-color: #ffe09a; --season-bg: #3b3325; }
+#gameTime[data-season="2"] { --season-color: #f5bc94; --season-bg: #3c2c29; }
+#gameTime[data-season="3"] { --season-color: #b7deff; --season-bg: #20344d; }
+.game-date-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; color: var(--season-color); background: var(--season-bg); font-size: 24px; line-height: 1; }
+.game-date-content { display: flex; flex-direction: column; gap: 2px; }
+.game-date-year { font-size: 10px; font-weight: 500; letter-spacing: 0.06em; line-height: 1.2; color: #aebdd2; }
+.game-date-main { display: flex; align-items: center; gap: 9px; line-height: 1; }
+.game-date-season { color: var(--season-color); font-size: 14px; font-weight: 700; }
+.game-date-divider { height: 12px; width: 1px; background: var(--line); }
+.game-date-day { display: inline-block; min-width: 2ch; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; color: #f1f6ff; text-align: right; }
+.game-date-unit { margin-left: 3px; font-size: 11px; color: #bfcde0; }
+.game-toolbar .asset-grid { display: flex; flex: 1; gap: 8px; margin: 0; }
+.game-toolbar .asset-card { display: flex; flex: 1; align-items: center; gap: 6px; padding: 6px 8px; min-width: 0; border-radius: 8px; cursor: pointer; }
+.game-toolbar .asset-thumb { width: 26px; height: 26px; min-width: 26px; padding: 0; background: none; }
+.game-toolbar .asset-thumb img { width: 100%; height: 100%; object-fit: contain; }
+.game-toolbar .asset-body { display: flex; align-items: center; gap: 8px; }
+.game-toolbar .asset-body .label { font-size: 12px; }
+.game-toolbar .asset-value { font-size: 15px; gap: 2px; white-space: nowrap; }
+.game-toolbar .asset-value .sub { font-size: 10px; margin: 0; }
+.game-toolbar .asset-note { display: none; }
+.game-menu { position: relative; white-space: nowrap; font-size: 13px; }
+summary { cursor: pointer; padding: 10px; }
+.game-menu[open] { z-index: 10; }
+.game-menu[open] .btn { display: block; width: 160px; margin: 6px 0; }
+.game-menu[open] { position: absolute; right: 2vw; top: 8px; background: #111a33; border: 1px solid var(--line); border-radius: 10px; padding: 0 8px; }
+.asset-card:focus-visible, summary:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+
+/* 探索と戦闘で地図の位置をそろえ、補助情報は下部へまとめる */
+main > .wrap { padding: 14px 0; }
+main .grid { grid-template-columns: minmax(230px, 0.8fr) minmax(0, 2fr) minmax(260px, 0.9fr); gap: 14px; }
+main .grid > * { min-width: 0; }
+.workspace-actions, #rosterCard { grid-column: 1; grid-row: 2; }
+.workspace-map { grid-column: 2; grid-row: 2; }
+#questCard, .battle-side { grid-column: 3; grid-row: 2; }
+.workspace-map > .bd { padding: 10px; }
+.workspace-map .map-block, .workspace-map .battle-block { border: 0; padding: 0; margin: 0; }
+.workspace-map .footer { display: none; }
+#mapCanvas, #battleCanvas { width: 100%; max-width: min(100%, calc(100dvh - 240px)); height: auto; aspect-ratio: 1; }
+.map-header { flex-wrap: wrap; }
+.workspace-actions .mode-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.workspace-actions .mode-actions .btn { flex: 1 1 110px; }
+#questBody { max-height: calc(100dvh - 190px); }
+.workspace-drawers { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.workspace-drawer { flex: 1 1 260px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #10192c; }
+.workspace-drawer > summary { font-size: 13px; color: var(--muted); }
+.workspace-drawer > .card { box-shadow: none; border: 0; }
+.workspace-drawer .row { flex-wrap: wrap; }
+.workspace-drawer .sep:first-child { display: none; }
+.battle-heading, .battle-command, .battle-side { display: none; }
+
+/* 編成・配置・開始の順序を一画面で案内する */
+.battle-view .workspace-actions, .battle-view #questCard { display: none; }
+.battle-view .battle-heading { display: flex; grid-column: 1 / -1; grid-row: 1; align-items: center; justify-content: space-between; gap: 12px; }
+.battle-heading > b { font-size: 20px; }
+.battle-steps { display: flex; gap: 18px; list-style: none; margin: 0; padding: 0; color: var(--muted); font-size: 13px; }
+.battle-steps li { padding: 8px 12px; border: 1px solid var(--line); border-radius: 20px; }
+.battle-steps .complete { color: var(--accent2); }
+.battle-steps .current { color: #a4f3ee; background: #123b46; border-color: #398f94; }
+.battle-view .battle-side { display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 210px); overflow: auto; }
+.battle-side > .card { flex-shrink: 0; }
+.workspace-title { font-size: 16px; margin: 0 0 12px; }
+.battle-formation { flex-direction: column; align-items: stretch; gap: 8px; margin: 0 0 16px; }
+.battle-select { width: 100%; }
+.battle-side .strategy-grid { grid-template-columns: 1fr; }
+.strategy-details { margin-top: 10px; border-block: 1px solid var(--line); }
+.strategy-details > div { margin: 10px 0; }
+.battle-side .battle-info { min-height: 64px; max-height: 180px; }
+.battle-side .battle-log { min-height: 0; max-height: 100px; overflow: auto; font-size: 12px; }
+.battle-view #rosterCard { max-height: calc(100dvh - 210px); overflow: auto; }
+.roster-cols { grid-template-columns: 1fr; }
+.roster-col { min-height: 0; }
+.roster-col:last-child { order: -1; }
+.roster-actions { margin-left: 0; flex-wrap: wrap; }
+.roster-actions .btn { flex: 1 1 auto; }
+#rosterAuto { background: #123b46; border-color: #398f94; }
+.roster-options { margin-bottom: 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.roster-options fieldset { border: 0; min-width: 0; padding: 8px 10px; margin: 0; }
+.roster-options label { display: block; margin: 8px 0; }
+.roster-options .roster-option-check { display: flex; align-items: flex-start; gap: 6px; }
+.roster-option-check input { flex: 0 0 auto; margin-top: 3px; }
+.roster-options .tiny { line-height: 1.6; }
+.roster-row { grid-template-columns: minmax(0, 1fr) auto; }
+.roster-right { grid-column: 1 / -1; flex-direction: row; }
+.roster-controls { flex: 1; min-width: 0; }
+.roster-line { min-width: 0; }
+.roster-line b { white-space: nowrap; }
+.roster-list { max-height: none; }
+.battle-view .battle-command { display: flex; grid-column: 1 / -1; grid-row: 3; align-items: center; justify-content: space-between; gap: 16px; position: sticky; bottom: 0; z-index: 4; padding: 12px 16px; background: #101e34; border: 1px solid var(--line); border-radius: 12px; }
+#battleGuide { margin: 0; font-size: 14px; line-height: 1.5; }
+.battle-command-actions { display: flex; gap: 8px; flex-shrink: 0; }
+#battleStartBtn { padding: 12px 20px; background: #12616b; border-color: #4bc9cc; font-size: 14px; }
+#battleStartBtn:disabled { opacity: 0.45; }
+.battle-playback { display: none; }
+.battle-in-progress .battle-playback { display: flex; }
+.battle-playback > .row { justify-content: center; margin-top: 0; }
+.battle-view #battleCanvas { max-width: min(100%, calc(100dvh - 285px)); }
+.battle-view .workspace-drawers { margin-bottom: 14px; }
+
+/* 狭い画面では無理な三列表示を避け、操作を縦に並べる */
+@media (max-width: 1100px) {
+  .game-toolbar { flex-wrap: wrap; gap: 6px 12px; }
+  .game-toolbar .asset-grid { order: 3; flex-basis: 100%; }
+  .game-menu { margin-left: auto; }
+  main .grid { grid-template-columns: 220px minmax(0, 1fr) 240px; gap: 10px; }
+  .game-toolbar .asset-card { justify-content: center; }
+  #mapCanvas, #battleCanvas { max-width: min(100%, calc(100dvh - 280px)); }
+}
+@media (max-width: 850px) {
+  main .grid { grid-template-columns: minmax(0, 1fr); }
+  .workspace-map { grid-column: 1; grid-row: 1; }
+  .workspace-actions { grid-column: 1; grid-row: 2; }
+  #questCard { grid-column: 1; grid-row: 3; }
+  .battle-view .battle-heading { grid-column: 1; grid-row: 1; flex-wrap: wrap; }
+  .battle-view .workspace-map { grid-row: 2; }
+  .battle-view #rosterCard { grid-row: 3; max-height: none; }
+  .battle-view .battle-side { grid-column: 1; grid-row: 4; max-height: none; }
+  .battle-view .battle-command { grid-row: 5; flex-wrap: wrap; padding: 10px; }
+  .battle-command-actions { flex-wrap: wrap; }
+  .battle-steps { gap: 6px; font-size: 12px; }
+  .battle-steps li { padding: 6px; }
+  .game-toolbar .asset-grid { flex-wrap: wrap; }
+  .game-toolbar .asset-card { flex: 1 1 28%; }
+  .game-toolbar .asset-body { flex-direction: column; gap: 2px; }
+  .game-toolbar .asset-body .label { white-space: nowrap; }
+  .game-header { position: static; }
+  #mapCanvas, #battleCanvas, .battle-view #battleCanvas { max-width: 100%; }
+}

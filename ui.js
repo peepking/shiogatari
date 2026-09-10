@@ -87,7 +87,8 @@ import {
   TROOP_STATS,
   wireTroopDismiss,
 } from "./troops.js";
-import { clamp, formatGameTime, nowStr } from "./util.js";
+import { clamp, nowStr } from "./util.js";
+import { renderGameTime } from "./gameTime.js";
 
 /**
  * 
@@ -1301,7 +1302,7 @@ function syncUI() {
     const name = settlement?.name;
     locationLabelEl.textContent = name ? `${here} / ${name}` : here;
   }
-  if (gameTimeEl) gameTimeEl.textContent = formatGameTime(state);
+  renderGameTime(gameTimeEl, state);
 
   if (shipsIn) shipsIn.value = String(state.ships);
   if (troopsIn) troopsIn.value = String(troopDisplay.total);
