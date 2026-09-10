@@ -28,13 +28,14 @@ function placeName(destination) {
  * @param {string} label
  * @param {number} owned
  * @param {number} required
+ * @param {string} [icon]
  * @returns {object}
  */
-function quantityRow(label, owned, required) {
+function quantityRow(label, owned, required, icon) {
   const current = Math.max(0, Number(owned) || 0);
   const total = Math.max(0, Number(required) || 0);
   const missing = Math.max(0, total - current);
-  return { label, current: Math.min(current, total), total, text: `${current} / ${total}`, note: missing ? `あと${missing}` : "必要数あり", done: missing === 0 };
+  return { label, icon, current: Math.min(current, total), total, text: `${current} / ${total}`, note: missing ? `あと${missing}` : "必要数あり", done: missing === 0 };
 }
 
 /**
@@ -56,16 +57,16 @@ export function getQuestProgress(q, state, { now, canFinish, origin, target, ite
   const supply = SINGLE_SUPPLY_TYPES.includes(q.type) || MULTI_SUPPLY_TYPES.includes(q.type);
   if (supply) {
     const items = SINGLE_SUPPLY_TYPES.includes(q.type) ? [{ id: q.itemId, qty: q.qty }] : q.items || [];
-    for (const item of items) rows.push(quantityRow(itemNames[item.id] || item.id, state.supplies?.[item.id], item.qty));
+    for (const item of items) rows.push(quantityRow(itemNames[item.id] || item.id, state.supplies?.[item.id], item.qty, item.id));
     destination = q.type === "oracle_supply" ? null : q.type === "delivery" ? target : origin;
     next = rows.some(row => !row.done) ? "不足している物資を集めてください。" : destination ? `${placeName(destination)}で納品してください。` : "物資を捧げて完了できます。";
   } else if (q.type === "oracle_troop") {
     const levels = state.troops?.[q.troopType];
     const count = typeof levels === "number" ? levels : Object.values(levels || {}).reduce((sum, n) => sum + Number(n || 0), 0);
-    rows.push(quantityRow(`${troopNames[q.troopType] || q.troopType}（人）`, count, 1));
+    rows.push(quantityRow(`${troopNames[q.troopType] || q.troopType}（人）`, count, 1, q.troopType));
     next = rows[0].done ? "部隊員を1人捧げて完了できます。" : "指定の兵種を1人雇用してください。";
   } else if (q.type === "war_truce") {
-    rows.push(quantityRow("資金", state.funds, q.costFunds || 0));
+    rows.push(quantityRow("資金", state.funds, q.costFunds || 0, "funds"));
     destination = origin;
     next = rows[0].done ? `${placeName(origin)}で停戦工作を完了してください。` : "停戦工作に必要な資金を用意してください。";
   } else if (["oracle_move", "noble_scout"].includes(q.type)) {

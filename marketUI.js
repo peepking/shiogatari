@@ -4,22 +4,10 @@ import { confirmAction, elements, pushLog, pushToast, setInlineMessage, setOutpu
 import { adjustSupport } from "./faction.js";
 import { state } from "./state.js";
 import { SUPPLY_ITEMS, calcSupplyCap, calcSupplyPrice, totalSupplies } from "./supplies.js";
+import { resourceIcon } from "./resourceUI.js";
 
 // 船の単価は固定（1隻=5000資金）。
 const SHIP_PRICE = 5000;
-const SUPPLY_ICONS = {
-  food: "\u{1F35E}",
-  wood: "\u{1FAB5}",
-  stone: "\u{1FAA8}",
-  iron: "\u26CF\uFE0F",
-  fiber: "\u{1F9F6}",
-  salt: "\u{1F9C2}",
-  spice: "\u{1F336}\uFE0F",
-  arms: "\u{1F6E1}\uFE0F",
-  textile: "\u{1F458}",
-  brew: "\u{1F376}",
-  leather: "\u{1F45E}",
-};
 
 /**
  * 物資取引モーダルのエラー表示を更新する。
@@ -83,7 +71,7 @@ export function renderTradeSelects() {
     .map(
       (r) => `
         <tr>
-          <td class="ta-center">${SUPPLY_ICONS[r.id] || "・"}</td>
+          <td class="ta-center">${resourceIcon(r.id)}</td>
           <td>${r.name}${r.discountPct > 0 ? `<span class="pill off-pill">買値${r.discountPct}%OFF</span>` : ""}</td>
           <td class="ta-center">${r.price}</td>
           <td class="ta-center">${r.townQty}</td>
@@ -191,7 +179,7 @@ export function renderEventTradeModal(trade) {
     .map(
       (d) => `
         <tr>
-          <td class="ta-center">${SUPPLY_ICONS[d.id] || "・"}</td>
+          <td class="ta-center">${resourceIcon(d.id)}</td>
           <td>${d.name}</td>
           <td class="ta-center">${d.price}</td>
           <td class="ta-center">${d.stock}</td>

@@ -50,7 +50,8 @@ import {
 } from "./map.js";
 import { openEventTrade, wireMarketModals } from "./marketUI.js";
 import { renderAssets, renderFactions, wireFactionPanel, wireMapToggle } from "./panelUI.js";
-import { renderQuestModal, renderQuestUI } from "./questUI.js";
+import { renderQuestModal, renderQuestUI, renderQuestConditions, renderQuestRewards } from "./questUI.js";
+import { renderReportLine, reportLineText } from "./resourceUI.js";
 import { absDay, manhattan } from "./questUtils.js";
 import {
   acceptNobleQuest,
@@ -87,7 +88,7 @@ import {
   TROOP_STATS,
   wireTroopDismiss,
 } from "./troops.js";
-import { clamp, nowStr } from "./util.js";
+import { clamp, nowStr, escapeHtml } from "./util.js";
 import { renderGameTime } from "./gameTime.js";
 
 /**
@@ -206,14 +207,14 @@ function renderEncounterPrep(info) {
 
 /**
  * 戦闘結果サマリをUIに反映する。
- * @param {string[]} summary 結果の各行
+ * @param {Array<string|object>} summary 結果の各行と表示用アイコン情報
  * @param {string} resultLabel 表示用の結果ラベル
  * @param {object} pending ペンディング中のエンカウント情報
  * @param {number} enemyTotal 敵推定人数
  * @param {boolean} isWin 勝利したか
  */
 function renderBattleSummary(summary, resultLabel, pending, enemyTotal, isWin) {
-  const body = summary.join("\n");
+  const body = summary.map(reportLineText).join("\n");
   const strengthText =
     pending.enemyFactionId !== "pirates" && pending.strength === "elite"
       ? `敵推定${enemyTotal}人（正規軍）`
@@ -706,20 +707,23 @@ function processBattleOutcome(resultCode, meta) {
   const questFightIdx = pending.questFightIdx ?? null;
   const summary = [];
   /**
-   * 行商人関連の追加戦利品を付与する。
+   * 行商人関連の追加戦利品を付与する。資金は敵規模に±10%の乱数補正を掛ける。
+   * 襲撃時は原料3回・加工品2回を重複ありで抽選し、表示用IDとログ本文を別に返す。
    * @param {number} scale 元となる敵規模
    * @param {boolean} elite 強編成かどうか
    * @param {"raid"|"help"} kind 襲撃/救助の別
-   * @returns {string[]} 付与内容の表示テキスト
+   * @returns {{texts:string[],resources:Array}} 付与内容の本文とアイコン表示用情報
    */
   const grantMerchantBonusLoot = (scale, elite, kind) => {
     const texts = [];
+    const resources = [];
     state.supplies ||= {};
     const variance = 0.9 + Math.random() * 0.2;
     const fundsGain = Math.max(5, Math.round(scale * (kind === "help" ? 15 : 20) * variance * (elite ? 1.2 : 1)));
     state.funds = (state.funds || 0) + fundsGain;
     texts.push(`資金 +${fundsGain}`);
-    if (kind === "help") return texts;
+    resources.push({ id: "funds", label: "資金", value: `+${fundsGain}` });
+    if (kind === "help") return { texts, resources };
     const rawPool = SUPPLY_ITEMS.filter((i) => i.type === SUPPLY_TYPES.raw);
     const procPool = SUPPLY_ITEMS.filter((i) => i.type === SUPPLY_TYPES.processed);
     const rawQty = Math.max(1, Math.round(scale / 25));
@@ -729,11 +733,13 @@ function processBattleOutcome(resultCode, meta) {
     for (let i = 0; i < 3 && rawPool.length; i++) {
       const pick = rawPool[Math.floor(Math.random() * rawPool.length)];
       rawPicks.push(pick);
+      resources.push({ id: pick.id, label: pick.name, value: `+${rawQty}` });
       state.supplies[pick.id] = (state.supplies[pick.id] ?? 0) + rawQty;
     }
     for (let i = 0; i < 2 && procPool.length; i++) {
       const pick = procPool[Math.floor(Math.random() * procPool.length)];
       procPicks.push(pick);
+      resources.push({ id: pick.id, label: pick.name, value: `+${procQty}` });
       state.supplies[pick.id] = (state.supplies[pick.id] ?? 0) + procQty;
     }
     if (rawPicks.length) {
@@ -750,7 +756,7 @@ function processBattleOutcome(resultCode, meta) {
           .join(" / ")}`
       );
     }
-    return texts;
+    return { texts, resources };
   };
   try {
     if (isWin) {
@@ -772,9 +778,9 @@ function processBattleOutcome(resultCode, meta) {
       }
       state.funds += fundsGain;
       state.supplies.food = (state.supplies.food ?? 0) + foodGain;
-      summary.push(`名声 +${fameDelta}`);
-      summary.push(`資金 +${fundsGain}`);
-      summary.push(`食料 +${foodGain}`);
+      summary.push({ text: `名声 +${fameDelta}`, icon: "fame" });
+      summary.push({ text: `資金 +${fundsGain}`, icon: "funds" });
+      summary.push({ text: `食料 +${foodGain}`, icon: "food" });
       const matText =
         Object.entries(pickedMap)
           .map(([k, v]) => {
@@ -782,14 +788,14 @@ function processBattleOutcome(resultCode, meta) {
             return `${name} +${v}`;
           })
           .join(" / ") || "なし";
-      summary.push(`物資: ${matText}`);
+      summary.push({ text: `物資: ${matText}`, label: "物資", resources: Object.entries(pickedMap).map(([id, qty]) => ({ id, label: SUPPLY_ITEMS.find(item => item.id === id)?.name || id, value: `+${qty}` })) });
     } else {
       state.fame = Math.max(0, state.fame - fameDelta);
       const lossRate = 0.45 + Math.random() * 0.1; // 45-55%
       const fundsLost = Math.round(state.funds * lossRate);
       state.funds = Math.max(0, state.funds - fundsLost);
-      summary.push(`名声 -${fameDelta}`);
-      summary.push(`資金 -${fundsLost}`);
+      summary.push({ text: `名声 -${fameDelta}`, icon: "fame" });
+      summary.push({ text: `資金 -${fundsLost}`, icon: "funds" });
       const supplyLoss = {};
       Object.keys(state.supplies || {}).forEach((k) => {
         const cur = Number(state.supplies[k] || 0);
@@ -798,7 +804,7 @@ function processBattleOutcome(resultCode, meta) {
         supplyLoss[k] = lost;
       });
       const foodLost = supplyLoss.food ?? 0;
-      if (foodLost) summary.push(`食料 -${foodLost}`);
+      if (foodLost) summary.push({ text: `食料 -${foodLost}`, icon: "food" });
     }
 
     const { losses } = calcLosses(meta);
@@ -811,7 +817,7 @@ function processBattleOutcome(resultCode, meta) {
         return `${name} ${rest || ""}`.trim();
       })
       .join(" / ") || NONE_LABEL;
-    summary.push(`損耗:${lossText === NONE_LABEL ? lossText : " " + lossText}`);
+    summary.push({ text: `損耗:${lossText === NONE_LABEL ? lossText : " " + lossText}`, label: "損耗", ...(lossEntries.length ? { resources: Object.entries(losses).map(([id, qty]) => ({ id, label: TROOP_STATS[id]?.name || id, value: `-${qty}` })) } : { icon: "troops" }) });
 
     const captured = calcCaptures(meta, eventTag);
     Object.entries(captured).forEach(([key, qty]) => {
@@ -825,19 +831,19 @@ function processBattleOutcome(resultCode, meta) {
         return `${name} Lv${lvl} +${n}`;
       }) || [];
     const capText = capEntries.length ? capEntries.join(" / ") : NONE_LABEL;
-    summary.push(`拿捕:${capText === NONE_LABEL ? capText : " " + capText}`);
+    summary.push({ text: `拿捕:${capText === NONE_LABEL ? capText : " " + capText}`, label: "拿捕", ...(capEntries.length ? { resources: Object.entries(captured).map(([key, qty]) => { const [id, level] = key.split("|"); return { id, label: `${TROOP_STATS[id]?.name || id} Lv${level}`, value: `+${qty}` }; }) } : { icon: "troops" }) });
 
     const extraShip =
       isWin && BONUS_CAPTURE_EVENT_TAGS.has(eventTag) && Math.random() < 0.3;
     if (extraShip) {
       state.ships = Math.max(0, (state.ships || 0) + 1);
-      summary.push("船 +1");
+      summary.push({ text: "船 +1", icon: "ships" });
     }
 
     const killed = killedEnemyCount(meta);
     const leveled = levelUpTroopsRandom(killed);
     if (leveled > 0) {
-      summary.push(`練度上昇: ${leveled}人がLv+1`);
+      summary.push({ text: `練度上昇: ${leveled}人がLv+1`, icon: "troops" });
     }
     if (questId) {
       if (questType === QUEST_TYPES.ORACLE_HUNT || questType === QUEST_TYPES.ORACLE_ELITE) {
@@ -884,7 +890,7 @@ function processBattleOutcome(resultCode, meta) {
         addWarScore(playerFactionId, fid, -4, absDay(state), 0, 0);
         summary.push("行商人襲撃: 戦況悪化");
         const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "raid");
-        if (extras.length) summary.push(`追加戦利品: ${extras.join(" / ")}`);
+        if (extras.texts.length) summary.push({ text: `追加戦利品: ${extras.texts.join(" / ")}`, label: "追加戦利品", resources: extras.resources });
       } else {
         addWarScore(playerFactionId, fid, 3, absDay(state), 0, 0);
         summary.push("行商人襲撃失敗: 戦況悪化");
@@ -901,7 +907,7 @@ function processBattleOutcome(resultCode, meta) {
         if (nobId) adjustNobleFavor(nobId, 4);
         summary.push("救助成功: 支持/好感度が上昇");
         const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "help");
-        if (extras.length) summary.push(`追加報酬: ${extras.join(" / ")}`);
+        if (extras.texts.length) summary.push({ text: `追加報酬: ${extras.texts.join(" / ")}`, label: "追加報酬", resources: extras.resources });
       } else {
         addWarScore(playerFactionId, fid, -4, absDay(state), 0, 0);
         if (setId && fid) adjustSupport(setId, fid, -1);
@@ -915,7 +921,7 @@ function processBattleOutcome(resultCode, meta) {
         addWarScore(playerFactionId, fid, -6, absDay(state), 0, 0);
         summary.push("難民襲撃: 戦況悪化");
         const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "raid");
-        if (extras.length) summary.push(`追加戦利品: ${extras.join(" / ")}`);
+        if (extras.texts.length) summary.push({ text: `追加戦利品: ${extras.texts.join(" / ")}`, label: "追加戦利品", resources: extras.resources });
       } else {
         addWarScore(playerFactionId, fid, 4, absDay(state), 0, 0);
         summary.push("難民襲撃失敗: 戦況悪化");
@@ -1361,7 +1367,7 @@ function closeModal(el) {
 
 /**
  * 戦果報告モーダルを組み立てて表示する。
- * @param {string[]|string} lines 表示する本文（配列なら各要素をli化）
+ * @param {Array<string|object>|string} lines 本文とアイコン情報（配列なら各要素をli化）
  * @param {string} [resultLabel=""] 見出しラベル
  */
 function showBattleResultModal(lines, resultLabel = "") {
@@ -1376,7 +1382,7 @@ function showBattleResultModal(lines, resultLabel = "") {
     const items =
       list && list.length
         ? list
-            .map((l) => `<li>${esc(l).replace(/\n/g, "<br>")}</li>`)
+            .map((l) => `<li>${renderReportLine(l)}</li>`)
             .join("")
         : "<li>結果なし</li>";
     const resultText = resultLabel ? `${esc(resultLabel)}` : "結果";
@@ -1451,7 +1457,6 @@ function renderNobleQuestModal(noble, settlement, syncUI) {
         q.type === QUEST_TYPES.NOBLE_SUPPLY || q.type === QUEST_TYPES.NOBLE_SCOUT ? 30 : 60;
       const remain = q.deadlineAbs != null ? Math.max(0, q.deadlineAbs - now) : null;
       const remainText = remain == null ? `受注から${baseDuration}日` : `残り${remain}日`;
-      const rewardText = q.reward ? `${q.reward}` : "-";
       const placeLabel =
         q.type === QUEST_TYPES.NOBLE_SUPPLY
           ? `${settlement.name}(${(settlement.coords.x || 0) + 1}, ${(settlement.coords.y || 0) + 1})で納品`
@@ -1471,9 +1476,9 @@ function renderNobleQuestModal(noble, settlement, syncUI) {
           <td class="ta-left">
             <div class="tiny">${typeLabel(q)} / ${placeLabel}</div>
             <b>${q.title}</b>
-            <div class="tiny">${q.desc || ""}</div>
+            <div class="tiny">${renderQuestConditions(q)}${escapeHtml(q.desc || "")}</div>
           </td>
-          <td class="ta-center">${rewardText}</td>
+          <td class="ta-center">${renderQuestRewards(q)}</td>
           <td class="ta-center">${remainText}</td>
           <td class="ta-center">
             <button class="btn primary quest-accept noble-accept" data-id="${q.id}">受注</button>

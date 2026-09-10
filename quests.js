@@ -57,6 +57,19 @@ const QUEST_TYPES = {
 };
 
 /**
+ * 達成ダイアログへ構造化した報酬を渡す。ログは従来の本文を使う。
+ * @param {string} title
+ * @param {object} q
+ * @param {Array} rewards
+ * @param {string} [note]
+ * @returns {void}
+ */
+function enqueueQuestResult(title, q, rewards, note = "") {
+  const resources = rewards.filter(reward => Number(reward.value) !== 0).map(reward => ({ ...reward, value: `+${reward.value}` }));
+  enqueueEvent({ title, body: `${q.title}${note ? ` / ${note}` : resources.length ? "" : " / 報酬なし"}`, resources });
+}
+
+/**
  * 依頼用の状態を初期化/補完する。
  * @returns {void}
  */
@@ -1220,7 +1233,11 @@ export function completeQuest(id) {
   pushLog("依頼完了", `${q.title} / ${rewardText}`, "-");
   if (!silent) {
     pushToast("依頼完了", `${q.title} / ${rewardText}`, "good");
-    enqueueEvent({ title: "依頼完了", body: `${q.title} / ${rewardText}` });
+    enqueueQuestResult("依頼完了", q, [
+      { id: "funds", label: "資金", value: q.reward || 0 },
+      { id: "faith", label: "信仰", value: q.rewardFaith || 0 },
+      { id: "fame", label: "名声", value: fameReward },
+    ], impact || "");
   } else {
     pushToast("依頼完了", `${q.title} / ${rewardText}`, "info");
   }
@@ -1318,7 +1335,7 @@ export function completeOracleBattleQuest(id) {
   const rewardText = rewardFaith > 0 ? `信仰+${rewardFaith}` : "報酬なし";
   pushLog("神託達成", `${q.title} / ${rewardText}`, "-");
   pushToast("神託達成", `${q.title} / ${rewardText}`, "good");
-  enqueueEvent({ title: "神託達成", body: `${q.title} / ${rewardText}` });
+  enqueueQuestResult("神託達成", q, [{ id: "faith", label: "信仰", value: rewardFaith }]);
   return true;
 }
 
@@ -1369,7 +1386,7 @@ export function completeHuntBattleQuest(id, success, reason = "") {
     pushToast("討伐達成", `${q.title} / ${rewardText}`, "good");
     const fid = q.enemyFactionId || "pirates";
     addWarScore(getPlayerFactionId(), fid, 8, absDay(state));
-    enqueueEvent({ title: "討伐達成", body: `${q.title} / ${rewardText}` });
+    enqueueQuestResult("討伐達成", q, [{ id: "funds", label: "資金", value: q.reward || 0 }, { id: "fame", label: "名声", value: q.rewardFame || 0 }]);
   } else {
     state.quests.active.splice(idx, 1);
     const note = reason ? ` / ${reason}` : "";
@@ -1427,7 +1444,7 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
     const rewardText = `資金+${reward} / 名声+${fameReward}`;
     pushLog("依頼達成", `${q.title} / ${rewardText}`, "-");
     pushToast("依頼達成", `${q.title} / ${rewardText}`, "good");
-    enqueueEvent({ title: "依頼達成", body: `${q.title} / ${rewardText}` });
+    enqueueQuestResult("依頼達成", q, [{ id: "funds", label: "資金", value: reward }, { id: "fame", label: "名声", value: fameReward }]);
     return true;
   }
   if (q.type === QUEST_TYPES.NOBLE_HUNT) {
@@ -1449,7 +1466,7 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
     const rewardText = `資金+${reward} / 名声+${fameReward}`;
     pushLog("依頼達成", `${q.title} / ${rewardText}`, "-");
     pushToast("依頼達成", `${q.title} / ${rewardText}`, "good");
-    enqueueEvent({ title: "依頼達成", body: `${q.title} / ${rewardText}` });
+    enqueueQuestResult("依頼達成", q, [{ id: "funds", label: "資金", value: reward }, { id: "fame", label: "名声", value: fameReward }]);
   }
   return true;
 }
@@ -1711,7 +1728,7 @@ export function completeRefugeeEscortAt(settlement) {
   const rewardText = "名声+4 / 支持が上昇";
   pushLog("護送完了", `${q.title} / ${rewardText}`, "-");
   pushToast("護送完了", `${q.title} / ${rewardText}`, "good");
-  enqueueEvent({ title: "護送完了", body: `${q.title} / ${rewardText}` });
+  enqueueQuestResult("護送完了", q, [{ id: "fame", label: "名声", value: 4 }], "支持が上昇");
   return true;
 }
 
@@ -1778,7 +1795,7 @@ export function completeNobleRefugeeAt(settlement) {
   const rewardText = `資金+${q.reward || 0} / 名声+${fameReward}`;
   pushLog("護送完了", `${q.title} / ${rewardText}`, "-");
   pushToast("護送完了", `${q.title} / ${rewardText}`, "good");
-  enqueueEvent({ title: "護送完了", body: `${q.title} / ${rewardText}` });
+  enqueueQuestResult("護送完了", q, [{ id: "funds", label: "資金", value: q.reward || 0 }, { id: "fame", label: "名声", value: fameReward }]);
   return true;
 }
 

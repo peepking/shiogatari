@@ -3,10 +3,11 @@ import { elements } from "./dom.js";
 import { addHonorFaction, addWarScore, adjustNobleFavor, adjustSupport, getPlayerFactionId } from "./faction.js";
 import { state } from "./state.js";
 import { scheduleGameSave } from "./storage.js";
+import { resourceList } from "./resourceUI.js";
 
 /**
  * イベントキューにイベントを追加し、未表示なら即座に表示する。
- * @param {{title?:string,body?:string,kind?:string,actions?:Array<{id?:string,label?:string,type?:string,payload?:any}>}} evt
+ * @param {{title?:string,body?:string,resources?:Array,kind?:string,actions?:Array<{id?:string,label?:string,type?:string,payload?:any}>}} evt
  */
 export function enqueueEvent(evt) {
   ensureQueue();
@@ -15,6 +16,7 @@ export function enqueueEvent(evt) {
     id,
     title: evt?.title || "イベント",
     body: evt?.body || "",
+    resources: Array.isArray(evt?.resources) ? evt.resources : [],
     kind: evt?.kind || "info",
     createdAt: Date.now(),
     actions: normalizeActions(evt?.actions, id),
@@ -170,7 +172,12 @@ function showNextEvent() {
     return;
   }
   if (elements.eventModalTitle) elements.eventModalTitle.textContent = ev.title || "イベント";
-  if (elements.eventModalBody) elements.eventModalBody.textContent = ev.body || "";
+  if (elements.eventModalBody) {
+    elements.eventModalBody.textContent = ev.body || "";
+    if (Array.isArray(ev.resources) && ev.resources.length) {
+      elements.eventModalBody.insertAdjacentHTML("beforeend", resourceList(ev.resources));
+    }
+  }
   if (elements.eventModalActions) {
     elements.eventModalActions.innerHTML = "";
     ev.actions.forEach((act) => {

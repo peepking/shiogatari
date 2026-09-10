@@ -69,6 +69,15 @@ main .grid > * { min-width: 0; }
 .quest-description summary { padding: 8px 0; color: var(--muted); font-size: 11px; }
 .quest-progress-card .quest-complete { width: 100%; margin-top: 10px; white-space: normal; }
 .quest-auto-note { margin-top: 8px; }
+.resource-icon { display: inline-block; width: 20px; height: 20px; flex: 0 0 20px; object-fit: contain; vertical-align: -5px; margin-right: 5px; }
+.resource-token { display: inline-flex; align-items: center; max-width: 100%; gap: 2px; line-height: 1.6; }
+.resource-token > span { overflow-wrap: anywhere; }
+.resource-token b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.resource-list { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 8px 0; }
+.event-body .resource-list { padding: 12px; background: #ffffff05; border: 1px solid var(--line); border-radius: 10px; white-space: normal; }
+.quest-progress-label .resource-icon { width: 18px; height: 18px; }
+.battle-result-list .resource-list { margin: 5px 0; }
+.trade-table td > .resource-icon { display: block; width: 22px; height: 22px; margin: 0 auto; }
 .workspace-drawers { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .workspace-drawer { flex: 1 1 260px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #10192c; }
 .workspace-drawer > summary { font-size: 13px; color: var(--muted); }

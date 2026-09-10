@@ -2,6 +2,7 @@ import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { getPlayerFactionId, getSupportLabel, getWarEntry, getWarScoreLabel } from "./faction.js";
 import { state } from "./state.js";
 import { sumValues } from "./util.js";
+import { resourceIcon } from "./resourceUI.js";
 
 /** @type {number} 基本の物資上限 */
 export const BASE_SUPPLY_CAP = 60;
@@ -145,33 +146,9 @@ export function renderSupplyModal(detailEl) {
   const rows = SUPPLY_ITEMS.map((item) => {
     const qty = state.supplies?.[item.id] ?? 0;
     if (qty <= 0) return "";
-    const icon =
-      item.id === "food"
-        ? "🍞"
-        : item.id === "wood"
-        ? "🪵"
-        : item.id === "stone"
-        ? "🪨"
-        : item.id === "iron"
-        ? "⛓️"
-        : item.id === "fiber"
-        ? "🧶"
-        : item.id === "salt"
-        ? "🧂"
-        : item.id === "spice"
-        ? "🌶️"
-        : item.id === "arms"
-        ? "🛡️"
-        : item.id === "textile"
-        ? "👘"
-        : item.id === "brew"
-        ? "🍶"
-        : item.id === "leather"
-        ? "👞"
-        : "・";
     return `
       <tr>
-        <td class="ta-center">${icon}</td>
+        <td class="ta-center">${resourceIcon(item.id)}</td>
         <td>${item.name}</td>
         <td class="ta-center">${qty}</td>
         <td class="ta-center">

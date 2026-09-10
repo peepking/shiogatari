@@ -15,6 +15,7 @@ import { SUPPLY_ITEMS } from "./supplies.js";
 import { TROOP_STATS } from "./troops.js";
 import { getQuestProgress } from "./questProgress.js";
 import { escapeHtml } from "./util.js";
+import { resourceIcon, resourceList } from "./resourceUI.js";
 
 const ITEM_NAMES = Object.fromEntries(SUPPLY_ITEMS.map(item => [item.id, item.name]));
 const TROOP_NAMES = Object.fromEntries(Object.entries(TROOP_STATS).map(([id, stat]) => [id, stat.name]));
@@ -27,7 +28,33 @@ const TROOP_NAMES = Object.fromEntries(Object.entries(TROOP_STATS).map(([id, sta
 function renderProgressRow(row) {
   const label = escapeHtml(row.label);
   const text = escapeHtml(row.text);
-  return `<div class="quest-progress-row ${row.done ? "is-done" : ""}"><div class="quest-progress-label"><span>${label}</span><b>${text}</b></div>${row.total > 0 ? `<progress max="${row.total}" value="${row.current}" aria-label="${label} ${text}"></progress>` : ""}${row.note ? `<div class="tiny">${escapeHtml(row.note)}</div>` : ""}</div>`;
+  return `<div class="quest-progress-row ${row.done ? "is-done" : ""}"><div class="quest-progress-label"><span>${resourceIcon(row.icon)}${label}</span><b>${text}</b></div>${row.total > 0 ? `<progress max="${row.total}" value="${row.current}" aria-label="${label} ${text}"></progress>` : ""}${row.note ? `<div class="tiny">${escapeHtml(row.note)}</div>` : ""}</div>`;
+}
+
+/**
+ * 依頼の必要物資・部隊員・資金を内部IDからアイコン付きで表示する。
+ * @param {object} q
+ * @returns {string}
+ */
+export function renderQuestConditions(q) {
+  const items = q.items || (q.itemId ? [{ id: q.itemId, qty: q.qty }] : []);
+  const resources = items.map(item => ({ id: item.id, label: ITEM_NAMES[item.id] || item.id, value: `×${item.qty}` }));
+  if (q.troopType) resources.push({ id: q.troopType, label: TROOP_NAMES[q.troopType] || q.troopType, value: "×1人" });
+  if (q.costFunds != null) resources.push({ id: "funds", label: "必要資金", value: q.costFunds });
+  return resources.length ? resourceList(resources) : "";
+}
+
+/**
+ * 依頼の確定報酬をアイコン付きで表示する。
+ * @param {object} q
+ * @returns {string}
+ */
+export function renderQuestRewards(q) {
+  const resources = [];
+  if (q.reward) resources.push({ id: "funds", label: "資金", value: `+${q.reward}` });
+  if (q.rewardFaith) resources.push({ id: "faith", label: "信仰", value: `+${q.rewardFaith}` });
+  if (q.rewardFame) resources.push({ id: "fame", label: "名声", value: `+${q.rewardFame}` });
+  return resources.length ? resourceList(resources) : "報酬は依頼内容を参照";
 }
 
 const TYPE_LABEL = {
@@ -55,14 +82,6 @@ const TYPE_LABEL = {
   [QUEST_TYPES.WAR_BLOCKADE]: "前線行動",
   [QUEST_TYPES.WAR_TRUCE]: "前線行動",
 };
-
-const ORACLE_TYPES = new Set([
-  QUEST_TYPES.ORACLE_SUPPLY,
-  QUEST_TYPES.ORACLE_MOVE,
-  QUEST_TYPES.ORACLE_TROOP,
-  QUEST_TYPES.ORACLE_HUNT,
-  QUEST_TYPES.ORACLE_ELITE,
-]);
 
 /**
  * 座標を表示用の文字列に整形する。
@@ -219,18 +238,6 @@ function buildEstimateText(q) {
 }
 
 /**
- * 追加報酬ラベル（神託など）を返す。
- * @param {*} q 依頼
- * @returns {string} 追加ラベル
- */
-function rewardExtraLabel(q) {
-  if (ORACLE_TYPES.has(q.type)) {
-    return `信仰+${q.rewardFaith ?? 0}`;
-  }
-  return "";
-}
-
-/**
  * 依頼一覧UIを最新状態に描画する。
  * @param {Function} syncUI 依頼完了後などに呼ぶ同期処理
  * @returns {void}
@@ -271,7 +278,6 @@ export function renderQuestUI(syncUI) {
         estText,
       });
       const progress = getQuestProgress(q, state, { now, canFinish: canCompleteQuest(q), origin, target, itemNames: ITEM_NAMES, troopNames: TROOP_NAMES });
-      const rewardExtra = rewardExtraLabel(q);
       const bodyText = buildBodyText(q, itemName, supplyInfo);
       return `
         <div class="sideBlock mb-8 quest-progress-card quest-${progress.status}">
@@ -280,7 +286,7 @@ export function renderQuestUI(syncUI) {
           <span class="quest-status">${progress.statusText}</span>
           <div class="quest-progress-rows">${progress.rows.map(renderProgressRow).join("")}</div>
           <p class="quest-next">${escapeHtml(progress.next)}</p>
-          <details class="quest-description"><summary>依頼の詳細・報酬</summary><div class="tiny">${escapeHtml(placeLabel)}</div><p class="tiny">${escapeHtml(bodyText)}</p><div class="tiny">資金 ${q.reward ?? 0}${rewardExtra ? ` / ${escapeHtml(rewardExtra)}` : ""}${q.rewardFame ? ` / 名声 +${q.rewardFame}` : ""}</div></details>
+          <details class="quest-description"><summary>依頼の詳細・報酬</summary><div class="tiny">${escapeHtml(placeLabel)}</div><div class="tiny">${renderQuestConditions(q)}${escapeHtml(bodyText)}</div><div class="tiny">${renderQuestRewards(q)}</div></details>
           ${progress.automatic && !progress.ready ? `<div class="tiny quest-auto-note">${progress.automaticLabel}</div>` : `<button class="btn good quest-complete" data-id="${q.id}" ${progress.ready ? "" : "disabled"}>完了して報酬を受取</button>`}
         </div>
       `;
@@ -348,9 +354,9 @@ export function renderQuestModal(settlement, syncUI) {
           <td>
             <div class="tiny">${typeLabel} / ${placeLabel}</div>
             <div><b>${q.title || itemName}</b></div>
-            <div class="tiny">${bodyText}</div>
+            <div class="tiny">${renderQuestConditions(q)}${escapeHtml(bodyText)}</div>
           </td>
-          <td class="ta-center">${q.reward ?? 0}</td>
+          <td class="ta-center">${renderQuestRewards(q)}</td>
           <td class="ta-center">${deadlineText}</td>
           <td class="ta-center"><button class="btn primary quest-accept" data-id="${q.id}">受注</button></td>
         </tr>
