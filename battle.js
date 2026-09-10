@@ -1227,8 +1227,10 @@ function addBattleLog(text) {
 }
 
 /**
- * 戦闘表示のステータスを更新する。
- * @param {string} [result]
+ * 準備中から速度欄の経過時間と残存兵数・部隊数を更新する。
+ * 兵数は撃破されていない部隊の編成人数の合計とし、HP割合から人数を推定しない。
+ * 準備中は盤面に反映済みの編成を表示する。
+ * @returns {void}
  */
 function updateBattleStatus() {
   const alive = battleState.units.filter((u) => u.hp > 0);
@@ -1236,8 +1238,11 @@ function updateBattleStatus() {
   const enemies = alive.filter((u) => u.side === "enemy");
   if (elements.battleTime)
     elements.battleTime.textContent = `${Math.floor((battleState.elapsedMs || 0) / 1000)}s`;
-  if (elements.battleCount)
-    elements.battleCount.textContent = `${allies.length} vs ${enemies.length}`;
+  if (elements.battleCount) {
+    const allyCount = allies.reduce((sum, unit) => sum + unit.count, 0);
+    const enemyCount = enemies.reduce((sum, unit) => sum + unit.count, 0);
+    elements.battleCount.textContent = `味方 ${allyCount}人（${allies.length}部隊） / 敵 ${enemyCount}人（${enemies.length}部隊）`;
+  }
   if (elements.battleStatus) {
     const status = battleState.result
       ? `結果: ${battleState.result}`
@@ -1305,6 +1310,7 @@ function updateSpeedUI() {
   document.querySelectorAll(".battle-speed").forEach((btn) => {
     const speed = Number(btn.getAttribute("data-battle-speed") || 1);
     btn.classList.toggle("active", speed === battleState.speed);
+    btn.setAttribute("aria-pressed", String(speed === battleState.speed));
   });
 }
 

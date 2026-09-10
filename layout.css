@@ -78,6 +78,19 @@ main .grid > * { min-width: 0; }
 .quest-progress-label .resource-icon { width: 18px; height: 18px; }
 .battle-result-list .resource-list { margin: 5px 0; }
 .trade-table td > .resource-icon { display: block; width: 22px; height: 22px; margin: 0 auto; }
+
+/* 依頼受注は操作列を確保し、狭い画面でもボタンを縦に折り返さない */
+.modal.quest-offer-modal { width: min(960px, calc(100vw - 28px)); }
+.quest-offer-scroll { max-width: 100%; overflow-x: auto; }
+.quest-offer-table { table-layout: fixed; min-width: 640px; }
+.quest-offer-table th:nth-child(2) { width: 180px; }
+.quest-offer-table th:nth-child(3) { width: 120px; }
+.quest-offer-table th:nth-child(4) { width: 88px; }
+.quest-offer-table td { vertical-align: middle; overflow-wrap: anywhere; }
+.quest-offer-table td:nth-child(3), .quest-offer-table th { white-space: nowrap; }
+.quest-offer-table .quest-accept { min-width: 64px; }
+.modal .trade-table .btn, .modal-close { white-space: nowrap; }
+.quest-offer-table .resource-list { gap: 6px 10px; }
 .workspace-drawers { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 .workspace-drawer { flex: 1 1 260px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #10192c; }
 .workspace-drawer > summary { font-size: 13px; color: var(--muted); }
@@ -94,7 +107,7 @@ main .grid > * { min-width: 0; }
 .battle-steps li { padding: 8px 12px; border: 1px solid var(--line); border-radius: 20px; }
 .battle-steps .complete { color: var(--accent2); }
 .battle-steps .current { color: #a4f3ee; background: #123b46; border-color: #398f94; }
-.battle-view .battle-side { display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 210px); overflow: auto; }
+.battle-view .battle-side { display: flex; flex-direction: column; gap: 12px; max-height: calc(100dvh - 245px); overflow: auto; }
 .battle-side > .card { flex-shrink: 0; }
 .workspace-title { font-size: 16px; margin: 0 0 12px; }
 .battle-formation { flex-direction: column; align-items: stretch; gap: 8px; margin: 0 0 16px; }
@@ -104,7 +117,7 @@ main .grid > * { min-width: 0; }
 .strategy-details > div { margin: 10px 0; }
 .battle-side .battle-info { min-height: 64px; max-height: 180px; }
 .battle-side .battle-log { min-height: 0; max-height: 100px; overflow: auto; font-size: 12px; }
-.battle-view #rosterCard { max-height: calc(100dvh - 210px); overflow: auto; }
+.battle-view #rosterCard { max-height: calc(100dvh - 245px); overflow: auto; }
 .roster-cols { grid-template-columns: 1fr; }
 .roster-col { min-height: 0; }
 .roster-col:last-child { order: -1; }
@@ -128,10 +141,10 @@ main .grid > * { min-width: 0; }
 .battle-command-actions { display: flex; gap: 8px; flex-shrink: 0; }
 #battleStartBtn { padding: 12px 20px; background: #12616b; border-color: #4bc9cc; font-size: 14px; }
 #battleStartBtn:disabled { opacity: 0.45; }
-.battle-playback { display: none; }
-.battle-in-progress .battle-playback { display: flex; }
+.battle-playback { display: flex; }
+.battle-count { flex-basis: 100%; justify-content: center; white-space: normal; text-align: center; }
 .battle-playback > .row { justify-content: center; margin-top: 0; }
-.battle-view #battleCanvas { max-width: min(100%, calc(100dvh - 285px)); }
+.battle-view #battleCanvas { max-width: min(100%, calc(100dvh - 365px)); }
 .battle-view .workspace-drawers { margin-bottom: 14px; }
 
 /* 狭い画面では無理な三列表示を避け、操作を縦に並べる */

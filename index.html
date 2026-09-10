@@ -255,11 +255,12 @@
                     <span class="pill">速度: <b id="battleSpeedLabel">x1</b></span>
                   </div>
                 <div class="row flex-wrap mt-10">
+                  <span class="tiny">速度</span>
                   <button class="btn ghost battle-speed" data-battle-speed="1">x1</button>
                   <button class="btn ghost battle-speed" data-battle-speed="2">x2</button>
                   <button class="btn ghost battle-speed" data-battle-speed="4">x4</button>
                   <span class="pill">経過: <b id="battleTime">0s</b></span>
-                  <span class="pill">残数: <b id="battleCount">-</b></span>
+                  <span class="pill battle-count">残存: <b id="battleCount">-</b></span>
                 </div>
                 <div class="battle-formation row flex-wrap mt-6">
                   <label class="tiny mb-0" for="battleFormationSelect">味方フォーメーション</label>
@@ -676,14 +677,14 @@
   </div>
 
   <div class="modal-backdrop" id="questModal" hidden>
-    <div class="modal">
+    <div class="modal quest-offer-modal">
       <div class="modal-hd">
         <div>依頼受注</div>
         <button class="modal-close" id="questModalClose">閉じる</button>
       </div>
       <div class="modal-bd">
-        <div class="table mt-10">
-          <table class="trade-table">
+        <div class="table mt-10 quest-offer-scroll" tabindex="0" role="region" aria-label="依頼受注一覧">
+          <table class="trade-table quest-offer-table">
             <thead>
               <tr>
                 <th class="ta-left">依頼</th>
@@ -700,14 +701,14 @@
   </div>
 
   <div class="modal-backdrop" id="nobleQuestModal" hidden>
-    <div class="modal">
+    <div class="modal quest-offer-modal">
       <div class="modal-hd">
         <div>貴族依頼</div>
         <button class="modal-close" id="nobleQuestModalClose">閉じる</button>
       </div>
       <div class="modal-bd">
-        <div class="table mt-10">
-          <table class="trade-table">
+        <div class="table mt-10 quest-offer-scroll" tabindex="0" role="region" aria-label="貴族依頼一覧">
+          <table class="trade-table quest-offer-table">
             <thead>
               <tr>
                 <th class="ta-left">依頼</th>
