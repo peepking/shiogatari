@@ -3,6 +3,7 @@ import { elements, pushLog, pushToast } from "./dom.js";
 import { getTerrainAt } from "./map.js";
 import { state } from "./state.js";
 import { updateBattleLayout } from "./layout.js";
+import { drawMapTile } from "./mapArt.js";
 import { rosterOptions, canAutoDeploy, splitRosterCounts } from "./rosterOptions.js";
 import { saveGameToStorage } from "./storage.js";
 import { TROOP_STATS } from "./troops.js";
@@ -1355,9 +1356,7 @@ function renderBattle() {
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const terrainKey = battleState.grid[y]?.[x];
-      const terrain = TERRAIN_KINDS.find((t) => t.key === terrainKey);
-      ctx.fillStyle = terrain?.color || "#0b1020";
-      ctx.fillRect(x * cell, y * cell, cell, cell);
+      drawMapTile(ctx, { terrain: terrainKey, building: "none" }, x * cell, y * cell, cell, true, null, (x + y) % 2);
     }
   }
   ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";

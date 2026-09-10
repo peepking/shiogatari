@@ -1,4 +1,5 @@
 import { elements } from "./dom.js";
+import { drawMapTile, drawMapPlayer } from "./mapArt.js";
 import { FACTIONS } from "./lore.js";
 import { FRONT_DURATION_DAYS } from "./constants.js";
 import { QUEST_TYPES } from "./quests.js";
@@ -624,15 +625,16 @@ function pinsAt(x, y) {
  * @param {number} startY 描画開始Y座標
  */
 function drawPin(ctx, pin, pad, cellSize, startX, startY) {
-  const cx = pad + (pin.x - startX) * cellSize + cellSize / 2;
-  const cy = pad + (pin.y - startY) * cellSize + cellSize / 2;
-  const r = Math.max(3, cellSize * 0.24);
+  const detailed = cellSize > MAP_CELL;
+  const cx = pad + (pin.x - startX) * cellSize + cellSize * (detailed ? 0.81 : 0.5);
+  const cy = pad + (pin.y - startY) * cellSize + cellSize * (detailed ? 0.2 : 0.5);
+  const r = Math.max(3, cellSize * (detailed ? 0.1 : 0.24));
   ctx.save();
   ctx.fillStyle = pin.color;
   ctx.strokeStyle = "#ffffffaa";
   ctx.lineWidth = 1.4;
   if (pin.shape === "dot") {
-    const size = Math.max(1.0, r * 0.30);
+    const size = Math.max(1.0, r * (detailed ? 0.65 : 0.30));
     ctx.beginPath();
     ctx.arc(cx, cy, size, 0, Math.PI * 2);
     ctx.fill();
@@ -749,7 +751,7 @@ export function renderMap() {
   if (!mapCanvas) return;
   const isZoom = state.mapMode === "zoom";
   const cells = isZoom ? MAP_ZOOM : MAP_SIZE;
-  const cellSize = MAP_CELL;
+  const cellSize = isZoom ? 64 : MAP_CELL;
   const pad = MAP_PAD;
   mapCanvas.width = cells * cellSize + pad * 2;
   mapCanvas.height = cells * cellSize + pad * 2;
@@ -771,44 +773,9 @@ export function renderMap() {
       const gx = startX + x;
       const gy = startY + y;
       const cell = mapData[gy][gx];
-      const t = terrainKinds.find((t) => t.key === cell.terrain) || terrainKinds[0];
-      ctx.fillStyle = t.color;
-      ctx.fillRect(pad + x * cellSize, pad + y * cellSize, cellSize - 1, cellSize - 1);
-
-      if (cell.building !== "none") {
-        const cx = pad + x * cellSize + cellSize / 2;
-        const cy = pad + y * cellSize + cellSize / 2;
-        const size = Math.max(4, cellSize * 0.32);
-        ctx.save();
-        ctx.lineWidth = 1.4;
-        const factionId = cell.settlement?.factionId || cell.factionId;
-        const factionColor =
-          factionId && (FACTIONS.find((f) => f.id === factionId)?.color || null);
-        const defaultColor =
-          cell.building === "town" ? "#7aa7ff" : cell.building === "village" ? "#8fd67a" : "#ffd27a";
-        const fill = factionColor || defaultColor;
-        if (cell.building === "village") {
-          ctx.fillStyle = fill;
-          ctx.strokeStyle = "#ffffffaa";
-          ctx.beginPath();
-          ctx.arc(cx, cy, size * 0.7, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
-        } else if (cell.building === "town") {
-          ctx.fillStyle = fill;
-          ctx.strokeStyle = "#ffffffaa";
-          ctx.translate(cx, cy);
-          ctx.rotate(Math.PI / 4);
-          ctx.fillRect(-size * 0.8, -size * 0.8, size * 1.6, size * 1.6);
-          ctx.strokeRect(-size * 0.8, -size * 0.8, size * 1.6, size * 1.6);
-        } else {
-          ctx.fillStyle = fill;
-          ctx.strokeStyle = "#ffffffaa";
-          ctx.fillRect(pad + x * cellSize + 3, pad + y * cellSize + 3, cellSize - 7, cellSize - 7);
-          ctx.strokeRect(pad + x * cellSize + 3, pad + y * cellSize + 3, cellSize - 7, cellSize - 7);
-        }
-        ctx.restore();
-      }
+      const factionId = cell.settlement?.factionId || cell.factionId;
+      const factionColor = FACTIONS.find(faction => faction.id === factionId)?.color;
+      drawMapTile(ctx, cell, pad + x * cellSize, pad + y * cellSize, cellSize - 1, isZoom, factionColor, (gx + gy) % 2);
     }
   }
 
@@ -833,7 +800,12 @@ export function renderMap() {
     }
   }
 
-  // 現在位置
+  // 現在地の地形に合わせて帆船または人物を描き、枠を最後に重ねる。
+  if (isZoom) {
+    drawMapPlayer(ctx, mapData[state.position.y][state.position.x],
+      pad + (state.position.x - startX) * cellSize,
+      pad + (state.position.y - startY) * cellSize, cellSize - 1);
+  }
   ctx.strokeStyle = "#e8efff";
   ctx.lineWidth = 2;
   ctx.strokeRect(
