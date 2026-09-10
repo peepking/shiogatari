@@ -27,6 +27,7 @@ import {
 import { state } from "./state.js";
 import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 import { TROOP_STATS } from "./troops.js";
+import { getQuestDeadlineDays } from "./questDeadlines.js";
 
 
 /** @enum {string} 依頼種別 */
@@ -369,13 +370,13 @@ export function addRefugeeEscortQuest(targetSet) {
     title: `護送: (${targetSet.coords.x + 1}, ${targetSet.coords.y + 1})`,
     targetId: targetSet.id,
     acceptedAbs: absDay(state),
-    deadlineAbs: absDay(state) + 30,
+    deadlineAbs: absDay(state) + getQuestDeadlineDays(QUEST_TYPES.REFUGEE_ESCORT),
     desc: `${titleTarget}へ難民旅団を護送せよ。`,
   };
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
   pushToast("依頼受注", q.title, "warn");
-  enqueueEvent({ title: "護送依頼", body: `${q.title} を受注しました。期限30日。` });
+  enqueueEvent({ title: "護送依頼", body: `${q.title} を受注しました。期限${getQuestDeadlineDays(q.type)}日。` });
   return q;
 }
 
@@ -394,7 +395,7 @@ export function acceptQuest(id, settlement) {
   const q = list.splice(idx, 1)[0];
   const now = absDay(state);
   q.acceptedAbs = now;
-  q.deadlineAbs = now + 30;
+  q.deadlineAbs = now + getQuestDeadlineDays(q.type);
   // 受注拠点基準で報酬を確定
   if (q.type === QUEST_TYPES.SUPPLY) {
     const demand = settlement.demand || {};
@@ -412,9 +413,6 @@ export function acceptQuest(id, settlement) {
   if (q.type === QUEST_TYPES.DELIVERY) {
     // 配達依頼は受注時に対象物資を受け取る。
     state.supplies[q.itemId] = (state.supplies[q.itemId] ?? 0) + q.qty;
-  }
-  if (q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT) {
-    q.deadlineAbs = now + 45;
   }
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
@@ -437,7 +435,7 @@ export function acceptNobleQuest(id, noble, settlement) {
   const q = list.splice(idx, 1)[0];
   const now = absDay(state);
   q.acceptedAbs = now;
-  q.deadlineAbs = now + (q.type === QUEST_TYPES.NOBLE_SUPPLY || q.type === QUEST_TYPES.NOBLE_SCOUT ? 30 : 60);
+  q.deadlineAbs = now + getQuestDeadlineDays(q.type);
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
   return q;

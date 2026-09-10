@@ -16,6 +16,7 @@ import { TROOP_STATS } from "./troops.js";
 import { getQuestProgress } from "./questProgress.js";
 import { escapeHtml } from "./util.js";
 import { resourceIcon, resourceList } from "./resourceUI.js";
+import { modalDeadlineText } from "./questDeadlines.js";
 
 const ITEM_NAMES = Object.fromEntries(SUPPLY_ITEMS.map(item => [item.id, item.name]));
 const TROOP_NAMES = Object.fromEntries(Object.entries(TROOP_STATS).map(([id, stat]) => [id, stat.name]));
@@ -173,32 +174,6 @@ function buildPlaceLabel(q, ctx) {
     default:
       return "";
   }
-}
-
-/**
- * 依頼モーダルに表示する期限ラベルを返す（受注からn日形式）。
- * @param {object} q 依頼オブジェクト
- * @param {number} nowAbs 現在の絶対日
- * @returns {string} 表示用期限ラベル
- */
-function modalDeadlineText(q, nowAbs) {
-  const nobleLongTypes = new Set([
-    QUEST_TYPES.NOBLE_SECURITY,
-    QUEST_TYPES.NOBLE_REFUGEE,
-    QUEST_TYPES.NOBLE_LOGISTICS,
-    QUEST_TYPES.NOBLE_HUNT,
-  ]);
-  const baseDays =
-    q.deadlineAbs != null
-      ? Math.max(0, q.deadlineAbs - nowAbs)
-      : q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT
-        ? 45
-        : q.type === QUEST_TYPES.NOBLE_SUPPLY || q.type === QUEST_TYPES.NOBLE_SCOUT
-          ? 30
-          : nobleLongTypes.has(q.type)
-            ? 60
-            : 30;
-  return `受注から${baseDays}日`;
 }
 
 /**

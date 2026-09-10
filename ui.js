@@ -1,3 +1,4 @@
+import { modalDeadlineText } from "./questDeadlines.js";
 import {
   attemptEnter,
   attemptExit,
@@ -1453,10 +1454,7 @@ function renderNobleQuestModal(noble, settlement, syncUI) {
   };
   body.innerHTML = list
     .map((q) => {
-      const baseDuration =
-        q.type === QUEST_TYPES.NOBLE_SUPPLY || q.type === QUEST_TYPES.NOBLE_SCOUT ? 30 : 60;
-      const remain = q.deadlineAbs != null ? Math.max(0, q.deadlineAbs - now) : null;
-      const remainText = remain == null ? `受注から${baseDuration}日` : `残り${remain}日`;
+      const remainText = modalDeadlineText(q, now);
       const placeLabel =
         q.type === QUEST_TYPES.NOBLE_SUPPLY
           ? `${settlement.name}(${(settlement.coords.x || 0) + 1}, ${(settlement.coords.y || 0) + 1})で納品`
