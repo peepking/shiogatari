@@ -7,6 +7,7 @@ import {
   adjustSupport,
   getFrontById,
   getPlayerFactionId,
+  honorFactions,
   getRelation,
   getWarEntry,
   isSettlementUnderSiege,
@@ -1278,10 +1279,11 @@ function enqueueWreckEvent(terrain) {
 }
 
 /**
- * 内通者接触イベント。
+ * 名誉家臣として所属する勢力がある場合だけ内通者接触イベントを生成する。
  * @returns {boolean}
  */
 function enqueueTraitorEvent() {
+  if (!honorFactions().length) return false;
   const info = nearestSettlementInfo();
   if (!info?.settlementId) return false;
   const intelCost = 80;
