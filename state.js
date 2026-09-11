@@ -65,7 +65,7 @@ const createState = () => ({
     FACTIONS.map((f) => [f.id, f.attitude || "neutral"])
   ),
   position: { x: 10, y: 10 },
-  mapMode: "full", // "full" | "zoom" の2状態
+  mapMode: "full", // 全体・周辺・拡大（full / nearby / zoom）
   selectedPosition: null,
 });
 

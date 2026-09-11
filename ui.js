@@ -20,6 +20,7 @@ import {
 import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL, NONE_LABEL, PLACE } from "./constants.js";
 import { elements, pushLog, pushToast, renderLogs, setInlineMessage, setOutput } from "./dom.js";
 import { initEventQueueUI, showNextEvent } from "./events.js";
+import { renderLocationHeader } from "./locationHeader.js";
 import { updateExplorationWorld, renderExplorationControl, resumeExploration, finishExploration } from "./explorationUI.js";
 import { processScheduledOmens } from "./time.js";
 import { snapshotOutfitting, outfittingBattleLosses } from "./outfitting.js";
@@ -122,18 +123,6 @@ const BONUS_CAPTURE_EVENT_TAGS = new Set([
   "refugee_raid",
 ]);
 
-/**
- * モード表示用のラベルを組み立てる。
- * @returns {string}
- */
-const formatModeLabel = () => {
-  const base = state.modeLabel;
-  const loc = getLocationStatus();
-  const parts = [base];
-  if (loc?.place) parts.push(loc.place);
-  if (loc?.faction) parts.push(loc.faction);
-  return parts.join("/");
-};
 
 /**
  * 現在位置で謁見可能な拠点情報を返す。
@@ -1278,8 +1267,6 @@ function syncUI() {
     faithEl,
     fundsEl,
     fameEl,
-    modeLabelEl,
-    locationLabelEl,
     gameTimeEl,
     shipsIn,
     troopsIn,
@@ -1297,13 +1284,7 @@ function syncUI() {
   if (faithEl) faithEl.textContent = String(state.faith);
   if (fundsEl) fundsEl.textContent = String(state.funds);
   if (fameEl) fameEl.textContent = String(state.fame);
-  if (modeLabelEl) modeLabelEl.textContent = formatModeLabel();
-  if (locationLabelEl) {
-    const here = loc?.place || "フィールド";
-    const settlement = getCurrentSettlement();
-    const name = settlement?.name;
-    locationLabelEl.textContent = name ? `${here} / ${name}` : here;
-  }
+  renderLocationHeader(getCurrentSettlement(), state.modeLabel, getTerrainAt(state.position.x, state.position.y));
   renderGameTime(gameTimeEl, state);
 
   if (shipsIn) shipsIn.value = String(state.ships);

@@ -1,4 +1,6 @@
 import { elements, pushToast } from "./dom.js";
+import { nextMapMode } from "./mapViewport.js";
+import { scheduleGameSave } from "./storage.js";
 import {
   getNobleFavor,
   getPlayerFactionId,
@@ -111,7 +113,7 @@ export function renderNobles(fid) {
   const allies = FACTIONS.filter((x) => x.id !== f.id && x.id !== "pirates" && getRelation(f.id, x.id) === "ally");
   const wars = FACTIONS.filter((x) => x.id !== f.id && x.id !== "pirates" && getRelation(f.id, x.id) === "war");
   const allianceCard = `
-    <div class="sideBlock mb-8" style="grid-column: span 2;">
+    <div class="sideBlock mb-8 noble-relations">
       <div class="sbTitle">関係</div>
       <div class="tiny">同盟: ${allies.length ? allies.map((a) => a.name).join(" / ") : "-"}</div>
       <div class="tiny">戦争: ${wars.length ? wars.map((w) => w.name).join(" / ") : "-"}</div>
@@ -229,9 +231,10 @@ export function wireFactionPanel() {
  */
 export function wireMapToggle(renderMap) {
   elements.mapToggle?.addEventListener("click", () => {
-    state.mapMode = state.mapMode === "full" ? "zoom" : "full";
+    state.mapMode = nextMapMode(state.mapMode);
     renderMap?.();
     refreshMapInfo();
+    scheduleGameSave();
   });
   elements.mapPinsToggle?.addEventListener("click", () => {
     state.mapPinsVisible = !state.mapPinsVisible;

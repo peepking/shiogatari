@@ -35,6 +35,14 @@ main > .wrap { padding: 14px 0; }
 main .grid { grid-template-columns: minmax(230px, 0.8fr) minmax(0, 2fr) minmax(260px, 0.9fr); gap: 14px; }
 main .grid > * { min-width: 0; }
 .workspace-actions, #rosterCard { grid-column: 1; grid-row: 2; }
+.location-heading { width: 100%; min-width: 0; }
+.location-status { font-size: 11px; letter-spacing: 0.08em; color: #a9c4dc; margin-bottom: 6px; }
+.location-heading h2 { margin: 0; font-size: 21px; line-height: 1.4; color: #f0f5ff; overflow-wrap: anywhere; }
+.location-faction:not([hidden]) { display: flex; align-items: center; gap: 9px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); }
+.location-faction img { width: 36px; height: 36px; flex-shrink: 0; object-fit: contain; }
+.location-faction > span { min-width: 0; }
+.location-faction-caption { display: block; font-size: 10px; color: var(--muted); margin-bottom: 2px; }
+.location-faction b { display: block; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
 .workspace-map { grid-column: 2; grid-row: 2; }
 #questCard, .battle-side { grid-column: 3; grid-row: 2; }
 .workspace-map > .bd { padding: 10px; }

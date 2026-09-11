@@ -1,4 +1,5 @@
 import { elements } from "./dom.js";
+import { mapViewport } from "./mapViewport.js";
 import { drawMapTile, drawMapPlayer, drawExplorationSite, drawChartSite } from "./mapArt.js";
 import { visibleChartSites } from "./charts.js";
 import { CHART_CONFIG } from "./expansionConfig.js";
@@ -15,7 +16,7 @@ import {
   SUPPLY_TYPES,
 } from "./supplies.js";
 import { initSettlementRecruitment, refreshSettlementRecruitment } from "./troops.js";
-import { clamp, displaySupportLabel, displayWarLabel, supportLabel } from "./util.js";
+import { displaySupportLabel, displayWarLabel, supportLabel } from "./util.js";
 
 /** @type {number} マップの一辺サイズ */
 export const MAP_SIZE = 50;
@@ -756,9 +757,8 @@ export function renderMap() {
   refreshPinCache();
   const { mapCanvas, mapPosLabel } = elements;
   if (!mapCanvas) return;
-  const isZoom = state.mapMode === "zoom";
-  const cells = isZoom ? MAP_ZOOM : MAP_SIZE;
-  const cellSize = isZoom ? 64 : MAP_CELL;
+  const { detailed: isZoom, cells, cellSize, startX, startY, label } = mapViewport(state.mapMode, state.position);
+  if (elements.mapToggle) elements.mapToggle.textContent = `地図切替：${label}`;
   const pad = MAP_PAD;
   mapCanvas.width = cells * cellSize + pad * 2;
   mapCanvas.height = cells * cellSize + pad * 2;
@@ -768,12 +768,6 @@ export function renderMap() {
   ctx.fillStyle = "#0b1020";
   ctx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
 
-  const startX = isZoom
-    ? clamp(state.position.x - Math.floor(MAP_ZOOM / 2), 0, MAP_SIZE - MAP_ZOOM)
-    : 0;
-  const startY = isZoom
-    ? clamp(state.position.y - Math.floor(MAP_ZOOM / 2), 0, MAP_SIZE - MAP_ZOOM)
-    : 0;
 
   for (let y = 0; y < cells; y++) {
     for (let x = 0; x < cells; x++) {
@@ -1051,7 +1045,7 @@ export function wireMapHover() {
   if (!isTouch) {
     mapCanvas.addEventListener("mousemove", (e) => {
       const rect = mapCanvas.getBoundingClientRect();
-      const cells = state.mapMode === "zoom" ? MAP_ZOOM : MAP_SIZE;
+      const { cells, startX, startY } = mapViewport(state.mapMode, state.position);
       const scaleX = rect.width / mapCanvas.width;
       const pad = MAP_PAD * scaleX;
       const cell = (rect.width - pad * 2) / cells;
@@ -1062,14 +1056,6 @@ export function wireMapHover() {
         updateMapInfo("", sel, true);
         return;
       }
-      const startX =
-        state.mapMode === "zoom"
-          ? clamp(state.position.x - Math.floor(MAP_ZOOM / 2), 0, MAP_SIZE - MAP_ZOOM)
-          : 0;
-      const startY =
-        state.mapMode === "zoom"
-          ? clamp(state.position.y - Math.floor(MAP_ZOOM / 2), 0, MAP_SIZE - MAP_ZOOM)
-          : 0;
       const gx = startX + localX;
       const gy = startY + localY;
       updateMapInfo(formatCellInfo(gx, gy), { x: gx, y: gy });
@@ -1085,21 +1071,13 @@ export function wireMapHover() {
     // クリックで自動移動を強制停止
     document.dispatchEvent(new CustomEvent("auto-move-stop"));
     const rect = mapCanvas.getBoundingClientRect();
-    const cells = state.mapMode === "zoom" ? MAP_ZOOM : MAP_SIZE;
+    const { cells, startX, startY } = mapViewport(state.mapMode, state.position);
     const scaleX = rect.width / mapCanvas.width;
     const pad = MAP_PAD * scaleX;
     const cell = (rect.width - pad * 2) / cells;
     const localX = Math.floor((e.clientX - rect.left - pad) / cell);
     const localY = Math.floor((e.clientY - rect.top - pad) / cell);
     if (localX < 0 || localY < 0 || localX >= cells || localY >= cells) return;
-    const startX =
-      state.mapMode === "zoom"
-        ? clamp(state.position.x - Math.floor(MAP_ZOOM / 2), 0, MAP_SIZE - MAP_ZOOM)
-        : 0;
-    const startY =
-      state.mapMode === "zoom"
-        ? clamp(state.position.y - Math.floor(MAP_ZOOM / 2), 0, MAP_SIZE - MAP_ZOOM)
-        : 0;
     const gx = startX + localX;
     const gy = startY + localY;
     const sameSelection =

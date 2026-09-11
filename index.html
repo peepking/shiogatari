@@ -5,8 +5,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
-  <link rel="stylesheet" href="styles.css?v=20260912-outfitting-3" />
-  <link rel="stylesheet" href="layout.css" />
+  <link rel="stylesheet" href="styles.css?v=20260912-nobles" />
+  <link rel="stylesheet" href="layout.css?v=20260912-sigils" />
 </head>
 
 <body>
@@ -237,7 +237,7 @@
                 <div class="map-header">
                   <span class="tiny">現在地: <span id="mapPosLabel">(11, 11)</span></span>
                   <button class="btn ghost" id="mapPinsToggle">ピン表示/非表示</button>
-                  <button class="btn ghost" id="mapToggle">全体 / 拡大 切替</button>
+                  <button class="btn ghost" id="mapToggle">地図切替：全体</button>
                 </div>
                 <canvas id="mapCanvas" width="640" height="640" aria-label="航路マップ"></canvas>
                 <div id="mapInfo"></div>
@@ -289,9 +289,10 @@
 
           <section class="card" aria-label="mode">
             <div class="hd">
-              <div class="row flex-wrap">
-                <span class="pill">モード: <b id="modeLabel">通常</b></span>
-                <span class="pill">場所: <b id="locationLabel">-</b></span>
+              <div class="location-heading">
+                <div class="location-status" id="locationStatus">現在地</div>
+                <h2 id="locationLabel">旅の途中</h2>
+                <div class="location-faction" id="locationFaction" hidden><img id="locationFactionIcon" alt=""><span><span class="location-faction-caption">所属勢力</span><b id="locationFactionName"></b></span></div>
               </div>
             </div>
             <div class="bd">

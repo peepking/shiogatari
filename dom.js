@@ -21,8 +21,6 @@ export const elements = {
   suppliesEl: $("supplies"),
   fundsEl: $("funds"),
   fameEl: $("fame"),
-  modeLabelEl: $("modeLabel"),
-  locationLabelEl: $("locationLabel"),
   gameTimeEl: $("gameTime"),
   ctxEl: $("context"),
   oracleBattleBtn: $("oracleBattleBtn"),
