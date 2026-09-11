@@ -9,6 +9,7 @@ import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { enqueueEvent } from "./events.js";
 import { SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 import { addTroops, TROOP_STATS } from "./troops.js";
+import { awardExplorationFragment } from "./chartWorld.js";
 import { initializeExploration, tickExploration, describeDanger, rollExplorationReward, consumeExploration, EXPLORATION_NAMES } from "./exploration.js";
 
 /**
@@ -59,6 +60,7 @@ export function getExplorationAt(position) {
 export function finishExploration(success) {
   const reward = consumeExploration(state.expansion.exploration, success);
   if (!reward) return [];
+  if (reward.fragment === true) awardExplorationFragment();
   state.ships += reward.ships;
   state.funds += reward.funds;
   const resources = [{ id: "funds", label: "探索資金", value: `+${reward.funds}` }];

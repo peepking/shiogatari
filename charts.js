@@ -12,10 +12,10 @@ export function chartRoom(chart) {
  * 収集中の既存海図を優先し、なければ空きサイズ・種類の組から均等抽選する。
  * 噂では回収済み・予約済みの噂を持つ海図を対象外にする。
  * @param {object} data 海図状態。 @param {boolean} rumor 噂か。
- * @param {Function} [random] 乱数源。 @returns {object|null} 割当候補。
+ * @param {Function} [random] 乱数源。 @param {string|null} [merchant] 購入元。 @returns {object|null} 割当候補。
  */
-export function chooseChart(data, rumor = false, random = Math.random) {
-  const existing = data.active.filter(c => chartRoom(c) > 0 && (!rumor || (!c.rumor && !c.rumorFragmentClaimed)));
+export function chooseChart(data, rumor = false, random = Math.random, merchant = null) {
+  const existing = data.active.filter(c => chartRoom(c) > 0 && (!rumor || (!c.rumor && !c.rumorFragmentClaimed)) && (!merchant || !c.merchantClaims?.includes(merchant)));
   if (existing.length) {
     const c = pick(existing, random);
     return { chartId: c.id, size: c.size, kind: c.kind };
@@ -46,13 +46,13 @@ export function assignChart(data, offer, destination) {
   if (current) return current;
   if (!destination) return null;
   const chart = { id: data.nextId++, kind: offer.kind, size: offer.size, fragments: 0, questIds: [],
-    rumor: null, rumorFragmentClaimed: false, destination };
+    rumor: null, rumorFragmentClaimed: false, merchantClaims: [], destination };
   data.active.push(chart);
   return chart;
 }
 
 /**
- * 依頼・噂は対応予約だけを消費し、戦闘は未予約枠だけを埋める。
+ * 依頼・噂は対応予約だけを消費し、戦闘・探索・購入は未予約枠だけを埋める。購入元ごとに海図1枚まで。
  * @param {object} chart 海図。 @param {string} source 入手元。 @param {*} [questId] 依頼ID。
  * @returns {boolean} 取得できたか。
  */
@@ -65,7 +65,14 @@ export function claimFragment(chart, source, questId = null) {
     if (!chart.rumor || chart.rumorFragmentClaimed) return false;
     chart.rumor = null;
     chart.rumorFragmentClaimed = true;
-  } else if (source !== "battle" || chartRoom(chart) < 1) return false;
+  } else {
+    const merchant = Object.hasOwn(CONFIG.merchants, source);
+    if ((!merchant && !["battle", "exploration"].includes(source)) || chartRoom(chart) < 1) return false;
+    if (merchant) {
+      if (chart.merchantClaims?.includes(source)) return false;
+      chart.merchantClaims = [...(chart.merchantClaims || []), source];
+    }
+  }
   chart.fragments++;
   return true;
 }
@@ -123,7 +130,7 @@ export function normalizeCharts(source = {}) {
     const rumor = validPosition(c.rumor) && !coords.has(rumorKey) && !c.rumorFragmentClaimed && c.fragments < c.size ? c.rumor : null;
     if (rumor) coords.add(rumorKey);
     active.push({ id: c.id, kind: c.kind, size: c.size, destination: c.destination, fragments: c.fragments,
-      rumor, rumorFragmentClaimed: c.rumorFragmentClaimed === true, questIds: [] });
+      rumor, rumorFragmentClaimed: c.rumorFragmentClaimed === true, merchantClaims: Object.keys(CONFIG.merchants).filter(id => Array.isArray(c.merchantClaims) && c.merchantClaims.includes(id)), questIds: [] });
   }
   let pending = source.pending;
   const chart = active.find(c => c.id === pending?.chartId);
@@ -135,7 +142,8 @@ export function normalizeCharts(source = {}) {
       !r.supplies || typeof r.supplies !== "object" || Array.isArray(r.supplies) || !Object.values(r.supplies).every(n => Number.isInteger(n) && n >= 0 && n <= 100)) pending = null;
   }
   const rumorSeasons = Object.fromEntries(Object.entries(source.rumorSeasons || {}).filter(([key, value]) => key.length < 100 && Number.isSafeInteger(value)));
-  return { nextId: Math.max(Number.isSafeInteger(source.nextId) ? source.nextId : 1, 1, ...active.map(c => c.id + 1)), active, rumorSeasons, pending };
+  const merchantSeasons = Object.fromEntries(Object.entries(source.merchantSeasons || {}).filter(([key, value]) => key.length < 100 && Number.isSafeInteger(value)));
+  return { nextId: Math.max(Number.isSafeInteger(source.nextId) ? source.nextId : 1, 1, ...active.map(c => c.id + 1)), active, rumorSeasons, merchantSeasons, pending };
 }
 
 /** @param {object} data 海図状態。 @returns {Array} 公開中の無期限探索地点。 */

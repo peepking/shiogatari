@@ -8,6 +8,8 @@ import { rosterOptions, canAutoDeploy, splitRosterCounts } from "./rosterOptions
 import { saveGameToStorage } from "./storage.js";
 import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
+import { snapshotOutfitting, outfittedStat, fireOutfitting, defendedDamage } from "./outfitting.js";
+import { OUTFITTING_ITEMS } from "./expansionConfig.js";
 
 const BASE_TICK_MS = 1000;
 const MAX_TICKS = 60;
@@ -20,6 +22,11 @@ const MAX_UNIT_COUNT = 10;
 const MAX_SQUADS = 20;
 let appliedRosterSignature = "";
 const ATTACK_FX_TTL = 2;
+const SUPPORT_FX = {
+  harpoon: { color: "#70e8ff", width: 3.5, glow: 6, rays: 5, radius: 0.18 },
+  ballista: { color: "#c49aff", width: 5.5, glow: 10, rays: 7, radius: 0.25 },
+  cannon: { color: "#ff9955", width: 8, glow: 16, rays: 10, radius: 0.34 },
+};
 const MOVE_FX_TTL = 3;
 const MOVE_COLORS = {
   ally: "#4ec7f0",
@@ -157,6 +164,8 @@ const UNIT_TARGET_MODE = {
   marine: "hp",
   shield: "hp",
   cavalry: "hp",
+  cavalier: "hp",
+  halberd: "hp",
   medic: "hp",
   scout: "hp",
   archer: "rear",
@@ -503,12 +512,13 @@ function buildDeploySlots(side, size) {
 }
 
 /**
- * 兵種情報から戦闘ユニットを生成する。
+ * 兵種情報から戦闘ユニットを生成する。味方は人数・レベル補正後に艤装倍率を一度だけ適用する。
  * @param {string} type
  * @param {"ally"|"enemy"} side
  * @param {number} index
  * @param {{x:number,y:number}} pos
  * @param {number} count
+ * @param {number} [level] レベル。
  * @returns {object}
  */
 function createUnit(type, side, index, pos, count, level = 1) {
@@ -534,8 +544,8 @@ function createUnit(type, side, index, pos, count, level = 1) {
     level: lvlRounded,
     hp: hpVal,
     maxHp: hpVal,
-    atk: atkVal,
-    def: defVal,
+    atk: side === "ally" ? outfittedStat(atkVal, stat?.range || 1, "atk", battleState.outfitting.effects) : atkVal,
+    def: side === "ally" ? outfittedStat(defVal, stat?.range || 1, "def", battleState.outfitting.effects) : defVal,
     spd: stat?.spd ?? 3,
     range: stat?.range ?? 1,
     move: stat?.move ?? 1,
@@ -1031,7 +1041,7 @@ function kiteForRanged(unit, enemies, target, occupied) {
 function applyAttack(attacker, target) {
   const atk = effectiveAtk(attacker);
   const def = effectiveDef(target);
-  const dmg = Math.max(1, Math.round((atk * 100) / (100 + def)));
+  const dmg = defendedDamage(atk, def);
   target.hp = Math.max(0, target.hp - dmg);
   // 攻撃エフェクトのため記録
   battleState.attackFx.push({ from: attacker.id, to: target.id, ttl: ATTACK_FX_TTL });
@@ -1042,11 +1052,7 @@ function applyAttack(attacker, target) {
 }
 
 /**
- * 戦闘状態を1ティック進める。
- * @returns {boolean}
- */
-/**
- * 戦闘状態を1ティック進める。
+ * 通常行動、枠順の支援射撃、勝敗、制限時間の順に1ティックを処理する。
  * @param {number} dtMs 進行時間(ms)
  * @returns {boolean}
  */
@@ -1111,7 +1117,7 @@ function advanceBattleTick(dtMs = BASE_TICK_MS) {
     const restrictCharge =
       unit.side === "ally" &&
       unit.move > 1 &&
-      (chargeMode === "all" || (chargeMode === "cavalry" && unit.type === "cavalry"));
+      (chargeMode === "all" || (chargeMode === "cavalry" && ["cavalry", "cavalier"].includes(unit.type)));
     if (restrictCharge) {
       const friends = (unit.side === "ally" ? allies : enemies).filter(
         (u) => u.hp > 0 && u.id !== unit.id
@@ -1162,6 +1168,10 @@ function advanceBattleTick(dtMs = BASE_TICK_MS) {
     if (movedTrail) recordMoveTrail(unit, startX, startY, retreatTrail);
   });
 
+  for (const shot of fireOutfitting(battleState.tick, battleState.units, battleState.outfitting.effects.attacks, effectiveDef)) {
+    battleState.attackFx.push({ support: true, equipmentId: shot.id, to: shot.target.id, ttl: ATTACK_FX_TTL, impact: true });
+    addBattleLog(`${OUTFITTING_ITEMS[shot.id].name}: 敵の${shot.target.name}に${shot.damage}ダメージ${shot.target.hp <= 0 ? "・撃破" : ""}。`);
+  }
   const nextAllies = alive.filter((u) => u.hp > 0 && u.side === "ally");
   const nextEnemies = alive.filter((u) => u.hp > 0 && u.side === "enemy");
   if (!nextAllies.length || !nextEnemies.length) {
@@ -1212,6 +1222,7 @@ function finishBattle(forceDraw = false) {
       enemyFormation: battleState.enemyFormation,
       enemyFactionId: battleState.enemyFactionId,
       resultLabel,
+      supportMedics: battleState.outfitting.medics,
     });
   }
   saveGameToStorage({ battleComplete: true });
@@ -1429,21 +1440,23 @@ function renderBattle() {
 
   // 攻撃エフェクト（ライン + スパーク）
   (battleState.attackFx || []).forEach((fx) => {
-    const from = getUnitById(fx.from, true);
+    const from = fx.support ? { x: -0.4, y: battleState.size - 1, side: "ally", hp: 1 } : getUnitById(fx.from, true);
     const to = getUnitById(fx.to, true);
-    if (!from || !to || from.hp <= 0 || to.hp <= 0) return;
+    if (!from || !to || from.hp <= 0 || (!fx.support && to.hp <= 0)) return;
     const fromX = from.x * cell + cell / 2;
     const fromY = from.y * cell + cell / 2;
     const toX = to.x * cell + cell / 2;
     const toY = to.y * cell + cell / 2;
     const ally = from.side === "ally";
-    const color = ally ? ATTACK_COLORS.ally : ATTACK_COLORS.enemy;
+    const supportFx = fx.support ? SUPPORT_FX[fx.equipmentId] || SUPPORT_FX.harpoon : null;
+    const color = supportFx ? supportFx.color : ally ? ATTACK_COLORS.ally : ATTACK_COLORS.enemy;
     const alpha = Math.max(0.2, Math.min(1, (fx.ttl || 1) / ATTACK_FX_TTL));
     ctx.save();
     ctx.globalAlpha = alpha;
     // ライン（頭太尻細）
     ctx.strokeStyle = color;
-    ctx.lineWidth = 2.4;
+    ctx.lineWidth = supportFx?.width || 2.4;
+    if (supportFx) { ctx.shadowColor = color; ctx.shadowBlur = supportFx.glow; }
     ctx.lineCap = "round";
     ctx.beginPath();
     ctx.moveTo(fromX, fromY);
@@ -1451,10 +1464,10 @@ function renderBattle() {
     ctx.stroke();
     // スパーク
     ctx.fillStyle = color;
-    const spark = fx.impact ? 5 : 3;
+    const spark = supportFx?.rays || (fx.impact ? 5 : 3);
     for (let i = 0; i < spark; i++) {
       const angle = (Math.PI * 2 * i) / spark;
-      const len = fx.crit ? cell * 0.22 : cell * 0.16;
+      const len = supportFx ? cell * supportFx.radius : fx.crit ? cell * 0.22 : cell * 0.16;
       ctx.beginPath();
       ctx.moveTo(toX, toY);
       ctx.lineTo(toX + Math.cos(angle) * len, toY + Math.sin(angle) * len);
@@ -1507,6 +1520,7 @@ function findUnitAt(x, y) {
  */
 function startBattle() {
   if (battleState.running || !battleState.ready || elements.battleStartBtn?.disabled) return;
+  if (!battleState.started) battleState.outfitting = snapshotOutfitting(state);
   setBattleSpeed(battleStrategy.speed || 1);
   // 撃破済み選択をクリア
   const sel = getUnitById(battleState.selectedId, true);
@@ -1544,6 +1558,9 @@ function pauseBattle() {
  */
 function resetBattle(useDraft = false, preserveField = true) {
   pauseBattle();
+  battleState.outfitting = snapshotOutfitting(state);
+  const equipmentLabel = document.getElementById("battleOutfitting");
+  if (equipmentLabel) equipmentLabel.textContent = `艤装: ${battleState.outfitting.equipped.map(id => OUTFITTING_ITEMS[id].name).join(" / ") || "なし"}`;
   battleState.tick = 0;
   battleState.elapsedMs = 0;
   battleState.resultCode = "";

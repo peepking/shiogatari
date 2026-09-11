@@ -130,6 +130,77 @@ export function awardBattleFragment(questId) {
   return chart;
 }
 
+/** @returns {object|null} 探索時に当選済みの断片を未予約枠へ付与する。 */
+export function awardExplorationFragment() {
+  syncChartReservations();
+  const offer = chooseChart(state.expansion.charts);
+  const chart = offer && allocate(offer);
+  if (!chart || !claimFragment(chart, "exploration")) return null;
+  announceFragment(chart, "探索報酬");
+  return chart;
+}
+
+/**
+ * 各購入元で未取得の海図を優先する。当落と対象はイベント生成時に固定し、再表示では抽選しない。
+ * 予約済み断片を侵食せず、候補がない場合は販売イベントを出さない。
+ * @param {string} source 購入元。 @returns {boolean} イベントを生成したか。
+ */
+export function enqueueChartMerchant(source) {
+  const settings = CONFIG.merchants[source];
+  if (!settings) return false;
+  syncChartReservations();
+  const offer = chooseChart(state.expansion.charts, false, Math.random, source);
+  if (!offer) return false;
+  const title = source === "sailor" ? "海図売り" : "古文書商";
+  const body = source === "sailor" ? "怪しい船乗りが古びた海図の切れ端を持っている" : "行商人が古びた海図の切れ端を持っている";
+  enqueueEvent({ title, body: `${body}。${settings.price}資金で購入しますか？\n本物の確率は${settings.success * 100}%。偽物でも代金は戻りません。この売り手からの断片は海図ごとに1枚までです。`,
+    actions: [{ label: `${settings.price}資金で購入`, type: "chart_purchase", payload: { source, offer, genuine: Math.random() < settings.success } }, { label: "見送る", type: "close" }] });
+  return true;
+}
+
+/**
+ * 支払い直前に空き・取得上限・資金を再確認する。偽物では取得上限を消費しない。
+ * @param {object} action 保存された選択肢。 @returns {boolean} 対応するイベントか。
+ */
+export function handleChartPurchase(action) {
+  if (action?.type !== "chart_purchase") return false;
+  const payload = action.payload || {};
+  const settings = CONFIG.merchants[payload.source];
+  if (!settings || payload.used || typeof payload.genuine !== "boolean") return true;
+  payload.used = true;
+  syncChartReservations();
+  const current = state.expansion.charts.active.find(c => c.size === payload.offer?.size);
+  if (!canAssignChart(state.expansion.charts, payload.offer) || current?.merchantClaims?.includes(payload.source)) {
+    enqueueEvent({ title: "購入できません", body: "対象の海図が変わったか、断片枠が埋まっています。資金は消費していません。" }); return true;
+  }
+  if (state.funds < settings.price) { enqueueEvent({ title: "資金不足", body: "購入資金が足りません。資金は消費していません。" }); return true; }
+  if (payload.genuine) {
+    const chart = allocate(payload.offer);
+    if (!chart || !claimFragment(chart, payload.source)) return true;
+    state.funds -= settings.price;
+    announceFragment(chart, payload.source === "sailor" ? "海図売りからの購入" : "古文書商からの購入");
+  } else {
+    state.funds -= settings.price;
+    enqueueEvent({ title: "偽物の海図", body: "切れ端を詳しく調べると、もっともらしく描かれた偽物でした。海図の断片は手に入りませんでした。", resources: [{ id: "funds", label: "購入代金", value: `−${settings.price}` }] });
+    pushLog("偽物の海図", `${settings.price}資金を支払いましたが、切れ端は偽物でした。`, "-");
+  }
+  return true;
+}
+
+/**
+ * 街ごとの季節初回入場だけ独立して10%で抽選し、出入りの繰り返しを防ぐ。
+ * @param {object|null} settlement 拠点。 @returns {void}
+ */
+export function rollChartMerchant(settlement) {
+  if (settlement?.kind !== "town") return;
+  const data = state.expansion.charts;
+  const season = state.year * 4 + state.season;
+  data.merchantSeasons ||= {};
+  if (data.merchantSeasons[settlement.id] === season) return;
+  data.merchantSeasons[settlement.id] = season;
+  if (Math.random() < CONFIG.merchants.archivist.chance) enqueueChartMerchant("archivist");
+}
+
 /**
  * 拠点ごとの季節初回入場を不発も含めて記録する。同じ海図の噂は最大1枚。
  * 進行中海図を優先し、候補地がなければ予約せず見送る。

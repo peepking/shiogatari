@@ -1,6 +1,7 @@
 import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { state } from "./state.js";
 import { renderUpkeepForecast } from "./upkeep.js";
+import { getOutfittingEffects, applyCapacityBonus } from "./outfitting.js";
 
 /** @type {number} 基本の部隊上限 */
 export const BASE_TROOP_CAP = 30;
@@ -19,6 +20,20 @@ export const TROOP_STATS = {
     def: 18,
     spd: 2,
     range: 1,
+    move: 1,
+    terrain: { plain: 110, forest: 120, mountain: 120, shoal: 100, sea: 100 },
+    level: 1,
+  },
+  halberd: {
+    name: "鉾槍兵",
+    hire: 170,
+    upkeep: 3,
+    basePower: 130,
+    hp: 110,
+    atk: 36,
+    def: 18,
+    spd: 3,
+    range: 2,
     move: 1,
     terrain: { plain: 110, forest: 120, mountain: 120, shoal: 100, sea: 100 },
     level: 1,
@@ -93,6 +108,20 @@ export const TROOP_STATS = {
     terrain: { plain: 150, forest: 100, mountain: 120, shoal: 80, sea: 80 },
     level: 1,
   },
+  cavalier: {
+    name: "重騎兵",
+    hire: 250,
+    upkeep: 5,
+    basePower: 180,
+    hp: 170,
+    atk: 32,
+    def: 35,
+    spd: 4,
+    range: 1,
+    move: 2,
+    terrain: { plain: 150, forest: 100, mountain: 120, shoal: 80, sea: 80 },
+    level: 1,
+  },
   crossbow: {
     name: "弩兵",
     hire: 180,
@@ -137,7 +166,7 @@ export const TROOP_STATS = {
   },
 };
 
-// 雇用枠は村2・街4、各枠3人まで。
+/** 雇用枠は村3・街5、各枠3人まで。 */
 const RECRUIT_PER_SLOT = 3;
 const RECRUIT_SLOTS = {
   village: 3,
@@ -154,10 +183,12 @@ const RECRUIT_BASE_WEIGHTS = {
   crossbow: 8,
   shield: 12,
   seaArcher: 5,
+  halberd: 8,
+  cavalier: 5,
 };
 const RECRUIT_KIND_BONUS = {
   village: { infantry: 5, scout: 5 },
-  town: { cavalry: 5, crossbow: 5, medic: 5 },
+  town: { cavalry: 5, crossbow: 5, medic: 5, halberd: 5, cavalier: 5 },
 };
 const RECRUIT_RARE_WEIGHTS = {
   cavalry: 25,
@@ -165,6 +196,8 @@ const RECRUIT_RARE_WEIGHTS = {
   shield: 20,
   seaArcher: 20,
   marine: 10,
+  halberd: 20,
+  cavalier: 20,
 };
 const RECRUIT_RARE_CHANCE = {
   village: 0.2,
@@ -272,10 +305,11 @@ export function refreshSettlementRecruitment(settlement) {
 /**
  * 部隊の所持上限を計算する。
  * @param {number} ships
+ * @param {object} [outfitting] 比較時に指定する艤装。
  * @returns {number}
  */
-export function calcTroopCap(ships) {
-  return BASE_TROOP_CAP + ships * CAP_PER_SHIP;
+export function calcTroopCap(ships, outfitting = state.expansion?.outfitting) {
+  return applyCapacityBonus(BASE_TROOP_CAP + ships * CAP_PER_SHIP, getOutfittingEffects(outfitting).troopCap);
 }
 
 /**

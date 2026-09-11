@@ -361,6 +361,7 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
   }
   state.modeLabel = insideLabel;
   rollChartRumor(hereSettlement);
+  rollChartMerchant(hereSettlement);
   resetEncounterMeter();
   setOutput("入場", `${targetPlace}に入りました。`, [
     { text: targetPlace, kind: "" },
@@ -506,6 +507,10 @@ export function rollTravelEvents() {
       state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
       return true;
     }
+  }
+  if (Math.random() < CHART_CONFIG.merchants.sailor.chance && enqueueChartMerchant("sailor")) {
+    state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
+    return true;
   }
   if (Math.random() < TRAITOR_EVENT_RATE) {
     const queued = enqueueTraitorEvent();
@@ -1002,6 +1007,7 @@ function handleTraitorAction(action) {
 export function handleTravelEventAction(action) {
   if (!action?.type) return false;
   const handlers = [
+    handleChartPurchase,
     handleMerchantAction,
     handleFrontAction,
     handleSmuggleAction,
@@ -1333,4 +1339,5 @@ function checkRefugeeEscortArrival() {
   completeRefugeeEscortAt(here);
   clearEscort();
 }
-import { rollChartRumor } from "./chartWorld.js";
+import { rollChartRumor, rollChartMerchant, enqueueChartMerchant, handleChartPurchase } from "./chartWorld.js";
+import { CHART_CONFIG } from "./expansionConfig.js";

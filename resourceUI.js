@@ -6,7 +6,7 @@ const ICONS = {
   food: "food", wood: "wood", stone: "stone", iron: "iron", fiber: "fiber", salt: "salt",
   spice: "spice", arms: "arms", textile: "textile", brew: "brew", leather: "leather",
 };
-const TROOP_IDS = ["infantry", "medic", "marine", "archer", "scout", "cavalry", "crossbow", "shield", "seaArcher"];
+const TROOP_IDS = ["infantry", "halberd", "medic", "marine", "archer", "scout", "cavalry", "cavalier", "crossbow", "shield", "seaArcher"];
 
 /**
  * 内部IDに対応する装飾アイコンを返す。未知IDのURLは生成しない。

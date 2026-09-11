@@ -1,0 +1,58 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs/promises");
+const path = require("node:path");
+const vm = require("node:vm");
+
+/** @returns {Promise<void>} 艤装購入・射撃境界・補助兵・消費を検証する。 */
+async function main() {
+  const modules = new Map();
+  /** @param {string} name モジュール名。 @returns {Promise<vm.Module>} 実モジュール。 */
+  async function load(name) {
+    if (modules.has(name)) return modules.get(name);
+    const m = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"));
+    modules.set(name, m); await m.link(load); return m;
+  }
+  const root = await load("./outfitting.js"); await root.evaluate();
+  const { changeOutfitting, snapshotOutfitting, defendedDamage, fireOutfitting, outfittedStat, outfittingBattleLosses } = root.namespace;
+  const { createExpansionState } = modules.get("./expansionState.js").namespace;
+  const s = { funds: 100000, troops: { medic: { 1: 5 }, scout: 7, infantry: 20 }, expansion: createExpansionState() };
+  assert.equal(changeOutfitting(s, "buy", "lifesaving"), true);
+  assert.equal(s.expansion.outfitting.equipped[0], null);
+  assert.equal(changeOutfitting(s, "buy", "lifesaving"), false);
+  assert.equal(s.funds, 90000);
+  assert.equal(changeOutfitting(s, "equip", "lifesaving", 0), true);
+  const snapshot = snapshotOutfitting(s);
+  assert.equal(snapshot.medics, 10); assert.equal(snapshot.scouts, 7);
+  s.troops.medic[1] = 0; assert.equal(snapshot.medics, 10);
+  assert.equal(snapshotOutfitting(s).medics, 5);
+  assert.equal(changeOutfitting(s, "expand", null), true); assert.equal(s.funds, 75000);
+  assert.equal(changeOutfitting(s, "equip", "lifesaving", 1), false);
+  assert.equal(changeOutfitting(s, "expand", null), true); assert.equal(s.funds, 45000);
+  assert.equal(changeOutfitting(s, "expand", null), false);
+  assert.equal(changeOutfitting(s, "equip", null, 0), true);
+  assert.ok(s.expansion.outfitting.owned.includes("lifesaving"));
+  s.funds = 1; assert.equal(changeOutfitting(s, "buy", "cannon"), false);
+  assert.equal(defendedDamage(30, 46), 21); assert.equal(defendedDamage(100, 46), 68);
+  const attacks = [{ id: "cannon", interval: 20, destroy: true }, { id: "harpoon", interval: 5, power: 30 }];
+  const units = [{ side: "ally", hp: 100 }, ...Array.from({ length: 4 }, () => ({ side: "enemy", hp: 10000 }))];
+  const fired = [];
+  for (let tick = 0; tick <= 60; tick++) fired.push(...fireOutfitting(tick, units, attacks, () => 46, () => 0).map(shot => ({ ...shot, tick })));
+  assert.deepEqual(fired.filter(s => s.id === "cannon").map(s => s.tick), [20, 40, 60]);
+  assert.equal(fired.filter(s => s.id === "harpoon").length, 12);
+  assert.notEqual(fired.find(s => s.tick === 20 && s.id === "cannon").target, fired.find(s => s.tick === 20 && s.id === "harpoon").target);
+  units[0].hp = 0; assert.equal(fireOutfitting(80, units, attacks, () => 0).length, 0);
+  const effects = { atk: 5, def: 5, meleeAtk: 10, meleeDef: 10, rangedAtk: 0, rangedDef: 0 };
+  assert.equal(outfittedStat(40, 1, "atk", effects), 46); assert.equal(outfittedStat(46, 1, "def", effects), 52);
+  assert.equal(outfittedStat(40, 4, "atk", effects), 42);
+  const lostUnits = [{ side: "ally", type: "infantry", count: 10, hp: 0 }];
+  s.troops.medic = 5;
+  assert.equal(outfittingBattleLosses(lostUnits, snapshotOutfitting(s).medics).losses.infantry, 3);
+  assert.equal(outfittingBattleLosses(lostUnits, snapshot.medics).lossProb, 0);
+  const upkeep = await load("./upkeep.js"); await upkeep.evaluate();
+  s.expansion.outfitting = { slots: 2, owned: ["storm_cover", "deck_tent"], equipped: ["storm_cover", "deck_tent"] };
+  s.troops = { infantry: 23 }; s.day = 9;
+  const cost = upkeep.namespace.getUpkeepForecast(s, { infantry: { upkeep: 2 } });
+  assert.equal(cost.funds, 41); assert.equal(cost.food, 4); assert.equal(cost.foodDays, 1);
+  console.log("艤装の購入・重複防止・射撃・待機衛生兵・消費軽減: 全項目成功");
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
-  <link rel="stylesheet" href="styles.css?v=20260911" />
+  <link rel="stylesheet" href="styles.css?v=20260912-outfitting-3" />
   <link rel="stylesheet" href="layout.css" />
 </head>
 
@@ -242,12 +242,17 @@
                 <canvas id="mapCanvas" width="640" height="640" aria-label="航路マップ"></canvas>
                 <div id="mapInfo"></div>
               </div>
+              <section class="outfitting-panel" id="outfittingPanel" aria-labelledby="outfittingTitle" hidden>
+                <div class="outfitting-heading"><h2 id="outfittingTitle" tabindex="-1">船の艤装</h2><div class="outfitting-heading-actions"><button class="btn ghost" id="outfittingEdit" aria-pressed="true">艤装変更</button><button class="btn ghost" id="outfittingDetails" aria-pressed="false">詳細確認</button><button class="btn ghost" id="outfittingClose">地図に戻る</button></div></div>
+                <div id="outfittingBody"></div>
+              </section>
               <div class="battle-block mb-12" id="battleBlock" hidden>
                 <div class="battle-header">
                   <span class="tiny">戦闘シミュレーション</span>
                   <button class="btn ghost" id="battleBackBtn">地図に戻る</button>
                 </div>
                 <canvas id="battleCanvas" width="640" height="640" aria-label="戦闘マップ"></canvas>
+                <div class="tiny" id="battleOutfitting"></div>
                 <div class="battle-panel">
                   <div class="row flex-wrap">
                     <button class="btn good" id="battleStartBtn">開始</button>
@@ -293,6 +298,7 @@
               <div class="mode-actions">
                 <button class="btn good" id="tradeBtn" hidden>物資取引</button>
                 <button class="btn good" id="shipTradeBtn" hidden>船取引</button>
+                <button class="btn good" id="outfittingOpenBtn" hidden>船の艤装</button>
                 <button class="btn good" id="questOpenBtn" hidden>依頼受注</button>
                 <button class="btn good" id="hireBtn" hidden>部隊員雇用</button>
                 <button class="btn good" id="audienceBtn" hidden>謁見する</button>

@@ -16,6 +16,10 @@ async function main() {
   const { createExpansionState, normalizeExpansionState } = module.namespace;
   const { initializeExploration, tickExploration, rollExplorationReward, consumeExploration, describeDanger } = modules.get("./exploration.js").namespace;
   const data = createExpansionState().exploration;
+  for (const [kind, chance] of [["drift", 0.05], ["battlefield", 0.05], ["wreck", 0.1]]) {
+    assert.equal(rollExplorationReward(kind, [], [], () => chance - 0.0001).fragment, true);
+    assert.equal(rollExplorationReward(kind, [], [], () => chance).fragment, false);
+  }
   const map = Array.from({ length: 10 }, (_, y) => Array.from({ length: 10 }, () => ({ terrain: y < 5 ? "sea" : "plain", building: "none" })));
   map[5][0].building = "town";
   /** @returns {number} 必ず抽選を当てる。 */

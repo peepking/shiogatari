@@ -32,7 +32,7 @@ async function main() {
   assert.equal(EXPLORATION_CONFIG.wreckDailyChance * 60, 1);
   assert.equal(CHART_CONFIG.battleFragmentChance, 0.005);
   assert.equal(CHART_CONFIG.questFragmentChance, 0.03);
-  assert.equal(CHART_CONFIG.rumorChance, 0.1);
+  assert.equal(CHART_CONFIG.rumorChance, 0.05);
   assert.equal(Object.keys(OUTFITTING_ITEMS).length, 16);
   assert.equal(OUTFITTING_ITEMS.harpoon.attack.power, 30);
   assert.equal(OUTFITTING_ITEMS.arrow_box.effects.rangedAtk, 10);

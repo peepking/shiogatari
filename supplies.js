@@ -4,6 +4,7 @@ import { state } from "./state.js";
 import { sumValues } from "./util.js";
 import { resourceIcon } from "./resourceUI.js";
 import { renderUpkeepForecast } from "./upkeep.js";
+import { getOutfittingEffects, applyCapacityBonus } from "./outfitting.js";
 import { TROOP_STATS } from "./troops.js";
 
 /** @type {number} 基本の物資上限 */
@@ -101,10 +102,11 @@ function priceSupportMultiplier(factionId, settlementId) {
 /**
  * 物資の所持上限を計算する。
  * @param {number} ships
+ * @param {object} [outfitting] 比較時に指定する艤装。
  * @returns {number}
  */
-export function calcSupplyCap(ships) {
-  return BASE_SUPPLY_CAP + ships * CAP_PER_SHIP_SUPPLY;
+export function calcSupplyCap(ships, outfitting = state.expansion?.outfitting) {
+  return applyCapacityBonus(BASE_SUPPLY_CAP + ships * CAP_PER_SHIP_SUPPLY, getOutfittingEffects(outfitting).supplyCap);
 }
 
 /**

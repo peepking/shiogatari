@@ -15,7 +15,7 @@
   "type": "commonjs",
   "main": "main.js",
   "scripts": {
-    "test": "node --experimental-vm-modules tests/storage.test.cjs && node --experimental-vm-modules tests/rosterOptions.test.cjs && node --experimental-vm-modules tests/questProgress.test.cjs && node --experimental-vm-modules tests/resourceUI.test.cjs && node --experimental-vm-modules tests/questDeadlines.test.cjs && node --experimental-vm-modules tests/upkeep.test.cjs && node --experimental-vm-modules tests/expansion.test.cjs && node --experimental-vm-modules tests/exploration.test.cjs && node --experimental-vm-modules tests/charts.test.cjs && node --experimental-vm-modules tests/chartExploration.test.cjs"
+    "test": "node --experimental-vm-modules tests/storage.test.cjs && node --experimental-vm-modules tests/rosterOptions.test.cjs && node --experimental-vm-modules tests/questProgress.test.cjs && node --experimental-vm-modules tests/resourceUI.test.cjs && node --experimental-vm-modules tests/questDeadlines.test.cjs && node --experimental-vm-modules tests/upkeep.test.cjs && node --experimental-vm-modules tests/expansion.test.cjs && node --experimental-vm-modules tests/exploration.test.cjs && node --experimental-vm-modules tests/charts.test.cjs && node --experimental-vm-modules tests/chartExploration.test.cjs && node --experimental-vm-modules tests/outfitting.test.cjs"
   },
   "dependencies": {
     "@eslint/js": "^9.39.2",

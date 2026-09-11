@@ -22,6 +22,8 @@ import { elements, pushLog, pushToast, renderLogs, setInlineMessage, setOutput }
 import { initEventQueueUI, showNextEvent } from "./events.js";
 import { updateExplorationWorld, renderExplorationControl, resumeExploration, finishExploration } from "./explorationUI.js";
 import { processScheduledOmens } from "./time.js";
+import { snapshotOutfitting, outfittingBattleLosses } from "./outfitting.js";
+import { renderOutfittingControl } from "./outfittingUI.js";
 import { syncChartReservations, awardBattleFragment, chartLabel } from "./chartWorld.js";
 import { renderChartCards, renderChartControl, resumeChartExploration } from "./chartUI.js";
 import {
@@ -495,18 +497,6 @@ function performPrayer() {
 const battlePrepActive = () => state.modeLabel === MODE_LABEL.PREP;
 
 /**
- * 指定兵種の総数をレベル合算で取得する。
- * @param {*} type 兵種ID
- * @returns {number} 総数
- */
-function totalTypeCount(type) {
-  const levels = state.troops?.[type];
-  if (!levels) return 0;
-  if (typeof levels === "number") return levels;
-  return Object.values(levels).reduce((s, v) => s + Number(v || 0), 0);
-}
-
-/**
  * 敵編成情報から総兵数を推定する。
  * @param {*} meta 戦闘メタ情報
  * @returns {number} 推定総兵数
@@ -526,7 +516,7 @@ function enemyTotalEstimate(meta) {
  * @returns {number} 成功率(0-1)
  */
 function escapeSuccessRate() {
-  const scouts = Math.min(10, totalTypeCount("scout"));
+  const scouts = snapshotOutfitting(state).scouts;
   const bonus = 70 * (1 - Math.pow(0.6, scouts)); // 初手が大きく、漸減しつつ10人でほぼ+70%
   return clamp(30 + bonus, 0, 100);
 }
@@ -637,20 +627,8 @@ function escapeBattleSuccess(reason) {
  * @returns {{losses:Object,lossProb:number}} 損耗マップと発生確率
  */
 function calcLosses(meta) {
-  const units = meta?.units || [];
-  const allies = units.filter((u) => u.side === "ally");
-  const medics = allies
-    .filter((u) => u.type === "medic")
-    .reduce((s, u) => s + Number(u.count || 0), 0);
-  const lossProb = Math.max(0, 0.5 * (1 - Math.min(10, medics) / 10));
-  const losses = {};
-  allies
-    .filter((u) => u.hp <= 0)
-    .forEach((u) => {
-      const lost = Math.round((u.count || 0) * lossProb);
-      if (lost > 0) losses[u.type] = (losses[u.type] || 0) + lost;
-    });
-  return { losses, lossProb };
+  const medics = meta?.supportMedics ?? snapshotOutfitting(state).medics;
+  return outfittingBattleLosses(meta?.units || [], medics);
 }
 
 /**
@@ -1341,6 +1319,7 @@ function syncUI() {
   updateModeControls(loc);
   renderExplorationControl(syncUI);
   renderChartControl(syncUI);
+  renderOutfittingControl(syncUI);
   renderChartCards();
   showNextEvent();
   renderQuestUI(syncUI);

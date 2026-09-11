@@ -1,4 +1,4 @@
-import { EXPLORATION_CONFIG as CONFIG } from "./expansionConfig.js";
+import { EXPLORATION_CONFIG as CONFIG, CHART_CONFIG } from "./expansionConfig.js";
 
 /** 自然探索地点の表示名。 */
 export const EXPLORATION_NAMES = Object.freeze({ drift: "漂流物", battlefield: "戦場跡", wreck: "難破船" });
@@ -95,7 +95,7 @@ export function tickExploration(data, map, now, blocked = new Set(), random = Ma
 
 /**
  * 固定幅の報酬を抽選する。高級品2種へ最低1個ずつ配り、残りを均等抽選する。
- * 救助兵種は1人ずつ均等抽選する。敵人数や名声は参照しない。
+ * 救助兵種は1人ずつ均等抽選する。敵人数や名声は参照しない。断片の当落も地点種別の確率で固定し、保存後に再抽選しない。
  * @param {string} kind 種別。
  * @param {string[]} goods 高級品ID。
  * @param {string[]} troopTypes 兵種ID。
@@ -119,6 +119,7 @@ export function rollExplorationReward(kind, goods, troopTypes, random = Math.ran
     }
     reward.ships = random() < settings.shipChance ? settings.ships : 0;
   }
+  reward.fragment = random() < (CHART_CONFIG.explorationFragmentChance[kind] || 0);
   return reward;
 }
 

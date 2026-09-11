@@ -1,4 +1,5 @@
 import { resourceIcon } from "./resourceUI.js";
+import { getOutfittingEffects, applyConsumptionReduction } from "./outfitting.js";
 
 /** 食料を消費する季節内の日付。 */
 export const FOOD_CONSUMPTION_DAYS = Object.freeze([10, 30]);
@@ -19,7 +20,9 @@ export function getUpkeepForecast(state, stats) {
   }
   const day = state.day;
   const nextFoodDay = FOOD_CONSUMPTION_DAYS.find(d => d > day) ?? FOOD_CONSUMPTION_DAYS[0] + 30;
-  const food = Math.floor(count / 4);
+  const effects = getOutfittingEffects(state.expansion?.outfitting);
+  funds = applyConsumptionReduction(funds, effects.upkeepReduction);
+  const food = applyConsumptionReduction(Math.floor(count / 4), effects.foodReduction);
   return { funds, food, fundsDays: 31 - day, foodDays: nextFoodDay - day,
     fundsShortage: Math.max(0, funds - (state.funds || 0)),
     foodShortage: Math.max(0, food - (state.supplies?.food || 0)) };

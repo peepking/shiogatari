@@ -30,7 +30,12 @@ export const CHART_CONFIG = freezeDefinition({
   sizes: [3, 5],
   battleFragmentChance: 0.005,
   questFragmentChance: 0.03,
-  rumorChance: 0.1,
+  rumorChance: 0.05,
+  explorationFragmentChance: { drift: 0.05, battlefield: 0.05, wreck: 0.1 },
+  merchants: {
+    sailor: { chance: 0.01, price: 1000, success: 0.25 },
+    archivist: { chance: 0.1, price: 2000, success: 0.5 },
+  },
   rumorDistance: [10, 15],
   destinationDistance: [10, 20],
   exploreDays: 1,
