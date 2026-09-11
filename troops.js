@@ -211,6 +211,15 @@ const RECRUIT_RARE_CHANCE = {
 const troopTypeKeys = () => Object.keys(TROOP_STATS);
 
 /**
+ * 正規軍は補助兵を除く全兵種、強編成は全兵種、通常編成は基本4兵種を候補にする。
+ * @param {boolean} regular 正規軍か。 @param {boolean} strong 強編成か。 @returns {string[]} 抽選前の候補。
+ */
+export function enemyTroopPool(regular, strong) {
+  if (regular) return troopTypeKeys().filter(type => !["scout", "medic"].includes(type));
+  return strong ? troopTypeKeys() : ["infantry", "archer", "scout", "marine"];
+}
+
+/**
  * 拠点種別に応じた雇用抽選用の重みを作成する。
  * @param {string} kind
  * @returns {Record<string, number>}

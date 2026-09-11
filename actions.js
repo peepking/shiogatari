@@ -26,7 +26,7 @@ import { absDay, manhattan, NORMAL_ANCHORS, pickAnchorRange, randInt, STRONG_ANC
 import { state } from "./state.js";
 import { calcSupplyCap, createSettlementDemand, SUPPLY_ITEMS, totalSupplies } from "./supplies.js";
 import { advanceDayWithEvents } from "./time.js";
-import { calcTroopCap, totalTroops, TROOP_STATS } from "./troops.js";
+import { calcTroopCap, totalTroops, enemyTroopPool } from "./troops.js";
 import { clamp, warScoreLabel } from "./util.js";
 
 /**
@@ -118,11 +118,7 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null) {
   const useStrongScale = useStrong || useRegular;
   const range = useStrongScale ? pickAnchorRange(fame, STRONG_ANCHORS) : pickAnchorRange(fame, NORMAL_ANCHORS);
   const total = randInt(range.min, range.max);
-  const basePool = useRegular
-    ? Object.keys(TROOP_STATS).filter((k) => k !== "scout" && k !== "medic")
-    : useStrong
-      ? Object.keys(TROOP_STATS)
-      : ["infantry", "archer", "scout", "marine"];
+  const basePool = enemyTroopPool(useRegular, useStrong);
   const pool = basePool.slice().sort(() => Math.random() - 0.5).slice(0, Math.min(6, basePool.length));
   if (!pool.length) pool.push("infantry");
   const formation = [];

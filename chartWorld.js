@@ -153,7 +153,7 @@ export function enqueueChartMerchant(source) {
   if (!offer) return false;
   const title = source === "sailor" ? "海図売り" : "古文書商";
   const body = source === "sailor" ? "怪しい船乗りが古びた海図の切れ端を持っている" : "行商人が古びた海図の切れ端を持っている";
-  enqueueEvent({ title, body: `${body}。${settings.price}資金で購入しますか？\n本物の確率は${settings.success * 100}%。偽物でも代金は戻りません。この売り手からの断片は海図ごとに1枚までです。`,
+  enqueueEvent({ title, body: `${body}。${settings.price}資金で購入しますか？\n本物の確率は${settings.success * 100}%。偽物でも代金は戻りません。`,
     actions: [{ label: `${settings.price}資金で購入`, type: "chart_purchase", payload: { source, offer, genuine: Math.random() < settings.success } }, { label: "見送る", type: "close" }] });
   return true;
 }
