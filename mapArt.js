@@ -174,6 +174,7 @@ export function drawMapTile(ctx, cell, x, y, size, detailed, factionColor, varia
  */
 export function drawMapPlayer(ctx, cell, x, y, size) {
   ctx.save(); ctx.translate(x,y); ctx.scale(size/32,size/32);
+  if (cell.exploration) { ctx.translate(-1, 17); ctx.scale(0.48, 0.48); }
   ctx.lineWidth = 0.9;
   if (cell.terrain === "sea" || cell.terrain === "shoal") {
     polygon(ctx, [[7,23],[26,23],[22,28],[11,28]], "#dfdfcd", "#193d58");
@@ -194,6 +195,73 @@ export function drawMapPlayer(ctx, cell, x, y, size) {
       ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       line(ctx, [[x,y+7],[x,y+11]], "#718b91");
     }
+  }
+  ctx.restore();
+}
+
+/**
+ * 自然探索地点を地形と同じ画風で描く。全体表示は種別記号に簡略化する。
+ * @param {CanvasRenderingContext2D} ctx 描画先。
+ * @param {string} kind 種別。
+ * @param {number} x 左端。
+ * @param {number} y 上端。
+ * @param {number} size マス幅。
+ * @param {boolean} detailed 拡大表示か。
+ * @returns {void}
+ */
+export function drawExplorationSite(ctx, kind, x, y, size, detailed) {
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 32, size / 32);
+  ctx.lineWidth = detailed ? 1 : 2;
+  if (!detailed) {
+    polygon(ctx, [[16,4],[28,16],[16,28],[4,16]], kind === "wreck" ? "#e6b3a0" : "#e8d8b4", "#253547");
+    if (kind === "wreck") line(ctx, [[10,19],[16,9],[22,19]], "#253547");
+    else if (kind === "battlefield") line(ctx, [[10,10],[22,22],[16,16],[22,10],[10,22]], "#253547");
+    else line(ctx, [[9,16],[23,16]], "#253547");
+  } else if (kind === "wreck") {
+    polygon(ctx, [[5,20],[15,22],[18,18],[27,21],[23,28],[17,25],[11,27]], "#ae7c52", "#223747");
+    line(ctx, [[15,22],[20,6]], "#dfc295");
+    polygon(ctx, [[20,7],[18,17],[23,14],[27,17],[24,8]], "#d9d7bd", "#29424d");
+    line(ctx, [[8,24],[13,25]], "#eed1a0");
+  } else if (kind === "battlefield") {
+    line(ctx, [[12,24],[18,6]], "#e0c39e");
+    polygon(ctx, [[18,6],[27,8],[23,11],[26,14],[16,12]], "#b7675c", "#283843");
+    polygon(ctx, [[10,15],[20,17],[18,25],[14,28],[9,23]], "#bdc6c1", "#293e43");
+    line(ctx, [[14,17],[14,24]], "#627c7d");
+  } else {
+    polygon(ctx, [[8,11],[23,9],[26,22],[11,25]], "#c99c68", "#243b43");
+    line(ctx, [[8,11],[26,22],[23,9],[11,25]], "#6e503c");
+    line(ctx, [[7,28],[17,27],[26,29]], "#8dc5cb");
+  }
+  ctx.restore();
+}
+/**
+ * 海図地点を枠なしの紙片・祭壇・入り江・宝箱として描く。全体地図では輪郭を簡略化する。
+ * @param {CanvasRenderingContext2D} ctx 描画先。 @param {string} kind 種類。
+ * @param {number} x 左端。 @param {number} y 上端。 @param {number} size マス幅。
+ * @param {boolean} detailed 拡大表示か。 @returns {void}
+ */
+export function drawChartSite(ctx, kind, x, y, size, detailed) {
+  ctx.save(); ctx.translate(x + size / 2, y + size / 2); ctx.scale(size / 64, size / 64);
+  ctx.lineWidth = detailed ? 2 : 4; ctx.strokeStyle = "#394439";
+  ctx.shadowColor = "#0b182b"; ctx.shadowBlur = detailed ? 3 : 1;
+  if (kind === "rumor") {
+    ctx.fillStyle = "#e4d3a7";
+    ctx.beginPath(); ctx.moveTo(-17, -21); ctx.lineTo(7, -22); ctx.lineTo(18, -9); ctx.lineTo(14, 21); ctx.lineTo(-18, 18); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "#8b6648"; ctx.beginPath(); ctx.moveTo(-10, -9); ctx.lineTo(5, -6); ctx.lineTo(-4, 5); ctx.lineTo(8, 12); ctx.stroke();
+    ctx.strokeStyle = "#a34c43"; ctx.beginPath(); ctx.moveTo(4, 8); ctx.lineTo(12, 16); ctx.moveTo(12, 8); ctx.lineTo(4, 16); ctx.stroke();
+  } else if (kind === "altar") {
+    ctx.fillStyle = "#a7b5a5"; ctx.fillRect(-21, 15, 42, 7); ctx.strokeRect(-21, 15, 42, 7);
+    ctx.fillRect(-14, -9, 28, 24); ctx.strokeRect(-14, -9, 28, 24);
+    ctx.fillStyle = "#cbd1b6"; ctx.fillRect(-20, -15, 40, 7); ctx.strokeRect(-20, -15, 40, 7);
+    ctx.fillStyle = "#c0e3cf"; ctx.beginPath(); ctx.moveTo(0, -30); ctx.lineTo(7, -21); ctx.lineTo(0, -16); ctx.lineTo(-7, -21); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle = "#627b70"; ctx.beginPath(); ctx.moveTo(-5, -4); ctx.lineTo(5, 8); ctx.moveTo(5, -4); ctx.lineTo(-5, 8); ctx.stroke();
+  } else if (kind === "inlet") {
+    ctx.fillStyle = "#799679"; ctx.beginPath(); ctx.moveTo(-24, 20); ctx.lineTo(-23, -10); ctx.lineTo(-12, -25); ctx.lineTo(5, -26); ctx.lineTo(22, -12); ctx.lineTo(25, 20); ctx.lineTo(13, 17); ctx.lineTo(8, -7); ctx.lineTo(-7, -8); ctx.lineTo(-13, 18); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = "#b9dae0"; ctx.beginPath(); ctx.moveTo(-9, 12); ctx.lineTo(0, 16); ctx.lineTo(8, 12); ctx.moveTo(-9, 22); ctx.lineTo(0, 26); ctx.lineTo(8, 22); ctx.stroke();
+  } else {
+    ctx.fillStyle = "#916343"; ctx.fillRect(-21, -6, 42, 26); ctx.strokeRect(-21, -6, 42, 26);
+    ctx.fillStyle = "#ba9157"; ctx.beginPath(); ctx.moveTo(-21, -6); ctx.quadraticCurveTo(-21, -25, 0, -25); ctx.quadraticCurveTo(21, -25, 21, -6); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#e5d3a0"; ctx.fillRect(-13, -6, 4, 26); ctx.fillRect(9, -6, 4, 26); ctx.fillRect(-4, -8, 8, 12);
   }
   ctx.restore();
 }

@@ -20,7 +20,7 @@ async function main() {
   const module = await load("./resourceUI.js");
   await module.evaluate();
   const { resourceIcon, resourceToken, resourceList, renderReportLine, reportLineText } = module.namespace;
-  for (const id of ["food", "wood", "stone", "iron", "fiber", "salt", "spice", "arms", "textile", "brew", "leather", "funds", "fame", "faith", "ships", "troops"]) {
+  for (const id of ["food", "wood", "stone", "iron", "fiber", "salt", "spice", "arms", "textile", "brew", "leather", "funds", "fame", "faith", "ships", "troops", "chart"]) {
     const html = resourceIcon(id);
     const src = html.match(/src="([^"]+)"/)[1];
     await fs.access(path.join(__dirname, "..", src));

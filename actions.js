@@ -360,6 +360,7 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
     return false;
   }
   state.modeLabel = insideLabel;
+  rollChartRumor(hereSettlement);
   resetEncounterMeter();
   setOutput("入場", `${targetPlace}に入りました。`, [
     { text: targetPlace, kind: "" },
@@ -1332,3 +1333,4 @@ function checkRefugeeEscortArrival() {
   completeRefugeeEscortAt(here);
   clearEscort();
 }
+import { rollChartRumor } from "./chartWorld.js";

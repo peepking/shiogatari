@@ -1,5 +1,8 @@
 import { elements } from "./dom.js";
-import { drawMapTile, drawMapPlayer } from "./mapArt.js";
+import { drawMapTile, drawMapPlayer, drawExplorationSite, drawChartSite } from "./mapArt.js";
+import { visibleChartSites } from "./charts.js";
+import { CHART_CONFIG } from "./expansionConfig.js";
+import { EXPLORATION_NAMES, describeDanger } from "./exploration.js";
 import { FACTIONS } from "./lore.js";
 import { FRONT_DURATION_DAYS } from "./constants.js";
 import { QUEST_TYPES } from "./quests.js";
@@ -686,6 +689,10 @@ function formatCellInfo(gx, gy) {
   if (!cell) return "";
   const t = terrainKinds.find((t) => t.key === cell.terrain);
   const terr = t ? t.name : cell.terrain;
+  const site = (state.expansion?.exploration.sites || []).find(s => s.position.x === gx && s.position.y === gy);
+  if (site) return `(${gx + 1}, ${gy + 1}) ${terr} / ${EXPLORATION_NAMES[site.kind]} / ${describeDanger(site.danger)} / 消滅まであと${Math.max(0, site.expiresAbs - absDay(state))}日`;
+  const chartSite = visibleChartSites(state.expansion?.charts).find(s => s.position.x === gx && s.position.y === gy);
+  if (chartSite) return `(${gx + 1}, ${gy + 1}) ${terr} / ${chartSite.kind === "rumor" ? "海図の断片の噂" : CHART_CONFIG.rewards[chartSite.kind].name} / 探索1日・期限なし`;
   if (!cell.settlement) return `(${gx + 1}, ${gy + 1}) ${terr}`;
   const s = cell.settlement;
   const ctrl = nobleName(s.nobleId);
@@ -781,6 +788,17 @@ export function renderMap() {
 
   // 移動可能範囲の強調表示（上下左右）。
   // 選択マスの強調表示
+  for (const site of state.expansion?.exploration.sites || []) {
+    const { x, y } = site.position;
+    if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
+    drawExplorationSite(ctx, site.kind, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1, isZoom);
+  }
+  const chartSites = visibleChartSites(state.expansion?.charts);
+  for (const site of chartSites) {
+    const { x, y } = site.position;
+    if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
+    drawChartSite(ctx, site.kind, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1, isZoom);
+  }
   if (state.selectedPosition) {
     const sel = state.selectedPosition;
     if (
@@ -802,7 +820,7 @@ export function renderMap() {
 
   // 現在地の地形に合わせて帆船または人物を描き、枠を最後に重ねる。
   if (isZoom) {
-    drawMapPlayer(ctx, mapData[state.position.y][state.position.x],
+    drawMapPlayer(ctx, { ...mapData[state.position.y][state.position.x], exploration: [...(state.expansion?.exploration.sites || []), ...chartSites].some(s => s.position.x === state.position.x && s.position.y === state.position.y) },
       pad + (state.position.x - startX) * cellSize,
       pad + (state.position.y - startY) * cellSize, cellSize - 1);
   }
@@ -1008,6 +1026,19 @@ function updateMapInfo(hoverText = "", hoverPos = null, suppressHoverPins = fals
 export function refreshMapInfo() {
   const pos = state.selectedPosition ? { ...state.selectedPosition } : null;
   updateMapInfo("", pos);
+}
+
+/**
+ * 配達先・海図の地点を共通の選択枠で強調し、全体地図へ移す。
+ * @param {{x:number,y:number}} position 対象座標。 @returns {void}
+ */
+export function focusMapPosition(position) {
+  state.selectedPosition = { ...position };
+  state.mapMode = "full";
+  state.mapPinsVisible = true;
+  renderMap();
+  refreshMapInfo();
+  elements.mapCanvas?.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
 /**

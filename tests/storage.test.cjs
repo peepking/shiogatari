@@ -161,6 +161,37 @@ async function main() {
   assert.equal(loadGameFromStorage(), true);
   assert.equal(state.logs.length, 0);
 
+  // 拡張領域のない旧セーブも資金や日数を維持して補完する。
+  delete state.expansion;
+  state.funds = 4321;
+  state.day = 19;
+  assert.equal(saveGameToStorage(), true);
+  resetState();
+  assert.equal(loadGameFromStorage(), true);
+  assert.equal(state.funds, 4321);
+  assert.equal(state.day, 19);
+  assert.equal(state.expansion.outfitting.slots, 1);
+  assert.equal(state.expansion.exploration.initialized, false);
+  assert.equal(state.expansion.exploration.sites.length, 0);
+
+  // 新しい進行情報と購入済み設備を往復しても、再抽選・再初期化しない。
+  state.expansion.exploration.initialized = true;
+  state.expansion.exploration.nextId = 8;
+  state.expansion.exploration.sites = [{ id: 7, kind: "wreck", position: { x: 12, y: 9 }, spawnedAbs: 200, expiresAbs: 320, danger: 0.75 }];
+  state.expansion.exploration.pending = { siteId: 7, dayApplied: true, reward: { funds: 1000, ships: 1, supplies: { spice: 3, brew: 3 }, troops: { infantry: 4 } }, encounter: null };
+  state.expansion.charts.nextId = 3;
+  state.expansion.charts.active = [{ id: 2, kind: "altar", size: 3, destination: { x: 15, y: 20 }, fragments: 1, rumor: null, rumorFragmentClaimed: false, questIds: [] }];
+  state.expansion.charts.rumorSeasons = { village: 4000 };
+  state.expansion.outfitting = { slots: 2, owned: ["harpoon", "cargo_tent"], equipped: ["cargo_tent", null] };
+  const expansionBefore = JSON.stringify(state.expansion);
+  assert.equal(saveGameToStorage(), true);
+  resetState();
+  assert.equal(loadGameFromStorage(), true);
+  assert.equal(JSON.stringify(state.expansion), expansionBefore);
+  assert.equal(loadGameFromStorage(), true);
+  assert.equal(JSON.stringify(state.expansion), expansionBefore);
+  assert.equal(state.funds, 4321);
+
   // 保存失敗でも以前のデータを壊さず、次回の保存で復帰できる。
   const validSave = saved;
   failWrite = true;

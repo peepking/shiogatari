@@ -61,6 +61,7 @@ export function resolveCurrentEvent() {
   ensureQueue();
   if (state.eventQueue.length) state.eventQueue.shift();
   showNextEvent();
+  if (typeof document !== "undefined") document.dispatchEvent(new CustomEvent("quests-updated"));
   scheduleGameSave();
 }
 
@@ -162,9 +163,13 @@ function handleAction(action) {
  * 次のイベントをモーダルに表示する。
  * @returns {void}
  */
-function showNextEvent() {
+export function showNextEvent() {
   const modal = elements.eventModal;
   if (!modal) return;
+  if (state.expansion?.exploration.pending || state.expansion?.charts.pending || (elements.battleBlock && !elements.battleBlock.hidden) || (elements.battleResultModal && !elements.battleResultModal.hidden)) {
+    modal.hidden = true;
+    return;
+  }
   ensureQueue();
   const ev = state.eventQueue[0];
   if (!ev) {

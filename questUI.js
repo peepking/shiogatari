@@ -1,6 +1,7 @@
 import { getCurrentSettlement } from "./actions.js";
 import { elements, pushToast } from "./dom.js";
-import { getSettlementById, renderMap, refreshMapInfo } from "./map.js";
+import { getSettlementById, focusMapPosition } from "./map.js";
+import { chartLabel } from "./chartWorld.js";
 import {
   acceptQuest,
   canCompleteQuest,
@@ -52,7 +53,8 @@ export function renderQuestConditions(q) {
  */
 export function renderQuestRewards(q) {
   const resources = [];
-  if (q.reward) resources.push({ id: "funds", label: "資金", value: `+${q.reward}` });
+  if (q.rewardFragment) resources.push({ id: "chart", label: `${chartLabel(q.rewardFragment)}の断片`, value: "+1（資金の代わり）" });
+  else if (q.reward) resources.push({ id: "funds", label: "資金", value: `+${q.reward}` });
   if (q.rewardFaith) resources.push({ id: "faith", label: "信仰", value: `+${q.rewardFaith}` });
   if (q.rewardFame) resources.push({ id: "fame", label: "名声", value: `+${q.rewardFame}` });
   return resources.length ? resourceList(resources) : "報酬は依頼内容を参照";
@@ -270,12 +272,7 @@ export function renderQuestUI(syncUI) {
     .join("");
   listEl.querySelectorAll(".quest-location").forEach((btn) => {
     btn.addEventListener("click", () => {
-      state.selectedPosition = { x: Number(btn.dataset.x), y: Number(btn.dataset.y) };
-      state.mapMode = "full";
-      state.mapPinsVisible = true;
-      renderMap();
-      refreshMapInfo();
-      elements.mapCanvas?.scrollIntoView({ block: "center", behavior: "smooth" });
+      focusMapPosition({ x: Number(btn.dataset.x), y: Number(btn.dataset.y) });
     });
   });
   listEl.querySelectorAll(".quest-complete").forEach((btn) => {

@@ -1,5 +1,6 @@
 import { MODE_LABEL } from "./constants.js";
 import { FACTIONS } from "./lore.js";
+import { createExpansionState } from "./expansionState.js";
 
 /**
  * ゲームの初期状態を生成する。
@@ -7,6 +8,7 @@ import { FACTIONS } from "./lore.js";
  */
 const createState = () => ({
   ships: 0,
+  expansion: createExpansionState(),
   troops: {
     infantry: { 1: 5 },
     archer: { 1: 5 },

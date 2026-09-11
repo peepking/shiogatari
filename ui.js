@@ -19,7 +19,11 @@ import {
 } from "./battle.js";
 import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL, NONE_LABEL, PLACE } from "./constants.js";
 import { elements, pushLog, pushToast, renderLogs, setInlineMessage, setOutput } from "./dom.js";
-import { initEventQueueUI } from "./events.js";
+import { initEventQueueUI, showNextEvent } from "./events.js";
+import { updateExplorationWorld, renderExplorationControl, resumeExploration, finishExploration } from "./explorationUI.js";
+import { processScheduledOmens } from "./time.js";
+import { syncChartReservations, awardBattleFragment, chartLabel } from "./chartWorld.js";
+import { renderChartCards, renderChartControl, resumeChartExploration } from "./chartUI.js";
 import {
   addHonorFaction,
   addWarScore,
@@ -616,6 +620,7 @@ function startAutoMove(target) {
  * @returns {void}
  */
 function escapeBattleSuccess(reason) {
+  if (state.pendingEncounter?.explorationId != null) finishExploration(false);
   const text = reason || "敵との接触を回避しました。";
   clearBattlePrep();
   setOutput("戦闘回避", text, [
@@ -777,10 +782,11 @@ function processBattleOutcome(resultCode, meta) {
         pickedMap[key] = (pickedMap[key] || 0) + 1;
         state.supplies[key] = (state.supplies[key] ?? 0) + 1;
       }
-      state.funds += fundsGain;
+      const fragment = awardBattleFragment(questId);
+      if (!fragment) state.funds += fundsGain;
       state.supplies.food = (state.supplies.food ?? 0) + foodGain;
       summary.push({ text: `名声 +${fameDelta}`, icon: "fame" });
-      summary.push({ text: `資金 +${fundsGain}`, icon: "funds" });
+      summary.push(fragment ? { text: `戦闘報酬: ${chartLabel(fragment)}の断片 +1`, icon: "chart" } : { text: `資金 +${fundsGain}`, icon: "funds" });
       summary.push({ text: `食料 +${foodGain}`, icon: "food" });
       const matText =
         Object.entries(pickedMap)
@@ -971,10 +977,14 @@ function processBattleOutcome(resultCode, meta) {
     }
     if (delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
 
+    if (pending.explorationId != null) {
+      const resources = finishExploration(isWin);
+      summary.push(resources.length ? { label: "探索報酬", text: `探索報酬: ${resources.map(r => `${r.label} ${r.value}`).join(" / ")}`, resources } : "探索失敗: 探索地点は消滅しました。");
+    }
     renderBattleSummary(summary, resultLabel, pending, enemyTotal, isWin);
-    syncUI();
   } finally {
     clearBattlePrep(true);
+    syncUI();
   }
 }
 
@@ -1281,6 +1291,9 @@ function updateModeControls(loc) {
  * 画面全体の状態表示を同期する。
  */
 function syncUI() {
+  updateExplorationWorld();
+  syncChartReservations();
+  if (!state.expansion.exploration.pending && !state.expansion.charts.pending && !state.pendingEncounter?.active && !state.eventQueue?.length && (!elements.battleBlock || elements.battleBlock.hidden) && (!elements.battleResultModal || elements.battleResultModal.hidden)) processScheduledOmens(absDay(state));
   const {
     shipsEl,
     troopsEl,
@@ -1326,6 +1339,10 @@ function syncUI() {
   renderMap();
   renderTroopModal(elements.troopsDetail);
   updateModeControls(loc);
+  renderExplorationControl(syncUI);
+  renderChartControl(syncUI);
+  renderChartCards();
+  showNextEvent();
   renderQuestUI(syncUI);
 
   // 行動選択の有効/無効切替
@@ -1834,6 +1851,9 @@ export function initUI() {
   wireTroopDismiss(elements.troopsDetail, syncUI);
   wireSupplyDiscard(elements.suppliesDetail, syncUI);
   wireMapHover();
+  updateExplorationWorld();
+  if (state.expansion.exploration.pending) resumeExploration(syncUI);
+  if (state.expansion.charts.pending) resumeChartExploration(syncUI);
   initEventQueueUI();
   renderLogs();
   syncUI();

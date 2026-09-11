@@ -2,6 +2,7 @@ import { MODE_LABEL } from "./constants.js";
 import { restoreWorld, snapshotWorld } from "./map.js";
 import { resetState, state } from "./state.js";
 import { normalizeLogs } from "./logStore.js";
+import { normalizeExpansionState } from "./expansionState.js";
 
 const SAVE_KEY = "shiogatari-save";
 let saveScheduled = false;
@@ -95,9 +96,12 @@ export function loadGameFromStorage() {
     }
     Object.assign(state, snapshot.state);
     state.logs = normalizeLogs(state.logs);
+    state.expansion = normalizeExpansionState(state.expansion);
+    reconcileCharts(state.expansion.charts, state.quests?.active || []);
     return true;
   } catch (e) {
     console.error("loadGameFromStorage failed", e);
     return false;
   }
 }
+import { reconcileCharts } from "./charts.js";

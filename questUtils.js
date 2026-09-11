@@ -1,5 +1,13 @@
 import { mapData } from "./map.js";
 import { SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
+import { state } from "./state.js";
+
+/** @returns {Set<string>} 自然探索と未公開の海図を含む予約座標。 */
+function explorationPositions() {
+  const positions = (state.expansion?.exploration.sites || []).map(s => s.position);
+  for (const chart of state.expansion?.charts.active || []) positions.push(chart.destination, chart.rumor);
+  return new Set(positions.filter(Boolean).map(p => `${p.x},${p.y}`));
+}
 
 /** @type {number} 1季節あたりの日数 */
 export const DAY_PER_SEASON = 30;
@@ -99,11 +107,13 @@ export function pickRandomProcessed(count = 2) {
  */
 export function randomSeaTarget(origin) {
   const candidates = [];
+  const blocked = explorationPositions();
   const minDist = 10;
   const maxDist = 15;
   for (let y = 0; y < mapData.length; y++) {
     for (let x = 0; x < mapData[0].length; x++) {
       const cell = mapData[y][x];
+      if (blocked.has(`${x},${y}`)) continue;
       if (cell.terrain !== "sea" && cell.terrain !== "shoal") continue;
       const d = manhattan(origin, { x, y });
       if (d >= minDist && d <= maxDist) {
@@ -116,6 +126,7 @@ export function randomSeaTarget(origin) {
     for (let y = 0; y < mapData.length; y++) {
       for (let x = 0; x < mapData[0].length; x++) {
         const cell = mapData[y][x];
+        if (blocked.has(`${x},${y}`)) continue;
         if (cell.terrain !== "sea" && cell.terrain !== "shoal") continue;
         const d = manhattan(origin, { x, y });
         if (d >= 10 && d <= 40) candidates.push({ x, y });
@@ -135,7 +146,7 @@ export function randomSeaTarget(origin) {
  * @returns {{x:number,y:number}}
  */
 export function randomHuntTarget(origin, minDist = 3, maxDist = 7, avoid = []) {
-  const avoidSet = new Set((avoid || []).map((p) => `${p.x},${p.y}`));
+  const avoidSet = new Set([...explorationPositions(), ...(avoid || []).filter(Boolean).map((p) => `${p.x},${p.y}`)]);
   const pickFrom = (lo, hi) => {
     const list = [];
     for (let y = 0; y < mapData.length; y++) {

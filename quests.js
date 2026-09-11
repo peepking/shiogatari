@@ -28,6 +28,7 @@ import { state } from "./state.js";
 import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 import { TROOP_STATS } from "./troops.js";
 import { getQuestDeadlineDays } from "./questDeadlines.js";
+import { offerQuestFragment, reserveQuestFragment, payQuestFunds, chartLabel } from "./chartWorld.js";
 
 
 /** @enum {string} 依頼種別 */
@@ -66,6 +67,7 @@ const QUEST_TYPES = {
  * @returns {void}
  */
 function enqueueQuestResult(title, q, rewards, note = "") {
+  if (q.rewardFragment) rewards = [...rewards, { id: "chart", label: `${chartLabel(q.rewardFragment)}の断片`, value: 1 }];
   const resources = rewards.filter(reward => Number(reward.value) !== 0).map(reward => ({ ...reward, value: `+${reward.value}` }));
   enqueueEvent({ title, body: `${q.title}${note ? ` / ${note}` : resources.length ? "" : " / 報酬なし"}`, resources });
 }
@@ -169,7 +171,7 @@ function genSupplyQuest(settlement) {
     targetId: settlement.id,
     acceptedAbs: null,
     deadlineAbs: null,
-    desc: `${itemName}を${qty}個用意し、受注した拠点で納品。報酬: ${reward}資金`,
+    desc: `${itemName}を${qty}個用意し、受注した拠点で納品。`,
   };
 }
 
@@ -232,7 +234,7 @@ function genDeliveryQuest(settlement) {
     targetId: target.id,
     acceptedAbs: null,
     deadlineAbs: null,
-    desc: `${titleTarget}へ${item.name}を届ける。報酬: ${reward}資金`,
+    desc: `${titleTarget}へ${item.name}を届ける。`,
   };
 }
 
@@ -261,6 +263,7 @@ function generateSeasonQuestsForSettlement(settlement) {
     .sort(() => Math.random() - 0.5)
     .slice(0, 3);
   state.quests.availableBySettlement[settlement.id] = pool;
+  pool.forEach(offerQuestFragment);
   state.quests.lastSeasonBySettlement[settlement.id] = { year: state.year, season: state.season };
 }
 
@@ -337,6 +340,7 @@ function generateNobleQuestsForNoble(noble, settlement) {
   ].filter(Boolean);
   const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 3);
   state.nobleQuests.availableByNoble[noble.id] = shuffled;
+  shuffled.forEach(offerQuestFragment);
   state.nobleQuests.lastSeasonByNoble[noble.id] = { year: state.year, season: state.season };
 }
 
@@ -392,12 +396,13 @@ export function acceptQuest(id, settlement) {
   const list = state.quests.availableBySettlement[settlement.id] || [];
   const idx = list.findIndex((q) => q.id === id);
   if (idx === -1) return null;
+  if (!reserveQuestFragment(list[idx])) return null;
   const q = list.splice(idx, 1)[0];
   const now = absDay(state);
   q.acceptedAbs = now;
   q.deadlineAbs = now + getQuestDeadlineDays(q.type);
   // 受注拠点基準で報酬を確定
-  if (q.type === QUEST_TYPES.SUPPLY) {
+  if (q.type === QUEST_TYPES.SUPPLY && !q.rewardFragment) {
     const demand = settlement.demand || {};
     const price = calcSupplyPrice(q.itemId, demand[q.itemId] ?? 10, {
       factionId: settlement.factionId,
@@ -405,7 +410,7 @@ export function acceptQuest(id, settlement) {
     }) ?? 0;
     q.reward = price * q.qty * 2;
   }
-  if (q.type === QUEST_TYPES.DELIVERY) {
+  if (q.type === QUEST_TYPES.DELIVERY && !q.rewardFragment) {
     const target = settlements.find((s) => s.id === q.targetId);
     const dist = target ? manhattan(target.coords, settlement.coords) : 1;
     q.reward = dist * 50;
@@ -432,6 +437,7 @@ export function acceptNobleQuest(id, noble, settlement) {
   const list = state.nobleQuests.availableByNoble[noble.id] || [];
   const idx = list.findIndex((q) => q.id === id);
   if (idx === -1) return null;
+  if (!reserveQuestFragment(list[idx])) return null;
   const q = list.splice(idx, 1)[0];
   const now = absDay(state);
   q.acceptedAbs = now;
@@ -676,7 +682,7 @@ function genNobleSupplyQuest(settlement, noble) {
     originId: settlement.id,
     deadlineAbs: null,
     acceptedAbs: null,
-    desc: `加工品を2種納品せよ（各${items.map((i) => `${i.name}x${i.qty}`).join(" / ")}）。報酬: 資金${totalPrice * 2 + 100}`,
+    desc: `加工品を2種納品せよ（各${items.map((i) => `${i.name}x${i.qty}`).join(" / ")}）。`,
   };
 }
 
@@ -704,7 +710,7 @@ function genNobleScoutQuest(settlement, noble) {
     originId: settlement.id,
     deadlineAbs: null,
     acceptedAbs: null,
-    desc: `指定座標 (${target.x + 1}, ${target.y + 1}) まで移動し偵察せよ。報酬: 資金${dist * 100}`,
+    desc: `指定座標 (${target.x + 1}, ${target.y + 1}) まで移動し偵察せよ。`,
   };
 }
 
@@ -813,7 +819,7 @@ function genNobleLogisticsQuest(settlement, noble) {
     originId: settlement.id,
     deadlineAbs: null,
     acceptedAbs: null,
-    desc: `食料${foodQty}と物資${pickName}x${qty}を納品せよ。報酬: 資金${totalPrice * 2 + 500}`,
+    desc: `食料${foodQty}と物資${pickName}x${qty}を納品せよ。`,
   };
 }
 
@@ -1217,9 +1223,10 @@ export function completeQuest(id) {
   if (q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT) {
     return false;
   }
-  if (q.reward) state.funds += q.reward;
+  payQuestFunds(q);
   state.quests.active.splice(idx, 1);
   const rewards = [];
+  if (q.rewardFragment) rewards.push(`${chartLabel(q.rewardFragment)}の断片+1`);
   if (q.reward && q.reward > 0) rewards.push(`資金+${q.reward}`);
   if (q.rewardFaith && q.rewardFaith > 0) rewards.push(`信仰+${q.rewardFaith}`);
   if (fameReward > 0) rewards.push(`名声+${fameReward}`);
@@ -1373,10 +1380,11 @@ export function completeHuntBattleQuest(id, success, reason = "") {
   if (idx === -1) return false;
   const q = state.quests.active[idx];
   if (success) {
-    if (q.reward) state.funds += q.reward;
+    payQuestFunds(q);
     if (q.rewardFame) state.fame += q.rewardFame;
     state.quests.active.splice(idx, 1);
     const rewards = [];
+    if (q.rewardFragment) rewards.push(`${chartLabel(q.rewardFragment)}の断片+1`);
     if (q.reward) rewards.push(`資金+${q.reward}`);
     if (q.rewardFame) rewards.push(`名声+${q.rewardFame}`);
     const rewardText = rewards.length ? rewards.join(" / ") : "報酬なし";
@@ -1433,13 +1441,12 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
       return true;
     }
     const totalSize = Math.max(0, q.fightTotals.reduce((a, b) => a + (b || 0), 0));
-    const reward = totalSize * 150;
+    const reward = payQuestFunds(q, totalSize * 150);
     const fameReward = Math.floor(totalSize / 2);
-    state.funds += reward;
     state.fame += fameReward;
     if (q.nobleId) adjustNobleFavor(q.nobleId, 4);
     state.quests.active.splice(idx, 1);
-    const rewardText = `資金+${reward} / 名声+${fameReward}`;
+    const rewardText = `${q.rewardFragment ? `${chartLabel(q.rewardFragment)}の断片+1` : `資金+${reward}`} / 名声+${fameReward}`;
     pushLog("依頼達成", `${q.title} / ${rewardText}`, "-");
     pushToast("依頼達成", `${q.title} / ${rewardText}`, "good");
     enqueueQuestResult("依頼達成", q, [{ id: "funds", label: "資金", value: reward }, { id: "fame", label: "名声", value: fameReward }]);
@@ -1455,13 +1462,12 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
       pushToast("依頼失敗", `${q.title} / 戦闘に敗北`, "bad");
       return true;
     }
-    const reward = (enemyTotal || 0) * 200;
+    const reward = payQuestFunds(q, (enemyTotal || 0) * 200);
     const fameReward = enemyTotal || 0;
-    state.funds += reward;
     state.fame += fameReward;
     if (q.nobleId) adjustNobleFavor(q.nobleId, 4);
     state.quests.active.splice(idx, 1);
-    const rewardText = `資金+${reward} / 名声+${fameReward}`;
+    const rewardText = `${q.rewardFragment ? `${chartLabel(q.rewardFragment)}の断片+1` : `資金+${reward}`} / 名声+${fameReward}`;
     pushLog("依頼達成", `${q.title} / ${rewardText}`, "-");
     pushToast("依頼達成", `${q.title} / ${rewardText}`, "good");
     enqueueQuestResult("依頼達成", q, [{ id: "funds", label: "資金", value: reward }, { id: "fame", label: "名声", value: fameReward }]);
@@ -1786,11 +1792,11 @@ export function completeNobleRefugeeAt(settlement) {
   const q = state.quests.active[idx];
   state.quests.active.splice(idx, 1);
   const fameReward = q.rewardFame || 0;
-  state.funds += q.reward || 0;
+  payQuestFunds(q);
   state.fame += fameReward;
   if (q.nobleId) adjustNobleFavor(q.nobleId, 4);
   state.refugeeEscort = { active: false, targetId: null, factionId: null, nobleId: null, questId: null };
-  const rewardText = `資金+${q.reward || 0} / 名声+${fameReward}`;
+  const rewardText = `${q.rewardFragment ? `${chartLabel(q.rewardFragment)}の断片+1` : `資金+${q.reward || 0}`} / 名声+${fameReward}`;
   pushLog("護送完了", `${q.title} / ${rewardText}`, "-");
   pushToast("護送完了", `${q.title} / ${rewardText}`, "good");
   enqueueQuestResult("護送完了", q, [{ id: "funds", label: "資金", value: q.reward || 0 }, { id: "fame", label: "名声", value: fameReward }]);

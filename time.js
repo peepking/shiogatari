@@ -8,6 +8,7 @@ import { absDay } from "./questUtils.js";
 import { advanceDay as baseAdvanceDay, state } from "./state.js";
 import { TROOP_STATS, applyTroopLosses, totalTroops } from "./troops.js";
 import { FOOD_CONSUMPTION_DAYS, getUpkeepForecast } from "./upkeep.js";
+import { updateExplorationWorld } from "./explorationUI.js";
 
 /**
  * 日付更新と、それに連動するイベント処理を進める。
@@ -23,6 +24,7 @@ export function advanceDayWithEvents(days = 1) {
       applyPeriodicFood();
     }
     const today = absDay(state);
+    updateExplorationWorld(true);
     tickDailyWar(today);
     tickRelationDrift(today);
     maybeQueueHonorInvite(today);
@@ -151,7 +153,7 @@ function buildLossesMap(totalLoss) {
  * スケジュールされた災いイベントを処理する。
  * @param {number} todayAbs
  */
-function processScheduledOmens(todayAbs) {
+export function processScheduledOmens(todayAbs) {
   if (!Array.isArray(state.pendingOmens)) return;
   const remaining = [];
   state.pendingOmens.forEach((o) => {
@@ -160,7 +162,7 @@ function processScheduledOmens(todayAbs) {
       remaining.push(o);
       return;
     }
-    if (state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE) {
+    if (state.expansion?.exploration.pending || state.expansion?.charts.pending || state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE) {
       remaining.push(o);
       return;
     }
