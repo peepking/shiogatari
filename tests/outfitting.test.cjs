@@ -46,8 +46,19 @@ async function main() {
   assert.equal(outfittedStat(40, 4, "atk", effects), 42);
   const lostUnits = [{ side: "ally", type: "infantry", count: 10, hp: 0 }];
   s.troops.medic = 5;
-  assert.equal(outfittingBattleLosses(lostUnits, snapshotOutfitting(s).medics).losses.infantry, 3);
-  assert.equal(outfittingBattleLosses(lostUnits, snapshot.medics).lossProb, 0);
+  assert.equal(outfittingBattleLosses(lostUnits, snapshotOutfitting(s).medics).losses.infantry, 2);
+  assert.ok(Math.abs(outfittingBattleLosses(lostUnits, snapshot.medics).lossProb - 0.1) < 1e-12);
+  for (const [medics, expected] of [[0, 0.6], [1, 0.4], [10, 0.1], [15, 0.1]]) {
+    const result = outfittingBattleLosses(lostUnits, medics);
+    assert.ok(Math.abs(result.lossProb - expected) < 1e-12);
+    assert.equal(result.losses.infantry, Math.round(10 * expected));
+  }
+  let previousGain = Infinity;
+  for (let medics = 1; medics <= 10; medics++) {
+    const gain = outfittingBattleLosses([], medics - 1).lossProb - outfittingBattleLosses([], medics).lossProb;
+    assert.ok(gain > 0 && gain < previousGain);
+    previousGain = gain;
+  }
   const upkeep = await load("./upkeep.js"); await upkeep.evaluate();
   s.expansion.outfitting = { slots: 2, owned: ["storm_cover", "deck_tent"], equipped: ["storm_cover", "deck_tent"] };
   s.troops = { infantry: 23 }; s.day = 9;
