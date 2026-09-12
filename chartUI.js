@@ -79,9 +79,12 @@ export function resumeChartExploration(syncUI) {
   if (!pending) return;
   const chart = data.active.find(c => c.id === pending.chartId);
   if (!chart) { data.pending = null; return; }
-  if (pending.reward && !pending.reward.shipTypes) {
+  if (pending.reward) {
     prepareShipReward(pending.reward);
-    if (!saveGameToStorage()) { pushToast("保存できません", "探索を再開して再試行してください。", "warn"); return; }
+    if (!saveGameToStorage()) {
+      state.modeLabel = MODE_LABEL.PREP;
+      pushToast("保存できません", "探索を再開して再試行してください。", "warn"); syncUI(); return;
+    }
   }
   if (!pending.dayApplied) {
     const before = structuredClone(state); const world = structuredClone(snapshotWorld());

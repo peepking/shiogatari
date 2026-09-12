@@ -1349,12 +1349,15 @@ a {
 .ship-quantity { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
 .ship-quantity input { width: 100px; max-width: 100%; }
 .ship-commit { width: 100%; margin-top: 12px; }
-.ship-choice .ship-icon { width: 40px; height: 40px; }
 .outfitting-categories { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
 .outfitting-catalog { min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
 .outfitting-layout { display: grid; grid-template-columns: minmax(145px, 0.85fr) minmax(0, 1.4fr); gap: 16px; align-items: stretch; flex: 1; min-height: 0; }
 .outfitting-panel .outfitting-item { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; padding: 12px; margin-bottom: 6px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .outfitting-item span { font-size: 11px; opacity: 0.75; }
+.outfitting-panel .ship-choice { display: grid; grid-template-columns: 32px minmax(0, 1fr); align-items: center; column-gap: 8px; }
+.ship-choice .ship-icon { width: 32px; height: 32px; grid-column: 1; grid-row: 1; }
+.ship-choice b { grid-column: 2; grid-row: 1; }
+.ship-choice span { grid-column: 1 / -1; }
 .outfitting-comparison { min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.025); }
 .outfitting-comparison h3 { margin: 0; font-size: 17px; }
 .outfitting-notice { font-size: 13px; }

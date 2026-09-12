@@ -27,6 +27,7 @@ async function main() {
     const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"), { context });
     modules.set(name, module); await module.link(load); return module;
   }
+  await load("./fleet.js");
   const root = await load("./chartWorld.js"); await root.evaluate();
   const base = await load("./expansionState.js"); await base.evaluate();
   const { createExpansionState, normalizeExpansionState } = base.namespace;

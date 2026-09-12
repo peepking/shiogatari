@@ -88,9 +88,12 @@ export function finishExploration(success) {
 export function resumeExploration(syncUI) {
   let pending = state.expansion.exploration.pending;
   if (!pending) return;
-  if (pending.reward && !pending.reward.shipTypes) {
+  if (pending.reward) {
     prepareShipReward(pending.reward);
-    if (!saveGameToStorage()) { pushToast("保存できません", "探索を再開して再試行してください。", "warn"); return; }
+    if (!saveGameToStorage()) {
+      state.modeLabel = MODE_LABEL.PREP;
+      pushToast("保存できません", "探索を再開して再試行してください。", "warn"); syncUI(); return;
+    }
   }
   if (!pending.dayApplied) {
     const before = structuredClone(state);
