@@ -26,6 +26,7 @@ async function main() {
   assert.equal(result.rows[0].current, 10);
   assert.equal(result.rows[0].text, "20 / 10");
   assert.equal(result.rows[1].done, true);
+  assert.deepEqual({ ...result.destination }, context.target.coords);
   for (const type of ["oracle_supply", "noble_supply", "noble_logistics", "war_supply"]) {
     result = getQuestProgress({ type, items: [{ id: "food", qty: 10 }, { id: "wood", qty: 5 }] }, state, context);
     assert.equal(result.rows[0].done, false);
@@ -39,14 +40,17 @@ async function main() {
   for (const type of ["oracle_move", "noble_scout"]) {
     result = getQuestProgress({ type, target: state.position }, state, context);
     assert.equal(result.rows[0].done, true);
+    assert.deepEqual({ ...result.destination }, state.position);
   }
   for (const type of ["noble_refugee", "war_escort"]) {
     result = getQuestProgress({ type, picked: false, target: state.position }, state, context);
     assert.equal(result.rows[0].done, false);
+    assert.deepEqual({ ...result.destination }, state.position);
     result = getQuestProgress({ type, picked: true, target: state.position }, state, context);
     assert.equal(result.rows[0].done, true);
     assert.equal(result.rows[1].done, false);
     assert.ok(result.next.includes("村"));
+    assert.deepEqual({ ...result.destination }, context.origin.coords);
   }
   for (const type of ["noble_security", "war_blockade"]) {
     result = getQuestProgress({ type, fights: [{ done: true }, { done: false, target: state.position }] }, state, context);
@@ -55,6 +59,23 @@ async function main() {
   }
   result = getQuestProgress({ type: "pirate_hunt", target: state.position }, state, context);
   assert.equal(result.rows[0].text, "0 / 1戦");
+  assert.deepEqual({ ...result.destination }, state.position);
+  for (const type of ["noble_security", "war_blockade"]) {
+    const q = { type, target: { x: 9, y: 9 }, fights: [
+      { target: { x: 0, y: 0 }, done: false }, { target: { x: 5, y: 6 }, done: false },
+    ] };
+    assert.deepEqual({ ...getQuestProgress(q, state, context).destination }, { x: 0, y: 0 });
+    q.fights[0].done = true;
+    assert.deepEqual({ ...getQuestProgress(q, state, context).destination }, { x: 5, y: 6 });
+    q.fights[1].done = true;
+    assert.equal(getQuestProgress(q, state, context).destination, null);
+  }
+  for (const type of ["oracle_hunt", "oracle_elite", "bounty_hunt", "noble_hunt", "war_defend_raid", "war_attack_raid", "war_skirmish"]) {
+    assert.deepEqual({ ...getQuestProgress({ type, target: state.position }, state, context).destination }, state.position);
+  }
+  assert.equal(getQuestProgress({ type: "oracle_supply", items: [] }, state, context).destination, null);
+  assert.equal(getQuestProgress({ type: "oracle_move", target: { x: NaN, y: 2 } }, state, context).destination, null);
+  assert.equal(getQuestProgress({ type: "oracle_move", target: state.position, deadlineAbs: 99 }, state, context).destination, null);
   for (const [deadlineAbs, deadline, ready] of [[100, "本日が期限", true], [99, "期限切れ", false], [103, "残り3日", true], [null, "期限なし", true]]) {
     result = getQuestProgress({ type: "oracle_move", target: state.position, deadlineAbs }, state, { ...context, canFinish: true });
     assert.equal(result.deadline, deadline);

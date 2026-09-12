@@ -42,6 +42,7 @@ function quantityRow(label, owned, required, icon) {
  * 依頼の条件と次の行動を、ゲーム状態を変更せず組み立てる。
  * 所持品は依頼ごとの判定であり予約・合算しない。完了可否は既存の判定を優先する。
  * 期限当日は有効、翌日から期限切れ。戦闘・護送は手動完了と区別する。
+ * 地図で確認する地点は未完了戦闘の先頭を優先し、護送の合流後は帰還先へ切り替える。
  * @param {object} q
  * @param {object} state
  * @param {{now:number,canFinish:boolean,origin:object,target:object,itemNames:object,troopNames:object}} context
@@ -90,8 +91,9 @@ export function getQuestProgress(q, state, { now, canFinish, origin, target, ite
     const total = fights.length || 1;
     const done = fights.filter(fight => fight.done).length;
     rows.push({ label: "討伐", current: done, total, text: `${done} / ${total}戦`, note: `残り${total - done}戦`, done: done === total });
-    const fightTarget = fights.find(fight => !fight.done)?.target || q.target;
-    next = isAt(state.position, fightTarget) ? "行動欄から戦闘へ。勝利すると進捗が更新されます。" : `${placeName(fightTarget)}で討伐してください。`;
+    const fightTarget = fights.length ? fights.find(fight => !fight.done)?.target : q.target;
+    destination = fightTarget;
+    next = !fightTarget ? "必要な戦闘は完了しました。" : isAt(state.position, fightTarget) ? "行動欄から戦闘へ。勝利すると進捗が更新されます。" : `${placeName(fightTarget)}で討伐してください。`;
   }
   if (destination) {
     const arrived = isAt(state.position, destination.coords || destination);
@@ -100,8 +102,10 @@ export function getQuestProgress(q, state, { now, canFinish, origin, target, ite
   const ready = !!canFinish && !expired;
   if (ready) next = "条件がそろいました。「完了して報酬を受取」で完了できます。";
   if (expired) next = "期限を過ぎています。";
+  const position = destination?.coords || destination;
   return {
     rows, next, ready, automatic,
+    destination: !expired && Number.isFinite(position?.x) && Number.isFinite(position?.y) ? { x: position.x, y: position.y } : null,
     automaticLabel: BATTLE_TYPES.includes(q.type) ? "必要な戦闘すべてに勝利すると自動完了" : "護送先への到着・入場で自動完了",
     status: expired ? "expired" : ready ? "ready" : "active",
     statusText: expired ? "期限切れ" : ready ? "完了できます" : "進行中",
