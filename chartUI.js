@@ -38,9 +38,8 @@ export function renderChartCards() {
     const status = complete ? "海図完成・現地を探索" : c.fragments ? "断片を収集中" : c.rumor ? "噂の手掛かり" : "依頼報酬を予約中";
     return `<article class="chart-card"><div class="chart-heading">${resourceIcon("chart")}<b>${escapeHtml(chartLabel(c))}</b><span>${c.fragments}/${c.size}枚</span></div><div class="tiny">${status}</div>
       <progress max="${c.size}" value="${c.fragments}" aria-label="${escapeHtml(chartLabel(c))} 取得${c.fragments}枚"></progress>
-      <div class="tiny">取得 ${c.fragments} ・依頼予約 ${c.questIds.length} ・噂予約 ${c.rumor ? 1 : 0}</div>
       ${position ? `<button class="btn chart-location" data-x="${position.x}" data-y="${position.y}">${complete ? "発見地点" : "噂の場所"}を地図で確認</button>` : ""}
-      <details class="quest-description"><summary>海図の内容・報酬</summary>${expectedReward(c)}<div class="tiny">${complete ? "現地で1日使って探索できます。" : `あと${c.size - c.fragments}枚で場所が判明します。予約分は依頼の達成・噂の現地回収が必要です。`}探索自体に戦闘はなく、期限はありません。</div></details></article>`;
+      <details class="quest-description"><summary>海図の内容・報酬</summary>${expectedReward(c)}<div class="tiny">${complete ? "現地で1日使って探索できます。" : `あと${c.size - c.fragments}枚で場所が判明します。`}</div></details></article>`;
   }).join("");
   panel.querySelectorAll(".chart-location").forEach(button => {
     button.addEventListener("click", () => focusMapPosition({ x: Number(button.dataset.x), y: Number(button.dataset.y) }));
