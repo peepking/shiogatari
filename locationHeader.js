@@ -4,9 +4,10 @@ import { MODE_LABEL } from "./constants.js";
 /**
  * 現在地を行動の見出しとして表示する。勢力は近隣ではなく現在の拠点から取得する。
  * @param {object|null} settlement 現在地の拠点。 @param {string} mode 内部状態。 @param {string} terrain 地形ID。
+ * @param {object|null} [noble] 滞在判定済みの謁見相手。
  * @returns {void}
  */
-export function renderLocationHeader(settlement, mode, terrain) {
+export function renderLocationHeader(settlement, mode, terrain, noble = null) {
   const title = document.getElementById("locationLabel");
   const status = document.getElementById("locationStatus");
   const factionRow = document.getElementById("locationFaction");
@@ -25,4 +26,12 @@ export function renderLocationHeader(settlement, mode, terrain) {
     icon.removeAttribute("src");
     document.getElementById("locationFactionName").textContent = "";
   }
+  const audienceRow = document.getElementById("locationAudience");
+  if (!audienceRow) return;
+  const visible = mode === MODE_LABEL.AUDIENCE && Boolean(noble);
+  audienceRow.hidden = !visible;
+  const portrait = document.getElementById("locationNobleIcon");
+  document.getElementById("locationNobleName").textContent = visible ? noble.name : "";
+  if (visible) portrait.src = noble.img;
+  else portrait.removeAttribute("src");
 }

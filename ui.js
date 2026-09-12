@@ -1284,7 +1284,8 @@ function syncUI() {
   if (faithEl) faithEl.textContent = String(state.faith);
   if (fundsEl) fundsEl.textContent = String(state.funds);
   if (fameEl) fameEl.textContent = String(state.fame);
-  renderLocationHeader(getCurrentSettlement(), state.modeLabel, getTerrainAt(state.position.x, state.position.y));
+  renderLocationHeader(getCurrentSettlement(), state.modeLabel, getTerrainAt(state.position.x, state.position.y),
+    isAudienceMode() ? getNobleById(getAudienceContext().nobleId) : null);
   renderGameTime(gameTimeEl, state);
 
   if (shipsIn) shipsIn.value = String(state.ships);

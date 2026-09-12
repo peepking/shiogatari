@@ -43,6 +43,10 @@ main .grid > * { min-width: 0; }
 .location-faction > span { min-width: 0; }
 .location-faction-caption { display: block; font-size: 10px; color: var(--muted); margin-bottom: 2px; }
 .location-faction b { display: block; font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.location-audience:not([hidden]) { display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 10px; border: 1px solid var(--line); border-radius: 10px; background: #ffffff05; }
+.location-audience img { width: 44px; height: 50px; object-fit: contain; flex-shrink: 0; }
+.location-audience > div { min-width: 0; }
+.location-audience b { font-size: 16px; line-height: 1.4; overflow-wrap: anywhere; }
 .workspace-map { grid-column: 2; grid-row: 2; }
 #questCard, .battle-side { grid-column: 3; grid-row: 2; }
 .workspace-map > .bd { padding: 10px; }

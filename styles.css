@@ -1359,3 +1359,12 @@ a {
   .outfitting-catalog { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
   .outfitting-panel .outfitting-item { margin: 0; }
 }
+
+/* 縦長のスマホではカード自体を伸ばし、購入欄が残り高さに押しつぶされるのを防ぐ。 */
+@media (max-width: 600px) and (orientation: portrait) {
+  .outfitting-panel { height: auto; min-height: 620px; }
+  .outfitting-layout { flex: none; grid-template-columns: 1fr; grid-template-rows: 145px max(360px, 50dvh); }
+  .outfitting-catalog { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .outfitting-panel .outfitting-item { margin: 0; }
+  .outfitting-details { max-height: max(480px, 65dvh); }
+}
