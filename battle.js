@@ -10,6 +10,8 @@ import { TROOP_STATS } from "./troops.js";
 import { clamp } from "./util.js";
 import { snapshotOutfitting, outfittedStat, fireOutfitting, defendedDamage } from "./outfitting.js";
 import { OUTFITTING_ITEMS } from "./expansionConfig.js";
+import { planBattleFormation } from "./battleFormation.js";
+import { orderRosterCandidates } from "./rosterPriority.js";
 
 const BASE_TICK_MS = 1000;
 const MAX_TICKS = 60;
@@ -358,7 +360,7 @@ function autoWeight(type) {
 /**
  * 保存された条件で自動配備を行う。兵種ごとに人数を分配してから、
  * 人数・兵種性能・平均Lvによる重みが大きい順に最大20部隊を選ぶ。
- * 同じ重みなら人数の多い部隊を優先し、同兵種内では高Lvの兵から取り出す。
+ * 同じ重みは指定の兵種順で交互に選び、同兵種内では高Lvの兵から取り出す。
  * 対象外の兵種・端数・上限超過の兵は待機に残す。
  */
 function autoDeployRoster() {
@@ -372,11 +374,10 @@ function autoDeployRoster() {
       return splitRosterCounts(cnt, rosterOptions.sizeMode).map((chunk) => {
         return { type, size: chunk, weight: base * chunk, avgLv };
       });
-    })
-    .sort((a, b) => b.weight - a.weight || b.size - a.size);
+    });
 
   battleRoster.sortie = [];
-  for (const chunk of chunks) {
+  for (const chunk of orderRosterCandidates(chunks)) {
     if (battleRoster.sortie.length >= MAX_SQUADS) break;
     const pulled = takeFromStandby(chunk.type, chunk.size);
     if (pulled.count <= 0) continue;
@@ -708,37 +709,6 @@ function pickTargetByMode(mode, unit, enemies) {
   }, null);
 }
 
-/**
- * スロットの並びをフォーメーション種別で並べ替える。
- * @param {"balance"|"assault"|"defense"} kind
- * @param {"ally"|"enemy"} side
- * @param {{x:number,y:number}[]} slots
- * @param {number} size
- * @returns {{x:number,y:number}[]}
- */
-function sortSlotsByFormation(kind, side, slots, size) {
-  const center = (size - 1) / 2;
-  // 前列 = 敵に近い列 / 後列 = 敵から遠い列
-  const frontCol = side === "ally" ? 1 : size - 2;
-  const backCol = side === "ally" ? 0 : size - 1;
-  const score = (slot) => {
-    const dist = Math.abs(slot.y - center);
-    const isFront = slot.x === frontCol;
-    const isBack = slot.x === backCol;
-    switch (kind) {
-      case "assault":
-        // 前の列を強く優先
-        return (isFront ? 0 : 100) + dist;
-      case "defense":
-        // 後ろの列を強く優先
-        return (isBack ? 0 : 100) + dist;
-      case "balance":
-      default:
-        return (isFront ? 2 : 4) + dist;
-    }
-  };
-  return [...slots].sort((a, b) => score(a) - score(b));
-}
 
 /**
  * ユニットへスロットを割り当てる。
@@ -795,11 +765,14 @@ function applyFormations(customOverride) {
   const enemySlots = battleState.enemySlotOrder;
   const kind = battleState.allyFormation;
   const useCustom = kind === "custom";
-  const slotsForAllies = useCustom
-    ? allySlots
-    : sortSlotsByFormation(kind, "ally", allySlots, battleState.size);
-  const customMap = useCustom ? customOverride || battleState.customSlots : {};
-  assignSlots(allies, slotsForAllies, customMap, useCustom);
+  if (useCustom) {
+    assignSlots(allies, allySlots, customOverride || battleState.customSlots, true);
+  } else {
+    planBattleFormation(allies, kind, battleState.size).forEach(({ unit, x, y }) => {
+      unit.x = x;
+      unit.y = y;
+    });
+  }
   assignSlots(enemies, enemySlots);
 }
 
@@ -1301,7 +1274,7 @@ function focusedUnit() {
 }
 
 /**
- * 戦闘詳細パネルを更新する。
+ * 戦闘詳細パネルを更新する。地形倍率は攻撃・防御計算と共通の処理で取得する。
  */
 function updateBattleInfo() {
   const infoEl = elements.battleInfo;
@@ -1314,7 +1287,7 @@ function updateBattleInfo() {
   }
   const terrainKey = battleState.grid[unit.y]?.[unit.x];
   const terrName = getTerrainName(terrainKey);
-  const terrRate = unit.terrain?.[terrainKey] ?? 100;
+  const terrRate = terrainRate(unit);
   const effAtk = fmt(effectiveAtk(unit));
   const effDef = fmt(effectiveDef(unit));
   const hpText = `${fmt(unit.hp)}/${fmt(unit.maxHp)}`;
@@ -1327,7 +1300,7 @@ function updateBattleInfo() {
     <div>${status}</div>
     <div>射程 ${unit.range} / 移動 ${unit.move}</div>
     <div>座標 ${coords}</div>
-    <div>地形 ${terrName} (補正 x${Math.round((terrRate / 100) * 100) / 100})</div>
+    <div>地形 ${terrName} (補正 x${Math.round(terrRate * 100) / 100})</div>
   `;
 }
 
