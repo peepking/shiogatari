@@ -20,6 +20,7 @@ const TARGET_SWITCH_RATIO = 1.5;
 const SPEED_OPTIONS = [1, 2, 4];
 const MAX_UNIT_COUNT = 10;
 const MAX_SQUADS = 20;
+const BATTLE_HP_MULTIPLIER = 2;
 let appliedRosterSignature = "";
 const ATTACK_FX_TTL = 2;
 const SUPPORT_FX = {
@@ -531,7 +532,7 @@ function createUnit(type, side, index, pos, count, level = 1) {
   const lvlRounded = Math.min(5, Math.round(Number(level) * 10) / 10); // 上限Lv5
   const lvlMultRaw = 1 + 0.1 * (lvlRounded - 1);
   const lvlMult = Math.round(lvlMultRaw * 100) / 100; // 小数2桁
-  const hpVal = Math.max(1, Math.floor(baseHp * ratio * lvlMult));
+  const hpVal = Math.max(1, Math.floor(baseHp * ratio * lvlMult)) * BATTLE_HP_MULTIPLIER;
   const atkVal = Math.max(1, Math.floor(baseAtk * ratio * lvlMult));
   const defVal = Math.max(1, Math.floor(baseDef * lvlMult));
   return {

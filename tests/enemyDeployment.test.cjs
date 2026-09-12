@@ -11,6 +11,7 @@ const context = vm.createContext({
   battleState: { grid: Array.from({ length: 10 }, () => Array(10).fill("plain")) },
   clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
 });
+vm.runInContext(source.match(/const BATTLE_HP_MULTIPLIER = \d+;/)[0], context);
 for (const name of ["buildDeploySlots", "createUnit", "createUnits", "terrainRate", "effectiveAtk", "effectiveDef", "calcStrength"]) {
   const start = source.indexOf(`function ${name}(`);
   const end = source.indexOf("\n}", start) + 2;
@@ -24,6 +25,8 @@ vm.runInContext(`
   const result = createUnits(entries, 'enemy', 10);
 `, context);
 assert.equal(vm.runInContext("result.length", context), 20);
+assert.equal(vm.runInContext("result[0].hp", context), 100);
+assert.equal(vm.runInContext("result[19].maxHp", context), 280);
 assert.equal(vm.runInContext("result.filter(u => u.level === 5).length", context), 6);
 assert.equal(vm.runInContext("new Set(result.map(u => u.x + ',' + u.y)).size", context), 20);
 assert.equal(vm.runInContext("JSON.stringify(entries) === before", context), true);
