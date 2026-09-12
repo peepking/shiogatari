@@ -1,6 +1,7 @@
 import { MODE_LABEL } from "./constants.js";
 import { restoreWorld, snapshotWorld } from "./map.js";
 import { reconcileWarFronts } from "./warFronts.js";
+import { migrateFleet } from "./fleet.js";
 import { resetState, state } from "./state.js";
 import { normalizeLogs } from "./logStore.js";
 import { normalizeExpansionState } from "./expansionState.js";
@@ -96,6 +97,8 @@ export function loadGameFromStorage() {
       restoreWorld(snapshot.world);
     }
     Object.assign(state, snapshot.state);
+    if (!snapshot.state.fleet) delete state.fleet;
+    migrateFleet(state);
     state.logs = normalizeLogs(state.logs);
     state.expansion = normalizeExpansionState(state.expansion);
     reconcileCharts(state.expansion.charts, state.quests?.active || []);

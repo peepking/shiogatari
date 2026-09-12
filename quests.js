@@ -1146,12 +1146,12 @@ export function completeQuest(id) {
     if (set?.nobleId) adjustNobleFavor(set.nobleId, 2);
     const fameGain = rollDice(5, 3);
     if (fameGain) state.fame = Math.max(0, (state.fame || 0) + fameGain);
-    state.ships = Math.max(0, (state.ships || 0) + 1);
+    const ship = awardShips(state);
     state.quests.active.splice(idx, 1);
     const rewardNote = [
       "戦況が有利に傾きました",
       fameGain ? `名声+${fameGain}` : null,
-      "船+1",
+      ship,
     ]
       .filter(Boolean)
       .join(" / ");
@@ -1820,3 +1820,4 @@ export function completeWarEscortAt(settlement) {
   pushLog("護送完了", `${q.title} / ${settlement.name} に護送完了 / ${impact}`, "-");
   pushToast("護送完了", `${q.title} を完了しました（${impact}）`, "good");
 }
+import { awardShips } from "./fleet.js";

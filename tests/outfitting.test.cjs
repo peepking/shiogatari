@@ -12,6 +12,7 @@ async function main() {
     const m = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"));
     modules.set(name, m); await m.link(load); return m;
   }
+  await load("./fleet.js");
   const root = await load("./outfitting.js"); await root.evaluate();
   const { changeOutfitting, snapshotOutfitting, defendedDamage, fireOutfitting, outfittedStat, outfittingBattleLosses } = root.namespace;
   const { createExpansionState } = modules.get("./expansionState.js").namespace;

@@ -61,6 +61,8 @@ async function main() {
     }
     return modules[specifier];
   }
+  await loadModule("./fleet.js");
+  await loadModule("./expansionState.js");
   const module = await loadModule("./storage.js");
   await module.evaluate();
   const { saveGameToStorage, scheduleGameSave, loadGameFromStorage } = module.namespace;
@@ -193,6 +195,23 @@ async function main() {
   assert.equal(state.funds, 4321);
 
   // 保存失敗でも以前のデータを壊さず、次回の保存で復帰できる。
+  delete state.fleet;
+  state.ships = 3;
+  assert.equal(saveGameToStorage(), true);
+  assert.equal(loadGameFromStorage(), true);
+  assert.equal(state.fleet.counts.cog, 3);
+  assert.equal("ships" in state, false);
+  state.fleet.counts.galleon = 2;
+  world.settlements[0].shipyard = { regular: [{type:"cog",targetStock:2}], stock:{cog:0,galleon:3}, lastRestockSeason:4001 };
+  state.expansion.exploration.pending.reward.shipTypes = { knarr: 1 };
+  assert.equal(saveGameToStorage(), true);
+  resetState();
+  assert.equal(loadGameFromStorage(), true);
+  assert.equal(state.fleet.counts.cog, 3);
+  assert.equal(state.fleet.counts.galleon, 2);
+  assert.equal(world.settlements[0].shipyard.stock.cog, 0);
+  assert.equal(world.settlements[0].shipyard.stock.galleon, 3);
+  assert.equal(state.expansion.exploration.pending.reward.shipTypes.knarr, 1);
   const validSave = saved;
   failWrite = true;
   assert.equal(saveGameToStorage(), false);

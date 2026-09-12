@@ -52,7 +52,9 @@ export function renderChartCards() {
  */
 function applyReward(reward) {
   const resources = [];
-  for (const [id, label] of [["ships", "船"], ["funds", "資金"], ["faith", "信仰"], ["fame", "名声"]]) {
+  addShips(state, prepareShipReward(reward));
+  if (reward.ships) resources.push({ id: "ships", label: "発見した船", value: shipListText(reward.shipTypes) });
+  for (const [id, label] of [["funds", "資金"], ["faith", "信仰"], ["fame", "名声"]]) {
     if (!reward[id]) continue;
     state[id] += reward[id];
     resources.push({ id, label, value: `+${reward[id]}` });
@@ -77,6 +79,10 @@ export function resumeChartExploration(syncUI) {
   if (!pending) return;
   const chart = data.active.find(c => c.id === pending.chartId);
   if (!chart) { data.pending = null; return; }
+  if (pending.reward && !pending.reward.shipTypes) {
+    prepareShipReward(pending.reward);
+    if (!saveGameToStorage()) { pushToast("保存できません", "探索を再開して再試行してください。", "warn"); return; }
+  }
   if (!pending.dayApplied) {
     const before = structuredClone(state); const world = structuredClone(snapshotWorld());
     state.modeLabel = MODE_LABEL.NORMAL;
@@ -134,3 +140,4 @@ export function renderChartControl(syncUI) {
   button.textContent = pending ? "海図の探索を再開" : site?.kind === "rumor" ? "噂の断片を回収" : "海図の発見地点を探索";
   button.onclick = () => beginChartExploration(syncUI);
 }
+import { addShips, prepareShipReward, shipListText } from "./fleet.js";

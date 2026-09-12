@@ -120,6 +120,7 @@ export function rollExplorationReward(kind, goods, troopTypes, random = Math.ran
     reward.ships = random() < settings.shipChance ? settings.ships : 0;
   }
   reward.fragment = random() < (CHART_CONFIG.explorationFragmentChance[kind] || 0);
+  prepareShipReward(reward, random);
   return reward;
 }
 
@@ -165,3 +166,4 @@ export function validateExploration(data) {
   if (pending?.encounter && (!pending.encounter.active || pending.encounter.explorationId !== site.id || !Array.isArray(pending.encounter.enemyFormation) || !pending.encounter.enemyFormation.length)) pending = null;
   return { ...data, sites, pending, nextId: Math.max(data.nextId, 1, ...sites.map(s => s.id + 1)) };
 }
+import { prepareShipReward } from "./fleet.js";

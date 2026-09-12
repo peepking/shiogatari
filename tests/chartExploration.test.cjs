@@ -31,6 +31,9 @@ async function main() {
     const m = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"), { context });
     modules.set(name, m); await m.link(load); return m;
   }
+  const fleet = await load("./fleet.js"); await fleet.evaluate();
+  const { totalShips, migrateFleet } = fleet.namespace;
+  migrateFleet(state);
   const root = await load("./chartUI.js"); await root.evaluate();
   const { resumeChartExploration } = root.namespace;
   /** @param {boolean} applied 日数適用済みか。 @returns {void} 完成地点の予約を用意する。 */
@@ -41,15 +44,15 @@ async function main() {
   }
   seed(false); fail = true;
   resumeChartExploration(() => {});
-  assert.equal(state.day, 10); assert.equal(world.days, 0); assert.equal(state.ships, 0);
+  assert.equal(state.day, 10); assert.equal(world.days, 0); assert.equal(totalShips(state.fleet), 0);
   assert.equal(state.expansion.charts.pending.dayApplied, false); assert.equal(state.modeLabel, "prep");
   fail = false;
   resumeChartExploration(() => {});
-  assert.equal(state.day, 11); assert.equal(world.days, 1); assert.equal(state.ships, 1); assert.equal(state.supplies.spice, 50);
+  assert.equal(state.day, 11); assert.equal(world.days, 1); assert.equal(totalShips(state.fleet), 1); assert.equal(state.supplies.spice, 50);
   assert.equal(state.expansion.charts.active.length, 0); assert.equal(saved.expansion.charts.pending, null);
-  resumeChartExploration(() => {}); assert.equal(state.ships, 1); assert.equal(state.day, 11);
+  resumeChartExploration(() => {}); assert.equal(totalShips(state.fleet), 1); assert.equal(state.day, 11);
   seed(true); resumeChartExploration(() => {});
-  assert.equal(state.day, 11); assert.equal(state.ships, 2);
+  assert.equal(state.day, 11); assert.equal(totalShips(state.fleet), 2);
   state.expansion.charts = { active: [{ id: 2, kind: "altar", size: 3, fragments: 2, rumor: { x: 1, y: 1 }, questIds: [] }],
     pending: { chartId: 2, kind: "rumor", dayApplied: false, reward: null } };
   resumeChartExploration(() => {});

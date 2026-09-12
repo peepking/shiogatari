@@ -13,6 +13,7 @@ async function main() {
     "./state.js": { state: {} },
     "./upkeep.js": { renderUpkeepForecast() {} },
     "./outfitting.js": { getOutfittingEffects() {}, applyCapacityBonus() {} },
+    "./fleet.js": { fleetEffects() {} },
   };
   const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../troops.js"), "utf8"), { context });
   await module.link(name => new vm.SyntheticModule(Object.keys(dependencies[name]), function () {

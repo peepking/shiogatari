@@ -243,7 +243,7 @@
                 <div id="mapInfo"></div>
               </div>
               <section class="outfitting-panel" id="outfittingPanel" aria-labelledby="outfittingTitle" hidden>
-                <div class="outfitting-heading"><h2 id="outfittingTitle" tabindex="-1">船の艤装</h2><div class="outfitting-heading-actions"><button class="btn ghost" id="outfittingEdit" aria-pressed="true">艤装変更</button><button class="btn ghost" id="outfittingDetails" aria-pressed="false">詳細確認</button><button class="btn ghost" id="outfittingClose">地図に戻る</button></div></div>
+                <div class="outfitting-heading"><h2 id="outfittingTitle" tabindex="-1">造船所</h2><div class="outfitting-heading-actions"><button class="btn ghost" id="outfittingEdit" aria-pressed="true">艤装変更</button><button class="btn ghost" id="outfittingTrade" aria-pressed="false">船取引</button><button class="btn ghost" id="outfittingDetails" aria-pressed="false">詳細確認</button><button class="btn ghost" id="outfittingClose">地図に戻る</button></div></div>
                 <div id="outfittingBody"></div>
               </section>
               <div class="battle-block mb-12" id="battleBlock" hidden>
@@ -299,8 +299,7 @@
             <div class="bd">
               <div class="mode-actions">
                 <button class="btn good" id="tradeBtn" hidden>物資取引</button>
-                <button class="btn good" id="shipTradeBtn" hidden>船取引</button>
-                <button class="btn good" id="outfittingOpenBtn" hidden>船の艤装</button>
+                <button class="btn good" id="outfittingOpenBtn" hidden>造船所</button>
                 <button class="btn good" id="questOpenBtn" hidden>依頼受注</button>
                 <button class="btn good" id="hireBtn" hidden>部隊員雇用</button>
                 <button class="btn good" id="audienceBtn" hidden>謁見する</button>
@@ -459,7 +458,7 @@
 
         <div class="two mt-10">
           <div>
-            <div class="tiny">船（聖船は別枠）</div>
+            <div class="tiny">コグ数（他船種・聖船は別枠）</div>
             <input type="number" id="shipsIn" min="0" value="0" />
           </div>
           <div>
@@ -511,7 +510,7 @@
             <li>移動：マップクリックで上下左右1マスに移動し1日経過。村/街の中では外に出てから移動。</li>
             <li>村/街：マップ上で村は●、街は◆のアイコン。現在地にある村・街へ入る/出るボタンで入出する。物資取引と依頼受注が可能。</li>
             <li>物資取引：村/街のと売買ができる。物資の相場は季節ごとに変化する。</li>
-            <li>船取引：街でのみ売買ができる。船の数を増やすと部隊数、物資の所持上限が増える。</li>
+            <li>造船所：街で船取引と艤装変更ができる。船種ごとに価格・容量・固有効果が異なり、詳細確認で船団全体の効果を確認できる。</li>
             <li>依頼：季節ごとに依頼が更新。依頼は依頼一覧から確認/完了が可能。</li>
             <li>部隊員雇用：村/街で部隊員を雇用できる。雇用枠は季節ごとに補充される。</li>
             <li>戦闘準備：敵に遭遇すると通常行動不可。戦闘開始、逃走（確率判定）、海に祈る（確定逃走）のみ可能。</li>
@@ -604,40 +603,6 @@
     </div>
   </div>
 
-  <div class="modal-backdrop" id="shipTradeModal" hidden>
-    <div class="modal">
-      <div class="modal-hd">
-        <div>船取引</div>
-        <button class="modal-close" id="shipTradeModalClose">閉じる</button>
-      </div>
-      <div class="modal-bd with-footer">
-        <div class="modal-scroll">
-          <div class="table mt-10">
-            <table class="trade-table">
-              <thead>
-                <tr>
-                  <th class="ta-left">品目</th>
-                  <th class="ta-center">単価</th>
-                  <th class="ta-center">所持数</th>
-                  <th class="ta-center">購入</th>
-                  <th class="ta-center">売却</th>
-                </tr>
-              </thead>
-              <tbody id="shipTradeTableBody"></tbody>
-            </table>
-          </div>
-          <div id="shipTradeError" class="msg error mt-10" hidden></div>
-        </div>
-        <div class="sticky-footer row gap-12 w-100">
-          <button class="btn primary" id="shipTradeConfirm">取引を確定</button>
-          <div class="modal-summary">
-            <span class="pill">現在の資金: <b id="shipTradeFunds">0</b></span>
-            <div id="shipTradeDelta" class="pill" hidden></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
   <div class="modal-backdrop" id="eventTradeModal" hidden>
     <div class="modal">

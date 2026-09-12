@@ -61,10 +61,10 @@ export function finishExploration(success) {
   const reward = consumeExploration(state.expansion.exploration, success);
   if (!reward) return [];
   if (reward.fragment === true) awardExplorationFragment();
-  state.ships += reward.ships;
+  addShips(state, prepareShipReward(reward));
   state.funds += reward.funds;
   const resources = [{ id: "funds", label: "探索資金", value: `+${reward.funds}` }];
-  if (reward.ships) resources.push({ id: "ships", label: "発見した船", value: `+${reward.ships}` });
+  if (reward.ships) resources.push({ id: "ships", label: "発見した船", value: shipListText(reward.shipTypes) });
   for (const [id, qty] of Object.entries(reward.supplies)) {
     if (!SUPPLY_ITEMS.some(item => item.id === id)) continue;
     state.supplies[id] = (state.supplies[id] || 0) + qty;
@@ -88,6 +88,10 @@ export function finishExploration(success) {
 export function resumeExploration(syncUI) {
   let pending = state.expansion.exploration.pending;
   if (!pending) return;
+  if (pending.reward && !pending.reward.shipTypes) {
+    prepareShipReward(pending.reward);
+    if (!saveGameToStorage()) { pushToast("保存できません", "探索を再開して再試行してください。", "warn"); return; }
+  }
   if (!pending.dayApplied) {
     const before = structuredClone(state);
     const world = structuredClone(snapshotWorld());
@@ -171,3 +175,4 @@ export function renderExplorationControl(syncUI) {
   info.hidden = button.hidden;
   info.textContent = site ? `${describeDanger(site.danger)} / 探索1日` : "";
 }
+import { addShips, prepareShipReward, shipListText } from "./fleet.js";

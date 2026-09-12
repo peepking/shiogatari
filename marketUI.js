@@ -1,13 +1,10 @@
 import { getCurrentSettlement } from "./actions.js";
-import { MODE_LABEL } from "./constants.js";
-import { confirmAction, elements, pushLog, pushToast, setInlineMessage, setOutput } from "./dom.js";
+import { elements, pushLog, pushToast, setInlineMessage } from "./dom.js";
 import { adjustSupport } from "./faction.js";
 import { state } from "./state.js";
 import { SUPPLY_ITEMS, calcSupplyCap, calcSupplyPrice, totalSupplies } from "./supplies.js";
 import { resourceIcon } from "./resourceUI.js";
 
-// 船の単価は固定（1隻=5000資金）。
-const SHIP_PRICE = 5000;
 
 /**
  * 物資取引モーダルのエラー表示を更新する。
@@ -17,13 +14,6 @@ function setTradeError(msg) {
   setInlineMessage(elements.tradeError, msg);
 }
 
-/**
- * 船取引モーダルのエラー表示を更新する。
- * @param {string} msg
- */
-function setShipTradeError(msg) {
-  setInlineMessage(elements.shipTradeError, msg);
-}
 
 /**
  * イベント取引モーダルのエラー表示を更新する。
@@ -236,7 +226,7 @@ function confirmEventTrade(closeModal, syncUI) {
     setEventTradeError("資金が足りません。");
     return;
   }
-  const cap = calcSupplyCap(state.ships);
+  const cap = calcSupplyCap(state.fleet);
   const totalBefore = totalSupplies(state.supplies);
   if (totalBefore + totalBuy > cap) {
     setEventTradeError(`所持上限(${cap})を超えます。`);
@@ -272,52 +262,6 @@ function confirmEventTrade(closeModal, syncUI) {
 }
 
 
-/**
- * 船取引モーダルを描画する。
- */
-function renderShipTradeModal() {
-  const body = elements.shipTradeTableBody;
-  if (!body) return;
-  body.innerHTML = `
-    <tr>
-      <td>船</td>
-      <td class="ta-center">${SHIP_PRICE}</td>
-      <td class="ta-center">${state.ships}</td>
-      <td class="ta-center">
-        <input type="number" min="0" value="0" class="ship-buy input-70">
-      </td>
-      <td class="ta-center">
-        <input type="number" min="0" max="${state.ships}" value="0" class="ship-sell input-70">
-      </td>
-    </tr>
-  `;
-  setShipTradeError("");
-  if (elements.shipTradeFunds) elements.shipTradeFunds.textContent = String(state.funds);
-  if (elements.shipTradeDelta) {
-    elements.shipTradeDelta.hidden = false;
-    elements.shipTradeDelta.textContent = "資金変動: 0";
-    elements.shipTradeDelta.className = "pill delta-zero";
-  }
-}
-
-/**
- * 船取引の資金変動を再計算する。
- */
-function updateShipTradeDelta() {
-  const buyInput = elements.shipTradeModal?.querySelector(".ship-buy");
-  const sellInput = elements.shipTradeModal?.querySelector(".ship-sell");
-  const buyQty = Math.max(0, Number(buyInput?.value) || 0);
-  const sellQty = Math.max(0, Number(sellInput?.value) || 0);
-  const fundsDelta = (sellQty - buyQty) * SHIP_PRICE;
-  if (elements.shipTradeFunds) elements.shipTradeFunds.textContent = String(state.funds);
-  const deltaEl = elements.shipTradeDelta;
-  if (!deltaEl) return;
-  deltaEl.hidden = false;
-  deltaEl.textContent = `資金変動: ${fundsDelta >= 0 ? "+" : ""}${fundsDelta}`;
-  if (fundsDelta > 0) deltaEl.className = "pill delta-pos";
-  else if (fundsDelta < 0) deltaEl.className = "pill delta-neg";
-  else deltaEl.className = "pill delta-zero";
-}
 
 /**
  * 物資/船取引モーダルのイベントを設定する。
@@ -325,7 +269,6 @@ function updateShipTradeDelta() {
  */
 export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage }) {
   bindModal?.(elements.tradeModal, elements.tradeModalClose);
-  bindModal?.(elements.shipTradeModal, elements.shipTradeModalClose);
   bindModal?.(elements.eventTradeModal, elements.eventTradeModalClose);
   elements.eventTradeModalClose?.addEventListener("click", () => {
     state.eventTrade = null;
@@ -335,18 +278,6 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
   elements.tradeBtn?.addEventListener("click", () => {
     renderTradeSelects();
     openModal?.(elements.tradeModal);
-  });
-  elements.shipTradeBtn?.addEventListener("click", () => {
-    const settlement = getCurrentSettlement();
-    if (!settlement || state.modeLabel !== MODE_LABEL.IN_TOWN) {
-      setOutput("船取引不可", "街の中でのみ船取引ができます。", [
-        { text: "船取引", kind: "warn" },
-        { text: "街のみ", kind: "warn" },
-      ]);
-      return;
-    }
-    renderShipTradeModal();
-    openModal?.(elements.shipTradeModal);
   });
 
   elements.tradeTableBody?.addEventListener("input", (e) => {
@@ -427,7 +358,7 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
     const totalBefore = totalSupplies(state.supplies);
     const buyTotal = Object.values(buys).reduce((a, b) => a + b, 0);
     const sellTotal = Object.values(sells).reduce((a, b) => a + b, 0);
-    const cap = calcSupplyCap(state.ships);
+    const cap = calcSupplyCap(state.fleet);
     if (totalBefore + buyTotal - sellTotal > cap) {
       setTradeError(`物資上限(${cap})を超えるため購入できません。`);
       return;
@@ -461,60 +392,6 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
     syncUI?.();
   });
 
-  elements.shipTradeModal?.addEventListener("input", (e) => {
-    const target = e.target;
-    if (!(target instanceof HTMLInputElement)) return;
-    if (!target.classList.contains("ship-buy") && !target.classList.contains("ship-sell")) return;
-    const buyInput = elements.shipTradeModal?.querySelector(".ship-buy");
-    const sellInput = elements.shipTradeModal?.querySelector(".ship-sell");
-    if (target.classList.contains("ship-sell")) {
-      const max = Math.max(0, Number(target.getAttribute("max")) || 0);
-      let v = Math.max(0, Number(target.value) || 0);
-      if (v > max) v = max;
-      target.value = String(v);
-      if (buyInput) buyInput.value = "0";
-    } else {
-      target.value = String(Math.max(0, Number(target.value) || 0));
-      if (sellInput) sellInput.value = "0";
-    }
-    updateShipTradeDelta();
-  });
-
-  elements.shipTradeConfirm?.addEventListener("click", () => {
-    const buyInput = elements.shipTradeModal?.querySelector(".ship-buy");
-    const sellInput = elements.shipTradeModal?.querySelector(".ship-sell");
-    const buyQty = Math.max(0, Number(buyInput?.value) || 0);
-    const sellQty = Math.max(0, Number(sellInput?.value) || 0);
-    if (!buyQty && !sellQty) {
-      setShipTradeError("取引する数を入力してください。");
-      return;
-    }
-    if (sellQty > state.ships) {
-      setShipTradeError("売却数が所持数を超えています。");
-      return;
-    }
-    const cost = buyQty * SHIP_PRICE;
-    const revenue = sellQty * SHIP_PRICE;
-    if (state.funds + revenue < cost) {
-      setShipTradeError("資金が不足しています。");
-      return;
-    }
-    setShipTradeError("");
-    const summary = `購入: ${buyQty || 0} / 売却: ${sellQty || 0}`;
-    // 取引確定前に必ず確認を挟む。
-    confirmAction({
-      title: "船取引の確認",
-      body: `${summary}\n資金変動: ${revenue - cost}`,
-      confirmText: "取引する",
-      onConfirm: () => {
-        state.ships = Math.max(0, state.ships + buyQty - sellQty);
-        state.funds += revenue - cost;
-        pushLog("船取引", `${summary} / 資金変動: ${revenue - cost}`, "-");
-        closeModal?.(elements.shipTradeModal);
-        syncUI?.();
-      },
-    });
-  });
 
   elements.eventTradeTableBody?.addEventListener("input", (e) => {
     const target = e.target;

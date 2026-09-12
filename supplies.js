@@ -6,11 +6,10 @@ import { resourceIcon } from "./resourceUI.js";
 import { renderUpkeepForecast } from "./upkeep.js";
 import { getOutfittingEffects, applyCapacityBonus } from "./outfitting.js";
 import { TROOP_STATS } from "./troops.js";
+import { fleetEffects } from "./fleet.js";
 
 /** @type {number} 基本の物資上限 */
 export const BASE_SUPPLY_CAP = 60;
-/** @type {number} 船1隻あたりの物資上限増分 */
-export const CAP_PER_SHIP_SUPPLY = 45;
 
 /** @enum {string} 物資タイプ */
 export const SUPPLY_TYPES = {
@@ -101,12 +100,12 @@ function priceSupportMultiplier(factionId, settlementId) {
 
 /**
  * 物資の所持上限を計算する。
- * @param {number} ships
+ * @param {object} [fleet] 船種別の船団。
  * @param {object} [outfitting] 比較時に指定する艤装。
  * @returns {number}
  */
-export function calcSupplyCap(ships, outfitting = state.expansion?.outfitting) {
-  return applyCapacityBonus(BASE_SUPPLY_CAP + ships * CAP_PER_SHIP_SUPPLY, getOutfittingEffects(outfitting).supplyCap);
+export function calcSupplyCap(fleet = state.fleet, outfitting = state.expansion?.outfitting) {
+  return applyCapacityBonus(BASE_SUPPLY_CAP + fleetEffects(fleet).supplies, getOutfittingEffects(outfitting, fleet).supplyCap);
 }
 
 /**
@@ -124,7 +123,7 @@ export function totalSupplies(sup = state.supplies) {
  */
 export function formatSupplyDisplay() {
   const total = totalSupplies();
-  const cap = calcSupplyCap(state.ships);
+  const cap = calcSupplyCap(state.fleet);
   return {
     total,
     cap,

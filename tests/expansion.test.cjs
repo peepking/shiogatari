@@ -22,6 +22,7 @@ async function main() {
     await module.link(load);
     return module;
   }
+  await load("./fleet.js");
   const module = await load("./outfitting.js");
   await module.evaluate();
   const { createExpansionState, normalizeExpansionState, normalizeOutfitting } = modules.get("./expansionState.js").namespace;

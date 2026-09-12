@@ -1,13 +1,14 @@
 import { MODE_LABEL } from "./constants.js";
 import { FACTIONS } from "./lore.js";
 import { createExpansionState } from "./expansionState.js";
+import { normalizeFleet } from "./fleet.js";
 
 /**
  * ゲームの初期状態を生成する。
  * @returns {object}
  */
 const createState = () => ({
-  ships: 0,
+  fleet: normalizeFleet(),
   expansion: createExpansionState(),
   troops: {
     infantry: { 1: 5 },

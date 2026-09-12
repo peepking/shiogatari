@@ -12,6 +12,7 @@ async function main() {
     const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"));
     modules.set(name, module); await module.link(load); return module;
   }
+  await load("./fleet.js");
   const module = await load("./expansionState.js"); await module.evaluate();
   const { createExpansionState, normalizeExpansionState } = module.namespace;
   const { initializeExploration, tickExploration, rollExplorationReward, consumeExploration, describeDanger } = modules.get("./exploration.js").namespace;

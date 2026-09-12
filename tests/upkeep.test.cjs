@@ -29,6 +29,7 @@ async function main() {
     await module.link(load);
     return module;
   }
+  await load("./fleet.js");
   const troops = await load("./troops.js");
   await troops.evaluate();
   const { getUpkeepForecast } = modules.get("./upkeep.js").namespace;

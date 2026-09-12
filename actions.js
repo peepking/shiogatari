@@ -285,12 +285,12 @@ export function moveToSelected(syncUI) {
     return { ok: false, code: "in-battle" };
   }
   const supplyTotal = totalSupplies();
-  const supplyCap = calcSupplyCap(state.ships);
+  const supplyCap = calcSupplyCap(state.fleet);
   if (supplyTotal > supplyCap) {
     return { ok: false, code: "over-supply", detail: { supplyTotal, supplyCap } };
   }
   const troopTotal = totalTroops();
-  const troopCap = calcTroopCap(state.ships);
+  const troopCap = calcTroopCap(state.fleet);
   if (troopTotal > troopCap) {
     return { ok: false, code: "over-troop", detail: { troopTotal, troopCap } };
   }
@@ -901,9 +901,9 @@ function handleOmenAction(action) {
       state.faith = Math.max(0, (state.faith || 0) - cost);
       const roll = Math.random();
       if (roll < 0.2) {
-        state.ships = Math.max(0, (state.ships || 0) + 1);
-        pushLog("祈りの兆し", "無人船を得ました。", "-");
-        pushToast("祈りの加護", "無人船を得ました。", "good");
+        const ship = awardShips(state);
+        pushLog("祈りの兆し", `${ship}を得ました。`, "-");
+        pushToast("祈りの加護", `${ship}を得ました。`, "good");
       } else if (roll < 0.6) {
         const foodGain = randInt(5, 15);
         state.supplies.food = (state.supplies.food || 0) + foodGain;
@@ -947,9 +947,9 @@ function handleWreckAction(action) {
   } else {
     const loot = Math.random();
     if (loot < 0.3) {
-      state.ships = Math.max(0, (state.ships || 0) + 1);
-      pushLog("廃船調査", "船を回収しました。", "-");
-      pushToast("廃船調査", "船を回収しました。", "good");
+      const ship = awardShips(state);
+      pushLog("廃船調査", `${ship}を回収しました。`, "-");
+      pushToast("廃船調査", `${ship}を回収しました。`, "good");
     } else {
       const id = SUPPLY_ITEMS[randInt(0, SUPPLY_ITEMS.length - 1)].id;
       const qty = randInt(2, 6);
@@ -1345,3 +1345,4 @@ function checkRefugeeEscortArrival() {
 }
 import { rollChartRumor, rollChartMerchant, enqueueChartMerchant, handleChartPurchase } from "./chartWorld.js";
 import { CHART_CONFIG } from "./expansionConfig.js";
+import { awardShips } from "./fleet.js";

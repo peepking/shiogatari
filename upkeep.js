@@ -20,7 +20,7 @@ export function getUpkeepForecast(state, stats) {
   }
   const day = state.day;
   const nextFoodDay = FOOD_CONSUMPTION_DAYS.find(d => d > day) ?? FOOD_CONSUMPTION_DAYS[0] + 30;
-  const effects = getOutfittingEffects(state.expansion?.outfitting);
+  const effects = getOutfittingEffects(state.expansion?.outfitting, state.fleet);
   funds = applyConsumptionReduction(funds, effects.upkeepReduction);
   const food = applyConsumptionReduction(Math.floor(count / 4), effects.foodReduction);
   return { funds, food, fundsDays: 31 - day, foodDays: nextFoodDay - day,

@@ -105,6 +105,7 @@ export function rollChartReward(chart, goods, random = Math.random) {
     for (const id of goods) reward.supplies[id] = 1;
     for (let n = goods.length; n < settings.goods; n++) reward.supplies[pick(goods, random)]++;
   }
+  prepareShipReward(reward, random);
   return reward;
 }
 
@@ -153,3 +154,4 @@ export function visibleChartSites(data) {
     ...(c.fragments === c.size ? [{ chartId: c.id, kind: c.kind, position: c.destination }] : []),
   ]);
 }
+import { prepareShipReward } from "./fleet.js";

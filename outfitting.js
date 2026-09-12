@@ -1,13 +1,15 @@
 import { OUTFITTING_CONFIG, OUTFITTING_ITEMS } from "./expansionConfig.js";
 import { normalizeOutfitting } from "./expansionState.js";
+import { fleetEffects } from "./fleet.js";
 
 /**
  * 装備中の効果を枠順で集計する。割合は加算し、射撃は独立して発動させる。
- * 船数・陸海・再描画の回数による倍率は付けない。
+ * 船固有バフを加算し、支援射撃だけにガレアスの威力・間隔補正を適用する。
  * @param {object} outfitting 艤装状態。
+ * @param {object} [fleet] 船種別の船団。
  * @returns {object} 比較表示と実効果で共有する集計値。
  */
-export function getOutfittingEffects(outfitting) {
+export function getOutfittingEffects(outfitting, fleet) {
   const result = { atk: 0, def: 0, meleeAtk: 0, meleeDef: 0, rangedAtk: 0, rangedDef: 0,
     supplyCap: 0, troopCap: 0, foodReduction: 0, upkeepReduction: 0, medics: 0, scouts: 0, attacks: [] };
   for (const id of normalizeOutfitting(outfitting).equipped) {
@@ -16,6 +18,11 @@ export function getOutfittingEffects(outfitting) {
     for (const [key, value] of Object.entries(item.effects || {})) result[key] += value;
     if (item.attack) result.attacks.push({ id, ...item.attack });
   }
+  const ships = fleetEffects(fleet);
+  for (const key of ["atk", "def", "supplyCap", "troopCap", "upkeepReduction"]) result[key] += ships[key];
+  result.attacks = result.attacks.map(attack => attack.destroy
+    ? { ...attack, interval: Math.max(1, attack.interval - ships.cannonReduction) }
+    : { ...attack, power: attack.power * (100 + ships.supportPower) / 100 });
   return result;
 }
 
@@ -59,7 +66,7 @@ export function supportTroopCount(troops, type) {
 
 /** @param {object} state 状態。 @returns {object} 戦闘開始時に固定する設備・補助兵効果。 */
 export function snapshotOutfitting(state) {
-  const effects = getOutfittingEffects(state.expansion?.outfitting);
+  const effects = getOutfittingEffects(state.expansion?.outfitting, state.fleet);
   return { effects, medics: effectiveSupportCount(supportTroopCount(state.troops, "medic"), effects.medics),
     scouts: effectiveSupportCount(supportTroopCount(state.troops, "scout"), effects.scouts),
     equipped: normalizeOutfitting(state.expansion?.outfitting).equipped.filter(Boolean) };

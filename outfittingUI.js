@@ -4,8 +4,9 @@ import { OUTFITTING_CONFIG, OUTFITTING_ITEMS } from "./expansionConfig.js";
 import { getCurrentSettlement } from "./actions.js";
 import { changeOutfitting, getOutfittingEffects, snapshotOutfitting } from "./outfitting.js";
 import { calcSupplyCap, totalSupplies } from "./supplies.js";
-import { calcTroopCap, totalTroops, TROOP_STATS } from "./troops.js";
-import { getUpkeepForecast } from "./upkeep.js";
+import { calcTroopCap, totalTroops } from "./troops.js";
+import { fleetMetrics, fleetDetails } from "./fleetUI.js";
+import { renderShipTrade, resetShipTrade } from "./shipyardUI.js";
 import { confirmAction, pushToast, pushLog } from "./dom.js";
 import { saveGameToStorage } from "./storage.js";
 import { escapeHtml } from "./util.js";
@@ -16,6 +17,7 @@ let selectedItem = "harpoon";
 let selectedCategory = "attack";
 let isOpen = false;
 let showDetails = false;
+let showTrade = false;
 
 /** @returns {boolean} 街で艤装を変更できるか。 */
 function canChange() {
@@ -32,14 +34,7 @@ function description(item) {
 
 /** @param {object} equipment 艤装。 @returns {object} 比較と実消費が共有する数値。 */
 function metrics(equipment) {
-  const projected = { ...state, expansion: { ...state.expansion, outfitting: equipment } };
-  const cost = getUpkeepForecast(projected, TROOP_STATS);
-  const support = snapshotOutfitting(projected);
-  const e = getOutfittingEffects(equipment);
-  return { "物資上限": calcSupplyCap(state.ships, equipment), "兵員上限": calcTroopCap(state.ships, equipment),
-    "次回維持費": cost.funds, "次回食料消費": cost.food, "衛生兵効果（人分）": support.medics, "斥候効果（人分）": support.scouts,
-    "近接ATK倍率（%）": 100 + e.atk + e.meleeAtk, "遠隔ATK倍率（%）": 100 + e.atk + e.rangedAtk,
-    "近接DEF倍率（%）": 100 + e.def + e.meleeDef, "遠隔DEF倍率（%）": 100 + e.def + e.rangedDef };
+  return fleetMetrics({ ...state, expansion: { ...state.expansion, outfitting: equipment } });
 }
 
 /** @param {string|null} id 設備または取り外し。 @returns {object} 選択枠だけ交換した比較用状態。 */
@@ -52,13 +47,13 @@ function projectedEquipment(id) {
 
 /** @param {object} equipment 艤装。 @returns {string} 射撃設備の比較表示。 */
 function attackSummary(equipment) {
-  return getOutfittingEffects(equipment).attacks.map(a => `${OUTFITTING_ITEMS[a.id].name}（${a.interval}tickごと）`).join(" / ") || "なし";
+  return getOutfittingEffects(equipment, state.fleet).attacks.map(a => `${OUTFITTING_ITEMS[a.id].name}（${a.interval}tickごと${a.destroy ? "・確定壊滅" : `・威力${a.power}`}）`).join(" / ") || "なし";
 }
 
 /** @param {object} next 変更後。 @returns {string} 全所持数と変更後超過量。 */
 function capacityNotice(next) {
   const supplies = totalSupplies(); const troops = totalTroops();
-  const supplyCap = calcSupplyCap(state.ships, next); const troopCap = calcTroopCap(state.ships, next);
+  const supplyCap = calcSupplyCap(state.fleet, next); const troopCap = calcTroopCap(state.fleet, next);
   const excess = supplies > supplyCap || troops > troopCap;
   return `物資 ${supplies}/${supplyCap} / 兵員 ${troops}/${troopCap}${excess ? `。物資${Math.max(0, supplies - supplyCap)}・兵員${Math.max(0, troops - troopCap)}が超過します。変更できますが、移動前に売却・破棄・解雇が必要です。` : "（超過なし）"}`;
 }
@@ -70,13 +65,13 @@ function capacityNotice(next) {
  */
 function requestChange(action, id, syncUI) {
   if (!canChange()) return;
-  const before = JSON.stringify({ funds: state.funds, equipment: state.expansion.outfitting, troops: state.troops, supplies: state.supplies });
+  const before = JSON.stringify({ funds: state.funds, fleet: state.fleet, equipment: state.expansion.outfitting, troops: state.troops, supplies: state.supplies });
   const slot = selectedSlot;
   const price = action === "expand" ? OUTFITTING_CONFIG.unlockPrices[state.expansion.outfitting.slots + 1] : OUTFITTING_ITEMS[id]?.price;
   const title = action === "buy" ? `${OUTFITTING_ITEMS[id].name}を購入` : action === "expand" ? "装備枠を拡張" : id ? `${OUTFITTING_ITEMS[id].name}を装備` : "設備を取り外す";
   const body = action === "equip" ? capacityNotice(projectedEquipment(id)) : `${price}資金を支払います。${action === "buy" ? "購入した設備は保管されます。装備する際は改めて付け替えてください。" : "空の装備枠を1つ増やします。"}`;
   confirmAction({ title, body, confirmText: "確定", onConfirm: () => {
-    if (!canChange() || before !== JSON.stringify({ funds: state.funds, equipment: state.expansion.outfitting, troops: state.troops, supplies: state.supplies })) { pushToast("再確認してください", "状況が変わったため、変更内容をもう一度確認してください。", "warn"); return; }
+    if (!canChange() || before !== JSON.stringify({ funds: state.funds, fleet: state.fleet, equipment: state.expansion.outfitting, troops: state.troops, supplies: state.supplies })) { pushToast("再確認してください", "状況が変わったため、変更内容をもう一度確認してください。", "warn"); return; }
     const funds = state.funds; const equipment = state.expansion.outfitting;
     if (!changeOutfitting(state, action, id, slot)) return;
     if (!saveGameToStorage()) { state.funds = funds; state.expansion.outfitting = equipment; pushToast("保存できません", "変更を取り消しました。", "warn"); return; }
@@ -93,7 +88,9 @@ function renderOutfitting(syncUI) {
   const catalogScroll = body.dataset.category === selectedCategory ? body.querySelector(".outfitting-catalog")?.scrollTop || 0 : 0;
   body.dataset.category = selectedCategory;
   document.getElementById("outfittingDetails").setAttribute("aria-pressed", String(showDetails));
-  document.getElementById("outfittingEdit").setAttribute("aria-pressed", String(!showDetails));
+  document.getElementById("outfittingEdit").setAttribute("aria-pressed", String(!showDetails && !showTrade));
+  document.getElementById("outfittingTrade").setAttribute("aria-pressed", String(showTrade));
+  if (showTrade) { renderShipTrade(body, canChange, syncUI); return; }
   if (showDetails) { renderOutfittingDetails(body, data); return; }
   const item = OUTFITTING_ITEMS[selectedItem];
   const next = projectedEquipment(selectedItem);
@@ -119,7 +116,7 @@ function renderOutfitting(syncUI) {
 
 /** @param {HTMLElement} body 表示先。 @param {object} data 現在の艤装。 @returns {void} 現在の全数値と各装備の効果を表示する。 */
 function renderOutfittingDetails(body, data) {
-  body.innerHTML = `<div class="outfitting-details"><h3>船団の現在値</h3><p class="tiny">陸戦・海戦共通。能力倍率は地形補正前の値です。</p><table class="outfitting-metrics"><tbody>${Object.entries(metrics(data)).map(([label, value]) => `<tr><th>${label}</th><td>${value.toLocaleString()}</td></tr>`).join("")}</tbody></table><h3>装備中の艤装と効果</h3>${data.equipped.map((id, i) => `<div class="outfitting-equipped"><b>枠${i + 1}：${id ? escapeHtml(OUTFITTING_ITEMS[id].name) : "空き"}</b>${id ? `<p>${description(OUTFITTING_ITEMS[id])}</p>` : ""}</div>`).join("")}<p class="tiny">衛生兵・斥候の効果は保有兵員と設備を合わせて最大10人分です。</p></div>`;
+  body.innerHTML = `<div class="outfitting-details"><h3>船団の現在値</h3><p class="tiny">陸戦・海戦共通。能力倍率は地形補正前の値です。</p><table class="outfitting-metrics"><tbody>${Object.entries(metrics(data)).map(([label, value]) => `<tr><th>${label}</th><td>${value.toLocaleString()}</td></tr>`).join("")}</tbody></table>${fleetDetails(state)}<h3>支援射撃の実効値</h3><p class="tiny">${attackSummary(data)}</p><h3>装備中の艤装と効果</h3>${data.equipped.map((id, i) => `<div class="outfitting-equipped"><b>枠${i + 1}：${id ? escapeHtml(OUTFITTING_ITEMS[id].name) : "空き"}</b>${id ? `<p>${description(OUTFITTING_ITEMS[id])}</p>` : ""}</div>`).join("")}<p class="tiny">衛生兵・斥候の効果は保有兵員と設備を合わせて最大10人分です。</p></div>`;
 }
 
 /** @param {object} current 現在値。 @param {object} after 変更後。 @param {boolean} changed 変化する項目を表示するか。 @returns {string} 差分を優先して表示する比較表。 */
@@ -142,8 +139,9 @@ export function renderOutfittingControl(syncUI) {
   const button = document.getElementById("outfittingOpenBtn");
   button.hidden = !canChange();
   if (isOpen) { setOutfittingOpen(!button.hidden); if (isOpen) renderOutfitting(syncUI); }
-  button.onclick = () => { if (!canChange()) return; showDetails = false; renderOutfitting(syncUI); setOutfittingOpen(true); if (isOpen) document.getElementById("outfittingTitle").focus(); };
-  document.getElementById("outfittingDetails").onclick = () => { showDetails = true; renderOutfitting(syncUI); };
-  document.getElementById("outfittingEdit").onclick = () => { showDetails = false; renderOutfitting(syncUI); };
+  button.onclick = () => { if (!canChange()) return; showDetails = false; showTrade = false; resetShipTrade(); renderOutfitting(syncUI); setOutfittingOpen(true); if (isOpen) document.getElementById("outfittingTitle").focus(); };
+  document.getElementById("outfittingDetails").onclick = () => { showDetails = true; showTrade = false; renderOutfitting(syncUI); };
+  document.getElementById("outfittingEdit").onclick = () => { showDetails = false; showTrade = false; renderOutfitting(syncUI); };
+  document.getElementById("outfittingTrade").onclick = () => { showDetails = false; showTrade = true; renderOutfitting(syncUI); };
   document.getElementById("outfittingClose").onclick = () => { setOutfittingOpen(false); button.focus(); };
 }

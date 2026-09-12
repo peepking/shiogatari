@@ -2,11 +2,10 @@ import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { state } from "./state.js";
 import { renderUpkeepForecast } from "./upkeep.js";
 import { getOutfittingEffects, applyCapacityBonus } from "./outfitting.js";
+import { fleetEffects } from "./fleet.js";
 
 /** @type {number} 基本の部隊上限 */
 export const BASE_TROOP_CAP = 30;
-/** @type {number} 船1隻あたりの部隊上限増分 */
-export const CAP_PER_SHIP = 15;
 
 /** @type {object} 兵種の定義 */
 export const TROOP_STATS = {
@@ -313,12 +312,12 @@ export function refreshSettlementRecruitment(settlement) {
 
 /**
  * 部隊の所持上限を計算する。
- * @param {number} ships
+ * @param {object} [fleet] 船種別の船団。
  * @param {object} [outfitting] 比較時に指定する艤装。
  * @returns {number}
  */
-export function calcTroopCap(ships, outfitting = state.expansion?.outfitting) {
-  return applyCapacityBonus(BASE_TROOP_CAP + ships * CAP_PER_SHIP, getOutfittingEffects(outfitting).troopCap);
+export function calcTroopCap(fleet = state.fleet, outfitting = state.expansion?.outfitting) {
+  return applyCapacityBonus(BASE_TROOP_CAP + fleetEffects(fleet).troops, getOutfittingEffects(outfitting, fleet).troopCap);
 }
 
 /**
@@ -459,7 +458,7 @@ export function levelUpTroopsRandom(upCount, promotions = []) {
  */
 export function formatTroopDisplay() {
   const total = totalTroops();
-  const cap = calcTroopCap(state.ships);
+  const cap = calcTroopCap(state.fleet);
   return {
     total,
     cap,

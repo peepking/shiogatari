@@ -45,7 +45,7 @@ export function renderAssets() {
   const troopDisplay = formatTroopDisplay();
   const supplyDisplay = formatSupplyDisplay();
   const defs = [
-    { key: "ships", card: "ships", sub: "聖船+", valueText: String(state.ships), img: "./image/ui/ship.svg" },
+    { key: "ships", card: "ships", sub: "聖船+", valueText: String(totalShips(state.fleet)), img: "./image/ui/ship.svg" },
     { key: "troops", card: "companions", sub: "", valueHtml: troopDisplay.html, img: "./image/ui/troops.svg" },
     { key: "faith", card: "faith", sub: "", valueText: String(state.faith), img: "./image/ui/faith.svg" },
     { key: "supplies", card: "supplies", sub: "上限", valueHtml: supplyDisplay.html, img: "./image/ui/supplies.svg" },
@@ -242,3 +242,4 @@ export function wireMapToggle(renderMap) {
     refreshMapInfo();
   });
 }
+import { totalShips } from "./fleet.js";

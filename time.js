@@ -20,6 +20,7 @@ export function advanceDayWithEvents(days = 1) {
   for (let i = 0; i < days; i++) {
     baseAdvanceDay(1);
     const d = state.day;
+    if (d === 1) settlements.forEach(s => refreshShipyard(s, shipyardSeason(state)));
     if (FOOD_CONSUMPTION_DAYS.includes(d)) {
       applyPeriodicFood();
     }
@@ -196,3 +197,5 @@ export function processScheduledOmens(todayAbs) {
   });
   state.pendingOmens = remaining;
 }
+import { settlements } from "./map.js";
+import { refreshShipyard, shipyardSeason } from "./shipyard.js";

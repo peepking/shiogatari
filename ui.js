@@ -106,6 +106,7 @@ import { renderGameTime } from "./gameTime.js";
 function resetAndSeedAll() {
   resetWorld();
   resetState();
+  settlements.forEach(s => refreshShipyard(s, shipyardSeason(state)));
   resetSettlementSupport();
   ensureFactionState();
   seedWarDefaults();
@@ -810,8 +811,7 @@ function processBattleOutcome(resultCode, meta) {
     const extraShip =
       isWin && BONUS_CAPTURE_EVENT_TAGS.has(eventTag) && Math.random() < 0.3;
     if (extraShip) {
-      state.ships = Math.max(0, (state.ships || 0) + 1);
-      summary.push({ text: "船 +1", icon: "ships" });
+      summary.push({ text: `獲得船: ${awardShips(state)}`, icon: "ships" });
     }
 
     const killed = killedEnemyCount(meta);
@@ -1078,8 +1078,6 @@ function updateModeControls(loc) {
     ? isHonorFaction(audienceCtx.settlement.factionId)
     : false;
   if (elements.tradeBtn) elements.tradeBtn.hidden = !visible || inAudience;
-  if (elements.shipTradeBtn)
-    elements.shipTradeBtn.hidden = state.modeLabel !== MODE_LABEL.IN_TOWN || inAudience;
   if (elements.questOpenBtn) elements.questOpenBtn.hidden = !visible || inAudience;
   if (elements.hireBtn) elements.hireBtn.hidden = !visible || inAudience;
   if (elements.oracleBtn) {
@@ -1209,7 +1207,6 @@ function updateModeControls(loc) {
     }
   }
   if (elements.tradeBtn) elements.tradeBtn.disabled = lockActions || inAudience;
-  if (elements.shipTradeBtn) elements.shipTradeBtn.disabled = lockActions || inAudience;
   if (elements.questOpenBtn) elements.questOpenBtn.disabled = lockActions || inAudience;
   if (elements.hireBtn) elements.hireBtn.disabled = lockActions || inAudience;
   if (elements.battlePrepPrayBtn) elements.battlePrepPrayBtn.disabled = !prepActive || !canPray();
@@ -1279,7 +1276,7 @@ function syncUI() {
   const troopDisplay = formatTroopDisplay();
   syncSuppliesUI(elements);
 
-  if (shipsEl) shipsEl.textContent = String(state.ships);
+  if (shipsEl) shipsEl.textContent = String(totalShips(state.fleet));
   if (troopsEl) troopsEl.innerHTML = troopDisplay.html;
   if (faithEl) faithEl.textContent = String(state.faith);
   if (fundsEl) fundsEl.textContent = String(state.funds);
@@ -1288,7 +1285,7 @@ function syncUI() {
     isAudienceMode() ? getNobleById(getAudienceContext().nobleId) : null);
   renderGameTime(gameTimeEl, state);
 
-  if (shipsIn) shipsIn.value = String(state.ships);
+  if (shipsIn) shipsIn.value = String(state.fleet?.counts.cog || 0);
   if (troopsIn) troopsIn.value = String(troopDisplay.total);
   if (faithIn) faithIn.value = String(state.faith);
   if (fundsIn) fundsIn.value = String(state.funds);
@@ -1660,7 +1657,8 @@ function bindMapShortcuts() {
  */
 function bindCoreUtilityButtons() {
   document.getElementById("syncBtn")?.addEventListener("click", () => {
-    state.ships = Math.max(0, Number(elements.shipsIn?.value) || 0);
+    state.fleet = normalizeFleet(state.fleet);
+    state.fleet.counts.cog = normalizeFleet(Math.max(0, Math.floor(Number(elements.shipsIn?.value) || 0))).counts.cog;
     state.faith = Math.max(0, Number(elements.faithIn?.value) || 0);
     state.funds = Math.max(0, Number(elements.fundsIn?.value) || 0);
     state.fame = Math.max(0, Number(elements.fameIn?.value) || 0);
@@ -1669,7 +1667,7 @@ function bindCoreUtilityButtons() {
     const supplyDisplay = formatSupplyDisplay();
     pushLog(
       "手動更新",
-      `従船=${state.ships} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame}`,
+      `従船=${totalShips(state.fleet)} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame}`,
       state.lastRoll ?? "-"
     );
   });
@@ -1737,7 +1735,7 @@ function bindJournalButtons() {
       `日時：${nowStr()}`,
       `状況：${ctxText}`,
       `直近の出目：${rollText}`,
-      `状態：従船=${state.ships} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame} / 沈黙=${state.silence}日`,
+      `状態：従船=${totalShips(state.fleet)} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame} / 沈黙=${state.silence}日`,
       "",
       "所感：",
       "",
@@ -1807,6 +1805,7 @@ export function initUI() {
     ensureNobleHomes();
     ensureSeasonalQuests(getCurrentSettlement());
   }
+  settlements.forEach(s => refreshShipyard(s, shipyardSeason(state)));
   wireButtons();
   wireBattleUI();
   wireTroopDismiss(elements.troopsDetail, syncUI);
@@ -1825,3 +1824,5 @@ export function initUI() {
   ]);
   if (!restored) pushLog("起動", "潮語り航海録を開始。");
 }
+import { awardShips, totalShips, normalizeFleet } from "./fleet.js";
+import { refreshShipyard, shipyardSeason } from "./shipyard.js";

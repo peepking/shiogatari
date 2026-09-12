@@ -1341,6 +1341,15 @@ a {
   .outfitting-slot-actions { grid-template-columns: 1fr; }
 }
 .outfitting-panel p { line-height: 1.7; }
+.ship-icon { width: 52px; height: 52px; color: #b6d9f7; flex-shrink: 0; }
+.ship-owned, .ship-detail-heading { display: flex; align-items: center; gap: 12px; }
+.ship-owned > div { min-width: 0; }
+.ship-trade-bar { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 12px; flex-shrink: 0; }
+.ship-trade-bar > span { font-size: 13px; color: var(--muted); }
+.ship-quantity { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
+.ship-quantity input { width: 100px; max-width: 100%; }
+.ship-commit { width: 100%; margin-top: 12px; }
+.ship-choice .ship-icon { width: 40px; height: 40px; }
 .outfitting-categories { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
 .outfitting-catalog { min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
 .outfitting-layout { display: grid; grid-template-columns: minmax(145px, 0.85fr) minmax(0, 1.4fr); gap: 16px; align-items: stretch; flex: 1; min-height: 0; }
