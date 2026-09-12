@@ -49,7 +49,7 @@ const REFUGEE_EVENT_RATE = 0.02;
 const CHECKPOINT_EVENT_RATE = 0.01;
 const OMEN_EVENT_RATE = 0.01;
 const WRECK_EVENT_RATE = 0.03;
-const TRAITOR_EVENT_RATE = 0.02;
+const TRAITOR_EVENT_RATE = 0.01;
 
 let travelSync = null;
 const travelEventTags = new Set(["merchant_attack", "merchant_rescue_help", "merchant_rescue_raid", "smuggle_raid", "refugee_raid", "checkpoint_force", "omen_attack", "wreck_attack"]);
@@ -103,6 +103,8 @@ function notifyAutoMoveStop() {
 
 /**
  * 名声と強敵フラグから敵編成を生成する。
+ * 各部隊は5～10人を抽選するが、残り枠へ全兵員が収まる最低人数を優先する。
+ * 最大20部隊・各10人とし、人数上限200人まで全員を配分する。兵種・レベルの抽選は従来どおり。
  * @param {"normal"|"elite"|null} forceStrength 強敵プール強制指定
  * @param {string|null} enemyFactionId 敵勢力ID（正規軍プール判定用）
  * @returns {{formation:Array, total:number, strength:string, terrain?:string}} 生成結果
@@ -118,7 +120,9 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null) {
         : fame >= 100 && Math.random() < STRONG_POOL_CHANCE;
   const useStrongScale = useStrong || useRegular;
   const range = useStrongScale ? pickAnchorRange(fame, STRONG_ANCHORS) : pickAnchorRange(fame, NORMAL_ANCHORS);
-  const total = randInt(range.min, range.max);
+  const maxSquads = 20;
+  const maxUnitCount = 10;
+  const total = Math.min(maxSquads * maxUnitCount, randInt(range.min, range.max));
   const basePool = enemyTroopPool(useRegular, useStrong);
   const pool = basePool.slice().sort(() => Math.random() - 0.5).slice(0, Math.min(6, basePool.length));
   if (!pool.length) pool.push("infantry");
@@ -127,7 +131,9 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null) {
   while (remain > 0) {
     const type = pool[randInt(0, pool.length - 1)];
     const level = useStrongScale ? randInt(1, 3) : 1;
-    const chunk = Math.min(remain, Math.max(1, randInt(5, 10)));
+    const remainingSlots = maxSquads - formation.length;
+    const minimumCount = Math.max(1, remain - (remainingSlots - 1) * maxUnitCount);
+    const chunk = Math.min(remain, Math.max(minimumCount, randInt(5, maxUnitCount)));
     formation.push({ type, count: chunk, level });
     remain -= chunk;
   }

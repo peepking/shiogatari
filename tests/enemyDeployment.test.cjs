@@ -36,4 +36,26 @@ const terrainSelection = "createUnits([...Array(20).fill({type:'basic',count:10}
 assert.equal(vm.runInContext(terrainSelection, context), false);
 vm.runInContext("battleState.grid.forEach(row => row.fill('forest'))", context);
 assert.equal(vm.runInContext(terrainSelection, context), true);
-console.log("敵出撃上限・強い候補の優先・配置重複防止・地形適性: 全項目成功");
+const actionsSource = fs.readFileSync(require("node:path").join(__dirname, "../actions.js"), "utf8");
+const formationStart = actionsSource.indexOf("function buildEnemyFormation(");
+context.state = { fame: 5611 };
+context.NORMAL_ANCHORS = []; context.STRONG_ANCHORS = [];
+context.enemyTroopPool = () => ["basic"];
+vm.runInContext(actionsSource.slice(formationStart, actionsSource.indexOf("\n}", formationStart) + 2), context);
+for (const fraction of [0, 0.5, 0.999]) {
+  context.randInt = (min, max) => Math.floor(min + (max - min + 1) * fraction);
+  for (let total = 1; total <= 200; total++) {
+    context.pickAnchorRange = () => ({ min: total, max: total });
+    for (const strength of ["normal", "elite"]) {
+      context.strength = strength;
+      const generated = vm.runInContext("buildEnemyFormation(strength, 'pirates')", context);
+      assert.equal(generated.total, total);
+      assert.ok(generated.formation.length <= 20);
+      assert.ok(generated.formation.every(entry => entry.count >= 1 && entry.count <= 10));
+      assert.equal(generated.formation.reduce((sum, entry) => sum + entry.count, 0), total);
+      context.generated = generated;
+      assert.equal(vm.runInContext("createUnits(generated.formation, 'enemy', 10).reduce((sum, unit) => sum + unit.count, 0)", context), total);
+    }
+  }
+}
+console.log("敵出撃上限・戦力選抜・全兵員の配分・報酬人数と出撃人数の一致: 全項目成功");
