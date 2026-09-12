@@ -139,7 +139,7 @@ export function normalizeCharts(source = {}) {
   if (pending?.kind === "destination") {
     const r = pending.reward;
     if (!r || ![r.funds, r.ships, r.faith, r.fame].every(n => Number.isSafeInteger(n) && n >= 0) ||
-      !r.supplies || typeof r.supplies !== "object" || Array.isArray(r.supplies) || !Object.values(r.supplies).every(n => Number.isInteger(n) && n >= 0 && n <= 100)) pending = null;
+      !r.supplies || typeof r.supplies !== "object" || Array.isArray(r.supplies) || !Object.values(r.supplies).every(n => Number.isInteger(n) && n >= 0 && n <= CONFIG.rewards.inlet[5].goods)) pending = null;
   }
   const rumorSeasons = Object.fromEntries(Object.entries(source.rumorSeasons || {}).filter(([key, value]) => key.length < 100 && Number.isSafeInteger(value)));
   const merchantSeasons = Object.fromEntries(Object.entries(source.merchantSeasons || {}).filter(([key, value]) => key.length < 100 && Number.isSafeInteger(value)));

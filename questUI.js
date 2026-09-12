@@ -226,7 +226,7 @@ export function renderQuestUI(syncUI) {
   if (!listEl) return;
   const active = quests.active || [];
   if (!active.length) {
-    listEl.innerHTML = `<div class="tiny">受注中の依頼はありません。</div>`;
+    listEl.innerHTML = state.expansion?.charts?.active?.length ? "" : `<div class="tiny">受注中の依頼はありません。</div>`;
     return;
   }
   const now = absDay(state);

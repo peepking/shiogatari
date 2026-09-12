@@ -12,14 +12,14 @@ import { saveGameToStorage } from "./storage.js";
 import { escapeHtml } from "./util.js";
 import { resourceList, resourceIcon } from "./resourceUI.js";
 
-/** @param {object} chart 海図。 @returns {string} 数値設定に連動した期待報酬。 */
+/** @param {object} chart 海図。 @returns {string} 獲得前は数量を明かさず、報酬の種類だけを示す。 */
 function expectedReward(chart) {
   const r = CONFIG.rewards[chart.kind][chart.size];
-  const resources = [{ id: "fame", label: "名声", value: CONFIG.fame[chart.size].join("～") }];
-  if (r.funds) resources.unshift({ id: "funds", label: "資金", value: r.funds });
-  if (r.faith) resources.unshift({ id: "faith", label: "信仰", value: r.faith.join("～") });
-  if (r.ships) resources.unshift({ id: "ships", label: "船", value: r.ships });
-  if (r.goods) resources.unshift({ id: "supplies", label: "高級品5種類 合計", value: r.goods });
+  const resources = [{ id: "fame", label: "名声", value: "" }];
+  if (r.funds) resources.unshift({ id: "funds", label: "資金", value: "" });
+  if (r.faith) resources.unshift({ id: "faith", label: "信仰", value: "" });
+  if (r.ships) resources.unshift({ id: "ships", label: "船", value: "" });
+  if (r.goods) resources.unshift({ id: "supplies", label: "高級品", value: "" });
   return resourceList(resources);
 }
 
@@ -36,7 +36,7 @@ export function renderChartCards() {
     const complete = c.fragments === c.size;
     const position = complete ? c.destination : c.rumor;
     const status = complete ? "海図完成・現地を探索" : c.fragments ? "断片を収集中" : c.rumor ? "噂の手掛かり" : "依頼報酬を予約中";
-    return `<article class="chart-card"><div class="chart-heading">${resourceIcon("chart")}<b>${escapeHtml(chartLabel(c))}</b><span>${c.fragments}/${c.size}枚</span></div><div class="tiny">${status}</div>
+    return `<article class="chart-card quest-progress-card"><div class="chart-heading">${resourceIcon("chart")}<b>${escapeHtml(chartLabel(c))}</b><span>${c.fragments}/${c.size}枚</span></div><div class="tiny">${status}</div>
       <progress max="${c.size}" value="${c.fragments}" aria-label="${escapeHtml(chartLabel(c))} 取得${c.fragments}枚"></progress>
       ${position ? `<button class="btn chart-location" data-x="${position.x}" data-y="${position.y}">${complete ? "発見地点" : "噂の場所"}を地図で確認</button>` : ""}
       <details class="quest-description"><summary>海図の内容・報酬</summary>${expectedReward(c)}<div class="tiny">${complete ? "現地で1日使って探索できます。" : `あと${c.size - c.fragments}枚で場所が判明します。`}</div></details></article>`;

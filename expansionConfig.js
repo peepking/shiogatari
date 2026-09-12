@@ -41,9 +41,9 @@ export const CHART_CONFIG = freezeDefinition({
   exploreDays: 1,
   fame: { 3: [9, 11], 5: [18, 22] },
   rewards: {
-    altar: { name: "古い祭壇", 3: { faith: [45, 55] }, 5: { faith: [90, 110] } },
-    inlet: { name: "隠れた入り江", 3: { goods: 50, ships: 1 }, 5: { goods: 100, ships: 2 } },
-    treasure: { name: "財宝の隠し場所", 3: { funds: 10000 }, 5: { funds: 20000 } },
+    altar: { name: "古い祭壇", 3: { faith: [90, 110] }, 5: { faith: [180, 220] } },
+    inlet: { name: "隠れた入り江", 3: { goods: 100, ships: 2 }, 5: { goods: 200, ships: 4 } },
+    treasure: { name: "財宝の隠し場所", 3: { funds: 25000 }, 5: { funds: 50000 } },
   },
 });
 

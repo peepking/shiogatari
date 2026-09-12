@@ -69,12 +69,15 @@ async function main() {
   for (const size of [3, 5]) {
     const r = rollChartReward({ kind: "inlet", size }, goods, () => 0);
     assert.equal(Object.keys(r.supplies).length, 5);
-    assert.equal(Object.values(r.supplies).reduce((a, b) => a + b, 0), size === 3 ? 50 : 100);
-    assert.equal(r.ships, size === 3 ? 1 : 2);
+    assert.equal(Object.values(r.supplies).reduce((a, b) => a + b, 0), size === 3 ? 100 : 200);
+    assert.equal(r.ships, size === 3 ? 2 : 4);
+    const restoredInlet = normalizeExpansionState({ charts: { active: [{ id: 1, kind: "inlet", size, fragments: size, destination: { x: 2, y: 2 } }], pending: { chartId: 1, kind: "destination", dayApplied: true, reward: r } } });
+    assert.ok(restoredInlet.charts.pending);
+    assert.equal(Object.values(restoredInlet.charts.pending.reward.supplies).reduce((a, b) => a + b, 0), size === 3 ? 100 : 200);
     const altar = rollChartReward({ kind: "altar", size }, goods, () => 0.999999);
-    assert.equal(altar.faith, size === 3 ? 55 : 110);
+    assert.equal(altar.faith, size === 3 ? 110 : 220);
     assert.equal(altar.fame, size === 3 ? 11 : 22);
-    assert.equal(rollChartReward({ kind: "treasure", size }, goods).funds, size === 3 ? 10000 : 20000);
+    assert.equal(rollChartReward({ kind: "treasure", size }, goods).funds, size === 3 ? 25000 : 50000);
   }
   data.pending = { chartId: c.id, kind: "destination", dayApplied: true, reward: rollChartReward(c, goods) };
   const restored = normalizeExpansionState(JSON.parse(JSON.stringify(state.expansion)));
