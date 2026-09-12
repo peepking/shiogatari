@@ -34,6 +34,9 @@ const PIN_STYLES = {
   supply: { shape: "dot", color: "#6b3dff", priority: 0, mergeKey: "supply" },
 };
 
+/** @type {Object<string,string>} 勢力紋章と共通の防衛ピン配色。 */
+const WAR_PIN_COLORS = { north: "#b6d9f7", archipelago: "#a6d9c0", citadel: "#dcc591", pirates: "#e3a39a" };
+
 let pinCache = { list: [], byPos: new Map() };
 
 /**
@@ -559,7 +562,7 @@ function buildPinCache(pins) {
   const byPos = new Map();
   merged.forEach((p) => {
     const infoParts = (p.labels || []).map((lbl, idx) => `${lbl}（${p.deadlines?.[idx] || "期限あと30日"}）`);
-    const entry = { ...p, info: infoParts.join(", ") };
+    const entry = { ...p, info: [...infoParts, p.info].filter(Boolean).join(", ") };
     const key = `${p.x},${p.y}`;
     if (!byPos.has(key)) byPos.set(key, []);
     byPos.get(key).push(entry);
@@ -588,11 +591,12 @@ function refreshPinCache() {
         pins.push({
           x: set.coords.x,
           y: set.coords.y,
-          color: "#ff7a7a",
+          color: WAR_PIN_COLORS[f.attacker] || "#c2c8d2",
+          defenderColor: WAR_PIN_COLORS[f.defender] || "#c2c8d2",
           shape: "shield",
           labels: ["防衛中"],
           deadlines: [`期限あと${remain}日`],
-          info: `攻撃: ${f.attacker}, 防衛: ${f.defender}`,
+          info: `攻: ${factionName(f.attacker)} → 防: ${factionName(f.defender)}`,
           priority: 1,
         });
       });
@@ -622,7 +626,7 @@ function pinsAt(x, y) {
 }
 
 /**
- * ピンをキャンバスに描画する。
+ * ピンをキャンバスに描画する。防衛盾は左を攻撃色、右を防衛色で塗り分け、マス内に収める。
  * @param {CanvasRenderingContext2D} ctx 描画コンテキスト
  * @param {object} pin ピン情報
  * @param {number} pad キャンバスパディング
@@ -664,6 +668,14 @@ function drawPin(ctx, pin, pad, cellSize, startX, startY) {
     ctx.lineTo(cx - w * 0.6, cy + h * 0.1);
     ctx.closePath();
     ctx.fill();
+    if (pin.defenderColor) {
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = pin.defenderColor;
+      ctx.fillRect(cx, cy - h * 0.4, w * 0.6, h);
+      ctx.restore();
+    }
+    ctx.strokeStyle = "#10192c";
     ctx.stroke();
   } else if (pin.shape === "star") {
     ctx.beginPath();
@@ -700,9 +712,9 @@ function formatCellInfo(gx, gy) {
   const s = cell.settlement;
   const ctrl = nobleName(s.nobleId);
   const support = displaySupportLabel(supportLabel(s.support?.[s.factionId] ?? 0));
-  const underAttack = (state.warLedger?.entries || []).some((e) =>
-    (e.activeFronts || []).some((f) => f.settlementId === s.id)
-  );
+  const fronts = (state.warLedger?.entries || []).flatMap(e => e.activeFronts || [])
+    .filter(f => f.settlementId === s.id);
+  const underAttack = fronts.length > 0;
   const war =
     s.warState?.label
       ? displayWarLabel(s.warState.label)
