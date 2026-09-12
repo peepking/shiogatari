@@ -56,11 +56,17 @@ async function main() {
   assert.equal(damaged.exploration.sites.length, 0);
   assert.equal(damaged.exploration.nextId, 1);
   const gear = normalizeOutfitting({ slots: 99, owned: ["harpoon", "harpoon", "ballista", "bad", "toString"], equipped: ["harpoon", "harpoon", "cannon", "ballista"] });
-  assert.equal(gear.slots, 3);
+  assert.equal(gear.slots, 5);
   assert.equal(gear.owned.length, 2);
   assert.equal(gear.equipped[0], "harpoon");
   assert.equal(gear.equipped[1], null);
   assert.equal(gear.equipped[2], null);
+  assert.equal(gear.equipped[3], "ballista");
+  assert.equal(gear.equipped[4], null);
+  const fiveSlots = { slots: 5, owned: ["harpoon", "ballista", "cannon", "cargo_tent", "lifesaving"], equipped: ["harpoon", "ballista", "cannon", "cargo_tent", "lifesaving"] };
+  assert.deepEqual(normalizeOutfitting(JSON.parse(JSON.stringify(fiveSlots))), fiveSlots);
+  assert.equal(getOutfittingEffects(fiveSlots).supplyCap, 20);
+  assert.equal(getOutfittingEffects(fiveSlots).medics, 5);
 
   const input = { slots: 3, owned: ["cargo_tent", "expanded_hold", "lifesaving"], equipped: ["cargo_tent", "expanded_hold", "lifesaving"] };
   const before = JSON.stringify(input);

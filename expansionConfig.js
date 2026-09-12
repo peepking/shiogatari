@@ -47,8 +47,8 @@ export const CHART_CONFIG = freezeDefinition({
   },
 });
 
-/** 装備枠は船団で共有し、初期1枠・最大3枠。 */
-export const OUTFITTING_CONFIG = freezeDefinition({ initialSlots: 1, maxSlots: 3, unlockPrices: { 2: 15000, 3: 30000 }, supportLimit: 10 });
+/** 装備枠は船団で共有し、初期1枠・最大5枠。 */
+export const OUTFITTING_CONFIG = freezeDefinition({ initialSlots: 1, maxSlots: 5, unlockPrices: { 2: 15000, 3: 30000, 4: 50000, 5: 100000 }, supportLimit: 10 });
 
 /** 艤装定義。効果の割合は百分率の整数で保持し、計算時に一度だけ除算する。 */
 export const OUTFITTING_ITEMS = freezeDefinition({
