@@ -491,8 +491,12 @@ function questToPin(q, nowAbs) {
     case QUEST_TYPES.NOBLE_LOGISTICS:
       return [fromSettlementId(q.originId, "supply", "supply")].filter(Boolean);
     case QUEST_TYPES.NOBLE_SCOUT:
-    case QUEST_TYPES.NOBLE_REFUGEE:
       return [fromTarget(q.target, "move")].filter(Boolean);
+    case QUEST_TYPES.NOBLE_REFUGEE:
+    case QUEST_TYPES.WAR_ESCORT:
+      return [q.picked
+        ? fromSettlementId(q.originId, "supply", "supply")
+        : fromTarget(q.target, "move")].filter(Boolean);
     case QUEST_TYPES.NOBLE_SECURITY: {
       const pins = [];
       (q.fights || []).forEach((f, idx) => {
@@ -512,8 +516,6 @@ function questToPin(q, nowAbs) {
       return [fromTarget(q.target, "bounty")].filter(Boolean);
     case QUEST_TYPES.WAR_SUPPLY:
       return [fromSettlementId(q.originId, "supply", "supply")].filter(Boolean);
-    case QUEST_TYPES.WAR_ESCORT:
-      return [fromTarget(q.target, "move")].filter(Boolean);
     case QUEST_TYPES.WAR_TRUCE:
       return [fromSettlementId(q.originId, "supply", "supply")].filter(Boolean);
     case QUEST_TYPES.WAR_BLOCKADE: {

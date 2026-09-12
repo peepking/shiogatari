@@ -856,7 +856,7 @@ function processBattleOutcome(resultCode, meta) {
         questType === QUEST_TYPES.WAR_SKIRMISH ||
         questType === QUEST_TYPES.WAR_BLOCKADE
       ) {
-        completeWarBattleQuest(questId, isWin, enemyTotal, questFightIdx);
+        completeWarBattleQuest(questId, isWin, questFightIdx);
         summary.push(isWin ? "前線行動: 戦闘達成" : "前線行動: 戦闘失敗");
       }
     }

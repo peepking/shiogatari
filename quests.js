@@ -1479,7 +1479,6 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
  * フロント行動（戦闘系）の完了処理。
  * @param {number} id
  * @param {boolean} success
- * @param {number} enemyTotal
  * @param {number|null} fightIdx
  * @returns {boolean}
  */
