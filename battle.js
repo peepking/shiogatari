@@ -559,7 +559,10 @@ function createUnit(type, side, index, pos, count, level = 1) {
 }
 
 /**
- * 側ごとのユニット配列を生成する。
+ * 側ごとのユニット配列を最大20部隊・配置枠数まで生成する。
+ * 敵候補が上限を超える場合、全配置マスで平均した既存の戦力判定値
+ * （地形補正後の攻撃力÷攻撃間隔×HP×防御補正）が高い順に選抜する。
+ * 人数・レベルも生成時の能力値に反映する。同点は元の順を優先し、選抜後も元の配置順を保つ。
  * @param {Array} entries
  * @param {"ally"|"enemy"} side
  * @param {number} size
@@ -568,11 +571,25 @@ function createUnit(type, side, index, pos, count, level = 1) {
  */
 function createUnits(entries, side, size, slots) {
   const positions = slots && slots.length ? slots : buildDeploySlots(side, size);
-  return entries.map((entry, i) => {
+  const limit = Math.min(MAX_SQUADS, positions.length);
+  let selected = entries;
+  if (side === "enemy" && entries.length > limit) {
+    const ranked = entries.map((entry, index) => {
+      const type = typeof entry === "string" ? entry : entry?.type;
+      const count = typeof entry === "string" ? MAX_UNIT_COUNT : entry?.count;
+      const level = typeof entry === "string" ? 1 : entry?.level ?? 1;
+      const strength = positions.reduce((total, pos) =>
+        total + calcStrength(createUnit(type, side, index, pos, count, level)), 0) / positions.length;
+      return { entry, index, strength };
+    });
+    selected = ranked.sort((a, b) => b.strength - a.strength || a.index - b.index)
+      .slice(0, limit).sort((a, b) => a.index - b.index).map(candidate => candidate.entry);
+  }
+  return selected.slice(0, limit).map((entry, i) => {
     const type = typeof entry === "string" ? entry : entry?.type;
     const count = typeof entry === "string" ? MAX_UNIT_COUNT : entry?.count;
     const level = typeof entry === "string" ? 1 : entry?.level ?? 1;
-    const pos = positions[i] || positions[positions.length - 1] || { x: 0, y: 0 };
+    const pos = positions[i];
     return createUnit(type, side, i, pos, count, level);
   });
 }
