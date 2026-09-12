@@ -1,5 +1,6 @@
 import { MODE_LABEL } from "./constants.js";
 import { restoreWorld, snapshotWorld } from "./map.js";
+import { reconcileWarFronts } from "./warFronts.js";
 import { resetState, state } from "./state.js";
 import { normalizeLogs } from "./logStore.js";
 import { normalizeExpansionState } from "./expansionState.js";
@@ -98,6 +99,7 @@ export function loadGameFromStorage() {
     state.logs = normalizeLogs(state.logs);
     state.expansion = normalizeExpansionState(state.expansion);
     reconcileCharts(state.expansion.charts, state.quests?.active || []);
+    reconcileWarFronts(state, snapshotWorld().settlements || []);
     return true;
   } catch (e) {
     console.error("loadGameFromStorage failed", e);

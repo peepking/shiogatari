@@ -1,4 +1,5 @@
 import { pushLog, pushToast } from "./dom.js";
+import { reconcileWarFronts } from "./warFronts.js";
 import { enqueueEvent } from "./events.js";
 import { FACTIONS } from "./lore.js";
 import { nobleHome, settlements } from "./map.js";
@@ -586,7 +587,7 @@ function maybeStartFront(entry, absDay, duration) {
   const orientedScore = attacker === entry.factions[0] ? entry.score : -entry.score;
   const baseScore = orientedScore;
   const defSets = settlements.filter(
-    (s) => s.factionId === defender && !(entry.activeFronts || []).some((f) => f?.settlementId === s.id)
+    (s) => s.factionId === defender && !isSettlementUnderSiege(s.id)
   );
   const atkSets = settlements.filter((s) => s.factionId === attacker);
   if (!defSets.length || !atkSets.length) return;
@@ -650,7 +651,7 @@ function resolveFront(_entry, front, attackerWins) {
   const loser = attackerWins ? front.defender : front.attacker;
   const winnerName = FACTIONS.find((f) => f.id === winner)?.name || winner;
   const set = settlements.find((s) => s.id === front.settlementId);
-  if (!set) return;
+  if (!set || set.factionId !== front.defender) return;
   const prevNoble = set.nobleId;
   const prevFaction = set.factionId;
   if (attackerWins) {
@@ -878,6 +879,7 @@ function queueTruceRequest(entry, front, absDay) {
  */
 export function tickDailyWar(absDay) {
   if (!state.warLedger?.entries) return;
+  reconcileWarFronts(state, settlements);
   const ATTACK_CHANCE = 0.05;
   const FRONT_THRESHOLD = 60;
 
