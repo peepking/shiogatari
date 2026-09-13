@@ -1,6 +1,6 @@
 import { state } from "./state.js";
 import { getCurrentSettlement } from "./actions.js";
-import { SHIP_TYPES } from "./shipConfig.js";
+import { SHIP_TYPES, SHIP_UPKEEP_RATE } from "./shipConfig.js";
 import { normalizeFleet } from "./fleet.js";
 import { refreshShipyard, shipyardSeason, shipTradePrice, quoteShipTrade, tradeShip } from "./shipyard.js";
 import { shipIcon, shipEffectText, fleetMetrics } from "./fleetUI.js";
@@ -80,7 +80,7 @@ export function renderShipTrade(body, canChange, syncUI) {
   if (!selected) { detail.innerHTML = '<p>船を購入すると、ここから売却できます。</p>'; return; }
   const ship = SHIP_TYPES[selected];
   const max = mode === "buy" ? Math.min(yard.stock[selected] || 0, Math.floor(state.funds / ship.price)) : counts[selected];
-  detail.innerHTML = `<div class="ship-detail-heading">${shipIcon(selected)}<div><h3>${ship.name}</h3><p>${shipTradePrice(selected, mode).toLocaleString()}資金 / 隻</p></div></div><p>1隻あたり 物資上限＋${ship.supplies} / 部隊上限＋${ship.troops}</p><p>${shipEffectText(selected)}</p>${ship.limit && counts[selected] >= ship.limit ? '<p class="outfitting-notice">固有バフは上限到達済みです。追加購入で固定容量は増えます。</p>' : ""}<label class="ship-quantity">${mode === "buy" ? "購入" : "売却"}数<input id="shipQuantity" type="number" min="1" max="${max}" step="1" value="${quantity}" ${max ? "" : "disabled"}></label><div id="shipTradePreview" aria-live="polite"></div><button class="btn primary ship-commit" id="shipCommit"></button>`;
+  detail.innerHTML = `<div class="ship-detail-heading">${shipIcon(selected)}<div><h3>${ship.name}</h3><p>${shipTradePrice(selected, mode).toLocaleString()}資金 / 隻</p></div></div><p>1隻あたり 物資上限＋${ship.supplies} / 部隊上限＋${ship.troops}</p><p>船維持費（軽減前）${ship.price * SHIP_UPKEEP_RATE}資金／隻・季節</p><p>${shipEffectText(selected)}</p>${ship.limit && counts[selected] >= ship.limit ? '<p class="outfitting-notice">固有バフは上限到達済みです。追加購入で固定容量は増えます。</p>' : ""}<label class="ship-quantity">${mode === "buy" ? "購入" : "売却"}数<input id="shipQuantity" type="number" min="1" max="${max}" step="1" value="${quantity}" ${max ? "" : "disabled"}></label><div id="shipTradePreview" aria-live="polite"></div><button class="btn primary ship-commit" id="shipCommit"></button>`;
   /** @returns {void} 入力を維持しながら数値予告と可否を更新する。 */
   function updatePreview() {
     const result = quoteShipTrade(state, settlement, selected, mode, quantity);
@@ -90,7 +90,7 @@ export function renderShipTrade(body, canChange, syncUI) {
     const preview = detail.querySelector("#shipTradePreview");
     if (result.error) { preview.textContent = result.error; return; }
     const current = fleetMetrics(state); const after = fleetMetrics({ ...state, fleet: result.fleet });
-    const keys = Object.keys(current).filter((key, index) => index < 3 || current[key] !== after[key]);
+    const keys = Object.keys(current).filter((key, index) => index < 5 || current[key] !== after[key]);
     preview.innerHTML = `<p>所持 ${counts[selected]} → ${result.fleet.counts[selected]}隻 / 資金 ${state.funds.toLocaleString()} → ${result.funds.toLocaleString()}</p><table class="outfitting-metrics"><thead><tr><th>効果</th><th>現在</th><th>取引後</th></tr></thead><tbody>${keys.map(key => `<tr><td>${key}</td><td>${current[key]}</td><td><b>${after[key]}</b></td></tr>`).join("")}</tbody></table><p class="tiny">${excessText(after)}</p>`;
   }
   detail.querySelector("#shipQuantity").oninput = event => { quantity = Number(event.target.value); updatePreview(); };

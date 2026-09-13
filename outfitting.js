@@ -11,7 +11,7 @@ import { fleetEffects } from "./fleet.js";
  */
 export function getOutfittingEffects(outfitting, fleet) {
   const result = { atk: 0, def: 0, meleeAtk: 0, meleeDef: 0, rangedAtk: 0, rangedDef: 0,
-    supplyCap: 0, troopCap: 0, foodReduction: 0, upkeepReduction: 0, medics: 0, scouts: 0, attacks: [] };
+    supplyCap: 0, troopCap: 0, foodReduction: 0, upkeepReduction: 0, shipUpkeepReduction: 0, medics: 0, scouts: 0, attacks: [] };
   for (const id of normalizeOutfitting(outfitting).equipped) {
     if (!id) continue;
     const item = OUTFITTING_ITEMS[id];
@@ -19,7 +19,7 @@ export function getOutfittingEffects(outfitting, fleet) {
     if (item.attack) result.attacks.push({ id, ...item.attack });
   }
   const ships = fleetEffects(fleet);
-  for (const key of ["atk", "def", "supplyCap", "troopCap", "upkeepReduction"]) result[key] += ships[key];
+  for (const key of ["atk", "def", "supplyCap", "troopCap", "upkeepReduction", "shipUpkeepReduction"]) result[key] += ships[key];
   result.attacks = result.attacks.map(attack => attack.destroy
     ? { ...attack, interval: Math.max(1, attack.interval - ships.cannonReduction) }
     : { ...attack, power: attack.power * (100 + ships.supportPower) / 100 });

@@ -151,6 +151,34 @@ async function main() {
     assert.equal(getNationalPower(game.nationalPower,"north"),before+gain); assert.equal(game.quests.active.length,0);
     vm.runInContext(`${fn}(1,true)`,context); assert.equal(getNationalPower(game.nationalPower,"north"),before+gain);
   }
+  Object.assign(context,{nextId:()=>7,randomHuntTarget:()=>({x:2,y:3}),predictEnemyTotal:()=>10,
+    reserveQuestFragment:()=>true,getQuestDeadlineDays:()=>60,bindQuestPower:rules.bindQuestPower,addWarScore(){}});
+  for (const name of ["genPirateHuntQuest","genBountyHuntQuest","acceptQuest","completeHuntBattleQuest"]) {
+    const offset=questSource.indexOf(`function ${name}(`);
+    vm.runInContext(questSource.slice(offset,questSource.indexOf("\n}",offset)+2),context);
+  }
+  context.origin={id:1,factionId:"north",coords:{x:0,y:0}};
+  for (const generator of ["genPirateHuntQuest","genBountyHuntQuest"]) {
+    game.quests={active:[],availableBySettlement:{}};
+    const generated=vm.runInContext(`${generator}(origin)`,context);
+    assert.equal(generated.originId,1);
+    assert.equal(rules.questPowerPlan(generated,[],places,atWar)[0].factionId,"north");
+    delete generated.originId; generated.powerFactionId=null;
+    game.quests.availableBySettlement[1]=[generated];
+    vm.runInContext("acceptQuest(7,origin)",context);
+    assert.equal(generated.originId,1); assert.equal(generated.powerFactionId,"north");
+    places[0].factionId="citadel";
+    const before=getNationalPower(game.nationalPower,"north");
+    vm.runInContext("completeHuntBattleQuest(7,true)",context);
+    assert.equal(getNationalPower(game.nationalPower,"north"),before+1);
+    assert.equal(generated.powerChanges[0].delta,1);
+    vm.runInContext("completeHuntBattleQuest(7,true)",context);
+    assert.equal(getNationalPower(game.nationalPower,"north"),before+1);
+    game.quests.active=[{id:8,type:generated.type,powerFactionId:"north"}];
+    vm.runInContext("completeHuntBattleQuest(8,false)",context);
+    assert.equal(getNationalPower(game.nationalPower,"north"),before+1);
+    places[0].factionId="north";
+  }
   await testDonationUI(module,modules.get("./nationalPowerConfig.js"),rulesModule);
   console.log("国力データ・日次処理・活動報酬・占領・軍資金提供の確定と取り消し: 全項目成功");
 }

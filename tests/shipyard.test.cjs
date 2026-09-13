@@ -16,7 +16,7 @@ async function main() {
   const { normalizeFleet, migrateFleet, totalShips, fleetEffects, rollShips, prepareShipReward, addShips, loseShips } = fleetModule.namespace;
   const { SHIP_TYPES } = modules.get("./shipConfig.js").namespace;
   assert.deepEqual(Object.values(SHIP_TYPES).map(s => [s.price, s.supplies, s.troops]), [
-    [4000,35,10], [4500,45,10], [5000,30,15], [5500,75,10], [6000,25,25], [10000,90,30], [12000,55,35], [15000,80,35],
+    [4000,35,10], [4500,45,10], [5000,30,15], [5500,75,10], [6000,25,25], [10000,90,30], [12000,55,35], [15000,80,35], [7500,60,10],
   ]);
   const old = { ships: 3, troops: { infantry: 100 } };
   migrateFleet(old); migrateFleet(old);
@@ -27,7 +27,8 @@ async function main() {
   const effects = fleetEffects(fleet);
   assert.equal(effects.upkeepReduction, 10); assert.equal(effects.supplyCap, 10); assert.equal(effects.troopCap, 10);
   assert.equal(effects.atk, 10); assert.equal(effects.def, 10); assert.equal(effects.supportPower, 20); assert.equal(effects.cannonReduction, 2);
-  assert.equal(effects.supplies, 4350); assert.equal(effects.troops, 1700);
+  assert.equal(effects.supplies, 4950); assert.equal(effects.troops, 1800);
+  assert.equal(effects.shipUpkeepReduction, 10);
   assert.equal(fleetEffects(normalizeFleet({ counts: { galley: 1 } })).troopCap, 2.5);
   const outfittingModule = await load("./outfitting.js"); await outfittingModule.evaluate();
   const { getOutfittingEffects, snapshotOutfitting, applyCapacityBonus, fireOutfitting } = outfittingModule.namespace;
@@ -47,14 +48,23 @@ async function main() {
   }
   assert.deepEqual(ticks, [18,36,54]);
   assert.equal(getOutfittingEffects(null, fleet).attacks.length, 0);
+  const fireEquipment={slots:1,owned:["fire_ballista"],equipped:["fire_ballista"]};
+  const fire=getOutfittingEffects(fireEquipment,normalizeFleet({counts:{galleass:2}})).attacks;
+  assert.equal(fire[0].power,180); assert.equal(fire[0].interval,15);
+  const fireUnits=[{side:"ally",hp:100},{side:"enemy",hp:1000}];
+  assert.equal(fireOutfitting(14,fireUnits,fire,()=>100,()=>0).length,0);
+  assert.equal(fireOutfitting(15,fireUnits,fire,()=>100,()=>0).length,1);
+  assert.equal(fireUnits[1].hp,910);
   const cargo = { slots: 1, owned: ["cargo_tent"], equipped: ["cargo_tent"] };
   const cargoEffects = getOutfittingEffects(cargo, fleet);
   assert.equal(cargoEffects.supplyCap, 30);
-  assert.equal(applyCapacityBonus(60 + effects.supplies, cargoEffects.supplyCap), 5733);
+  assert.equal(applyCapacityBonus(60 + effects.supplies, cargoEffects.supplyCap), 6513);
   const upkeepModule = await load("./upkeep.js"); await upkeepModule.evaluate();
   const cost = upkeepModule.namespace.getUpkeepForecast({ fleet, troops: { infantry: 23 }, day: 29,
     expansion: { outfitting: { slots: 1, owned: ["storm_cover"], equipped: ["storm_cover"] } } }, { infantry: { upkeep: 2 } });
-  assert.equal(cost.funds, 36);
+  assert.equal(cost.troopFunds, 36);
+  assert.equal(cost.shipFunds, 12510);
+  assert.equal(cost.funds, 12546);
   const yardModule = await load("./shipyard.js"); await yardModule.evaluate();
   const { refreshShipyard, quoteShipTrade, tradeShip, shipyardSeason } = yardModule.namespace;
   assert.equal(shipyardSeason({year:1001,season:0}) - shipyardSeason({year:1000,season:3}), 1);
@@ -78,7 +88,7 @@ async function main() {
   refreshShipyard(town,3); assert.equal(yard.stock.galleon,0);
   addShips(state,{caravel:5}); tradeShip(state,town,"caravel","sell",5);
   refreshShipyard(town,4); assert.equal(yard.stock.caravel,7);
-  assert.deepEqual(rollShips(2,()=>0),{caravel:2}); assert.deepEqual(rollShips(4,()=>0.99999),{galleon:4});
+  assert.deepEqual(rollShips(2,()=>0),{caravel:2}); assert.deepEqual(rollShips(4,()=>0.99999),{fluyt:4});
   const reward = { ships: 2 }; prepareShipReward(reward,()=>0);
   const savedReward = JSON.parse(JSON.stringify(reward)); prepareShipReward(savedReward,()=>0.99999);
   assert.deepEqual(savedReward.shipTypes,{caravel:2});

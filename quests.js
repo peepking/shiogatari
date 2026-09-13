@@ -405,6 +405,10 @@ export function acceptQuest(id, settlement) {
   const now = absDay(state);
   q.acceptedAbs = now;
   q.deadlineAbs = now + getQuestDeadlineDays(q.type);
+  if (q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT) {
+    q.originId = settlement.id;
+    q.powerFactionId = settlement.factionId;
+  }
   // 受注拠点基準で報酬を確定
   if (q.type === QUEST_TYPES.SUPPLY && !q.rewardFragment) {
     const demand = settlement.demand || {};
@@ -597,6 +601,7 @@ function genPirateHuntQuest(settlement) {
     id: nextId(),
     type: QUEST_TYPES.PIRATE_HUNT,
     title: "海賊討伐",
+    originId: settlement?.id ?? null,
     target,
     enemyFactionId: "pirates",
     estimatedTotal,
@@ -627,6 +632,7 @@ function genBountyHuntQuest(settlement) {
     id: nextId(),
     type: QUEST_TYPES.BOUNTY_HUNT,
     title: "賞金首討伐",
+    originId: settlement?.id ?? null,
     target,
     enemyFactionId: "pirates",
     estimatedTotal,

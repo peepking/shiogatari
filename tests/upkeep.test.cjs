@@ -30,6 +30,7 @@ async function main() {
     return module;
   }
   await load("./fleet.js");
+  await load("./outfitting.js");
   const troops = await load("./troops.js");
   await troops.evaluate();
   const { getUpkeepForecast } = modules.get("./upkeep.js").namespace;
@@ -52,6 +53,41 @@ async function main() {
     { type: "infantry", from: 4, to: 5, count: 1 },
   ]);
   assert.equal(state.troops.infantry[5], 1);
-  console.log("維持費の境界・昇級内訳: 全項目成功");
+  const shipModule=await load("./shipUpkeep.js"); await shipModule.evaluate();
+  const {shipUpkeepCost,payShipUpkeep}=shipModule.namespace;
+  const {normalizeFleet}=modules.get("./fleet.js").namespace;
+  const ships={funds:10000,fleet:normalizeFleet({counts:{fluyt:4,cog:1}}),expansion:{outfitting:{slots:1,owned:["shipwright"],equipped:["shipwright"]}},troops:{},supplies:{food:999}};
+  assert.equal(shipUpkeepCost(ships),568);
+  ships.fleet.counts.fluyt=5; assert.equal(shipUpkeepCost(ships),688);
+  ships.fleet=normalizeFleet({counts:{fluyt:1}}); ships.expansion.outfitting=null;
+  assert.equal(shipUpkeepCost(ships),146);
+  ships.funds=0;
+  const sale=payShipUpkeep(ships);
+  assert.equal(sale.sold[0].id,"fluyt"); assert.equal(ships.funds,5854); assert.equal(shipUpkeepCost(ships),0);
+  assert.equal(ships.supplies.food,999);
+  ships.fleet=normalizeFleet({counts:{caravel:1,cog:100,galleon:1}}); ships.funds=0;
+  const bulk=payShipUpkeep(ships);
+  assert.deepEqual(bulk.sold.map(row=>[row.id,row.count]),[["caravel",1],["cog",2]]);
+  assert.equal(ships.funds,620);
+  const timeSource=await fs.readFile(path.join(__dirname,"../time.js"),"utf8");
+  const fixture={day:30,season:3,year:1000,funds:5,troops:{infantry:10},supplies:{food:900},fleet:normalizeFleet({counts:{cog:1}})};
+  const notices=[];
+  const context=vm.createContext({state:fixture,TROOP_STATS:{infantry:{upkeep:2}},getUpkeepForecast,payShipUpkeep,
+    SHIP_TYPES:modules.get("./shipConfig.js").namespace.SHIP_TYPES,
+    buildLossesMap:n=>n,applyTroopLosses:n=>{fixture.troops.infantry-=n;},pushLog(){},enqueueEvent:e=>notices.push(e),
+    baseAdvanceDay:()=>{fixture.day++;if(fixture.day>30){fixture.day=1;fixture.season++;if(fixture.season>3){fixture.season=0;fixture.year++;}}},
+    settlements:[],FOOD_CONSUMPTION_DAYS:[],absDay:()=>0,updateExplorationWorld(){},tickDailyWar(){},tickRelationDrift(){},
+    maybeQueueHonorInvite(){},applySupportDrift(){},processScheduledOmens(){},questTickDay(){}});
+  for (const name of ["applySeasonUpkeep","advanceDayWithEvents"]) {
+    const offset=timeSource.indexOf(`function ${name}(`);
+    vm.runInContext(timeSource.slice(offset,timeSource.indexOf("\n}",offset)+2),context);
+  }
+  vm.runInContext("advanceDayWithEvents(1)",context);
+  assert.equal(fixture.year,1001); assert.equal(fixture.day,1); assert.equal(fixture.troops.infantry,8);
+  assert.equal(fixture.funds,4290); assert.equal(notices.length,1); assert.equal(fixture.supplies.food,900);
+  fixture.troops={}; fixture.funds=0; fixture.day=30; fixture.fleet=normalizeFleet({counts:{cog:2}});
+  vm.runInContext("advanceDayWithEvents(61)",context);
+  assert.equal(fixture.fleet.counts.cog,1); assert.equal(fixture.funds,3960);
+  console.log("部隊・船維持費の分離、季節境界・複数季節、自動売却・端数・軽減上限: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

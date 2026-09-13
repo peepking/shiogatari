@@ -1,5 +1,6 @@
 import { resourceIcon } from "./resourceUI.js";
 import { getOutfittingEffects, applyConsumptionReduction } from "./outfitting.js";
+import { shipUpkeepCost } from "./shipUpkeep.js";
 
 /** 食料を消費する季節内の日付。 */
 export const FOOD_CONSUMPTION_DAYS = Object.freeze([10, 30]);
@@ -22,8 +23,11 @@ export function getUpkeepForecast(state, stats) {
   const nextFoodDay = FOOD_CONSUMPTION_DAYS.find(d => d > day) ?? FOOD_CONSUMPTION_DAYS[0] + 30;
   const effects = getOutfittingEffects(state.expansion?.outfitting, state.fleet);
   funds = applyConsumptionReduction(funds, effects.upkeepReduction);
+  const troopFunds = funds;
+  const shipFunds = shipUpkeepCost(state);
+  funds += shipFunds;
   const food = applyConsumptionReduction(Math.floor(count / 4), effects.foodReduction);
-  return { funds, food, fundsDays: 31 - day, foodDays: nextFoodDay - day,
+  return { funds, troopFunds, shipFunds, food, fundsDays: 31 - day, foodDays: nextFoodDay - day,
     fundsShortage: Math.max(0, funds - (state.funds || 0)),
     foodShortage: Math.max(0, food - (state.supplies?.food || 0)) };
 }
@@ -38,6 +42,7 @@ export function renderUpkeepForecast(state, stats) {
   const forecast = getUpkeepForecast(state, stats);
   return `<div class="sideBlock mb-8"><div class="note">次回の維持費・食料消費</div>
     <div>${resourceIcon("funds")}資金 ${forecast.funds} / あと${forecast.fundsDays}日${forecast.fundsShortage ? `（現在${forecast.fundsShortage}不足）` : "（払い可能）"}</div>
+    <div class="tiny">部隊 ${forecast.troopFunds} ＋ 船 ${forecast.shipFunds}。船維持費が不足すると安価な船から自動売却します。</div>
     <div>${resourceIcon("food")}食料 ${forecast.food} / あと${forecast.foodDays}日${forecast.foodShortage ? `（現在${forecast.foodShortage}不足）` : "（補給可能）"}</div>
     <div class="tiny">維持費は毎季節1日、食料は毎季節10・30日に消費。</div></div>`;
 }

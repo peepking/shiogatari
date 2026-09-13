@@ -63,6 +63,7 @@ async function main() {
   }
   await loadModule("./fleet.js");
   await loadModule("./expansionState.js");
+  await loadModule("./nationalPower.js");
   const module = await loadModule("./storage.js");
   await module.evaluate();
   const { saveGameToStorage, scheduleGameSave, loadGameFromStorage } = module.namespace;

@@ -54,6 +54,7 @@ export const OUTFITTING_CONFIG = freezeDefinition({ initialSlots: 1, maxSlots: 5
 export const OUTFITTING_ITEMS = freezeDefinition({
   harpoon: { name: "モリ投擲", category: "attack", price: 5000, attack: { interval: 5, power: 30 } },
   ballista: { name: "バリスタ", category: "attack", price: 15000, attack: { interval: 10, power: 100 } },
+  fire_ballista: { name: "ファイヤバリスタ", category: "attack", price: 15000, attack: { interval: 15, power: 150 } },
   cannon: { name: "砲撃支援", category: "attack", price: 25000, attack: { interval: 20, destroy: true } },
   iron_coating: { name: "鉄の被膜", category: "buff", price: 15000, effects: { def: 5 } },
   round_shields: { name: "舷の丸盾", category: "buff", price: 15000, effects: { meleeDef: 10 } },
@@ -66,6 +67,7 @@ export const OUTFITTING_ITEMS = freezeDefinition({
   expanded_hold: { name: "拡張船倉", category: "logistics", price: 5000, effects: { supplyCap: 10, troopCap: 10 } },
   deck_tent: { name: "甲板のテント", category: "logistics", price: 5000, effects: { foodReduction: 10 } },
   storm_cover: { name: "嵐対策用の覆い", category: "logistics", price: 5000, effects: { upkeepReduction: 10 } },
+  shipwright: { name: "船大工の設備", category: "logistics", price: 5000, effects: { shipUpkeepReduction: 10 } },
   lifesaving: { name: "救命設備", category: "logistics", price: 10000, effects: { medics: 5 } },
   lookout: { name: "見張り台", category: "logistics", price: 10000, effects: { scouts: 5 } },
 });

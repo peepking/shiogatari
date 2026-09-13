@@ -9,18 +9,21 @@ import { advanceDay as baseAdvanceDay, state } from "./state.js";
 import { TROOP_STATS, applyTroopLosses, totalTroops } from "./troops.js";
 import { FOOD_CONSUMPTION_DAYS, getUpkeepForecast } from "./upkeep.js";
 import { updateExplorationWorld } from "./explorationUI.js";
+import { payShipUpkeep } from "./shipUpkeep.js";
+import { SHIP_TYPES } from "./shipConfig.js";
 
 /**
  * 日付更新と、それに連動するイベント処理を進める。
  * @param {number} [days=1]
  */
 export function advanceDayWithEvents(days = 1) {
-  const prevSeason = state.season;
-  const prevYear = state.year;
   for (let i = 0; i < days; i++) {
     baseAdvanceDay(1);
     const d = state.day;
-    if (d === 1) settlements.forEach(s => refreshShipyard(s, shipyardSeason(state)));
+    if (d === 1) {
+      settlements.forEach(s => refreshShipyard(s, shipyardSeason(state)));
+      applySeasonUpkeep();
+    }
     if (FOOD_CONSUMPTION_DAYS.includes(d)) {
       applyPeriodicFood();
     }
@@ -34,29 +37,25 @@ export function advanceDayWithEvents(days = 1) {
     }
     processScheduledOmens(today);
   }
-  // 季節が進んだ回数だけ維持費処理を行う。
-  const prevIndex = prevYear * 4 + prevSeason;
-  const nowIndex = state.year * 4 + state.season;
-  const seasonSteps = Math.max(0, nowIndex - prevIndex);
-  for (let i = 0; i < seasonSteps; i++) {
-    applySeasonUpkeep();
-  }
   // 日付進行に合わせて依頼の期限/季節更新を処理する。
   questTickDay(days);
 }
 
 /**
- * 季節の切り替わり時に維持費と食料消費を適用する。
+ * 季節1日に部隊、船の順に維持費を支払う。部隊分の不足は兵員損耗、船分の不足は安価な船の売却で補う。
+ * 今季の額は支払前に確定し、船売却益を部隊の不足額へ遡って充当しない。
+ * @returns {void}
  */
 function applySeasonUpkeep() {
-  const upkeepCost = getUpkeepForecast(state, TROOP_STATS).funds;
+  const forecast = getUpkeepForecast(state, TROOP_STATS);
+  const upkeepCost = forecast.troopFunds;
 
   const fundsBefore = state.funds || 0;
   const fundsPaid = Math.min(fundsBefore, upkeepCost);
   const deficitFunds = Math.max(0, upkeepCost - fundsPaid);
   state.funds = Math.max(0, fundsBefore - upkeepCost);
 
-  if (upkeepCost === 0) return;
+  if (forecast.funds === 0) return;
 
   // 資金不足時は不足額/6人ぶんの兵士を損耗（人数比で按分、余りは順繰り）
   let lossCount = 0;
@@ -66,9 +65,15 @@ function applySeasonUpkeep() {
       applyTroopLosses(buildLossesMap(lossCount));
     }
   }
+  const shipPayment = payShipUpkeep(state, forecast.shipFunds);
+  if (shipPayment.sold.length) {
+    const soldText = shipPayment.sold.map(row => `${SHIP_TYPES[row.id].name} ${row.count}隻（資金＋${row.proceeds}）`).join(" / ");
+    enqueueEvent({ title: "船維持費のため自動売却", body: `${soldText}\n船維持費 ${shipPayment.cost}を支払いました。残り資金 ${state.funds}。積載上限が減るため、物資・兵員の超過を確認してください。` });
+    pushLog("船の自動売却", soldText, "-");
+  }
   pushLog(
     "維持費・消費",
-    `資金 -${fundsPaid}（必要資金 ${upkeepCost}` +
+    `資金 -${fundsPaid + shipPayment.paid}（部隊 ${fundsPaid}/${upkeepCost}・船 ${shipPayment.paid}/${shipPayment.cost}` +
       (lossCount > 0 ? ` / 資金不足による損耗 -${lossCount}` : "") +
       "）",
     state.lastRoll ?? "-"

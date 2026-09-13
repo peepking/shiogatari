@@ -34,7 +34,7 @@ async function main() {
   assert.equal(CHART_CONFIG.battleFragmentChance, 0.005);
   assert.equal(CHART_CONFIG.questFragmentChance, 0.03);
   assert.equal(CHART_CONFIG.rumorChance, 0.05);
-  assert.equal(Object.keys(OUTFITTING_ITEMS).length, 16);
+  assert.equal(Object.keys(OUTFITTING_ITEMS).length, 18);
   assert.equal(OUTFITTING_ITEMS.harpoon.attack.power, 30);
   assert.equal(OUTFITTING_ITEMS.arrow_box.effects.rangedAtk, 10);
   assert.ok(Object.isFrozen(OUTFITTING_ITEMS.harpoon.attack));
