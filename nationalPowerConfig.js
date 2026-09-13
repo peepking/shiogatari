@@ -1,7 +1,7 @@
 /** 国力の対象国家。海賊と無所属プレイヤーは含めない。 */
 export const NATIONAL_POWER_FACTIONS = Object.freeze(["north", "archipelago", "citadel"]);
 
-const villageRecovery = 5;
+const villageRecovery = 1;
 
 /** 国力の調整値。precisionは保存形式に関わるため、変更時には移行処理が必要。 */
 export const NATIONAL_POWER_CONFIG = Object.freeze({

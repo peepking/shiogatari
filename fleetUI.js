@@ -17,8 +17,8 @@ export function shipIcon(id) {
 /** @param {string} id 船種。 @returns {string} 船種設定から作る固有効果の説明。 */
 export function shipEffectText(id) {
   const ship = SHIP_TYPES[id];
-  const names = { upkeepReduction: "部隊維持費", shipUpkeepReduction: "船維持費", supplyCap: "物資上限", troopCap: "部隊上限", atk: "部隊ATK", def: "部隊DEF", supportPower: "モリ・バリスタ系威力", cannonReduction: "砲撃支援の間隔" };
-  const effects = Object.entries(ship.effects).map(([key, n]) => `${names[key]} ${key.endsWith("Reduction") ? "−" : "+"}${n}${key === "cannonReduction" ? "tick" : "%"}/隻`);
+  const names = { upkeepReduction: "部隊維持費", shipUpkeepReduction: "船維持費", supplyCap: "物資上限", troopCap: "部隊上限", atk: "部隊ATK", def: "部隊DEF", supportPower: "支援射撃威力" };
+  const effects = Object.entries(ship.effects).map(([key, n]) => `${names[key]} ${key.endsWith("Reduction") ? "−" : "+"}${n}%/隻`);
   return effects.length ? `${effects.join(" / ")}（${ship.limit}隻で上限）` : "固有バフなし・容量重視の船";
 }
 
@@ -33,15 +33,15 @@ export function fleetMetrics(state) {
     "船維持費軽減（%）": e.shipUpkeepReduction, "次回食料消費": cost.food, "衛生兵効果（人分）": support.medics, "斥候効果（人分）": support.scouts,
     "近接ATK倍率（%）": 100 + e.atk + e.meleeAtk, "遠隔ATK倍率（%）": 100 + e.atk + e.rangedAtk,
     "近接DEF倍率（%）": 100 + e.def + e.meleeDef, "遠隔DEF倍率（%）": 100 + e.def + e.rangedDef };
-  for (const [id, name] of Object.entries({ harpoon: "モリ投擲", ballista: "バリスタ", fire_ballista: "ファイヤバリスタ", cannon: "砲撃支援" })) {
+  for (const [id, name] of Object.entries({ harpoon: "モリ投擲", ballista: "バリスタ", fire_ballista: "ファイヤバリスタ", grape_ballista: "ブドウ弾バリスタ", fire_grape_ballista: "火炎ブドウ弾バリスタ", cannon: "砲撃支援" })) {
     const attack = e.attacks.find(a => a.id === id);
     if (!attack) {
       result[`${name}間隔（tick）`] = "未装備";
-      if (id !== "cannon") result[`${name}威力`] = "未装備";
+      result[`${name}威力`] = "未装備";
       continue;
     }
     result[`${name}間隔（tick）`] = attack.interval;
-    if (!attack.destroy) result[`${name}威力`] = attack.power;
+    result[`${name}威力`] = attack.power;
   }
   return result;
 }
@@ -55,5 +55,5 @@ export function fleetDetails(state) {
     const ship = SHIP_TYPES[id];
     return `<div class="outfitting-equipped ship-owned">${shipIcon(id)}<div><b>${ship.name} ${n}隻</b><p>物資容量＋${ship.supplies * n} / 部隊容量＋${ship.troops * n}</p><p>船維持費（軽減前）${ship.price * SHIP_UPKEEP_RATE * n}資金／季節</p><p>${shipEffectText(id)}${ship.limit ? ` / 有効${Math.min(n, ship.limit)}隻分${n >= ship.limit ? "・上限到達" : ""}` : ""}</p></div></div>`;
   }).join("");
-  return `<h3>保有船と固有効果</h3>${rows || '<p class="tiny">従船はありません。</p>'}<p class="tiny">船のバフ合計：物資上限＋${e.supplyCap}% / 部隊上限＋${e.troopCap}% / 部隊維持費−${e.upkeepReduction}% / 船維持費−${e.shipUpkeepReduction}% / ATK＋${e.atk}% / DEF＋${e.def}% / モリ・バリスタ系＋${e.supportPower}% / 砲撃間隔−${e.cannonReduction}tick</p>${e.supportPower && !attacks.length ? '<p class="tiny">ガレアス：対応する支援射撃艤装は未装備です。</p>' : ""}`;
+  return `<h3>保有船と固有効果</h3>${rows || '<p class="tiny">従船はありません。</p>'}<p class="tiny">船のバフ合計：物資上限＋${e.supplyCap}% / 部隊上限＋${e.troopCap}% / 部隊維持費−${e.upkeepReduction}% / 船維持費−${e.shipUpkeepReduction}% / ATK＋${e.atk}% / DEF＋${e.def}% / 支援射撃威力＋${e.supportPower}%</p>${e.supportPower && !attacks.length ? '<p class="tiny">ガレアス：対応する支援射撃艤装は未装備です。</p>' : ""}`;
 }

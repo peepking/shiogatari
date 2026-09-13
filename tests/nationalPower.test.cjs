@@ -41,7 +41,7 @@ async function main() {
   for (let i=0;i<5;i++) changeNationalPower(data,"north",-0.2);
   assert.equal(getNationalPower(data,"north"),0);
   assert.throws(()=>changeNationalPower(data,"north",Infinity),RangeError);
-  assert.equal(nationalPowerRecovery([{factionId:"north",kind:"town"},{factionId:"north",kind:"village"},{factionId:"citadel",kind:"town"}],"north"),15);
+  assert.equal(nationalPowerRecovery([{factionId:"north",kind:"town"},{factionId:"north",kind:"village"},{factionId:"citadel",kind:"town"}],"north"),3);
   assert.equal(nationalPowerRecovery([],"north"),0);
   assert.equal(nationalPowerDailyCost(2,2),1.2);
   assert.equal(nationalPowerDailyCost(0,0),0);
@@ -78,8 +78,8 @@ async function main() {
   game.nationalPower.values.north = 999000;
   rules.tickNationalPower(game, places, atWar);
   assert.equal(getNationalPower(game.nationalPower,"north"),999.6);
-  assert.equal(getNationalPower(game.nationalPower,"citadel"),604.8);
-  assert.equal(game.warLedger.entries[0].score,0.15792);
+  assert.equal(getNationalPower(game.nationalPower,"citadel"),600.8);
+  assert.equal(game.warLedger.entries[0].score,0.15952);
   assert.equal(game.warLedger.entries[1].score,0.15984);
   const processed = JSON.stringify(game);
   rules.tickNationalPower(game,places,atWar); assert.equal(JSON.stringify(game),processed);
@@ -90,7 +90,7 @@ async function main() {
   delete game.warLedger; game.season++; game.day=1;
   rules.tickNationalPower(game,places,()=>false);
   assert.equal(getNationalPower(game.nationalPower,"north"),1000);
-  assert.equal(getNationalPower(game.nationalPower,"archipelago"),605);
+  assert.equal(getNationalPower(game.nationalPower,"archipelago"),601);
   const quest = { type:"delivery", originId:1 };
   rules.bindQuestPower(quest,[],places); places[0].factionId="citadel";
   game.nationalPower.values.north=600000;

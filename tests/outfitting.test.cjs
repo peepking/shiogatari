@@ -49,14 +49,33 @@ async function main() {
   assert.ok(s.expansion.outfitting.owned.includes("lifesaving"));
   s.funds = 1; assert.equal(changeOutfitting(s, "buy", "cannon"), false);
   assert.equal(defendedDamage(30, 46), 21); assert.equal(defendedDamage(100, 46), 68);
-  const attacks = [{ id: "cannon", interval: 20, destroy: true }, { id: "harpoon", interval: 5, power: 30 }];
+  const attacks = snapshotOutfitting({ expansion: { outfitting: { slots: 2, owned: ["cannon", "harpoon"], equipped: ["cannon", "harpoon"] } } }).effects.attacks;
   const units = [{ side: "ally", hp: 100 }, ...Array.from({ length: 4 }, () => ({ side: "enemy", hp: 10000 }))];
   const fired = [];
   for (let tick = 0; tick <= 60; tick++) fired.push(...fireOutfitting(tick, units, attacks, () => 46, () => 0).map(shot => ({ ...shot, tick })));
   assert.deepEqual(fired.filter(s => s.id === "cannon").map(s => s.tick), [20, 40, 60]);
   assert.equal(fired.filter(s => s.id === "harpoon").length, 12);
-  assert.notEqual(fired.find(s => s.tick === 20 && s.id === "cannon").target, fired.find(s => s.tick === 20 && s.id === "harpoon").target);
+  assert.equal(fired.find(s => s.tick === 20 && s.id === "cannon").damage, 171);
+  assert.equal(units[1].hp, 10000 - 171 * 3 - 21 * 12);
   units[0].hp = 0; assert.equal(fireOutfitting(80, units, attacks, () => 0).length, 0);
+  for (const [id, interval, power] of [["grape_ballista",6,30],["fire_grape_ballista",12,60]]) {
+    const owner={funds:15000,expansion:createExpansionState(),fleet:{counts:{galleass:2}}};
+    assert.equal(changeOutfitting(owner,"buy",id),true); assert.equal(owner.funds,0);
+    assert.equal(changeOutfitting(owner,"equip",id,0),true);
+    const area=snapshotOutfitting(owner).effects.attacks;
+    assert.equal(area[0].power,power*1.2); assert.equal(area[0].allEnemies,true);
+    const targets=[{side:"ally",hp:100},...Array.from({length:20},(_,i)=>({side:"enemy",hp:1000,def:i*10})),{side:"enemy",hp:0,def:0}];
+    const noRandom=()=>{throw new Error("全体射撃では標的抽選しない");};
+    assert.equal(fireOutfitting(0,targets,area,u=>u.def,noRandom).length,0);
+    assert.equal(fireOutfitting(interval-1,targets,area,u=>u.def,noRandom).length,0);
+    const volley=fireOutfitting(interval,targets,area,u=>u.def,noRandom);
+    assert.equal(volley.length,20); assert.equal(new Set(volley.map(s=>s.target)).size,20);
+    for (const shot of volley) assert.equal(shot.target.hp,1000-defendedDamage(power*1.2,shot.target.def));
+    assert.equal(targets[0].hp,100); assert.equal(targets[21].hp,0);
+    const finishing=[{side:"ally",hp:100},{side:"enemy",hp:1},{side:"enemy",hp:1}];
+    assert.equal(fireOutfitting(interval,finishing,area,()=>0,noRandom).length,2);
+    assert.equal(fireOutfitting(interval*2,finishing,area,()=>0,noRandom).length,0);
+  }
   const effects = { atk: 5, def: 5, meleeAtk: 10, meleeDef: 10, rangedAtk: 0, rangedDef: 0 };
   assert.equal(outfittedStat(40, 1, "atk", effects), 46); assert.equal(outfittedStat(46, 1, "def", effects), 52);
   assert.equal(outfittedStat(40, 4, "atk", effects), 42);

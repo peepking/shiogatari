@@ -9,7 +9,7 @@ export const SHIP_TYPES = Object.freeze({
   cog: { name: "コグ", price: 5500, supplies: 75, troops: 10, limit: 0, effects: {} },
   galley: { name: "ガレー", price: 6000, supplies: 25, troops: 25, limit: 4, effects: { troopCap: 2.5 } },
   carrack: { name: "キャラック", price: 10000, supplies: 90, troops: 30, limit: 0, effects: {} },
-  galleass: { name: "ガレアス", price: 12000, supplies: 55, troops: 35, limit: 2, effects: { supportPower: 10, cannonReduction: 1 } },
+  galleass: { name: "ガレアス", price: 12000, supplies: 55, troops: 35, limit: 2, effects: { supportPower: 10 } },
   galleon: { name: "ガレオン", price: 15000, supplies: 80, troops: 35, limit: 2, effects: { def: 5 } },
   fluyt: { name: "フリュート", price: 7500, supplies: 60, troops: 10, limit: 4, effects: { shipUpkeepReduction: 2.5 } },
 });

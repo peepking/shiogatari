@@ -27,7 +27,7 @@ function canChange() {
 
 /** @param {object} item 設備定義。 @returns {string} 設定値に連動する効果の説明。 */
 function description(item) {
-  if (item.attack) return `${item.attack.interval}tickごとに敵1部隊${item.attack.destroy ? "を確実に壊滅" : `へ威力${item.attack.power}の射撃（DEFで軽減）`}。射程無限。`;
+  if (item.attack) return `${item.attack.interval}tickごとに${item.attack.allEnemies ? "敵全部隊それぞれ" : "敵1部隊"}へ威力${item.attack.power}の射撃（DEFで軽減）。射程無限。`;
   const names = { atk: "全兵員ATK", def: "全兵員DEF", meleeAtk: "近接ATK", meleeDef: "近接DEF", rangedAtk: "遠隔ATK", rangedDef: "遠隔DEF", supplyCap: "物資上限", troopCap: "兵員上限", foodReduction: "食料消費", upkeepReduction: "兵員維持費", shipUpkeepReduction: "船維持費", medics: "衛生兵効果", scouts: "斥候効果" };
   return Object.entries(item.effects).map(([key, n]) => `${names[key]} ${key.endsWith("Reduction") ? "−" : "+"}${n}${["medics", "scouts"].includes(key) ? "人分（最大10人分）" : "%"}`).join(" / ");
 }
@@ -47,7 +47,7 @@ function projectedEquipment(id) {
 
 /** @param {object} equipment 艤装。 @returns {string} 射撃設備の比較表示。 */
 function attackSummary(equipment) {
-  return getOutfittingEffects(equipment, state.fleet).attacks.map(a => `${OUTFITTING_ITEMS[a.id].name}（${a.interval}tickごと${a.destroy ? "・確定壊滅" : `・威力${a.power}`}）`).join(" / ") || "なし";
+  return getOutfittingEffects(equipment, state.fleet).attacks.map(a => `${OUTFITTING_ITEMS[a.id].name}（${a.interval}tickごと・${a.allEnemies ? "敵全体・" : ""}威力${a.power}）`).join(" / ") || "なし";
 }
 
 /** @param {object} next 変更後。 @returns {string} 全所持数と変更後超過量。 */

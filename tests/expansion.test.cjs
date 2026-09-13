@@ -34,7 +34,7 @@ async function main() {
   assert.equal(CHART_CONFIG.battleFragmentChance, 0.005);
   assert.equal(CHART_CONFIG.questFragmentChance, 0.03);
   assert.equal(CHART_CONFIG.rumorChance, 0.05);
-  assert.equal(Object.keys(OUTFITTING_ITEMS).length, 18);
+  assert.equal(Object.keys(OUTFITTING_ITEMS).length, 20);
   assert.equal(OUTFITTING_ITEMS.harpoon.attack.power, 30);
   assert.equal(OUTFITTING_ITEMS.arrow_box.effects.rangedAtk, 10);
   assert.ok(Object.isFrozen(OUTFITTING_ITEMS.harpoon.attack));
@@ -86,7 +86,7 @@ async function main() {
   assert.equal(getOutfittingEffects(input).supplyCap, effects.supplyCap);
   const attacks = getOutfittingEffects({ slots: 3, owned: ["harpoon", "ballista", "cannon"], equipped: ["cannon", "harpoon", "ballista"] }).attacks;
   assert.equal(attacks[0].interval, 20);
-  assert.equal(attacks[0].destroy, true);
+  assert.equal(attacks[0].power, 250);
   assert.equal(attacks[1].power, 30);
   assert.equal(attacks[2].power, 100);
   const buffs = getOutfittingEffects({ slots: 3, owned: ["iron_coating", "round_shields", "arrow_box"], equipped: ["iron_coating", "round_shields", "arrow_box"] });

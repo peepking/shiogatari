@@ -4,7 +4,7 @@ import { fleetEffects } from "./fleet.js";
 
 /**
  * 装備中の効果を枠順で集計する。割合は加算し、射撃は独立して発動させる。
- * 船固有バフを加算し、支援射撃だけにガレアスの威力・間隔補正を適用する。
+ * 船固有バフを加算し、支援射撃だけにガレアスの威力補正を適用する。発射間隔は変更しない。
  * @param {object} outfitting 艤装状態。
  * @param {object} [fleet] 船種別の船団。
  * @returns {object} 比較表示と実効果で共有する集計値。
@@ -20,9 +20,7 @@ export function getOutfittingEffects(outfitting, fleet) {
   }
   const ships = fleetEffects(fleet);
   for (const key of ["atk", "def", "supplyCap", "troopCap", "upkeepReduction", "shipUpkeepReduction"]) result[key] += ships[key];
-  result.attacks = result.attacks.map(attack => attack.destroy
-    ? { ...attack, interval: Math.max(1, attack.interval - ships.cannonReduction) }
-    : { ...attack, power: attack.power * (100 + ships.supportPower) / 100 });
+  result.attacks = result.attacks.map(attack => ({ ...attack, power: attack.power * (100 + ships.supportPower) / 100 }));
   return result;
 }
 
@@ -99,7 +97,8 @@ export function outfittedStat(base, range, ability, effects) {
 }
 
 /**
- * 枠順に支援射撃し、発射ごとに生存敵から均等抽選する。通常行動で決着済みなら発射しない。
+ * 枠順に支援射撃する。単体射撃は生存敵から均等抽選し、全体射撃は発射時の生存敵全員へ各1回適用する。
+ * DEF軽減は対象ごとに計算する。通常行動で決着済みなら発射しない。
  * @param {number} tick ティック。 @param {Array} units 戦闘部隊。 @param {Array} attacks 設備。
  * @param {Function} defense 有効DEF計算。 @param {Function} [random] 乱数源。 @returns {Array} 発射結果。
  */
@@ -110,10 +109,12 @@ export function fireOutfitting(tick, units, attacks, defense, random = Math.rand
     if (tick <= 0 || tick % attack.interval) continue;
     const enemies = units.filter(u => u.side === "enemy" && u.hp > 0);
     if (!enemies.length) break;
-    const target = enemies[Math.floor(random() * enemies.length)];
-    const damage = attack.destroy ? target.hp : defendedDamage(attack.power, defense(target));
-    target.hp = Math.max(0, target.hp - damage);
-    shots.push({ id: attack.id, target, damage });
+    const targets = attack.allEnemies ? enemies : [enemies[Math.floor(random() * enemies.length)]];
+    for (const target of targets) {
+      const damage = defendedDamage(attack.power, defense(target));
+      target.hp = Math.max(0, target.hp - damage);
+      shots.push({ id: attack.id, target, damage });
+    }
   }
   return shots;
 }

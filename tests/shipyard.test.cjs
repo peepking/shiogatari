@@ -26,17 +26,18 @@ async function main() {
   const fleet = normalizeFleet({ counts: Object.fromEntries(Object.keys(SHIP_TYPES).map(id => [id, 10])) });
   const effects = fleetEffects(fleet);
   assert.equal(effects.upkeepReduction, 10); assert.equal(effects.supplyCap, 10); assert.equal(effects.troopCap, 10);
-  assert.equal(effects.atk, 10); assert.equal(effects.def, 10); assert.equal(effects.supportPower, 20); assert.equal(effects.cannonReduction, 2);
+  assert.equal(effects.atk, 10); assert.equal(effects.def, 10); assert.equal(effects.supportPower, 20);
   assert.equal(effects.supplies, 4950); assert.equal(effects.troops, 1800);
   assert.equal(effects.shipUpkeepReduction, 10);
   assert.equal(fleetEffects(normalizeFleet({ counts: { galley: 1 } })).troopCap, 2.5);
   const outfittingModule = await load("./outfitting.js"); await outfittingModule.evaluate();
   const { getOutfittingEffects, snapshotOutfitting, applyCapacityBonus, fireOutfitting } = outfittingModule.namespace;
   const equipment = { slots: 3, owned: ["harpoon", "ballista", "cannon"], equipped: ["harpoon", "ballista", "cannon"] };
-  for (const [count, power, interval] of [[0,30,20],[1,33,19],[2,36,18],[3,36,18]]) {
+  for (const [count, power, cannonPower] of [[0,30,250],[1,33,275],[2,36,300],[3,36,300]]) {
     const f = normalizeFleet({ counts: { galleass: count } });
     const attacks = getOutfittingEffects(equipment, f).attacks;
-    assert.equal(attacks[0].power, power); assert.equal(attacks[1].power, 100 + Math.min(count,2)*10); assert.equal(attacks[2].interval, interval);
+    assert.equal(attacks[0].power, power); assert.equal(attacks[1].power, 100 + Math.min(count,2)*10);
+    assert.equal(attacks[2].interval, 20); assert.equal(attacks[2].power, cannonPower);
   }
   const battleState = { fleet, expansion: { outfitting: equipment }, troops: {} };
   const snapshot = snapshotOutfitting(battleState);
@@ -46,7 +47,8 @@ async function main() {
   for (let tick = 0; tick <= 60; tick++) {
     if (fireOutfitting(tick, units, [snapshot.effects.attacks[2]], () => 0, () => 0).length) ticks.push(tick);
   }
-  assert.deepEqual(ticks, [18,36,54]);
+  assert.deepEqual(ticks, [20,40,60]);
+  assert.equal(units[1].hp, 9100);
   assert.equal(getOutfittingEffects(null, fleet).attacks.length, 0);
   const fireEquipment={slots:1,owned:["fire_ballista"],equipped:["fire_ballista"]};
   const fire=getOutfittingEffects(fireEquipment,normalizeFleet({counts:{galleass:2}})).attacks;
