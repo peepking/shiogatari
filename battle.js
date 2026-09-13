@@ -29,6 +29,8 @@ const SUPPORT_FX = {
   harpoon: { color: "#70e8ff", width: 3.5, glow: 6, rays: 5, radius: 0.18 },
   ballista: { color: "#c49aff", width: 5.5, glow: 10, rays: 7, radius: 0.25 },
   fire_ballista: { color: "#ff5d45", width: 6.5, glow: 14, rays: 9, radius: 0.29 },
+  grape_ballista: { color: "#a9c5ff", width: 2, glow: 4, rays: 5, radius: 0.14 },
+  fire_grape_ballista: { color: "#ff7050", width: 2.5, glow: 6, rays: 6, radius: 0.17 },
   cannon: { color: "#ff9955", width: 8, glow: 16, rays: 10, radius: 0.34 },
 };
 const MOVE_FX_TTL = 3;
