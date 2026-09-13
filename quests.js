@@ -25,6 +25,8 @@ import {
   STRONG_ANCHORS,
 } from "./questUtils.js";
 import { state } from "./state.js";
+import { bindQuestPower } from "./nationalPowerRules.js";
+import { awardQuestNationalPower, nationalPowerResources } from "./nationalPowerWorld.js";
 import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "./supplies.js";
 import { TROOP_STATS } from "./troops.js";
 import { getQuestDeadlineDays } from "./questDeadlines.js";
@@ -69,6 +71,7 @@ const QUEST_TYPES = {
 function enqueueQuestResult(title, q, rewards, note = "") {
   if (q.rewardFragment) rewards = [...rewards, { id: "chart", label: `${chartLabel(q.rewardFragment)}の断片`, value: 1 }];
   const resources = rewards.filter(reward => Number(reward.value) !== 0).map(reward => ({ ...reward, value: `+${reward.value}` }));
+  resources.push(...nationalPowerResources(q.powerChanges));
   enqueueEvent({ title, body: `${q.title}${note ? ` / ${note}` : resources.length ? "" : " / 報酬なし"}`, resources });
 }
 
@@ -377,6 +380,7 @@ export function addRefugeeEscortQuest(targetSet) {
     deadlineAbs: absDay(state) + getQuestDeadlineDays(QUEST_TYPES.REFUGEE_ESCORT),
     desc: `${titleTarget}へ難民旅団を護送せよ。`,
   };
+  bindQuestPower(q, FACTIONS, settlements);
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
   pushToast("依頼受注", q.title, "warn");
@@ -419,6 +423,7 @@ export function acceptQuest(id, settlement) {
     // 配達依頼は受注時に対象物資を受け取る。
     state.supplies[q.itemId] = (state.supplies[q.itemId] ?? 0) + q.qty;
   }
+  bindQuestPower(q, FACTIONS, settlements);
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
   return q;
@@ -442,6 +447,7 @@ export function acceptNobleQuest(id, noble, settlement) {
   const now = absDay(state);
   q.acceptedAbs = now;
   q.deadlineAbs = now + getQuestDeadlineDays(q.type);
+  bindQuestPower(q, FACTIONS, settlements);
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
   return q;
@@ -1024,6 +1030,7 @@ export function addWarFrontQuest(settlement, front, role, kind, opts = {}) {
   if (opts.scoreDelta != null) q.scoreDelta = opts.scoreDelta;
   if (opts.frontId) q.frontId = opts.frontId;
   if (opts.nobleId) q.nobleId = opts.nobleId;
+  bindQuestPower(q, FACTIONS, settlements);
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
   return q;
@@ -1036,6 +1043,7 @@ export function addWarFrontQuest(settlement, front, role, kind, opts = {}) {
  * @returns {void}
  */
 function applyWarFrontScore(q, success) {
+  if (success) awardQuestNationalPower(q);
   if (!q?.frontSettlementId || !q?.enemyFactionId) return;
   const pf = getPlayerFactionId();
   const deltaMap = {
@@ -1223,6 +1231,7 @@ export function completeQuest(id) {
   if (q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT) {
     return false;
   }
+  awardQuestNationalPower(q);
   payQuestFunds(q);
   state.quests.active.splice(idx, 1);
   const rewards = [];
@@ -1380,6 +1389,7 @@ export function completeHuntBattleQuest(id, success, reason = "") {
   if (idx === -1) return false;
   const q = state.quests.active[idx];
   if (success) {
+    awardQuestNationalPower(q);
     payQuestFunds(q);
     if (q.rewardFame) state.fame += q.rewardFame;
     state.quests.active.splice(idx, 1);
@@ -1441,6 +1451,7 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
       return true;
     }
     const totalSize = Math.max(0, q.fightTotals.reduce((a, b) => a + (b || 0), 0));
+    awardQuestNationalPower(q);
     const reward = payQuestFunds(q, totalSize * 150);
     const fameReward = Math.floor(totalSize / 2);
     state.fame += fameReward;
@@ -1462,6 +1473,7 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
       pushToast("依頼失敗", `${q.title} / 戦闘に敗北`, "bad");
       return true;
     }
+    awardQuestNationalPower(q);
     const reward = payQuestFunds(q, (enemyTotal || 0) * 200);
     const fameReward = enemyTotal || 0;
     state.fame += fameReward;
@@ -1791,6 +1803,7 @@ export function completeNobleRefugeeAt(settlement) {
   const q = state.quests.active[idx];
   state.quests.active.splice(idx, 1);
   const fameReward = q.rewardFame || 0;
+  awardQuestNationalPower(q);
   payQuestFunds(q);
   state.fame += fameReward;
   if (q.nobleId) adjustNobleFavor(q.nobleId, 4);

@@ -5,6 +5,9 @@ import { migrateFleet } from "./fleet.js";
 import { resetState, state } from "./state.js";
 import { normalizeLogs } from "./logStore.js";
 import { normalizeExpansionState } from "./expansionState.js";
+import { normalizeNationalPower, nationalPowerDay } from "./nationalPower.js";
+import { bindQuestPower } from "./nationalPowerRules.js";
+import { FACTIONS } from "./lore.js";
 
 const SAVE_KEY = "shiogatari-save";
 let saveScheduled = false;
@@ -99,10 +102,13 @@ export function loadGameFromStorage() {
     Object.assign(state, snapshot.state);
     if (!snapshot.state.fleet) delete state.fleet;
     migrateFleet(state);
+    state.nationalPower = normalizeNationalPower(snapshot.state.nationalPower, nationalPowerDay(state));
     state.logs = normalizeLogs(state.logs);
     state.expansion = normalizeExpansionState(state.expansion);
     reconcileCharts(state.expansion.charts, state.quests?.active || []);
     reconcileWarFronts(state, snapshotWorld().settlements || []);
+    const powerSettlements = snapshotWorld().settlements || [];
+    for (const q of state.quests?.active || []) bindQuestPower(q, FACTIONS, powerSettlements);
     return true;
   } catch (e) {
     console.error("loadGameFromStorage failed", e);

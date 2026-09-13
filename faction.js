@@ -4,6 +4,9 @@ import { enqueueEvent } from "./events.js";
 import { FACTIONS } from "./lore.js";
 import { nobleHome, settlements } from "./map.js";
 import { FRONT_DURATION_DAYS } from "./constants.js";
+import { tickNationalPower, applyNationalPowerPlan } from "./nationalPowerRules.js";
+import { NATIONAL_POWER_CONFIG } from "./nationalPowerConfig.js";
+import { nationalPowerResources } from "./nationalPowerWorld.js";
 import { absDay, manhattan, randInt } from "./questUtils.js";
 import { state } from "./state.js";
 import { clamp, displayWarLabel, relationLabel, supportLabel, warScoreLabel } from "./util.js";
@@ -654,6 +657,8 @@ function resolveFront(_entry, front, attackerWins) {
   if (!set || set.factionId !== front.defender) return;
   const prevNoble = set.nobleId;
   const prevFaction = set.factionId;
+  const powerChanges = attackerWins ? applyNationalPowerPlan(state, [{ factionId: front.defender, delta: -(NATIONAL_POWER_CONFIG.settlementLoss[set.kind] || 0) }]) : [];
+  const powerNote = nationalPowerResources(powerChanges).map(r => `${r.label} ${r.value}`).join(" / ");
   if (attackerWins) {
     set.factionId = winner;
     // 勝者側の拠点保有が少ない貴族に割り当て
@@ -695,12 +700,12 @@ function resolveFront(_entry, front, attackerWins) {
   if (playerInvolved) {
     enqueueEvent({
       title: "拠点攻防の決着",
-      body: `${setName} ${setPos} は ${winnerName} が占領しました`,
+      body: `${setName} ${setPos} は ${winnerName} が${attackerWins ? "占領" : "防衛に成功"}しました${powerNote ? ` / ${powerNote}` : ""}`,
     });
   } else {
-    pushToast("拠点攻防の決着", `${setName} ${setPos} は ${winnerName} が占領しました`, "info");
+    pushToast("拠点攻防の決着", `${setName} ${setPos} は ${winnerName} が${attackerWins ? "占領" : "防衛に成功"}しました${powerNote ? ` / ${powerNote}` : ""}`, "info");
   }
-  pushLog("攻防決着", `${setName} ${setPos} が ${winnerName} に占領されました`, "-");
+  pushLog("攻防決着", `${setName} ${setPos} / ${winnerName} が${attackerWins ? "占領" : "防衛に成功"}${powerNote ? ` / ${powerNote}` : ""}`, "-");
   if (state?.quests?.active) {
     const warTypes = new Set([
       "war_defend_raid",
@@ -878,8 +883,10 @@ function queueTruceRequest(entry, front, absDay) {
  * @returns {void}
  */
 export function tickDailyWar(absDay) {
-  if (!state.warLedger?.entries) return;
   reconcileWarFronts(state, settlements);
+  const recovery = tickNationalPower(state, settlements, (a, b) => getRelation(a, b) === "war");
+  if (recovery.length) pushLog("国力の季節回復", nationalPowerResources(recovery).map(r => `${r.label} ${r.value}`).join(" / "), "-");
+  if (!state.warLedger?.entries) return;
   const ATTACK_CHANCE = 0.05;
   const FRONT_THRESHOLD = 60;
 

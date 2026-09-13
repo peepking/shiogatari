@@ -1379,3 +1379,16 @@ a {
   .outfitting-panel .outfitting-item { margin: 0; }
   .outfitting-details { max-height: max(480px, 65dvh); }
 }
+.national-power-sheet { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; background: rgba(122, 167, 255, .05); }
+.national-power-container { grid-column: 1 / -1; min-width: 0; }
+.national-power-container:empty { display: none; }
+.national-power-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
+.national-power-heading strong { font-size: 24px; color: #b6d9f7; }
+.national-power-sheet progress { display: block; width: 100%; height: 8px; margin: 12px 0; accent-color: #7aa7ff; }
+.national-power-metrics { margin: 12px 0; font-size: 13px; }
+.national-power-metrics > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.national-power-metrics dd { margin: 0; white-space: nowrap; }
+.national-power-metrics small { display: block; color: var(--muted); }
+.national-power-amount { display: grid; gap: 8px; }
+.national-power-amount input { width: 100%; box-sizing: border-box; }
+.national-power-preview { white-space: pre-line; line-height: 1.8; }

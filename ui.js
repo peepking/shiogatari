@@ -948,6 +948,8 @@ function processBattleOutcome(resultCode, meta) {
       const resources = finishExploration(isWin);
       summary.push(resources.length ? { label: "探索報酬", text: `探索報酬: ${resources.map(r => `${r.label} ${r.value}`).join(" / ")}`, resources } : "探索失敗: 探索地点は消滅しました。");
     }
+    const powerResources = nationalPowerResources(completeBattlePower(state, pending, isWin));
+    if (powerResources.length) summary.push({ label: "国力への貢献", text: powerResources.map(r => `${r.label} ${r.value}`).join(" / "), resources: powerResources });
     renderBattleSummary(summary, resultLabel, pending, enemyTotal, isWin);
   } finally {
     clearBattlePrep(true);
@@ -961,6 +963,7 @@ function processBattleOutcome(resultCode, meta) {
  */
 function startPrepBattle() {
   if (!state.pendingEncounter?.active) return;
+  state.pendingEncounter.powerContext ||= snapshotBattlePower(state, state.pendingEncounter, nationalPowerAtWar);
   setEnemyFormation(state.pendingEncounter.enemyFormation || []);
   const enemyFactionId = state.pendingEncounter?.enemyFactionId || "pirates";
   setBattleEnemyFaction(enemyFactionId);
@@ -1296,6 +1299,7 @@ function syncUI() {
   renderMap();
   renderTroopModal(elements.troopsDetail);
   updateModeControls(loc);
+  renderNationalPowerControls(getAudienceContext);
   renderExplorationControl(syncUI);
   renderChartControl(syncUI);
   renderOutfittingControl(syncUI);
@@ -1807,6 +1811,7 @@ export function initUI() {
   }
   settlements.forEach(s => refreshShipyard(s, shipyardSeason(state)));
   wireButtons();
+  initNationalPowerUI(getAudienceContext, syncUI);
   wireBattleUI();
   wireTroopDismiss(elements.troopsDetail, syncUI);
   wireSupplyDiscard(elements.suppliesDetail, syncUI);
@@ -1825,4 +1830,7 @@ export function initUI() {
   if (!restored) pushLog("起動", "潮語り航海録を開始。");
 }
 import { awardShips, totalShips, normalizeFleet } from "./fleet.js";
+import { snapshotBattlePower, completeBattlePower } from "./nationalPowerRules.js";
+import { nationalPowerAtWar, nationalPowerResources } from "./nationalPowerWorld.js";
+import { initNationalPowerUI, renderNationalPowerControls } from "./nationalPowerUI.js";
 import { refreshShipyard, shipyardSeason } from "./shipyard.js";

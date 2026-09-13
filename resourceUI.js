@@ -1,6 +1,7 @@
 import { escapeHtml } from "./util.js";
 
 const ICONS = {
+  nationalPower: "fame",
   chart: "chart",
   ships: "ship", funds: "funds", faith: "faith", fame: "fame", supplies: "supplies", troops: "troops",
   food: "food", wood: "wood", stone: "stone", iron: "iron", fiber: "fiber", salt: "salt",

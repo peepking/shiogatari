@@ -2,12 +2,14 @@ import { MODE_LABEL } from "./constants.js";
 import { FACTIONS } from "./lore.js";
 import { createExpansionState } from "./expansionState.js";
 import { normalizeFleet } from "./fleet.js";
+import { createNationalPower, nationalPowerDay } from "./nationalPower.js";
 
 /**
  * ゲームの初期状態を生成する。
  * @returns {object}
  */
-const createState = () => ({
+const createState = () => {
+  const initial = {
   fleet: normalizeFleet(),
   expansion: createExpansionState(),
   troops: {
@@ -68,7 +70,10 @@ const createState = () => ({
   position: { x: 10, y: 10 },
   mapMode: "full", // 全体・周辺・拡大（full / nearby / zoom）
   selectedPosition: null,
-});
+  };
+  initial.nationalPower = createNationalPower(nationalPowerDay(initial));
+  return initial;
+};
 
 /**
  * 行動決定系の一時状態を生成する。

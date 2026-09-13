@@ -12,6 +12,7 @@ import {
 } from "./quests.js";
 import { absDay, manhattan } from "./questUtils.js";
 import { state } from "./state.js";
+import { questPowerRewardHtml } from "./nationalPowerUI.js";
 import { SUPPLY_ITEMS } from "./supplies.js";
 import { TROOP_STATS } from "./troops.js";
 import { getQuestProgress } from "./questProgress.js";
@@ -57,7 +58,8 @@ export function renderQuestRewards(q) {
   else if (q.reward) resources.push({ id: "funds", label: "資金", value: `+${q.reward}` });
   if (q.rewardFaith) resources.push({ id: "faith", label: "信仰", value: `+${q.rewardFaith}` });
   if (q.rewardFame) resources.push({ id: "fame", label: "名声", value: `+${q.rewardFame}` });
-  return resources.length ? resourceList(resources) : "報酬は依頼内容を参照";
+  const power = questPowerRewardHtml(q);
+  return (resources.length ? resourceList(resources) : power ? "" : "報酬は依頼内容を参照") + power;
 }
 
 const TYPE_LABEL = {

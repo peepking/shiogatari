@@ -14,6 +14,7 @@ import {
 import { FACTIONS } from "./lore.js";
 import { getSettlementsByNoble, nobleHome, refreshMapInfo, settlements } from "./map.js";
 import { state } from "./state.js";
+import { nationalPowerSheet } from "./nationalPowerUI.js";
 import { formatSupplyDisplay, SUPPLY_ITEMS } from "./supplies.js";
 import { formatTroopDisplay, TROOP_STATS } from "./troops.js";
 import { displayRelationLabel, displayWarLabel } from "./util.js";
@@ -151,7 +152,7 @@ export function renderNobles(fid) {
       </div>`;
     })
     .join("");
-  elements.nobleListEl.innerHTML = allianceCard + nobleCards;
+  elements.nobleListEl.innerHTML = `<div class="national-power-container" data-national-power="${f.id}">${nationalPowerSheet(f.id)}</div>` + allianceCard + nobleCards;
   if (elements.nobleDetail) elements.nobleDetail.innerHTML = "";
 }
 

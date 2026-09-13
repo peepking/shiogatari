@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
-  <link rel="stylesheet" href="styles.css?v=20260913-shipyard" />
+  <link rel="stylesheet" href="styles.css?v=20260913-national-power" />
   <link rel="stylesheet" href="layout.css?v=20260912-audience" />
 </head>
 
@@ -331,6 +331,7 @@
                 <button class="btn" id="warBlockBtn">補給封鎖</button>
               </div>
               <div class="mode-actions" id="audienceRow" hidden>
+                <button class="btn good" id="nationalPowerDonate" hidden>軍資金を提供</button>
                 <button class="btn" id="audienceBribeBtn">賄賂を渡す</button>
                 <button class="btn primary" id="audienceHonorBtn" hidden>仕官する</button>
                 <button class="btn good" id="audienceRequestBtn" hidden>貴族依頼受注</button>
@@ -441,6 +442,18 @@
           <button class="btn" id="bribeCancel">キャンセル</button>
           <button class="btn primary" id="bribeConfirm">渡す</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="nationalPowerModal" hidden>
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="nationalPowerRecipient">
+      <div class="modal-hd"><div id="nationalPowerRecipient">軍資金提供</div><button class="modal-close" id="nationalPowerClose">閉じる</button></div>
+      <div class="modal-bd">
+        <p id="nationalPowerRate" class="tiny"></p>
+        <label class="national-power-amount" for="nationalPowerAmount">提供する資金<input id="nationalPowerAmount" type="number" min="1" step="1" inputmode="numeric"></label>
+        <p id="nationalPowerPreview" class="national-power-preview" aria-live="polite"></p>
+        <div class="row"><button class="btn ghost" id="nationalPowerBack" hidden>入力に戻る</button><button class="btn good" id="nationalPowerSubmit">提供内容を確認</button></div>
       </div>
     </div>
   </div>
