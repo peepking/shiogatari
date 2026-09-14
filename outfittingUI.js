@@ -136,6 +136,7 @@ function setOutfittingOpen(open) {
 
 /** @param {Function} syncUI 表示同期。 @returns {void} 街の艤装操作を中央カードに接続し、街を離れた際には閉じる。 */
 export function renderOutfittingControl(syncUI) {
+  renderFleetDetailsControl();
   const button = document.getElementById("outfittingOpenBtn");
   button.hidden = !canChange();
   if (isOpen) { setOutfittingOpen(!button.hidden); if (isOpen) renderOutfitting(syncUI); }
@@ -144,4 +145,28 @@ export function renderOutfittingControl(syncUI) {
   document.getElementById("outfittingEdit").onclick = () => { showDetails = false; showTrade = false; renderOutfitting(syncUI); };
   document.getElementById("outfittingTrade").onclick = () => { showDetails = false; showTrade = true; renderOutfitting(syncUI); };
   document.getElementById("outfittingClose").onclick = () => { setOutfittingOpen(false); button.focus(); };
+}
+
+/** @returns {void} ヘッダから共有の詳細だけを表示する。造船所の開閉・選択状態やゲーム状態は変更しない。 */
+function renderFleetDetailsControl() {
+  const trigger = document.getElementById("asset-ships");
+  const modal = document.getElementById("fleetDetailsModal");
+  const body = document.getElementById("fleetDetailsBody");
+  const closeButton = document.getElementById("fleetDetailsClose");
+  trigger.setAttribute("aria-haspopup", "dialog");
+  trigger.setAttribute("aria-controls", "fleetDetailsModal");
+  if (!modal.hidden) renderOutfittingDetails(body, state.expansion.outfitting);
+  trigger.onclick = () => {
+    renderOutfittingDetails(body, state.expansion.outfitting);
+    modal.hidden = false;
+    closeButton.focus();
+  };
+  /** @returns {void} 詳細を閉じ、ヘッダの船へフォーカスを戻す。 */
+  function close() { modal.hidden = true; trigger.focus(); }
+  closeButton.onclick = close;
+  modal.onclick = event => { if (event.target === modal) close(); };
+  modal.onkeydown = event => {
+    if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
+    if (event.key === "Tab") { event.preventDefault(); closeButton.focus(); }
+  };
 }

@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
-  <link rel="stylesheet" href="styles.css?v=20260913-national-power" />
+  <link rel="stylesheet" href="styles.css?v=20260914-fleet-details" />
   <link rel="stylesheet" href="layout.css?v=20260912-audience" />
 </head>
 
@@ -495,6 +495,16 @@
           <button class="btn" id="syncBtn">入力した数値で状態を上書き</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="fleetDetailsModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="fleetDetailsTitle">
+      <div class="modal-hd">
+        <div id="fleetDetailsTitle">船団詳細</div>
+        <button class="modal-close" id="fleetDetailsClose">閉じる</button>
+      </div>
+      <div class="modal-bd scrollable fleet-details-body" id="fleetDetailsBody"></div>
     </div>
   </div>
 

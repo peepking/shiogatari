@@ -1326,6 +1326,7 @@ a {
 .outfitting-heading-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .outfitting-heading-actions [aria-pressed="true"] { background: #293c60; border-color: #6b8aaa; }
 .outfitting-details { overflow-y: auto; scrollbar-gutter: stable; padding: 0 8px; }
+.fleet-details-body .outfitting-details { overflow: visible; max-height: none; scrollbar-gutter: auto; }
 .outfitting-equipped { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .outfitting-heading { display: flex; flex-wrap: wrap; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .outfitting-heading h2 { margin: 0; font-size: 19px; }
