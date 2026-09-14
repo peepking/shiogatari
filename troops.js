@@ -477,13 +477,13 @@ export function setTroopsManual(total) {
 
 /**
  * 兵種別の合計人数と、人数のあるレベルを昇順で部隊詳細に描画する。
- * 内訳は初期状態で開き、再描画時は兵種ごとの折りたたみ状態を保持する。
+ * 内訳は初期状態で閉じ、再描画時は兵種ごとの開閉状態を保持する。
  * @param {HTMLElement|null} detailEl
  */
 export function renderTroopModal(detailEl) {
   if (!detailEl) return;
   const { total, cap } = formatTroopDisplay();
-  const closed = new Set([...detailEl.querySelectorAll(".troop-group:not([open])")].map(el => el.dataset.type));
+  const opened = new Set([...detailEl.querySelectorAll(".troop-group[open]")].map(el => el.dataset.type));
   const cards = Object.entries(state.troops || {}).map(([type, levels]) => {
     const stat = TROOP_STATS[type];
     if (!stat) return "";
@@ -491,7 +491,7 @@ export function renderTroopModal(detailEl) {
       .sort((a, b) => Number(a[0]) - Number(b[0]));
     const count = entries.reduce((sum, [, qty]) => sum + Number(qty), 0);
     if (!count) return "";
-    return `<details class="troop-group" data-type="${type}" ${closed.has(type) ? "" : "open"}>
+    return `<details class="troop-group" data-type="${type}" ${opened.has(type) ? "open" : ""}>
       <summary class="troop-group-heading"><img src="image/troops/${type}.gif" alt="" class="troop-icon"><b>${stat.name}</b><span class="troop-group-total">${count.toLocaleString()}<small>人</small></span></summary>
       <div class="troop-group-body"><p class="tiny">レベル別人数（出撃・控えの合計）</p>
       <div class="troop-level-list">${entries.map(([level, qty]) => `<div class="troop-level-item"><div><b>Lv${Number(level)}</b><strong>${Number(qty).toLocaleString()}人</strong></div><div class="troop-dismiss-field"><span>解雇する人数</span>${quantityControl(`<input type="number" min="0" max="${Number(qty)}" step="1" value="0" data-type="${type}" data-level="${Number(level)}" aria-label="${stat.name} Lv${Number(level)}の解雇人数" class="troop-dismiss">`, false, true)}</div></div>`).join("")}</div>
