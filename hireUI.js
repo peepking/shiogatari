@@ -3,6 +3,7 @@ import { MODE_LABEL } from "./constants.js";
 import { elements, pushLog, setInlineMessage, setOutput } from "./dom.js";
 import { state } from "./state.js";
 import { TROOP_STATS } from "./troops.js";
+import { quantityControl, wireQuantityControls, refreshQuantity } from "./quantityUI.js";
 
 /**
  * 雇用モーダルのエラー表示を更新する。
@@ -73,13 +74,14 @@ export function renderHireModal(settlement) {
           <td class="ta-center">${hire}</td>
           <td class="ta-center">${remaining}</td>
           <td class="ta-center">
-            <input type="number" min="0" max="${remaining}" value="0" data-type="${slot.type}" class="hire-count input-70" ${disabled}>
+            ${quantityControl(`<input type="number" min="0" max="${remaining}" step="1" value="0" aria-label="${name}の雇用人数" data-type="${slot.type}" class="hire-count" ${disabled}>`, false, true)}
           </td>
         </tr>
       `;
     })
     .join("");
   body.innerHTML = rows;
+  body.querySelectorAll('.hire-count').forEach(refreshQuantity);
   setHireError("");
   updateHireDelta();
 }
@@ -89,6 +91,7 @@ export function renderHireModal(settlement) {
  * @param {{openModal:Function,bindModal:Function,syncUI:Function}} param0
  */
 export function wireHireModal({ openModal, bindModal, syncUI }) {
+  wireQuantityControls(elements.hireModal);
   bindModal?.(elements.hireModal, elements.hireModalClose);
   elements.hireModal?.addEventListener("input", (e) => {
     const target = e.target;
@@ -96,9 +99,10 @@ export function wireHireModal({ openModal, bindModal, syncUI }) {
     if (!target.classList.contains("hire-count")) return;
     // 雇用数は残り枠を超えないように強制する。
     const max = Math.max(0, Number(target.getAttribute("max")) || 0);
-    let v = Math.max(0, Number(target.value) || 0);
+    let v = Math.max(0, Math.trunc(Number(target.value) || 0));
     if (v > max) v = max;
     target.value = String(v);
+    refreshQuantity(target);
     updateHireDelta();
   });
   elements.hireConfirm?.addEventListener("click", () => {

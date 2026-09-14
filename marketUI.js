@@ -1,3 +1,4 @@
+import { quantityControl, wireQuantityControls, refreshQuantity } from "./quantityUI.js";
 import { getCurrentSettlement } from "./actions.js";
 import { elements, pushLog, pushToast, setInlineMessage } from "./dom.js";
 import { adjustSupport } from "./faction.js";
@@ -40,7 +41,7 @@ export function renderTradeSelects() {
     const basePrice = calcSupplyPrice(i.id, demand[i.id] ?? 10, {
       factionId: settlement.factionId,
       settlementId: settlement.id,
-      mode: "sell", // 支持度補正なしの基準価格として利用
+      mode: "reference", // 支持度と手数料を含まない比較価格
     }) ?? price;
     const discountPct = basePrice > 0 ? Math.max(0, Math.round((1 - price / basePrice) * 100)) : 0;
     const townQty = stock[i.id] ?? 0;
@@ -63,11 +64,10 @@ export function renderTradeSelects() {
         <tr>
           <td class="ta-center">${resourceIcon(r.id)}</td>
           <td>${r.name}${r.discountPct > 0 ? `<span class="pill off-pill">買値${r.discountPct}%OFF</span>` : ""}</td>
-          <td class="ta-center">${r.price}</td>
+          <td class="ta-center">買 ${r.price}<br>売 ${calcSupplyPrice(r.id, demand[r.id] ?? 10, { factionId: settlement.factionId, mode: "sell" })}</td>
           <td class="ta-center">${r.townQty}</td>
           <td class="ta-center">${r.haveQty}</td>
-          <td class="ta-center"><input type="number" min="0" value="0" data-id="${r.id}" data-stock="${r.townQty}" data-have="${r.haveQty}" class="trade-buy input-70"></td>
-          <td class="ta-center"><input type="number" min="0" value="0" data-id="${r.id}" data-stock="${r.townQty}" data-have="${r.haveQty}" class="trade-sell input-70"></td>
+          <td class="ta-center">${quantityControl(`<input type="number" min="${-r.haveQty}" max="${r.townQty}" step="1" value="0" aria-label="${r.name}の取引数量" data-id="${r.id}" class="trade-quantity">`, true)}</td>
         </tr>`
     )
     .join("");
@@ -76,84 +76,73 @@ export function renderTradeSelects() {
     deltaEl.hidden = rows.length === 0;
     deltaEl.textContent = "資金変動: 0";
     deltaEl.className = "pill delta-zero";
-    deltaEl.title = "買値のみ支持度補正（売値は補正なし）";
+    deltaEl.title = "買値のみ支持度補正・売値は手数料10%控除後";
   }
   setTradeError("");
   if (elements.tradeFunds) elements.tradeFunds.textContent = String(state.funds);
+  recalcTradeDelta();
 }
 
-/**
- * 物資取引の資金変動を再計算する。
- */
-function recalcTradeDelta() {
-  const settlement = getCurrentSettlement();
-  if (!settlement) return;
-  const demand = settlement.demand || {};
-  setTradeError("");
-  let delta = 0;
-  const buyInputs = elements.tradeTableBody?.querySelectorAll(".trade-buy") || [];
-  buyInputs.forEach((inp) => {
-    const id = inp.getAttribute("data-id");
-    const max = Math.max(0, Number(inp.getAttribute("data-stock")) || 0);
-    let v = Math.max(0, Number(inp.value) || 0);
-    if (v > max) {
-      v = max;
-      inp.value = String(v);
+/** 現在の在庫と単価で予定数量を集計し、全品目の取引後条件を検証する。 */
+function collectTrade(eventTrade = false) {
+  const settlement = eventTrade ? null : getCurrentSettlement();
+  const root = eventTrade ? elements.eventTradeTableBody : elements.tradeTableBody;
+  const buys = {}, sells = {};
+  let fundsDelta = 0, quantityDelta = 0, error = "";
+  root?.querySelectorAll('input').forEach(input => {
+    refreshQuantity(input);
+    const id = input.dataset.id;
+    const value = Number(input.value);
+    if (!input.value || !Number.isSafeInteger(value) || input.validity.badInput) {
+      error = "数量は整数で入力してください。";
+      return;
     }
-    const price = calcSupplyPrice(id, demand[id] ?? 10, {
-      factionId: settlement.factionId,
-      settlementId: settlement.id,
-      mode: "buy",
-    }) ?? 0;
-    delta -= v * price;
-  });
-  const sellInputs = elements.tradeTableBody?.querySelectorAll(".trade-sell") || [];
-  sellInputs.forEach((inp) => {
-    const id = inp.getAttribute("data-id");
-    const max = Math.max(0, Number(inp.getAttribute("data-have")) || 0);
-    let v = Math.max(0, Number(inp.value) || 0);
-    if (v > max) {
-      v = max;
-      inp.value = String(v);
+    const deal = currentEventTrade?.deals?.find(item => item.id === id);
+    const stock = eventTrade ? deal?.stock ?? 0 : settlement?.stock?.[id] ?? 0;
+    const have = eventTrade ? 0 : state.supplies?.[id] ?? 0;
+    if (value > stock || value < -have) {
+      error = "在庫・所持数の範囲で入力してください。";
+      return;
     }
-    const price = calcSupplyPrice(id, demand[id] ?? 10, {
-      factionId: settlement.factionId,
-      settlementId: settlement.id,
-      mode: "sell",
-    }) ?? 0;
-    delta += v * price;
+    if (!value) return;
+    const price = eventTrade ? deal.price : calcSupplyPrice(id, settlement.demand?.[id] ?? 10, {
+      factionId: settlement.factionId, settlementId: settlement.id, mode: value > 0 ? "buy" : "sell",
+    });
+    if (value > 0) buys[id] = value;
+    else sells[id] = -value;
+    fundsDelta -= value * price;
+    quantityDelta += value;
   });
-  const el = elements.tradeDelta;
-  if (!el) return;
-  el.hidden = false;
-  el.textContent = `資金変動: ${delta > 0 ? "+" : ""}${delta}`;
-  el.className = "pill " + (delta > 0 ? "delta-pos" : delta < 0 ? "delta-neg" : "delta-zero");
+  const after = totalSupplies(state.supplies) + quantityDelta;
+  const cap = calcSupplyCap(state.fleet);
+  const shortages = [];
+  if (state.funds + fundsDelta < 0) shortages.push(`資金が${-(state.funds + fundsDelta)}不足しています。`);
+  if (after > cap) shortages.push(`物資上限を${after - cap}個超えています。`);
+  error ||= shortages.join(" ");
+  return { buys, sells, fundsDelta, after, cap, error, empty: !Object.keys(buys).length && !Object.keys(sells).length };
 }
 
-/**
- * イベント取引の収支を再計算する。
- * @returns {void}
- */
-function recalcEventTradeDelta() {
-  const deltaEl = elements.eventTradeDelta;
-  if (!deltaEl) return;
-  setEventTradeError("");
-  let delta = 0;
-  const inputs = elements.eventTradeTableBody?.querySelectorAll(".event-trade-buy") || [];
-  inputs.forEach((inp) => {
-    const price = Number(inp.getAttribute("data-price")) || 0;
-    const max = Math.max(0, Number(inp.getAttribute("data-stock")) || 0);
-    let v = Math.max(0, Number(inp.value) || 0);
-    if (v > max) {
-      v = max;
-      inp.value = String(v);
-    }
-    delta -= v * price;
-  });
-  deltaEl.hidden = false;
-  deltaEl.textContent = `資金変動: ${delta > 0 ? "+" : ""}${delta}`;
-  deltaEl.className = "pill " + (delta > 0 ? "delta-pos" : delta < 0 ? "delta-neg" : "delta-zero");
+/** 既存の資金・エラー表示を更新し、取引後の積載と確定可否を表示する。 */
+function updateTradePreview(eventTrade = false) {
+  const result = collectTrade(eventTrade);
+  const delta = eventTrade ? elements.eventTradeDelta : elements.tradeDelta;
+  const button = eventTrade ? elements.eventTradeConfirm : elements.tradeConfirm;
+  const setError = eventTrade ? setEventTradeError : setTradeError;
+  setError(result.error);
+  if (button) button.disabled = !!result.error || result.empty;
+  if (delta) {
+    delta.hidden = false;
+    delta.textContent = `資金変動: ${result.fundsDelta > 0 ? "+" : ""}${result.fundsDelta} ／ 取引後物資: ${result.after}/${result.cap}`;
+    delta.className = "pill " + (result.fundsDelta > 0 ? "delta-pos" : result.fundsDelta < 0 ? "delta-neg" : "delta-zero");
+  }
+  return result;
 }
+
+/** 拠点取引の予告を更新する。 */
+function recalcTradeDelta() { return updateTradePreview(); }
+
+/** イベント取引の予告を更新する。 */
+function recalcEventTradeDelta() { return updateTradePreview(true); }
 
 let currentEventTrade = null;
 
@@ -171,10 +160,10 @@ export function renderEventTradeModal(trade) {
         <tr>
           <td class="ta-center">${resourceIcon(d.id)}</td>
           <td>${d.name}</td>
-          <td class="ta-center">${d.price}</td>
+          <td class="ta-center">買 ${d.price}</td>
           <td class="ta-center">${d.stock}</td>
           <td class="ta-center">
-            <input type="number" min="0" value="0" data-id="${d.id}" data-price="${d.price}" data-stock="${d.stock}" class="event-trade-buy input-70">
+            ${quantityControl(`<input type="number" min="0" max="${d.stock}" step="1" value="0" aria-label="${d.name}の購入数量" data-id="${d.id}" class="event-trade-buy">`, true)}
           </td>
         </tr>`
     )
@@ -190,7 +179,7 @@ export function renderEventTradeModal(trade) {
     elements.eventTradeDelta.textContent = "資金変動: 0";
     elements.eventTradeDelta.className = "pill delta-zero";
   }
-  setEventTradeError("");
+  recalcEventTradeDelta();
 }
 
 /**
@@ -204,41 +193,8 @@ function confirmEventTrade(closeModal, syncUI) {
     state.eventTrade = null;
     return;
   }
-  const buys = {};
-  let fundsDelta = 0;
-  const inputs = elements.eventTradeTableBody?.querySelectorAll(".event-trade-buy") || [];
-  inputs.forEach((inp) => {
-    const id = inp.getAttribute("data-id");
-    const price = Number(inp.getAttribute("data-price")) || 0;
-    const max = Math.max(0, Number(inp.getAttribute("data-stock")) || 0);
-    const v = Math.max(0, Math.min(max, Number(inp.value) || 0));
-    if (v > 0 && id) {
-      buys[id] = (buys[id] || 0) + v;
-      fundsDelta -= v * price;
-    }
-  });
-  const totalBuy = Object.values(buys).reduce((a, b) => a + b, 0);
-  if (!totalBuy) {
-    setEventTradeError("購入数量を入力してください。");
-    return;
-  }
-  if (fundsDelta < 0 && state.funds < -fundsDelta) {
-    setEventTradeError("資金が足りません。");
-    return;
-  }
-  const cap = calcSupplyCap(state.fleet);
-  const totalBefore = totalSupplies(state.supplies);
-  if (totalBefore + totalBuy > cap) {
-    setEventTradeError(`所持上限(${cap})を超えます。`);
-    return;
-  }
-  const stockMap = Object.fromEntries((currentEventTrade.deals || []).map((d) => [d.id, d.stock]));
-  for (const [id, qty] of Object.entries(buys)) {
-    if ((stockMap[id] ?? 0) < qty) {
-      setEventTradeError("在庫を超える数量は購入できません。");
-      return;
-    }
-  }
+  const { buys, fundsDelta, error, empty } = recalcEventTradeDelta();
+  if (error || empty) return;
   if (!state.supplies) state.supplies = {};
   Object.entries(buys).forEach(([id, qty]) => {
     state.supplies[id] = (state.supplies[id] || 0) + qty;
@@ -280,93 +236,16 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
     openModal?.(elements.tradeModal);
   });
 
-  elements.tradeTableBody?.addEventListener("input", (e) => {
-    const target = e.target;
-    if (!(target instanceof HTMLInputElement)) return;
-    const id = target.getAttribute("data-id");
-    if (!id) return;
-    const isBuy = target.classList.contains("trade-buy");
-    const isSell = target.classList.contains("trade-sell");
-    if (!isBuy && !isSell) return;
-    const maxAttr = isBuy ? "data-stock" : "data-have";
-    const max = Math.max(0, Number(target.getAttribute(maxAttr)) || 0);
-    let v = Math.max(0, Number(target.value) || 0);
-    if (v > max) v = max;
-    target.value = String(v);
-    // 購入/売却は同一品目で排他的に扱う（片方入力で反対は0）。
-    const counterpartClass = isBuy ? ".trade-sell" : ".trade-buy";
-    const counterpart = elements.tradeTableBody?.querySelector(`${counterpartClass}[data-id="${id}"]`);
-    if (counterpart) counterpart.value = "0";
-    recalcTradeDelta();
-  });
+  wireQuantityControls(elements.tradeTableBody);
+  wireQuantityControls(elements.eventTradeTableBody);
+  elements.tradeTableBody?.addEventListener("input", recalcTradeDelta);
 
   elements.tradeConfirm?.addEventListener("click", () => {
     const settlement = getCurrentSettlement();
     if (!settlement) return;
-    const demand = settlement.demand || {};
-    const stock = settlement.stock || {};
-    const buys = {};
-    const sells = {};
-    let fundsDelta = 0;
-    const buyInputs = elements.tradeTableBody?.querySelectorAll(".trade-buy") || [];
-    buyInputs.forEach((inp) => {
-      const id = inp.getAttribute("data-id");
-      const max = Math.max(0, Number(inp.getAttribute("data-stock")) || 0);
-      let v = Math.max(0, Number(inp.value) || 0);
-      if (v > max) v = max;
-      inp.value = String(v);
-      if (v > 0) buys[id] = v;
-      const price = calcSupplyPrice(id, demand[id] ?? 10, {
-        factionId: settlement.factionId,
-        settlementId: settlement.id,
-        mode: "buy",
-      }) ?? 0;
-      fundsDelta -= v * price;
-    });
-    const sellInputs = elements.tradeTableBody?.querySelectorAll(".trade-sell") || [];
-    sellInputs.forEach((inp) => {
-      const id = inp.getAttribute("data-id");
-      const max = Math.max(0, Number(inp.getAttribute("data-have")) || 0);
-      let v = Math.max(0, Number(inp.value) || 0);
-      if (v > max) v = max;
-      inp.value = String(v);
-      if (v > 0) sells[id] = v;
-      const price = calcSupplyPrice(id, demand[id] ?? 10, {
-        factionId: settlement.factionId,
-        settlementId: settlement.id,
-        mode: "sell",
-      }) ?? 0;
-      fundsDelta += v * price;
-    });
+    const { buys, sells, fundsDelta, error, empty } = recalcTradeDelta();
+    if (error || empty) return;
     const allIds = new Set([...Object.keys(buys), ...Object.keys(sells)]);
-    if (!allIds.size) {
-      setTradeError("購入・売却数量を入力してください。");
-      return;
-    }
-    for (const id of Object.keys(buys)) {
-      if ((stock[id] ?? 0) < buys[id]) {
-        setTradeError("在庫が不足しています。");
-        return;
-      }
-    }
-    for (const id of Object.keys(sells)) {
-      if ((state.supplies?.[id] ?? 0) < sells[id]) {
-        setTradeError("売却する在庫が不足しています。");
-        return;
-      }
-    }
-    const totalBefore = totalSupplies(state.supplies);
-    const buyTotal = Object.values(buys).reduce((a, b) => a + b, 0);
-    const sellTotal = Object.values(sells).reduce((a, b) => a + b, 0);
-    const cap = calcSupplyCap(state.fleet);
-    if (totalBefore + buyTotal - sellTotal > cap) {
-      setTradeError(`物資上限(${cap})を超えるため購入できません。`);
-      return;
-    }
-    if (fundsDelta < 0 && state.funds < -fundsDelta) {
-      setTradeError("資金が不足しています。");
-      return;
-    }
     for (const id of allIds) {
       const buy = buys[id] ?? 0;
       const sell = sells[id] ?? 0;

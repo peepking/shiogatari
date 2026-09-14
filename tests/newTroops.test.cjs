@@ -9,6 +9,7 @@ async function main() {
   let seed = 12345;
   context.Math.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const dependencies = {
+    "./quantityUI.js": { quantityControl() {}, wireQuantityControls() {}, refreshQuantity() {} },
     "./dom.js": { confirmAction() {}, pushLog() {}, pushToast() {} },
     "./state.js": { state: {} },
     "./upkeep.js": { renderUpkeepForecast() {} },

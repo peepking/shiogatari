@@ -25,7 +25,7 @@ import {
 } from "./quests.js";
 import { absDay, manhattan, NORMAL_ANCHORS, pickAnchorRange, randInt, STRONG_ANCHORS } from "./questUtils.js";
 import { state } from "./state.js";
-import { calcSupplyCap, createSettlementDemand, SUPPLY_ITEMS, totalSupplies } from "./supplies.js";
+import { calcSupplyPrice, calcSupplyCap, createSettlementDemand, SUPPLY_ITEMS, totalSupplies } from "./supplies.js";
 import { advanceDayWithEvents } from "./time.js";
 import { calcTroopCap, totalTroops, enemyTroopPool } from "./troops.js";
 import { clamp, warScoreLabel } from "./util.js";
@@ -583,11 +583,11 @@ function handleMerchantAction(action) {
       state.eventTrade = {
         source: "merchant",
         title: "行商人との取引",
-        note: "相場より高めの価格です。",
+        note: "購入専用の取引です。",
         deals: deals.map((d) => ({
           id: d.id,
           name: SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id,
-          price: Math.max(1, Math.round((d.cost || 0) / Math.max(1, d.qty || 1))),
+          price: d.price ?? Math.max(1, Math.round((d.cost || 0) / Math.max(1, d.qty || 1))),
           stock: d.qty || 0,
         })),
       };
@@ -723,11 +723,11 @@ function handleSmuggleAction(action) {
       state.eventTrade = {
         source: "smuggle",
         title: "密輸船との取引",
-        note: "相場より高めの価格です。",
+        note: "購入専用の取引です。",
         deals: deals.map((d) => ({
           id: d.id,
           name: SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id,
-          price: Math.max(1, Math.round((d.cost || 0) / Math.max(1, d.qty || 1))),
+          price: d.price ?? Math.max(1, Math.round((d.cost || 0) / Math.max(1, d.qty || 1))),
           stock: d.qty || 0,
         })),
         settlementId: ctx.settlementId || null,
@@ -1108,10 +1108,12 @@ function enqueueMerchantRescueEvent(terrain) {
 }
 
 /**
- * 行商人イベント用の取引品を作る。
- * @returns {Array<{id:string,qty:number,cost:number}>}
+ * 需要の高い品目ほど選ばれやすい重みで重複なく取引品を選ぶ。
+ * 行商人は遭遇時の需要から単価を固定し、密輸は既存の固定倍率を維持する。
+ * @param {boolean} marketPrice 相場価格を使用するか。
+ * @returns {Array<{id:string,qty:number,cost:number,price:number}>}
  */
-function pickDeals() {
+function pickDeals(marketPrice = true) {
   const demand = createSettlementDemand("village");
   const candidates = SUPPLY_ITEMS.slice();
   const deals = [];
@@ -1128,8 +1130,9 @@ function pickDeals() {
     }
     const item = candidates.splice(pickIdx, 1)[0];
     const qty = randInt(1, 3);
-    const cost = Math.floor(item.basePrice * qty * 1.6);
-    deals.push({ id: item.id, qty, cost });
+    const cost = marketPrice ? calcSupplyPrice(item.id, demand[item.id]) * qty : Math.floor(item.basePrice * qty * 1.6);
+    const price = marketPrice ? calcSupplyPrice(item.id, demand[item.id]) : Math.max(1, Math.round(cost / qty));
+    deals.push({ id: item.id, qty, cost, price });
   }
   return deals;
 }
@@ -1194,7 +1197,7 @@ export function startTravelEncounter({ forceStrength, enemyFactionId, title, fla
  */
 function enqueueSmuggleEvent(terrain) {
   const info = nearestSettlementInfo();
-  const deals = pickDeals();
+  const deals = pickDeals(false);
   enqueueEvent({
     title: "密輸船を発見",
     body: `正規ルートを避ける船団を発見しました（地形: ${terrain}）。\nどうしますか？`,

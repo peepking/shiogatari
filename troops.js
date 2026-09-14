@@ -1,3 +1,4 @@
+import { quantityControl, wireQuantityControls, refreshQuantity } from "./quantityUI.js";
 import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { state } from "./state.js";
 import { renderUpkeepForecast } from "./upkeep.js";
@@ -493,7 +494,7 @@ export function renderTroopModal(detailEl) {
     return `<details class="troop-group" data-type="${type}" ${closed.has(type) ? "" : "open"}>
       <summary class="troop-group-heading"><img src="image/troops/${type}.gif" alt="" class="troop-icon"><b>${stat.name}</b><span class="troop-group-total">${count.toLocaleString()}<small>人</small></span></summary>
       <div class="troop-group-body"><p class="tiny">レベル別人数（出撃・控えの合計）</p>
-      <div class="troop-level-list">${entries.map(([level, qty]) => `<div class="troop-level-item"><div><b>Lv${Number(level)}</b><strong>${Number(qty).toLocaleString()}人</strong></div><label>解雇する人数<input type="number" min="0" max="${Number(qty)}" step="1" value="0" data-type="${type}" data-level="${Number(level)}" aria-label="${stat.name} Lv${Number(level)}の解雇人数" class="troop-dismiss"></label></div>`).join("")}</div>
+      <div class="troop-level-list">${entries.map(([level, qty]) => `<div class="troop-level-item"><div><b>Lv${Number(level)}</b><strong>${Number(qty).toLocaleString()}人</strong></div><div class="troop-dismiss-field"><span>解雇する人数</span>${quantityControl(`<input type="number" min="0" max="${Number(qty)}" step="1" value="0" data-type="${type}" data-level="${Number(level)}" aria-label="${stat.name} Lv${Number(level)}の解雇人数" class="troop-dismiss">`, false, true)}</div></div>`).join("")}</div>
       <p class="troop-base-stats tiny">基礎能力（レベル・地形・船団補正前）<br>HP ${stat.hp ?? 0} / ATK ${stat.atk ?? stat.basePower ?? 0} / DEF ${stat.def ?? 0} / SPD ${stat.spd ?? 0} / RNG ${stat.range ?? 1} / MOV ${stat.move ?? 1}<br>維持費 ${stat.upkeep ?? 0}資金／人・季節（軽減前）</p></div>
     </details>`;
   }).join("");
@@ -501,6 +502,7 @@ export function renderTroopModal(detailEl) {
     <div class="tiny mb-6">保有兵員: ${total}人 / 上限 ${cap}人（出撃・控えを含む）</div>
     <div class="troop-group-list">${cards || '<p>部隊がいません</p>'}</div>
     <div class="sticky-footer justify-end"><button class="btn bad" id="troopDismissBtn">入力した部隊員を解雇</button></div>`;
+  detailEl.querySelectorAll(".troop-dismiss").forEach(refreshQuantity);
 }
 
 /**
@@ -511,14 +513,16 @@ export function renderTroopModal(detailEl) {
 export function wireTroopDismiss(detailEl, onChange) {
   if (!detailEl || detailEl.dataset.troopDismissWired) return;
   detailEl.dataset.troopDismissWired = "1";
+  wireQuantityControls(detailEl);
   detailEl.addEventListener("input", (e) => {
     const target = e.target;
     if (!(target instanceof HTMLInputElement)) return;
     if (!target.classList.contains("troop-dismiss")) return;
     const max = Math.max(0, Number(target.getAttribute("max")) || 0);
-    let v = Math.max(0, Number(target.value) || 0);
+    let v = Math.max(0, Math.trunc(Number(target.value) || 0));
     if (v > max) v = max;
     target.value = String(v);
+    refreshQuantity(target);
   });
   detailEl.addEventListener("click", (e) => {
     const btn = e.target.closest("#troopDismissBtn");

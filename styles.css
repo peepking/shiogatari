@@ -303,12 +303,19 @@ h1 {
   white-space: pre-wrap;
 }
 
-.btn.primary {
+.btn.primary,
+#tradeTableBody .quantity-control [data-step="1"],
+#tradeTableBody .quantity-control [data-step="5"],
+#eventTradeTableBody .quantity-control [data-step="1"],
+#eventTradeTableBody .quantity-control [data-step="5"],
+#hireTableBody .quantity-control [data-step="1"] {
   background: rgba(122, 167, 255, 0.18);
   border-color: rgba(122, 167, 255, 0.35);
 }
 
-.btn.good {
+.btn.good,
+#tradeTableBody .quantity-control [data-step="-1"],
+#tradeTableBody .quantity-control [data-step="-5"] {
   background: rgba(125, 255, 178, 0.14);
   border-color: rgba(125, 255, 178, 0.35);
 }
@@ -318,7 +325,10 @@ h1 {
   border-color: rgba(255, 210, 122, 0.35);
 }
 
-.btn.bad {
+.btn.bad,
+#suppliesDetail .quantity-control [data-step="1"],
+#suppliesDetail .quantity-control [data-step="5"],
+#troopsDetail .quantity-control [data-step="1"] {
   background: rgba(255, 122, 122, 0.12);
   border-color: rgba(255, 122, 122, 0.35);
 }
@@ -1234,6 +1244,35 @@ option {
   max-height: min(390px, 65vh);
   overflow: auto;
   width: 100%;
+}
+
+.quantity-control {
+  display: grid;
+  grid-template-columns: 40px 36px minmax(54px, 1fr) 36px 40px;
+  gap: 4px;
+  align-items: center;
+  min-width: 222px;
+}
+.quantity-control button { min-height: 42px; padding: 4px; white-space: nowrap; }
+.quantity-control input { width: 100%; min-width: 0; box-sizing: border-box; text-align: center; padding: 6px; }
+.quantity-control .quantity-reset { grid-column: 1 / 3; min-height: 30px; font-size: 11px; }
+.quantity-description { grid-column: 3 / 6; font-size: 12px; }
+.quantity-control input::-webkit-inner-spin-button { appearance: none; }
+.quantity-control.quantity-single { grid-template-columns: 32px minmax(32px, 1fr) 32px; min-width: 0; }
+.troop-level-item > .troop-dismiss-field { display: grid; gap: 5px; margin-top: 10px; font-size: 11px; color: #a7b7d0; }
+#tradeConfirm, #eventTradeConfirm { flex-shrink: 0; white-space: nowrap; }
+#tradeModal .sticky-footer, #eventTradeModal .sticky-footer { flex-wrap: wrap; }
+#tradeModal .modal-summary, #eventTradeModal .modal-summary { min-width: 0; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .trade-table thead { display: none; }
+  .trade-table tbody { display: grid; gap: 12px; }
+  .trade-table tbody tr { display: flex; flex-wrap: wrap; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+  .trade-table tbody td { border: 0; padding: 4px; }
+  .trade-table tbody td:last-child { flex: 0 0 100%; box-sizing: border-box; }
+  .trade-table .quantity-control { min-width: 0; width: 100%; }
+  #tradeTableBody td:nth-child(4)::before, #eventTradeTableBody td:nth-child(4)::before { content: "在庫 "; }
+  #tradeTableBody td:nth-child(5)::before { content: "所持 "; }
+  #suppliesDetail .trade-table td:nth-child(3)::before { content: "所持 "; }
 }
 
 .troop-group-list { display: grid; gap: 12px; }

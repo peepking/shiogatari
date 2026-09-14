@@ -1,3 +1,4 @@
+import { quantityControl, wireQuantityControls, refreshQuantity } from "./quantityUI.js";
 import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { getPlayerFactionId, getSupportLabel, getWarEntry, getWarScoreLabel } from "./faction.js";
 import { state } from "./state.js";
@@ -155,7 +156,7 @@ export function renderSupplyModal(detailEl) {
         <td>${item.name}</td>
         <td class="ta-center">${qty}</td>
         <td class="ta-center">
-          <input type="number" min="0" max="${qty}" value="0" data-id="${item.id}" class="supply-discard input-70">
+          ${quantityControl(`<input type="number" min="0" max="${qty}" step="1" value="0" aria-label="${item.name}の破棄数量" data-id="${item.id}" class="supply-discard">`)}
         </td>
       </tr>`;
   })
@@ -182,6 +183,7 @@ export function renderSupplyModal(detailEl) {
       <button class="btn bad" id="supplyDiscardBtn">選択分を破棄</button>
     </div>
   `;
+  detailEl.querySelectorAll('.quantity-control input').forEach(refreshQuantity);
 }
 
 /**
@@ -192,19 +194,21 @@ export function renderSupplyModal(detailEl) {
 export function wireSupplyDiscard(detailEl, onChange) {
   if (!detailEl || detailEl.dataset.supplyDiscardWired) return;
   detailEl.dataset.supplyDiscardWired = "1";
+  wireQuantityControls(detailEl);
   detailEl.addEventListener("input", (e) => {
     const target = e.target;
     if (!(target instanceof HTMLInputElement)) return;
     if (!target.classList.contains("supply-discard")) return;
-    const max = Math.max(0, Number(target.getAttribute("max")) || 0);
-    let v = Math.max(0, Number(target.value) || 0);
-    if (v > max) v = max;
-    target.value = String(v);
+    refreshQuantity(target);
+    const invalid = [...detailEl.querySelectorAll('.supply-discard')].some(input => !input.value || !input.checkValidity() || !Number.isSafeInteger(Number(input.value)));
+    const button = detailEl.querySelector('#supplyDiscardBtn');
+    if (button) button.disabled = invalid;
   });
   detailEl.addEventListener("click", (e) => {
     const btn = e.target.closest("#supplyDiscardBtn");
     if (!btn) return;
     const inputs = detailEl.querySelectorAll(".supply-discard");
+    if ([...inputs].some(input => !input.value || !input.checkValidity() || !Number.isSafeInteger(Number(input.value)))) return;
     const selections = [];
     inputs.forEach((inp) => {
       const id = inp.getAttribute("data-id");
@@ -273,23 +277,25 @@ export function wireSupplyModal(elements, openModal, closeModal) {
   });
 }
 
+/** 相場範囲と売却手数料を管理する。 */
+export const SUPPLY_MARKET = Object.freeze({ demandMin: 1, demandMax: 10, minMultiplier: 1, maxMultiplier: 4, sellRate: 0.9 });
+
 /**
- * 需要度から物資価格を計算する。
- * modeが"buy"のときのみ支持度補正を適用し、売却時は支持度による減額を避ける。
+ * 需要と売買区分から補正後の整数単価を求める。referenceは支持度・手数料を含まない。
  * @param {string} supplyId
  * @param {number} demand
- * @param {{factionId?:string|null,settlementId?:string|null,mode?:"buy"|"sell"}} [opts]
+ * @param {{factionId?:string|null,settlementId?:string|null,mode?:"buy"|"sell"|"reference"}} [opts]
  * @returns {number|null}
  */
 export function calcSupplyPrice(supplyId, demand, opts = {}) {
   const item = SUPPLY_INDEX[supplyId];
   if (!item) return null;
-  const d = clamp(Number(demand) || 0, 1, 10);
+  const d = clamp(Number(demand) || 0, SUPPLY_MARKET.demandMin, SUPPLY_MARKET.demandMax);
   const warMul = priceWarMultiplier(opts.factionId, opts.settlementId);
   const mode = opts.mode || "buy";
   const supportMul = mode === "buy" ? priceSupportMultiplier(opts.factionId, opts.settlementId) : 1;
-  // 価格は基本価格 * (1 + 需要度/10) * 各補正、小数点切り捨て。
-  return Math.floor(item.basePrice * (1 + d / 10) * warMul * supportMul);
+  const market = SUPPLY_MARKET.minMultiplier + (d - SUPPLY_MARKET.demandMin) / (SUPPLY_MARKET.demandMax - SUPPLY_MARKET.demandMin) * (SUPPLY_MARKET.maxMultiplier - SUPPLY_MARKET.minMultiplier);
+  return Math.floor(item.basePrice * market * warMul * supportMul * (mode === "sell" ? SUPPLY_MARKET.sellRate : 1));
 }
 
 /**
