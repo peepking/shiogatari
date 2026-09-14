@@ -1259,6 +1259,9 @@ option {
 .quantity-description { grid-column: 3 / 6; font-size: 12px; }
 .quantity-control input::-webkit-inner-spin-button { appearance: none; }
 .quantity-control.quantity-single { grid-template-columns: 32px minmax(32px, 1fr) 32px; min-width: 0; }
+.faith-benefit-list { display: grid; gap: 10px; margin-top: 12px; }
+.faith-benefit-list h3 { margin: 0 0 6px; color: var(--accent2); }
+.faith-benefit-list p { margin: 0; line-height: 1.7; }
 .troop-level-item > .troop-dismiss-field { display: grid; gap: 5px; margin-top: 10px; font-size: 11px; color: #a7b7d0; }
 #tradeConfirm, #eventTradeConfirm { flex-shrink: 0; white-space: nowrap; }
 #tradeModal .sticky-footer, #eventTradeModal .sticky-footer { flex-wrap: wrap; }

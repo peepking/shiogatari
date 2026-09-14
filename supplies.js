@@ -1,3 +1,4 @@
+import { faithEffects } from "./faith.js";
 import { quantityControl, wireQuantityControls, refreshQuantity } from "./quantityUI.js";
 import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { getPlayerFactionId, getSupportLabel, getWarEntry, getWarScoreLabel } from "./faction.js";
@@ -295,7 +296,8 @@ export function calcSupplyPrice(supplyId, demand, opts = {}) {
   const mode = opts.mode || "buy";
   const supportMul = mode === "buy" ? priceSupportMultiplier(opts.factionId, opts.settlementId) : 1;
   const market = SUPPLY_MARKET.minMultiplier + (d - SUPPLY_MARKET.demandMin) / (SUPPLY_MARKET.demandMax - SUPPLY_MARKET.demandMin) * (SUPPLY_MARKET.maxMultiplier - SUPPLY_MARKET.minMultiplier);
-  return Math.floor(item.basePrice * market * warMul * supportMul * (mode === "sell" ? SUPPLY_MARKET.sellRate : 1));
+  const price = Math.floor(item.basePrice * market * warMul * supportMul * (mode === "sell" ? SUPPLY_MARKET.sellRate * (1 + faithEffects(state).sale) : 1));
+  return mode === "sell" ? Math.min(price, calcSupplyPrice(supplyId, demand, { ...opts, mode: "buy" })) : price;
 }
 
 /**

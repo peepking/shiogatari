@@ -187,10 +187,13 @@ async function main() {
   state.expansion.charts.rumorSeasons = { village: 4000 };
   state.expansion.outfitting = { slots: 2, owned: ["harpoon", "cargo_tent"], equipped: ["cargo_tent", null] };
   const expansionBefore = JSON.stringify(state.expansion);
+  state.faithBenefits = { afterglowUntil: 4001, foodSeason: 4000, recruitment: { town: { season: 4000, slot: { type: "infantry", level: 3, remaining: 2 } } } };
+  const faithBefore = JSON.stringify(state.faithBenefits);
   assert.equal(saveGameToStorage(), true);
   resetState();
   assert.equal(loadGameFromStorage(), true);
   assert.equal(JSON.stringify(state.expansion), expansionBefore);
+  assert.equal(JSON.stringify(state.faithBenefits), faithBefore);
   assert.equal(loadGameFromStorage(), true);
   assert.equal(JSON.stringify(state.expansion), expansionBefore);
   assert.equal(state.funds, 4321);

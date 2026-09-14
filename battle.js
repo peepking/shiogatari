@@ -1,3 +1,4 @@
+import { faithEffects } from "./faith.js";
 import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL } from "./constants.js";
 import { elements, pushLog, pushToast } from "./dom.js";
 import { getTerrainAt } from "./map.js";
@@ -1217,6 +1218,7 @@ function finishBattle(forceDraw = false) {
       enemyFactionId: battleState.enemyFactionId,
       resultLabel,
       supportMedics: battleState.outfitting.medics,
+      faithRescue: battleState.faithRescue || 0,
     });
   }
   saveGameToStorage({ battleComplete: true });
@@ -1514,7 +1516,10 @@ function findUnitAt(x, y) {
  */
 function startBattle() {
   if (battleState.running || !battleState.ready || elements.battleStartBtn?.disabled) return;
-  if (!battleState.started) battleState.outfitting = snapshotOutfitting(state);
+  if (!battleState.started) {
+    battleState.outfitting = snapshotOutfitting(state);
+    battleState.faithRescue = faithEffects(state).rescue;
+  }
   setBattleSpeed(battleStrategy.speed || 1);
   // 撃破済み選択をクリア
   const sel = getUnitById(battleState.selectedId, true);

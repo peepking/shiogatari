@@ -1,3 +1,4 @@
+import { activateAfterglow, rollFaithRecruitment } from "./faith.js";
 import { MODE_LABEL, PLACE } from "./constants.js";
 import { pushLog, pushToast, setOutput } from "./dom.js";
 import { enqueueEvent } from "./events.js";
@@ -27,7 +28,7 @@ import { absDay, manhattan, NORMAL_ANCHORS, pickAnchorRange, randInt, STRONG_ANC
 import { state } from "./state.js";
 import { calcSupplyPrice, calcSupplyCap, createSettlementDemand, SUPPLY_ITEMS, totalSupplies } from "./supplies.js";
 import { advanceDayWithEvents } from "./time.js";
-import { calcTroopCap, totalTroops, enemyTroopPool } from "./troops.js";
+import { TROOP_STATS, calcTroopCap, totalTroops, enemyTroopPool } from "./troops.js";
 import { clamp, warScoreLabel } from "./util.js";
 
 /**
@@ -363,6 +364,8 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
     return false;
   }
   state.modeLabel = insideLabel;
+  const recruit = rollFaithRecruitment(state, hereSettlement, TROOP_STATS);
+  if (recruit) enqueueEvent({ title: "潮盟の便り", body: `潮の縁者の紹介で、${TROOP_STATS[recruit.type].name} Lv${recruit.level} ${recruit.remaining}人が雇用候補に加わりました。` });
   rollChartRumor(hereSettlement);
   rollChartMerchant(hereSettlement);
   resetEncounterMeter();
@@ -899,6 +902,7 @@ function handleOmenAction(action) {
       }
       const cost = Math.max(10, Math.floor(state.faith * 0.1));
       state.faith = Math.max(0, (state.faith || 0) - cost);
+      activateAfterglow(state);
       const roll = Math.random();
       if (roll < 0.2) {
         const ship = awardShips(state);

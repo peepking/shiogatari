@@ -1,3 +1,4 @@
+import { faithEffects } from "./faith.js";
 import { resourceIcon } from "./resourceUI.js";
 import { getOutfittingEffects, applyConsumptionReduction } from "./outfitting.js";
 import { shipUpkeepCost } from "./shipUpkeep.js";
@@ -22,7 +23,7 @@ export function getUpkeepForecast(state, stats) {
   const day = state.day;
   const nextFoodDay = FOOD_CONSUMPTION_DAYS.find(d => d > day) ?? FOOD_CONSUMPTION_DAYS[0] + 30;
   const effects = getOutfittingEffects(state.expansion?.outfitting, state.fleet);
-  funds = applyConsumptionReduction(funds, effects.upkeepReduction);
+  funds = applyConsumptionReduction(funds, effects.upkeepReduction + faithEffects(state).upkeep * 100);
   const troopFunds = funds;
   const shipFunds = shipUpkeepCost(state);
   funds += shipFunds;

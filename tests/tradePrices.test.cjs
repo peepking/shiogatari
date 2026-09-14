@@ -15,7 +15,9 @@ async function main() {
     './troops.js': {TROOP_STATS: {}}, './fleet.js': {fleetEffects() {}},
   };
   const mod = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, '../supplies.js'), 'utf8'));
-  await mod.link(name => new vm.SyntheticModule(Object.keys(dependencies[name]), function () {
+  const faith = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, '../faith.js'), 'utf8'));
+  await faith.link(() => {});
+  await mod.link(name => name === './faith.js' ? faith : new vm.SyntheticModule(Object.keys(dependencies[name]), function () {
     for (const [key, value] of Object.entries(dependencies[name])) this.setExport(key, value);
   }));
   await mod.evaluate();
@@ -36,6 +38,11 @@ async function main() {
   const foodSell = price('food', 1, {mode: 'sell'});
   assert.equal(foodSell, 4);
   assert.equal(foodSell * 100, foodSell * 37 + foodSell * 63);
+  dependencies['./state.js'].state.faith=500;
+  support='high';war='even';
+  assert.equal(price('spice',10,{...opts,mode:'sell'}),378);
+  faith.namespace.activateAfterglow(dependencies['./state.js'].state);
+  assert.equal(price('spice',10,{...opts,mode:'sell'}),price('spice',10,opts));
   console.log('交易価格の上下限・補正・端数: 全項目成功');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -1,3 +1,4 @@
+import { normalizeFaith } from "./faith.js";
 import { MODE_LABEL } from "./constants.js";
 import { FACTIONS } from "./lore.js";
 import { createExpansionState } from "./expansionState.js";
@@ -17,6 +18,7 @@ const createState = () => {
     archer: { 1: 5 },
   },
   faith: 0,
+  faithBenefits: normalizeFaith(),
   supplies: { food: 10 },
   funds: 1000,
   fame: 0,

@@ -1,3 +1,5 @@
+import { activateAfterglow, rescueFaithLosses } from "./faith.js";
+import { wireFaithDetails, renderFaithDetails } from "./faithUI.js";
 import { modalDeadlineText } from "./questDeadlines.js";
 import {
   attemptEnter,
@@ -467,6 +469,7 @@ function performPrayer() {
     return false;
   }
   state.faith = Math.max(0, state.faith - consume);
+  activateAfterglow(state);
   const fundsGain = consume * rollDice(50, 10);
   const foodGain = consume * 2;
   state.funds += fundsGain;
@@ -783,7 +786,7 @@ function processBattleOutcome(resultCode, meta) {
       if (foodLost) summary.push({ text: `食料 -${foodLost}`, icon: "food" });
     }
 
-    const { losses } = calcLosses(meta);
+    const losses = rescueFaithLosses(calcLosses(meta).losses, meta?.faithRescue || 0, isWin);
     applyTroopLosses(losses);
     const lossEntries = Object.entries(losses || {}).map(([t, n]) => `${t} -${n}`);
     const lossText = lossEntries
@@ -1267,6 +1270,7 @@ function updateModeControls(loc) {
  * 画面全体の状態表示を同期する。
  */
 function syncUI() {
+  renderFaithDetails();
   updateExplorationWorld();
   syncChartReservations();
   if (!state.expansion.exploration.pending && !state.expansion.charts.pending && !state.pendingEncounter?.active && !state.eventQueue?.length && (!elements.battleBlock || elements.battleBlock.hidden) && (!elements.battleResultModal || elements.battleResultModal.hidden)) processScheduledOmens(absDay(state));
@@ -1513,6 +1517,7 @@ function wireButtons() {
   wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage });
   document.addEventListener("event-trade-open", () => openEventTrade(openModal));
   wireHireModal({ openModal, bindModal, syncUI });
+  wireFaithDetails({ openModal, bindModal });
 
   const troopCard = document.getElementById("asset-companions") || document.getElementById("asset-troops");
   troopCard?.addEventListener("click", () => {

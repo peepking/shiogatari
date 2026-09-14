@@ -1,3 +1,4 @@
+import { faithEffects } from "./faith.js";
 import { SHIP_TYPES, SHIP_UPKEEP_RATE, SHIP_SELL_RATE } from "./shipConfig.js";
 import { normalizeFleet } from "./fleet.js";
 import { getOutfittingEffects, applyConsumptionReduction } from "./outfitting.js";
@@ -7,7 +8,7 @@ export function shipUpkeepCost(state) {
   const fleet = normalizeFleet(state.fleet);
   const price = Object.entries(fleet.counts).reduce((sum, [id, count]) => sum + SHIP_TYPES[id].price * count, 0);
   const effects = getOutfittingEffects(state.expansion?.outfitting, fleet);
-  return applyConsumptionReduction(price * SHIP_UPKEEP_RATE, effects.shipUpkeepReduction);
+  return applyConsumptionReduction(price * SHIP_UPKEEP_RATE, effects.shipUpkeepReduction + faithEffects(state).upkeep * 100);
 }
 
 /**

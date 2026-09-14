@@ -1,3 +1,4 @@
+import { normalizeFaith } from "./faith.js";
 import { MODE_LABEL } from "./constants.js";
 import { restoreWorld, snapshotWorld } from "./map.js";
 import { reconcileWarFronts } from "./warFronts.js";
@@ -100,6 +101,7 @@ export function loadGameFromStorage() {
       restoreWorld(snapshot.world);
     }
     Object.assign(state, snapshot.state);
+    state.faithBenefits = normalizeFaith(snapshot.state.faithBenefits);
     if (!snapshot.state.fleet) delete state.fleet;
     migrateFleet(state);
     state.nationalPower = normalizeNationalPower(snapshot.state.nationalPower, nationalPowerDay(state));

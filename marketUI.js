@@ -64,7 +64,7 @@ export function renderTradeSelects() {
         <tr>
           <td class="ta-center">${resourceIcon(r.id)}</td>
           <td>${r.name}${r.discountPct > 0 ? `<span class="pill off-pill">買値${r.discountPct}%OFF</span>` : ""}</td>
-          <td class="ta-center">買 ${r.price}<br>売 ${calcSupplyPrice(r.id, demand[r.id] ?? 10, { factionId: settlement.factionId, mode: "sell" })}</td>
+          <td class="ta-center">買 ${r.price}<br>売 ${calcSupplyPrice(r.id, demand[r.id] ?? 10, { factionId: settlement.factionId, settlementId: settlement.id, mode: "sell" })}</td>
           <td class="ta-center">${r.townQty}</td>
           <td class="ta-center">${r.haveQty}</td>
           <td class="ta-center">${quantityControl(`<input type="number" min="${-r.haveQty}" max="${r.townQty}" step="1" value="0" aria-label="${r.name}の取引数量" data-id="${r.id}" class="trade-quantity">`, true)}</td>

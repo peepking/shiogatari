@@ -73,6 +73,7 @@ async function main() {
   const fixture={day:30,season:3,year:1000,funds:5,troops:{infantry:10},supplies:{food:900},fleet:normalizeFleet({counts:{cog:1}})};
   const notices=[];
   const context=vm.createContext({state:fixture,TROOP_STATS:{infantry:{upkeep:2}},getUpkeepForecast,payShipUpkeep,
+    grantFaithSeason: modules.get("./faith.js").namespace.grantFaithSeason, calcSupplyCap: () => 60,
     SHIP_TYPES:modules.get("./shipConfig.js").namespace.SHIP_TYPES,
     buildLossesMap:n=>n,applyTroopLosses:n=>{fixture.troops.infantry-=n;},pushLog(){},enqueueEvent:e=>notices.push(e),
     baseAdvanceDay:()=>{fixture.day++;if(fixture.day>30){fixture.day=1;fixture.season++;if(fixture.season>3){fixture.season=0;fixture.year++;}}},
@@ -88,6 +89,21 @@ async function main() {
   fixture.troops={}; fixture.funds=0; fixture.day=30; fixture.fleet=normalizeFleet({counts:{cog:2}});
   vm.runInContext("advanceDayWithEvents(61)",context);
   assert.equal(fixture.fleet.counts.cog,1); assert.equal(fixture.funds,3960);
+  const faithful={year:1000,season:0,day:30,faith:500,troops:{infantry:100},fleet:normalizeFleet({counts:{cog:1}}),funds:1000,supplies:{}};
+  assert.equal(getUpkeepForecast(faithful,TROOP_STATS).troopFunds,180);
+  assert.equal(shipUpkeepCost(faithful),99);
+  modules.get("./faith.js").namespace.activateAfterglow(faithful);
+  assert.equal(getUpkeepForecast(faithful,TROOP_STATS).troopFunds,170);
+  assert.equal(shipUpkeepCost(faithful),93);
+  Object.assign(fixture,{year:1000,season:3,day:30,faith:500,funds:1000,troops:{infantry:10},supplies:{food:0},fleet:normalizeFleet({counts:{cog:1}}),faithBenefits:undefined});
+  modules.get("./faith.js").namespace.activateAfterglow(fixture);
+  vm.runInContext("advanceDayWithEvents(1)",context);
+  assert.equal(fixture.funds,890); assert.equal(fixture.supplies.food,50);
+  assert.equal(fixture.faithBenefits.afterglowUntil,null);
+  fixture.troops={};fixture.fleet=normalizeFleet();fixture.day=30;fixture.supplies={};
+  modules.get("./faith.js").namespace.activateAfterglow(fixture);
+  vm.runInContext("advanceDayWithEvents(1)",context);
+  assert.equal(fixture.faithBenefits.afterglowUntil,null);assert.equal(fixture.supplies.food,50);
   console.log("部隊・船維持費の分離、季節境界・複数季節、自動売却・端数・軽減上限: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

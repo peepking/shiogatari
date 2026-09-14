@@ -4,6 +4,7 @@ import { getOutfittingEffects, snapshotOutfitting } from "./outfitting.js";
 import { calcSupplyCap } from "./supplies.js";
 import { calcTroopCap, TROOP_STATS } from "./troops.js";
 import { getUpkeepForecast } from "./upkeep.js";
+import { faithEffects } from "./faith.js";
 
 /** @param {string} id 船種。 @returns {string} 既存の線画に合わせた船種別の帆装アイコン。 */
 export function shipIcon(id) {
@@ -30,7 +31,7 @@ export function fleetMetrics(state) {
   const support = snapshotOutfitting(state);
   const result = { "物資上限": calcSupplyCap(state.fleet, equipment), "兵員上限": calcTroopCap(state.fleet, equipment),
     "次回維持費": cost.funds, "部隊維持費": cost.troopFunds, "船維持費": cost.shipFunds,
-    "船維持費軽減（%）": e.shipUpkeepReduction, "次回食料消費": cost.food, "衛生兵効果（人分）": support.medics, "斥候効果（人分）": support.scouts,
+    "船維持費軽減（%）": e.shipUpkeepReduction + faithEffects(state).upkeep * 100, "次回食料消費": cost.food, "衛生兵効果（人分）": support.medics, "斥候効果（人分）": support.scouts,
     "近接ATK倍率（%）": 100 + e.atk + e.meleeAtk, "遠隔ATK倍率（%）": 100 + e.atk + e.rangedAtk,
     "近接DEF倍率（%）": 100 + e.def + e.meleeDef, "遠隔DEF倍率（%）": 100 + e.def + e.rangedDef };
   for (const [id, name] of Object.entries({ harpoon: "モリ投擲", ballista: "バリスタ", fire_ballista: "ファイヤバリスタ", grape_ballista: "ブドウ弾バリスタ", fire_grape_ballista: "火炎ブドウ弾バリスタ", cannon: "砲撃支援" })) {

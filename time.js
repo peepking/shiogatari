@@ -1,3 +1,5 @@
+import { grantFaithSeason } from "./faith.js";
+import { calcSupplyCap } from "./supplies.js";
 import { startTravelEncounter } from "./actions.js";
 import { MODE_LABEL } from "./constants.js";
 import { pushLog } from "./dom.js";
@@ -23,6 +25,12 @@ export function advanceDayWithEvents(days = 1) {
     if (d === 1) {
       settlements.forEach(s => refreshShipyard(s, shipyardSeason(state)));
       applySeasonUpkeep();
+      const gift = grantFaithSeason(state, calcSupplyCap());
+      if (gift?.amount) {
+        const body = `潮の縁者が航海の糧を融通してくれました。食料＋${gift.received}` + (gift.missed ? `（容量不足で${gift.missed}個は受け取れませんでした）` : "");
+        enqueueEvent({ title: "潮待ちの恵み", body });
+        pushLog("潮待ちの恵み", body, "-");
+      }
     }
     if (FOOD_CONSUMPTION_DAYS.includes(d)) {
       applyPeriodicFood();
