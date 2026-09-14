@@ -1,4 +1,4 @@
-import { handleTravelEventAction } from "./actions.js";
+import { handleTravelEventAction, isBattleEventActionBlocked } from "./actions.js";
 import { elements } from "./dom.js";
 import { addHonorFaction, addWarScore, adjustNobleFavor, adjustSupport, getPlayerFactionId } from "./faction.js";
 import { state } from "./state.js";
@@ -95,6 +95,10 @@ function normalizeActions(actions, baseId) {
  * @returns {void}
  */
 function handleAction(action) {
+  if (isBattleEventActionBlocked(action)) {
+    showNextEvent();
+    return;
+  }
   if (!action) {
     resolveCurrentEvent();
     return;
@@ -190,6 +194,8 @@ export function showNextEvent() {
       btn.className = "btn";
       btn.textContent = act.label || "閉じる";
       btn.dataset.actionId = act.id;
+      btn.disabled = isBattleEventActionBlocked(act);
+      if (btn.disabled) btn.title = "部隊員がいないため選択できません。";
       elements.eventModalActions.append(btn);
     });
   }

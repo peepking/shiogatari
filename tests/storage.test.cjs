@@ -70,7 +70,7 @@ async function main() {
   const { normalizeLogs } = modules["./logStore.js"].namespace;
   /** @returns {void} 今回使わない勢力操作を置き換える。 */
   function unusedAction() {}
-  modules["./actions.js"] = mockModule({ handleTravelEventAction: unusedAction });
+  modules["./actions.js"] = mockModule({ handleTravelEventAction: unusedAction, isBattleEventActionBlocked: () => false });
   modules["./dom.js"] = mockModule({ elements: {} });
   modules["./faction.js"] = mockModule({
     addHonorFaction: unusedAction, addWarScore: unusedAction, adjustNobleFavor: unusedAction,

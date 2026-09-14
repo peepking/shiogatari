@@ -1002,12 +1002,18 @@ function handleTraitorAction(action) {
   }
 }
 
+/** 部隊員がいない場合、選択によって直ちに戦闘へ進む行動を禁止する。 */
+export function isBattleEventActionBlocked(action) {
+  return ["merchant_attack", "merchant_rescue_help", "merchant_rescue_attack", "smuggle_attack", "refugee_attack", "checkpoint_force"].includes(action?.type) && totalTroops() <= 0;
+}
+
 /**
  * イベントモーダルのアクションを処理する。
  * @param {object} action
  * @returns {boolean} 処理した場合true
  */
 export function handleTravelEventAction(action) {
+  if (isBattleEventActionBlocked(action)) return false;
   if (!action?.type) return false;
   const handlers = [
     handleChartPurchase,
