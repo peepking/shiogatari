@@ -93,6 +93,7 @@ import {
   formatTroopDisplay,
   levelUpTroopsRandom,
   renderTroopModal,
+  totalTroops,
   TROOP_STATS,
   wireTroopDismiss,
 } from "./troops.js";
@@ -986,6 +987,7 @@ function startPrepBattle() {
  * @returns {void}
  */
 function startOracleBattle() {
+  if (totalTroops() <= 0) return;
   if (state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE) return;
   const meta = getBattleQuestAt(state.position);
   if (!meta) return;
@@ -1174,7 +1176,7 @@ function updateModeControls(loc) {
   if (elements.oracleBattleBtn) {
     const show = !lockActions && !!battleQuestMeta && !inAudience;
     elements.oracleBattleBtn.hidden = !show;
-    elements.oracleBattleBtn.disabled = !show;
+    elements.oracleBattleBtn.disabled = !show || totalTroops() <= 0;
     if (show) {
     const strength =
       battleQuestMeta.strength === "elite" || battleQuestMeta.quest.type === QUEST_TYPES.BOUNTY_HUNT
@@ -1182,7 +1184,9 @@ function updateModeControls(loc) {
         : battleQuestMeta.quest.type === QUEST_TYPES.WAR_TRUCE || battleQuestMeta.quest.type?.startsWith("war_")
           ? "正規軍"
           : "通常編成";
-    elements.oracleBattleBtn.title = `${battleQuestMeta.quest.title}（${strength}）`;
+    elements.oracleBattleBtn.title = totalTroops() <= 0
+      ? "部隊員がいないため討伐できません。"
+      : `${battleQuestMeta.quest.title}（${strength}）`;
   } else {
     elements.oracleBattleBtn.title = "";
   }
@@ -1212,6 +1216,11 @@ function updateModeControls(loc) {
   if (elements.tradeBtn) elements.tradeBtn.disabled = lockActions || inAudience;
   if (elements.questOpenBtn) elements.questOpenBtn.disabled = lockActions || inAudience;
   if (elements.hireBtn) elements.hireBtn.disabled = lockActions || inAudience;
+  const hasBattleTroops = totalTroops() > 0;
+  if (elements.battlePrepFightBtn) {
+    elements.battlePrepFightBtn.disabled = !prepActive || !hasBattleTroops;
+    elements.battlePrepFightBtn.title = hasBattleTroops ? "" : "部隊員がいないため戦闘できません。";
+  }
   if (elements.battlePrepPrayBtn) elements.battlePrepPrayBtn.disabled = !prepActive || !canPray();
   if (elements.battlePrepInfo) {
     const showInfo = prepActive && !inBattle && !battleVisible;
