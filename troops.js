@@ -475,80 +475,32 @@ export function setTroopsManual(total) {
 }
 
 /**
- * 部隊詳細モーダルを描画する。
+ * 兵種別の合計人数と、人数のあるレベルを昇順で部隊詳細に描画する。
+ * 内訳は初期状態で開き、再描画時は兵種ごとの折りたたみ状態を保持する。
  * @param {HTMLElement|null} detailEl
  */
 export function renderTroopModal(detailEl) {
   if (!detailEl) return;
   const { total, cap } = formatTroopDisplay();
-  const rows = Object.entries(state.troops || {})
-    .flatMap(([type, levels]) => {
-      const stat = TROOP_STATS[type];
-      const name = stat?.name || type;
-      return Object.entries(levels || {})
-        .filter(([, qty]) => qty > 0)
-        .map(([lvlStr, qty]) => {
-          const lvl = Number(lvlStr);
-          const upkeep = stat?.upkeep ?? 0;
-          const hp = stat?.hp ?? 0;
-          const atk = stat?.atk ?? stat?.basePower ?? 0;
-          const def = stat?.def ?? 0;
-          const spd = stat?.spd ?? 0;
-          const range = stat?.range ?? 1;
-          const move = stat?.move ?? 1;
-          const imgSrc = `image/troops/${type}.gif`;
-          return `
-            <tr>
-              <td class="ta-center"><img src="${imgSrc}" alt="${name}" class="troop-icon"></td>
-              <td>${name}</td>
-              <td class="ta-center">Lv${lvl}</td>
-              <td class="ta-center">${upkeep}</td>
-              <td class="ta-center">${hp}</td>
-              <td class="ta-center">${atk}</td>
-              <td class="ta-center">${def}</td>
-              <td class="ta-center">${spd}</td>
-              <td class="ta-center">${range}</td>
-              <td class="ta-center">${move}</td>
-              <td class="ta-center">${qty}</td>
-              <td class="ta-center">
-                <input type="number" min="0" max="${qty}" value="0" data-type="${type}" data-level="${lvl}" class="troop-dismiss input-70">
-              </td>
-            </tr>
-          `;
-        });
-    })
-    .join("");
-
-  detailEl.innerHTML = `
-    ${renderUpkeepForecast(state, TROOP_STATS)}
-    <div class="tiny mb-6">部隊数: ${total} / 上限 ${cap}</div>
-    <div class="table-scroll">
-      <table class="trade-table">
-        <thead>
-          <tr>
-            <th class="ta-center col-icon">画像</th>
-            <th class="ta-left col-name">兵種</th>
-            <th class="ta-center col-lv">Lv</th>
-            <th class="ta-center col-small">維持</th>
-            <th class="ta-center col-small">HP</th>
-            <th class="ta-center col-small">ATK</th>
-            <th class="ta-center col-small">DEF</th>
-            <th class="ta-center col-small">SPD</th>
-            <th class="ta-center col-small">RNG</th>
-            <th class="ta-center col-small">MOV</th>
-            <th class="ta-center col-small">人数</th>
-            <th class="ta-center col-action">解雇</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rows || `<tr><td colspan="12" class="ta-center">部隊がいません</td></tr>`}
-        </tbody>
-      </table>
-    </div>
-    <div class="sticky-footer justify-end">
-      <button class="btn bad" id="troopDismissBtn">部隊員を解雇</button>
-    </div>
-  `;
+  const closed = new Set([...detailEl.querySelectorAll(".troop-group:not([open])")].map(el => el.dataset.type));
+  const cards = Object.entries(state.troops || {}).map(([type, levels]) => {
+    const stat = TROOP_STATS[type];
+    if (!stat) return "";
+    const entries = Object.entries(levels || {}).filter(([, qty]) => qty > 0)
+      .sort((a, b) => Number(a[0]) - Number(b[0]));
+    const count = entries.reduce((sum, [, qty]) => sum + Number(qty), 0);
+    if (!count) return "";
+    return `<details class="troop-group" data-type="${type}" ${closed.has(type) ? "" : "open"}>
+      <summary class="troop-group-heading"><img src="image/troops/${type}.gif" alt="" class="troop-icon"><b>${stat.name}</b><span class="troop-group-total">${count.toLocaleString()}<small>人</small></span></summary>
+      <div class="troop-group-body"><p class="tiny">レベル別人数（出撃・控えの合計）</p>
+      <div class="troop-level-list">${entries.map(([level, qty]) => `<div class="troop-level-item"><div><b>Lv${Number(level)}</b><strong>${Number(qty).toLocaleString()}人</strong></div><label>解雇する人数<input type="number" min="0" max="${Number(qty)}" step="1" value="0" data-type="${type}" data-level="${Number(level)}" aria-label="${stat.name} Lv${Number(level)}の解雇人数" class="troop-dismiss"></label></div>`).join("")}</div>
+      <p class="troop-base-stats tiny">基礎能力（レベル・地形・船団補正前）<br>HP ${stat.hp ?? 0} / ATK ${stat.atk ?? stat.basePower ?? 0} / DEF ${stat.def ?? 0} / SPD ${stat.spd ?? 0} / RNG ${stat.range ?? 1} / MOV ${stat.move ?? 1}<br>維持費 ${stat.upkeep ?? 0}資金／人・季節（軽減前）</p></div>
+    </details>`;
+  }).join("");
+  detailEl.innerHTML = `${renderUpkeepForecast(state, TROOP_STATS)}
+    <div class="tiny mb-6">保有兵員: ${total}人 / 上限 ${cap}人（出撃・控えを含む）</div>
+    <div class="troop-group-list">${cards || '<p>部隊がいません</p>'}</div>
+    <div class="sticky-footer justify-end"><button class="btn bad" id="troopDismissBtn">入力した部隊員を解雇</button></div>`;
 }
 
 /**

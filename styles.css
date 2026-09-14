@@ -1236,6 +1236,22 @@ option {
   width: 100%;
 }
 
+.troop-group-list { display: grid; gap: 12px; }
+.troop-group { border: 1px solid #334155; border-radius: 12px; background: rgba(255,255,255,.025); min-width: 0; }
+.troop-group-heading { display: flex; align-items: center; gap: 10px; padding: 12px; cursor: pointer; list-style: none; }
+.troop-group-heading::-webkit-details-marker { display: none; }
+.troop-group-heading::after { content: "▸"; color: #9cb5d3; }
+.troop-group[open] > .troop-group-heading::after { content: "▾"; }
+.troop-group-total { margin-left: auto; font-size: 24px; font-weight: 700; white-space: nowrap; color: #bddcff; }
+.troop-group-total small { font-size: 13px; margin-left: 4px; }
+.troop-group-body { padding: 0 12px 12px; border-top: 1px solid #334155; }
+.troop-level-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; }
+.troop-level-item { padding: 10px; border: 1px solid #334155; border-radius: 8px; min-width: 0; }
+.troop-level-item > div { display: flex; justify-content: space-between; gap: 8px; }
+.troop-level-item label { display: grid; gap: 5px; margin-top: 10px; font-size: 11px; color: #a7b7d0; }
+.troop-level-item input { width: 100%; min-width: 0; box-sizing: border-box; }
+.troop-base-stats { line-height: 1.7; margin-bottom: 0; }
+
 #troopsDetail .table-scroll table {
   min-width: 640px;
 }
