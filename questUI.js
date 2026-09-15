@@ -339,7 +339,7 @@ export function renderQuestModal(settlement, syncUI) {
         <tr>
           <td>
             <div class="tiny">${typeLabel} / ${placeLabel}</div>
-            ${q.type === QUEST_TYPES.DELIVERY && target ? `<div class="tiny">最短距離: ${manhattan(settlement.coords, target.coords)}マス（移動のみで${manhattan(settlement.coords, target.coords)}日） / 基本報酬: 距離 × 50資金。寄り道・待機は別途日数が必要です。</div>` : ""}
+            ${q.type === QUEST_TYPES.DELIVERY && target ? `<div class="tiny">最短距離: ${manhattan(settlement.coords, target.coords)}マス</div>` : ""}
             <div><b>${q.title || itemName}</b></div>
             <div class="tiny">${renderQuestConditions(q)}${escapeHtml(bodyText)}</div>
           </td>

@@ -67,11 +67,11 @@ function confirmSupport(panel, syncUI) {
   });
 }
 /** 支援入力を必要時だけ表示する。人数は兵種・レベルごとに指定する。 */
-function supportHTML(site) {
+function supportHTML() {
   if (!support) return '';
   const rows = Object.entries(state.troops || {}).flatMap(([type, levels]) => Object.entries(typeof levels === 'number' ? {1:levels} : levels).filter(([,count]) => count > 0).map(([level,count]) =>
     `<label class="tide-troop-row"><span>${escapeHtml(TROOP_STATS[type]?.name || type)} Lv${escapeHtml(level)}<small>保有 ${count}人</small></span>${quantityControl(`<input type="number" min="0" max="${count}" value="0" data-tide-type="${escapeHtml(type)}" data-level="${escapeHtml(level)}" aria-label="${escapeHtml(TROOP_STATS[type]?.name || type)} Lv${escapeHtml(level)}の送り出す人数">`,false,true)}</label>`)).join('');
-  return `<section class="tide-support"><h3>${support === 'funds' ? '資金を寄付する' : '潮盟の担い手として送り出す'}</h3><p>${progressText(site)}</p>${support === 'funds' ? `<label>寄付額（所持 ${state.funds.toLocaleString()}）<input id="tideFunds" type="number" min="0" max="${state.funds}" step="1" value="0" inputmode="numeric"></label>` : `<p>誰でも1人として支えになります。送り出すと部隊から恒久的に離脱します。</p>${rows || '<p>送り出せる部隊員がいません。</p>'}`}<div class="tide-actions"><button class="btn good" id="tideCommit">内容を確認する</button><button class="btn ghost" id="tideCancel">取り消す</button></div></section>`;
+  return `<section class="tide-support"><h3>${support === 'funds' ? '資金を寄付する' : '潮盟の担い手として送り出す'}</h3>${support === 'funds' ? `<label>寄付額（所持 ${state.funds.toLocaleString()}）<input id="tideFunds" type="number" min="0" max="${state.funds}" step="1" value="0" inputmode="numeric"></label>` : `<p>誰でも1人として支えになります。送り出すと部隊から恒久的に離脱します。</p>${rows || '<p>送り出せる部隊員がいません。</p>'}`}<div class="tide-actions"><button class="btn good" id="tideCommit">内容を確認する</button><button class="btn ghost" id="tideCancel">取り消す</button></div></section>`;
 }
 /** 地図領域で情景を表示し、数値は折りたたみの詳細へまとめる。 */
 export function renderTideControl(syncUI) {
@@ -110,7 +110,7 @@ export function renderTideControl(syncUI) {
     <blockquote class="tide-conversation">${scene.conversation.map(line => `<p>${line}</p>`).join('')}<p class="tide-reaction">${scene.reaction}</p></blockquote>
     <div class="tide-overview"><section class="tide-progress"><h4>${nextStage ? `${nextStage.name}への支え` : 'この地に根づいた支え'}</h4>${nextStage ? `<label>資金 <b>${(site?.funds || 0).toLocaleString()} / ${nextStage.funds.toLocaleString()}</b><progress max="${nextStage.funds}" value="${Math.min(site?.funds || 0, nextStage.funds)}"></progress></label><label>担い手 <b>${site?.people || 0} / ${nextStage.people}人</b><progress max="${nextStage.people}" value="${Math.min(site?.people || 0, nextStage.people)}"></progress></label><p class="tiny">資金と担い手の両方が必要です。</p>` : `<p>神殿に到達しました。</p><p class="tiny">累計資金 ${(site?.funds || 0).toLocaleString()}・担い手 ${site?.people || 0}人</p><p class="tiny">これからの支援も記録に残りますが、恩恵は増えません。</p>`}</section><section class="tide-season ${target ? 'is-active' : ''}"><h4>今季の状態</h4><p>${target ? 'この地の支えが、旅へ届いている' : 'この地の営みが続いている'}</p><p class="tiny">${contribution(target)}</p><div class="tide-next-season"><h4>次季節の見込み</h4><p>${contribution(next)}</p></div></section></div>
     <div class="tide-actions"><button class="btn good" id="tideDonate" ${canSupport() ? '' : 'disabled'}>資金を寄付する</button><button class="btn" id="tidePeople" ${canSupport() ? '' : 'disabled'}>潮盟の担い手として送り出す</button></div>
-    ${!canSupport() ? '<p class="tiny">支援するには、この街・村に入ってください。</p>' : ''}${supportHTML(site)}
+    ${!canSupport() ? '<p class="tiny">支援するには、この街・村に入ってください。</p>' : ''}${supportHTML()}
 `;
   panel.querySelector('#tideClose').onclick = () => closeTide();
   panel.querySelector('#tideDonate').onclick = () => { support = 'funds'; renderTideControl(syncUI); panel.querySelector('#tideFunds')?.focus(); };
