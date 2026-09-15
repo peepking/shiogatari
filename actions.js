@@ -1,3 +1,4 @@
+import { visitTideSite } from "./tideAlliance.js";
 import { activateAfterglow, rollFaithRecruitment } from "./faith.js";
 import { MODE_LABEL, PLACE } from "./constants.js";
 import { pushLog, pushToast, setOutput } from "./dom.js";
@@ -364,6 +365,7 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
     return false;
   }
   state.modeLabel = insideLabel;
+  visitTideSite(state, hereSettlement?.id);
   const recruit = rollFaithRecruitment(state, hereSettlement, TROOP_STATS);
   if (recruit) enqueueEvent({ title: "潮盟の便り", body: `潮の縁者の紹介で、${TROOP_STATS[recruit.type].name} Lv${recruit.level} ${recruit.remaining}人が雇用候補に加わりました。` });
   rollChartRumor(hereSettlement);

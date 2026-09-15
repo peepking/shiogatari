@@ -189,11 +189,14 @@ async function main() {
   const expansionBefore = JSON.stringify(state.expansion);
   state.faithBenefits = { afterglowUntil: 4001, foodSeason: 4000, recruitment: { town: { season: 4000, slot: { type: "infantry", level: 3, remaining: 2 } } } };
   const faithBefore = JSON.stringify(state.faithBenefits);
+  state.tideAlliance = {sites:{town:{funds:20000,people:5,order:1,visits:2,reaction:'return'}},nextOrder:2,season:4000,targets:[{id:'town',stage:1,faith:2,bonus:2}],remainder:4,bonus:2};
+  const tideBefore = JSON.stringify(state.tideAlliance);
   assert.equal(saveGameToStorage(), true);
   resetState();
   assert.equal(loadGameFromStorage(), true);
   assert.equal(JSON.stringify(state.expansion), expansionBefore);
   assert.equal(JSON.stringify(state.faithBenefits), faithBefore);
+  assert.equal(JSON.stringify(state.tideAlliance), tideBefore);
   assert.equal(loadGameFromStorage(), true);
   assert.equal(JSON.stringify(state.expansion), expansionBefore);
   assert.equal(state.funds, 4321);

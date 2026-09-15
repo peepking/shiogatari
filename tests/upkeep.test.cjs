@@ -72,10 +72,14 @@ async function main() {
   const timeSource=await fs.readFile(path.join(__dirname,"../time.js"),"utf8");
   const fixture={day:30,season:3,year:1000,funds:5,troops:{infantry:10},supplies:{food:900},fleet:normalizeFleet({counts:{cog:1}})};
   const notices=[];
+  const toasts=[];
+  const tideModule = await load("./tideAlliance.js"); await tideModule.evaluate();
   const context=vm.createContext({state:fixture,TROOP_STATS:{infantry:{upkeep:2}},getUpkeepForecast,payShipUpkeep,
     grantFaithSeason: modules.get("./faith.js").namespace.grantFaithSeason, calcSupplyCap: () => 60,
+    settleTideSeason: tideModule.namespace.settleTideSeason,
     SHIP_TYPES:modules.get("./shipConfig.js").namespace.SHIP_TYPES,
     buildLossesMap:n=>n,applyTroopLosses:n=>{fixture.troops.infantry-=n;},pushLog(){},enqueueEvent:e=>notices.push(e),
+    pushToast:(title,body)=>toasts.push({title,body}),
     baseAdvanceDay:()=>{fixture.day++;if(fixture.day>30){fixture.day=1;fixture.season++;if(fixture.season>3){fixture.season=0;fixture.year++;}}},
     settlements:[],FOOD_CONSUMPTION_DAYS:[],absDay:()=>0,updateExplorationWorld(){},tickDailyWar(){},tickRelationDrift(){},
     maybeQueueHonorInvite(){},applySupportDrift(){},processScheduledOmens(){},questTickDay(){}});
@@ -104,6 +108,16 @@ async function main() {
   modules.get("./faith.js").namespace.activateAfterglow(fixture);
   vm.runInContext("advanceDayWithEvents(1)",context);
   assert.equal(fixture.faithBenefits.afterglowUntil,null);assert.equal(fixture.supplies.food,50);
-  console.log("部隊・船維持費の分離、季節境界・複数季節、自動売却・端数・軽減上限: 全項目成功");
+  const noticesBeforeTide = notices.length;
+  toasts.length = 0;
+  fixture.day=30; fixture.faith=509; fixture.supplies={};
+  fixture.tideAlliance={sites:{a:{funds:200000,people:50,order:1}}};
+  vm.runInContext("advanceDayWithEvents(1)",context);
+  assert.equal(fixture.supplies.food,50);
+  assert.equal(fixture.faith,510);
+  assert.equal(fixture.tideAlliance.bonus,10);
+  assert.equal(notices.length, noticesBeforeTide);
+  assert.deepEqual(toasts.map(row => row.title), ['潮待ちの恵み', '潮盟の支え']);
+  console.log("部隊・船維持費の分離、季節境界・複数季節、自動売却・端数・軽減上限・潮盟の支給順: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
-  <link rel="stylesheet" href="styles.css?v=20260914-faith" />
+  <link rel="stylesheet" href="styles.css?v=20260915-tide-layout" />
   <link rel="stylesheet" href="layout.css?v=20260912-audience" />
 </head>
 
@@ -246,6 +246,7 @@
                 <div class="outfitting-heading"><h2 id="outfittingTitle" tabindex="-1">造船所</h2><div class="outfitting-heading-actions"><button class="btn ghost" id="outfittingEdit" aria-pressed="true">艤装変更</button><button class="btn ghost" id="outfittingTrade" aria-pressed="false">船取引</button><button class="btn ghost" id="outfittingDetails" aria-pressed="false">詳細確認</button><button class="btn ghost" id="outfittingClose">地図に戻る</button></div></div>
                 <div id="outfittingBody"></div>
               </section>
+              <section class="tide-panel" id="tidePanel" aria-label="潮盟の拠点" hidden></section>
               <div class="battle-block mb-12" id="battleBlock" hidden>
                 <div class="battle-header">
                   <span class="tiny">戦闘シミュレーション</span>
@@ -300,6 +301,7 @@
               <div class="mode-actions">
                 <button class="btn good" id="tradeBtn" hidden>物資取引</button>
                 <button class="btn good" id="outfittingOpenBtn" hidden>造船所</button>
+                <button class="btn good" id="tideOpen" hidden>潮盟の拠点</button>
                 <button class="btn good" id="questOpenBtn" hidden>依頼受注</button>
                 <button class="btn good" id="hireBtn" hidden>部隊員雇用</button>
                 <button class="btn good" id="audienceBtn" hidden>謁見する</button>

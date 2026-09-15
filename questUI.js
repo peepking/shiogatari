@@ -1,3 +1,4 @@
+import { tideOracleReward } from "./tideAlliance.js";
 import { getCurrentSettlement } from "./actions.js";
 import { elements, pushToast } from "./dom.js";
 import { getSettlementById, focusMapPosition } from "./map.js";
@@ -56,10 +57,10 @@ export function renderQuestRewards(q) {
   const resources = [];
   if (q.rewardFragment) resources.push({ id: "chart", label: `${chartLabel(q.rewardFragment)}の断片`, value: "+1（資金の代わり）" });
   else if (q.reward) resources.push({ id: "funds", label: "資金", value: `+${q.reward}` });
-  if (q.rewardFaith) resources.push({ id: "faith", label: "信仰", value: `+${q.rewardFaith}` });
+  if (q.rewardFaith) resources.push({ id: "faith", label: q.type?.startsWith("oracle_") ? `信仰（基本${q.rewardFaith}・今季の報告見込み）` : "信仰", value: `+${tideOracleReward(state, q)}` });
   if (q.rewardFame) resources.push({ id: "fame", label: "名声", value: `+${q.rewardFame}` });
   const power = questPowerRewardHtml(q);
-  return (resources.length ? resourceList(resources) : power ? "" : "報酬は依頼内容を参照") + power;
+  return (resources.length ? resourceList(resources) : power ? "" : "報酬は依頼内容を参照") + power + (q.type?.startsWith("oracle_") ? '<div class="tiny">信仰の報告見込みは季節が変わると変動する場合があります。</div>' : '');
 }
 
 const TYPE_LABEL = {

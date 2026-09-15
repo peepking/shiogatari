@@ -1,8 +1,9 @@
+import { settleTideSeason } from "./tideAlliance.js";
 import { grantFaithSeason } from "./faith.js";
 import { calcSupplyCap } from "./supplies.js";
 import { startTravelEncounter } from "./actions.js";
 import { MODE_LABEL } from "./constants.js";
-import { pushLog } from "./dom.js";
+import { pushLog, pushToast } from "./dom.js";
 import { enqueueEvent } from "./events.js";
 import { applySupportDrift, maybeQueueHonorInvite, tickDailyWar, tickRelationDrift } from "./faction.js";
 import { questTickDay } from "./quests.js";
@@ -28,8 +29,15 @@ export function advanceDayWithEvents(days = 1) {
       const gift = grantFaithSeason(state, calcSupplyCap());
       if (gift?.amount) {
         const body = `潮の縁者が航海の糧を融通してくれました。食料＋${gift.received}` + (gift.missed ? `（容量不足で${gift.missed}個は受け取れませんでした）` : "");
-        enqueueEvent({ title: "潮待ちの恵み", body });
+        pushToast("潮待ちの恵み", body, "good");
         pushLog("潮待ちの恵み", body, "-");
+      }
+    }
+    if (d === 1) {
+      const tide = settleTideSeason(state);
+      if (tide?.count) {
+        pushToast("潮盟の支え", `潮盟の${tide.count}拠点から支えが届きました。信仰＋${tide.gain} / 今季の神託報酬＋${tide.bonus}%`, "good");
+        pushLog("潮盟の支え", `信仰＋${tide.gain} / 神託＋${tide.bonus}%`, "-");
       }
     }
     if (FOOD_CONSUMPTION_DAYS.includes(d)) {

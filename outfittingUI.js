@@ -127,9 +127,10 @@ function comparisonTable(current, after, changed) {
 }
 
 /** @param {boolean} open 開閉状態。 @returns {void} 戦闘画面を優先し、地図と艤装画面を切り替える。 */
-function setOutfittingOpen(open) {
+export function setOutfittingOpen(open) {
   const battleVisible = !document.getElementById("battleBlock").hidden;
   isOpen = open && !battleVisible;
+  if (isOpen) document.dispatchEvent(new CustomEvent("tide-close"));
   document.getElementById("outfittingPanel").hidden = !isOpen;
   document.getElementById("mapBlock").hidden = isOpen || battleVisible;
 }

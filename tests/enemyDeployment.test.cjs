@@ -25,8 +25,11 @@ vm.runInContext(`
   const result = createUnits(entries, 'enemy', 10);
 `, context);
 assert.equal(vm.runInContext("result.length", context), 20);
-assert.equal(vm.runInContext("result[0].hp", context), 100);
-assert.equal(vm.runInContext("result[19].maxHp", context), 280);
+const hpMultiplier = vm.runInContext("BATTLE_HP_MULTIPLIER", context);
+assert.equal(vm.runInContext("result[0].hp", context), 50 * hpMultiplier);
+assert.equal(vm.runInContext("result[19].maxHp", context), 140 * hpMultiplier);
+assert.equal(vm.runInContext("result[0].atk", context), 15);
+assert.equal(vm.runInContext("result[19].def", context), 28);
 assert.equal(vm.runInContext("result.filter(u => u.level === 5).length", context), 6);
 assert.equal(vm.runInContext("new Set(result.map(u => u.x + ',' + u.y)).size", context), 20);
 assert.equal(vm.runInContext("JSON.stringify(entries) === before", context), true);

@@ -1,3 +1,4 @@
+import { renderTideControl } from "./tideAllianceUI.js";
 import { activateAfterglow, rescueFaithLosses } from "./faith.js";
 import { wireFaithDetails, renderFaithDetails } from "./faithUI.js";
 import { modalDeadlineText } from "./questDeadlines.js";
@@ -1316,6 +1317,7 @@ function syncUI() {
   renderExplorationControl(syncUI);
   renderChartControl(syncUI);
   renderOutfittingControl(syncUI);
+  renderTideControl(syncUI);
   renderChartCards();
   showNextEvent();
   renderQuestUI(syncUI);

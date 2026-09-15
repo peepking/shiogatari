@@ -1,3 +1,4 @@
+import { normalizeTide } from "./tideAlliance.js";
 import { normalizeFaith } from "./faith.js";
 import { MODE_LABEL } from "./constants.js";
 import { FACTIONS } from "./lore.js";
@@ -18,6 +19,7 @@ const createState = () => {
     archer: { 1: 5 },
   },
   faith: 0,
+  tideAlliance: normalizeTide(),
   faithBenefits: normalizeFaith(),
   supplies: { food: 10 },
   funds: 1000,

@@ -1,3 +1,4 @@
+import { tideOracleReward } from "./tideAlliance.js";
 import { pushLog, pushToast } from "./dom.js";
 import { enqueueEvent } from "./events.js";
 import {
@@ -477,7 +478,7 @@ function genOracleSupply() {
     reward: 0,
     acceptedAbs: absDay(state),
     deadlineAbs: absDay(state) + 90,
-    desc: `加工品を捧げよ（各${items.map((i) => `${i.name}x${i.qty}`).join(" / ")}）。報酬: 信仰+${rewardFaith}`,
+    desc: `加工品を捧げよ（各${items.map((i) => `${i.name}x${i.qty}`).join(" / ")}）。基本報酬: 信仰+${rewardFaith}`,
   };
 }
 
@@ -497,7 +498,7 @@ function genOracleMove() {
     reward: 0,
     acceptedAbs: absDay(state),
     deadlineAbs: absDay(state) + 90,
-    desc: `指定座標(${target.x + 1}, ${target.y + 1})へ至れ。報酬: 信仰+${rewardFaith}`,
+    desc: `指定座標(${target.x + 1}, ${target.y + 1})へ至れ。基本報酬: 信仰+${rewardFaith}`,
   };
 }
 
@@ -519,7 +520,7 @@ function genOracleTroop() {
     reward: 0,
     acceptedAbs: absDay(state),
     deadlineAbs: absDay(state) + 90,
-    desc: `${name}を1人捧げよ。報酬: 信仰+${rewardFaith}`,
+    desc: `${name}を1人捧げよ。基本報酬: 信仰+${rewardFaith}`,
   };
 }
 
@@ -543,7 +544,7 @@ function genOracleHunt() {
     reward: 0,
     acceptedAbs: absDay(state),
     deadlineAbs: absDay(state) + 90,
-    desc: `指定座標(${target.x + 1}, ${target.y + 1})で討伐し勝利せよ。報酬: 信仰+${rewardFaith}`,
+    desc: `指定座標(${target.x + 1}, ${target.y + 1})で討伐し勝利せよ。基本報酬: 信仰+${rewardFaith}`,
   };
 }
 
@@ -567,7 +568,7 @@ function genOracleElite() {
     reward: 0,
     acceptedAbs: absDay(state),
     deadlineAbs: absDay(state) + 90,
-    desc: `指定座標(${target.x + 1}, ${target.y + 1})で強編成を討伐し勝利せよ。報酬: 信仰+${rewardFaith}`,
+    desc: `指定座標(${target.x + 1}, ${target.y + 1})で強編成を討伐し勝利せよ。基本報酬: 信仰+${rewardFaith}`,
   };
 }
 
@@ -1179,12 +1180,12 @@ export function completeQuest(id) {
     q.items.forEach((it) => {
       state.supplies[it.id] = Math.max(0, (state.supplies[it.id] ?? 0) - it.qty);
     });
-    state.faith += q.rewardFaith ?? 0;
+    state.faith += tideOracleReward(state, q);
   }
   if (q.type === QUEST_TYPES.ORACLE_MOVE) {
     const herePos = state.position;
     if (!q.target || herePos.x !== q.target.x || herePos.y !== q.target.y) return false;
-    state.faith += q.rewardFaith ?? 0;
+    state.faith += tideOracleReward(state, q);
   }
   if (q.type === QUEST_TYPES.ORACLE_TROOP) {
     const levels = state.troops?.[q.troopType];
@@ -1199,7 +1200,7 @@ export function completeQuest(id) {
     if (next === 0) delete levels[lowest];
     else levels[lowest] = next;
     if (Object.keys(levels).length === 0) delete state.troops[q.troopType];
-    state.faith += q.rewardFaith ?? 0;
+    state.faith += tideOracleReward(state, q);
   }
   if (q.type === QUEST_TYPES.NOBLE_SUPPLY) {
     if (!here || here.id !== q.originId) return false;
@@ -1243,7 +1244,7 @@ export function completeQuest(id) {
   const rewards = [];
   if (q.rewardFragment) rewards.push(`${chartLabel(q.rewardFragment)}の断片+1`);
   if (q.reward && q.reward > 0) rewards.push(`資金+${q.reward}`);
-  if (q.rewardFaith && q.rewardFaith > 0) rewards.push(`信仰+${q.rewardFaith}`);
+  if (q.rewardFaith && q.rewardFaith > 0) rewards.push(`信仰+${tideOracleReward(state, q)}`);
   if (fameReward > 0) rewards.push(`名声+${fameReward}`);
   const impact =
     q.type === QUEST_TYPES.WAR_SUPPLY ? "戦況が少し有利に傾きました" : null;
@@ -1255,7 +1256,7 @@ export function completeQuest(id) {
     pushToast("依頼完了", `${q.title} / ${rewardText}`, "good");
     enqueueQuestResult("依頼完了", q, [
       { id: "funds", label: "資金", value: q.reward || 0 },
-      { id: "faith", label: "信仰", value: q.rewardFaith || 0 },
+      { id: "faith", label: "信仰", value: tideOracleReward(state, q) },
       { id: "fame", label: "名声", value: fameReward },
     ], impact || "");
   } else {
@@ -1349,7 +1350,7 @@ export function completeOracleBattleQuest(id) {
   );
   if (idx === -1) return false;
   const q = state.quests.active[idx];
-  const rewardFaith = q.rewardFaith ?? 0;
+  const rewardFaith = tideOracleReward(state, q);
   state.faith += rewardFaith;
   state.quests.active.splice(idx, 1);
   const rewardText = rewardFaith > 0 ? `信仰+${rewardFaith}` : "報酬なし";

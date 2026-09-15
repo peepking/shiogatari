@@ -1259,9 +1259,28 @@ option {
 .quantity-description { grid-column: 3 / 6; font-size: 12px; }
 .quantity-control input::-webkit-inner-spin-button { appearance: none; }
 .quantity-control.quantity-single { grid-template-columns: 32px minmax(32px, 1fr) 32px; min-width: 0; }
-.faith-benefit-list { display: grid; gap: 10px; margin-top: 12px; }
-.faith-benefit-list h3 { margin: 0 0 6px; color: var(--accent2); }
-.faith-benefit-list p { margin: 0; line-height: 1.7; }
+#faithDetailsModal .modal { background: #111a2d; }
+#faithDetailsModal .modal-hd { flex-shrink: 0; }
+#faithDetailsBody { min-height: 0; }
+.faith-current { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 2px 4px 16px; color: var(--muted); }
+.faith-current strong { font-size: 28px; font-variant-numeric: tabular-nums; color: var(--accent2); }
+.faith-benefit-list { display: flex; flex-direction: column; gap: 12px; }
+.faith-benefit-card { flex: none; min-width: 0; border: 1px solid var(--line); border-radius: 12px; background: #152137; padding: 16px; }
+.faith-benefit-card h3 { margin: 0 0 10px; font-size: 16px; line-height: 1.5; color: var(--accent2); }
+.faith-benefit-card p { margin: 0; line-height: 1.75; overflow-wrap: anywhere; }
+.faith-benefit-card p + p { margin-top: 8px; }
+.faith-benefit-card .tiny, .faith-caption { color: var(--muted); }
+.faith-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0; }
+.faith-metrics > div { min-width: 0; padding: 10px 6px; border-radius: 8px; background: #0e182b; text-align: center; }
+.faith-metrics dt { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.faith-metrics dd { margin: 6px 0 0; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.faith-metrics small { font-size: 12px; margin-left: 3px; font-weight: 400; }
+.faith-footnote { margin: 16px 4px 0; line-height: 1.7; }
+@media (max-width: 400px) {
+  .faith-benefit-card { padding: 12px; }
+  .faith-metrics { gap: 4px; }
+  .faith-metrics dd { font-size: 19px; }
+}
 .troop-level-item > .troop-dismiss-field { display: grid; gap: 5px; margin-top: 10px; font-size: 11px; color: #a7b7d0; }
 #tradeConfirm, #eventTradeConfirm { flex-shrink: 0; white-space: nowrap; }
 #tradeModal .sticky-footer, #eventTradeModal .sticky-footer { flex-wrap: wrap; }
@@ -1377,6 +1396,57 @@ a {
 .chart-heading span { margin-left: auto; color: #e6d3a4; white-space: nowrap; }
 .chart-card progress { width: 100%; height: 6px; accent-color: #bca16a; margin: 8px 0; }
 .chart-location { margin-top: 8px; white-space: normal; word-break: keep-all; }
+.tide-panel { container-type: inline-size; width: 100%; min-width: 0; box-sizing: border-box; padding: 4px; }
+.tide-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.tide-heading h2 { font-size: 20px; margin: 4px 0; }
+.tide-heading .btn { white-space: nowrap; flex-shrink: 0; }
+.tide-intro { display: grid; grid-template-columns: 112px minmax(0, 1fr); column-gap: 20px; align-items: start; border-top: 1px solid #344355; padding-top: 22px; }
+.tide-icon-wrap { grid-row: span 2; align-self: center; }
+.tide-icon { display: block; width: 96px; height: 96px; margin: auto; }
+.tide-intro h3 { margin: 0 0 8px; font-size: 20px; color: #ede3c9; }
+.tide-description { line-height: 1.85; font-size: 14px; }
+.tide-description p { margin: 0 0 8px; }
+.tide-conversation { margin: 18px 0; padding: 14px 18px; border-left: 2px solid #7caca6; border-radius: 0 10px 10px 0; background: #192c3b; line-height: 1.85; font-size: 14px; }
+.tide-conversation p { margin: 4px 0; }
+.tide-conversation .tide-reaction { margin-top: 10px; font-size: 12px; }
+.tide-overview { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; margin: 20px 0; }
+.tide-progress, .tide-season { min-width: 0; padding: 16px; border: 1px solid #344355; border-radius: 12px; background: #152438; }
+.tide-overview h4 { margin: 0 0 14px; font-size: 14px; color: #b8d0d8; }
+.tide-overview p { line-height: 1.8; margin: 8px 0 0; }
+.tide-progress label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px; margin-top: 12px; font-size: 13px; }
+.tide-progress b { font-variant-numeric: tabular-nums; }
+.tide-progress progress { width: 100%; height: 8px; border: 0; border-radius: 6px; overflow: hidden; background: #344b5c; accent-color: #9dc8be; }
+.tide-progress progress::-webkit-progress-bar { background: #344b5c; }
+.tide-progress progress::-webkit-progress-value { background: #9dc8be; border-radius: 6px; }
+.tide-progress progress::-moz-progress-bar { background: #9dc8be; }
+.tide-season.is-active { border-color: #628f89; }
+.tide-next-season { border-top: 1px solid #344355; margin-top: 16px; padding-top: 14px; }
+.tide-next-season h4 { margin-bottom: 6px; }
+.tide-next-season p { font-size: 13px; }
+@container (max-width: 480px) {
+  .tide-intro { grid-template-columns: 64px minmax(0, 1fr); gap: 12px; align-items: center; }
+  .tide-icon-wrap { grid-row: auto; }
+  .tide-icon { width: 64px; height: 64px; }
+  .tide-intro h3 { margin: 0; font-size: 18px; }
+  .tide-description { grid-column: 1 / -1; }
+  .tide-overview { grid-template-columns: minmax(0, 1fr); }
+  .tide-actions .btn { flex: 1 1 100%; }
+}
+.tide-reaction { color: #a9bacc; }
+.tide-blessing { color: #b4d4cc; font-size: 12px; }
+.tide-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+.tide-actions .btn { white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+.tide-details, .tide-support { border: 1px solid #344355; border-radius: 12px; padding: 14px; margin: 16px 0; line-height: 1.8; }
+.tide-details summary { cursor: pointer; color: #bad2df; }
+.tide-details p { font-size: 13px; }
+.tide-support h3 { font-size: 16px; margin: 0; }
+.tide-support label, .tide-other { display: flex; flex-direction: column; gap: 8px; }
+.tide-support input { min-width: 0; max-width: 100%; box-sizing: border-box; }
+.tide-support .tide-troop-row { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid #344355; }
+.tide-troop-row small { display: block; color: #a9bacc; }
+.tide-troop-row .quantity-control { width: 160px; }
+.tide-other { border-top: 1px solid #344355; padding-top: 16px; margin-top: 20px; font-size: 12px; color: #a9bacc; }
+.tide-other select { width: 100%; min-width: 0; }
 .outfitting-panel { container-type: inline-size; padding: 4px; width: 100%; box-sizing: border-box; height: max(620px, calc(100dvh - 180px)); }
 .outfitting-panel:not([hidden]) { display: flex; flex-direction: column; }
 #outfittingBody { display: flex; flex-direction: column; flex: 1; min-height: 0; }

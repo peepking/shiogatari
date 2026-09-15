@@ -1,3 +1,4 @@
+import { normalizeTide } from "./tideAlliance.js";
 import { normalizeFaith } from "./faith.js";
 import { MODE_LABEL } from "./constants.js";
 import { restoreWorld, snapshotWorld } from "./map.js";
@@ -101,6 +102,7 @@ export function loadGameFromStorage() {
       restoreWorld(snapshot.world);
     }
     Object.assign(state, snapshot.state);
+    state.tideAlliance = normalizeTide(snapshot.state.tideAlliance);
     state.faithBenefits = normalizeFaith(snapshot.state.faithBenefits);
     if (!snapshot.state.fleet) delete state.fleet;
     migrateFleet(state);
