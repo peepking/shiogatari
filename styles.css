@@ -1248,17 +1248,21 @@ option {
 
 .quantity-control {
   display: grid;
-  grid-template-columns: 40px 36px minmax(54px, 1fr) 36px 40px;
+  grid-template-columns: 40px 36px minmax(0, max-content) 36px 40px;
   gap: 4px;
   align-items: center;
-  min-width: 222px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
 }
 .quantity-control button { min-height: 42px; padding: 4px; white-space: nowrap; }
 .quantity-control input { width: 100%; min-width: 0; box-sizing: border-box; text-align: center; padding: 6px; }
 .quantity-control .quantity-reset { grid-column: 1 / 3; min-height: 30px; font-size: 11px; }
 .quantity-description { grid-column: 3 / 6; font-size: 12px; }
 .quantity-control input::-webkit-inner-spin-button { appearance: none; }
-.quantity-control.quantity-single { grid-template-columns: 32px minmax(32px, 1fr) 32px; min-width: 0; }
+.quantity-control.quantity-single { grid-template-columns: 32px minmax(0, max-content) 32px; min-width: 0; }
+#hireTableBody td > .quantity-control,
+#suppliesDetail td > .quantity-control { margin-inline: auto; }
 #faithDetailsModal .modal { background: #111a2d; }
 #faithDetailsModal .modal-hd { flex-shrink: 0; }
 #faithDetailsBody { min-height: 0; }
@@ -1296,7 +1300,7 @@ option {
   .trade-table tbody tr { display: flex; flex-wrap: wrap; align-items: center; border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
   .trade-table tbody td { border: 0; padding: 4px; }
   .trade-table tbody td:last-child { flex: 0 0 100%; box-sizing: border-box; }
-  .trade-table .quantity-control { min-width: 0; width: 100%; }
+  .trade-table .quantity-control { min-width: 0; width: fit-content; }
   #tradeTableBody td:nth-child(4)::before, #eventTradeTableBody td:nth-child(4)::before { content: "在庫 "; }
   #tradeTableBody td:nth-child(5)::before { content: "所持 "; }
   #suppliesDetail .trade-table td:nth-child(3)::before { content: "所持 "; }
@@ -1449,7 +1453,7 @@ a {
 .tide-support input { min-width: 0; max-width: 100%; box-sizing: border-box; }
 .tide-support .tide-troop-row { display: flex; flex-direction: row; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid #344355; }
 .tide-troop-row small { display: block; color: #a9bacc; }
-.tide-troop-row .quantity-control { width: 160px; }
+.tide-troop-row .quantity-control { width: fit-content; }
 .tide-other { border-top: 1px solid #344355; padding-top: 16px; margin-top: 20px; font-size: 12px; color: #a9bacc; }
 .tide-other select { width: 100%; min-width: 0; }
 .outfitting-panel { container-type: inline-size; padding: 4px; width: 100%; box-sizing: border-box; height: max(620px, calc(100dvh - 180px)); }
@@ -1525,4 +1529,22 @@ a {
 .national-power-metrics small { display: block; color: var(--muted); }
 .national-power-amount { display: grid; gap: 8px; }
 .national-power-amount input { width: 100%; box-sizing: border-box; }
+input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) + 34px); max-width: 100%; min-width: 0; min-height: 42px; box-sizing: border-box; padding: 6px; font-variant-numeric: tabular-nums; justify-self: start; flex: 0 1 auto; }
+.quantity-control input.number-compact { width: calc(var(--number-text-width, 3ch) + 14px); }
+.number-compact[data-number-width="3"] { --number-text-width: 3ch; }
+.number-compact[data-number-width="4"] { --number-text-width: 4ch; }
+.number-compact[data-number-width="5"] { --number-text-width: 5ch; }
+.number-compact[data-number-width="6"] { --number-text-width: 6ch; }
+.number-compact[data-number-width="7"] { --number-text-width: 7ch; }
+.number-compact[data-number-width="8"] { --number-text-width: 8ch; }
+.number-compact[data-number-width="9"] { --number-text-width: 9ch; }
+.number-compact[data-number-width="10"] { --number-text-width: 10ch; }
+.number-compact[data-number-width="11"] { --number-text-width: 11ch; }
+.number-compact[data-number-width="12"] { --number-text-width: 12ch; }
+.number-compact[data-number-width="13"] { --number-text-width: 13ch; }
+.number-compact[data-number-width="14"] { --number-text-width: 14ch; }
+.number-compact[data-number-width="15"] { --number-text-width: 15ch; }
+.number-compact[data-number-width="16"] { --number-text-width: 16ch; }
+.number-compact[data-number-width="17"] { --number-text-width: 17ch; }
+.number-compact[data-number-width="18"] { --number-text-width: 18ch; }
 .national-power-preview { white-space: pre-line; line-height: 1.8; }
