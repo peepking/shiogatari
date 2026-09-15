@@ -23,8 +23,8 @@ export function shipEffectText(id) {
   return effects.length ? `${effects.join(" / ")}（${ship.limit}隻で上限）` : "固有バフなし・容量重視の船";
 }
 
-/** @param {object} state 実状態または比較用状態。 @returns {object} 先頭3項目を物資上限・兵員上限・維持費とする共通表示値。 */
-export function fleetMetrics(state) {
+/** @param {object} state 実状態または比較用状態。 @param {boolean} includeUnequipped 比較用に未装備の射撃設備も含めるか。 @returns {object} 先頭3項目を物資上限・兵員上限・維持費とする共通表示値。 */
+export function fleetMetrics(state, includeUnequipped = true) {
   const equipment = state.expansion?.outfitting;
   const e = getOutfittingEffects(equipment, state.fleet);
   const cost = getUpkeepForecast(state, TROOP_STATS);
@@ -37,6 +37,7 @@ export function fleetMetrics(state) {
   for (const [id, name] of Object.entries({ harpoon: "モリ投擲", ballista: "バリスタ", fire_ballista: "ファイヤバリスタ", grape_ballista: "ブドウ弾バリスタ", fire_grape_ballista: "火炎ブドウ弾バリスタ", cannon: "砲撃支援" })) {
     const attack = e.attacks.find(a => a.id === id);
     if (!attack) {
+      if (!includeUnequipped) continue;
       result[`${name}間隔（tick）`] = "未装備";
       result[`${name}威力`] = "未装備";
       continue;

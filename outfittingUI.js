@@ -32,9 +32,9 @@ function description(item) {
   return Object.entries(item.effects).map(([key, n]) => `${names[key]} ${key.endsWith("Reduction") ? "−" : "+"}${n}${["medics", "scouts"].includes(key) ? "人分（最大10人分）" : "%"}`).join(" / ");
 }
 
-/** @param {object} equipment 艤装。 @returns {object} 比較と実消費が共有する数値。 */
-function metrics(equipment) {
-  return fleetMetrics({ ...state, expansion: { ...state.expansion, outfitting: equipment } });
+/** @param {object} equipment 艤装。 @param {boolean} includeUnequipped 比較用に未装備の射撃設備も含めるか。 @returns {object} 比較と実消費が共有する数値。 */
+function metrics(equipment, includeUnequipped = true) {
+  return fleetMetrics({ ...state, expansion: { ...state.expansion, outfitting: equipment } }, includeUnequipped);
 }
 
 /** @param {string|null} id 設備または取り外し。 @returns {object} 選択枠だけ交換した比較用状態。 */
@@ -116,7 +116,7 @@ function renderOutfitting(syncUI) {
 
 /** @param {HTMLElement} body 表示先。 @param {object} data 現在の艤装。 @returns {void} 現在の全数値と各装備の効果を表示する。 */
 function renderOutfittingDetails(body, data) {
-  body.innerHTML = `<div class="outfitting-details"><h3>船団の現在値</h3><p class="tiny">陸戦・海戦共通。能力倍率は地形補正前の値です。</p><table class="outfitting-metrics"><tbody>${Object.entries(metrics(data)).map(([label, value]) => `<tr><th>${label}</th><td>${value.toLocaleString()}</td></tr>`).join("")}</tbody></table>${fleetDetails(state)}<h3>支援射撃の実効値</h3><p class="tiny">${attackSummary(data)}</p><h3>装備中の艤装と効果</h3>${data.equipped.map((id, i) => `<div class="outfitting-equipped"><b>枠${i + 1}：${id ? escapeHtml(OUTFITTING_ITEMS[id].name) : "空き"}</b>${id ? `<p>${description(OUTFITTING_ITEMS[id])}</p>` : ""}</div>`).join("")}<p class="tiny">衛生兵・斥候の効果は保有兵員と設備を合わせて最大10人分です。</p></div>`;
+  body.innerHTML = `<div class="outfitting-details"><h3>船団の現在値</h3><p class="tiny">陸戦・海戦共通。能力倍率は地形補正前の値です。</p><table class="outfitting-metrics"><tbody>${Object.entries(metrics(data, false)).map(([label, value]) => `<tr><th>${label}</th><td>${value.toLocaleString()}</td></tr>`).join("")}</tbody></table>${fleetDetails(state)}<h3>支援射撃の実効値</h3><p class="tiny">${attackSummary(data)}</p><h3>装備中の艤装と効果</h3>${data.equipped.map((id, i) => `<div class="outfitting-equipped"><b>枠${i + 1}：${id ? escapeHtml(OUTFITTING_ITEMS[id].name) : "空き"}</b>${id ? `<p>${description(OUTFITTING_ITEMS[id])}</p>` : ""}</div>`).join("")}<p class="tiny">衛生兵・斥候の効果は保有兵員と設備を合わせて最大10人分です。</p></div>`;
 }
 
 /** @param {object} current 現在値。 @param {object} after 変更後。 @param {boolean} changed 変化する項目を表示するか。 @returns {string} 差分を優先して表示する比較表。 */
