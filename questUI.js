@@ -266,7 +266,7 @@ export function renderQuestUI(syncUI) {
           <span class="quest-status">${progress.statusText}</span>
           <div class="quest-progress-rows">${progress.rows.map(renderProgressRow).join("")}</div>
           <p class="quest-next">${escapeHtml(progress.next)}</p>
-          ${progress.destination ? `<button class="btn quest-location" data-x="${progress.destination.x}" data-y="${progress.destination.y}">${q.type === QUEST_TYPES.DELIVERY ? "配達先を地図で強調" : "目的地を地図で確認"}</button>` : ""}
+          ${progress.destination ? `<button class="btn quest-location" data-x="${progress.destination.x}" data-y="${progress.destination.y}">${q.type === QUEST_TYPES.DELIVERY ? "配達先を地図で確認" : "目的地を地図で確認"}</button>` : ""}
           <details class="quest-description"><summary>依頼の詳細・報酬</summary><div class="tiny">${escapeHtml(placeLabel)}</div><div class="tiny">${renderQuestConditions(q)}${escapeHtml(bodyText)}</div><div class="tiny">${renderQuestRewards(q)}</div></details>
           ${progress.automatic && !progress.ready ? `<div class="tiny quest-auto-note">${progress.automaticLabel}</div>` : `<button class="btn good quest-complete" data-id="${q.id}" ${progress.ready ? "" : "disabled"}>完了して報酬を受取</button>`}
         </div>
@@ -338,8 +338,7 @@ export function renderQuestModal(settlement, syncUI) {
       return `
         <tr>
           <td>
-            <div class="tiny">${typeLabel} / ${placeLabel}</div>
-            ${q.type === QUEST_TYPES.DELIVERY && target ? `<div class="tiny">最短距離: ${manhattan(settlement.coords, target.coords)}マス</div>` : ""}
+            <div class="tiny">${typeLabel} / ${placeLabel}${q.type === QUEST_TYPES.DELIVERY && target ? ` / 最短距離: ${manhattan(settlement.coords, target.coords)}マス` : ""}</div>
             <div><b>${q.title || itemName}</b></div>
             <div class="tiny">${renderQuestConditions(q)}${escapeHtml(bodyText)}</div>
           </td>

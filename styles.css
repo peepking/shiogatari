@@ -1276,6 +1276,11 @@ option {
 .faith-metrics dd { margin: 6px 0 0; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .faith-metrics small { font-size: 12px; margin-left: 3px; font-weight: 400; }
 .faith-footnote { margin: 16px 4px 0; line-height: 1.7; }
+.faith-site-locator { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.faith-site-locator label { display: block; margin-bottom: 8px; font-size: 13px; color: var(--muted); }
+.faith-site-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+.faith-site-controls select { flex: 1 1 200px; width: 100%; min-width: 0; }
+.faith-site-controls .btn { flex: 0 0 auto; white-space: nowrap; }
 @media (max-width: 400px) {
   .faith-benefit-card { padding: 12px; }
   .faith-metrics { gap: 4px; }
