@@ -14,6 +14,7 @@ import { escapeHtml } from './util.js';
 let open = false, selected = null, wired = false, support = null;
 /** 街・村の内部に滞在している場合だけ潮盟拠点を訪問できる。 */
 function canVisit() {
+  if (getCurrentSettlement()?.pirateHaven) return false;
   const kind = getCurrentSettlement()?.kind;
   return (state.modeLabel === MODE_LABEL.IN_TOWN && kind === 'town') ||
     (state.modeLabel === MODE_LABEL.IN_VILLAGE && kind === 'village');

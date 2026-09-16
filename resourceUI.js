@@ -1,6 +1,8 @@
+import { PIRATE_IMAGES, troopImage } from "./pirateConfig.js";
 import { escapeHtml } from "./util.js";
 
 const ICONS = {
+  illegal_drug: "spice", illicit_brew: "brew", stolen_arms: "arms", stolen_craft: "supplies",
   nationalPower: "fame",
   chart: "chart",
   ships: "ship", funds: "funds", faith: "faith", fame: "fame", supplies: "supplies", troops: "troops",
@@ -16,7 +18,7 @@ const TROOP_IDS = ["infantry", "halberd", "medic", "marine", "archer", "scout", 
  */
 export function resourceIcon(id) {
   const src = Object.hasOwn(ICONS, id) ? `./image/ui/${ICONS[id]}.svg`
-    : TROOP_IDS.includes(id) ? `./image/troops/${id}.gif` : null;
+    : (TROOP_IDS.includes(id) || Object.hasOwn(PIRATE_IMAGES, id)) ? `./${troopImage(id)}` : null;
   return src ? `<img class="resource-icon" src="${src}" alt="" aria-hidden="true">` : "";
 }
 

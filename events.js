@@ -57,8 +57,9 @@ export function initEventQueueUI() {
 /**
  * 現在のイベントを解決し、次のイベントを表示する。
  */
-export function resolveCurrentEvent() {
+export function resolveCurrentEvent(force = false) {
   ensureQueue();
+  if (!force && state.piracy?.checkpoint && state.eventQueue[0]?.actions?.some(a => a.type?.startsWith("pirate_"))) return;
   if (state.eventQueue.length) state.eventQueue.shift();
   showNextEvent();
   if (typeof document !== "undefined") document.dispatchEvent(new CustomEvent("quests-updated"));
@@ -104,7 +105,7 @@ function handleAction(action) {
     return;
   }
   if (handleTravelEventAction(action)) {
-    resolveCurrentEvent();
+    resolveCurrentEvent(true);
     return;
   }
   switch (action.type) {
@@ -176,6 +177,7 @@ export function showNextEvent() {
   }
   ensureQueue();
   const ev = state.eventQueue[0];
+  if (elements.eventModalClose) elements.eventModalClose.hidden = !!(state.piracy?.checkpoint && ev?.actions?.some(a => a.type?.startsWith("pirate_")));
   if (!ev) {
     modal.hidden = true;
     return;

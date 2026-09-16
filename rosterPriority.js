@@ -1,4 +1,4 @@
-const ROTATION_ORDER = ["crossbow", "halberd", "seaArcher", "shield", "archer", "marine", "scout", "medic"];
+const ROTATION_ORDER = ["crossbow", "halberd", "seaArcher", "shield", "archer", "marine", "scout", "medic", "pirate_spear", "pirate_assault", "pirate_shield", "pirate_archer", "pirate_axe", "raider_cavalry"];
 
 /**
  * 評価の降順で候補を並べ、同評価内は指定の兵種順で1部隊ずつ巡回する。

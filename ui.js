@@ -164,7 +164,7 @@ function isAudienceMode() {
  * @returns {boolean}
  */
 function canHonorHere(ctx) {
-  if (!ctx?.settlement || !ctx.nobleId) return false;
+  if (!ctx?.settlement || !ctx.nobleId || ctx.settlement.pirateHaven) return false;
   if (honorFactions().length > 0) return false;
   if (isHonorFaction(ctx.settlement.factionId)) return false;
   if ((state.fame || 0) < 100) return false;
@@ -745,7 +745,7 @@ function processBattleOutcome(resultCode, meta) {
       const foodGainBase = enemyTotal * 0.5;
       const foodGain = Math.max(0, Math.round(foodGainBase * (0.9 + Math.random() * 0.2) * (isStrong ? 2 : 1)));
       const materialSlots = Math.max(1, isStrong ? 2 : 1);
-      const materialPool = SUPPLY_ITEMS.filter((i) => i.id !== "food").map((i) => i.id);
+      const materialPool = SUPPLY_ITEMS.filter((i) => i.id !== "food" && i.type !== "contraband").map((i) => i.id);
       const pickedMap = {};
       for (let i = 0; i < materialSlots; i++) {
         const key =
@@ -998,7 +998,7 @@ function startOracleBattle() {
   const quest = meta.quest;
   const force = meta.strength === "elite" ? "elite" : "normal";
   const enemyFactionId = meta.enemyFactionId || quest.enemyFactionId || "pirates";
-  const { formation, total, strength } = buildEnemyFormation(force, enemyFactionId);
+  const { formation, total, strength } = quest.fixedEnemy || buildEnemyFormation(force, enemyFactionId);
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   state.pendingEncounter = {
     active: true,
@@ -1245,7 +1245,7 @@ function updateModeControls(loc) {
     elements.audienceBtn.disabled = lockActions || inAudience;
   }
   if (elements.audienceRow) elements.audienceRow.hidden = !inAudience;
-  if (elements.audienceBribeBtn) elements.audienceBribeBtn.hidden = !inAudience || honorHere;
+  if (elements.audienceBribeBtn) elements.audienceBribeBtn.hidden = !inAudience || honorHere || !!audienceCtx.settlement?.pirateHaven;
   if (elements.audienceHonorBtn) {
     const showHonor = inAudience && canHonorHere(audienceCtx);
     elements.audienceHonorBtn.hidden = !showHonor;

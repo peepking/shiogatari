@@ -15,7 +15,7 @@ export function renderLocationHeader(settlement, mode, terrain, noble = null) {
   const inside = [MODE_LABEL.IN_TOWN, MODE_LABEL.IN_VILLAGE, MODE_LABEL.AUDIENCE].includes(mode);
   const sea = ["sea", "shoal"].includes(terrain);
   title.textContent = settlement?.name || (sea ? "航海中" : "陸路を移動中");
-  status.textContent = settlement ? `${settlement.kind === "town" ? "街" : "村"} · ${inside ? "滞在中" : "入口"}` : "現在地";
+  status.textContent = settlement ? `${settlement.pirateHaven ? "無法港" : settlement.kind === "town" ? "街" : "村"} · ${inside ? "滞在中" : "入口"}` : "現在地";
   const faction = settlement && FACTIONS.find(f => f.id === settlement.factionId);
   factionRow.hidden = !faction;
   const icon = document.getElementById("locationFactionIcon");

@@ -374,3 +374,4 @@ Chrome、Edge、Firefoxなど、ES Modulesに対応したブラウザでプレ�
 ## 素材提供
 
 - [lapizwcg.itch.io](https://lapizwcg.itch.io/)
+- [lyaseek.itch.io](https://lyaseek.itch.io/)

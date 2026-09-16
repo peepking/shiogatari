@@ -10,6 +10,7 @@ const WAR_QUESTS = new Set(["noble_logistics", "noble_hunt", "war_defend_raid", 
  * @returns {object} 支援先と敵。状態を変更しない。
  */
 export function questPowerParties(q, factions, settlements) {
+  if (q.pirateKind) return { ally: null, enemy: null };
   if (!NORMAL_QUESTS.has(q.type) && !WAR_QUESTS.has(q.type)) return { ally: null, enemy: null };
   const nobleFaction = factions.find(f => f.nobles?.some(n => n.id === q.nobleId))?.id;
   const ally = Object.hasOwn(q, "powerFactionId") ? q.powerFactionId : nobleFaction || q.factionId || settlements.find(s => s.id === q.originId)?.factionId;

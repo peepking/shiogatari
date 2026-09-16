@@ -1,3 +1,4 @@
+import { buildPirateHavens } from "./pirateWorld.js";
 import { elements } from "./dom.js";
 import { mapViewport } from "./mapViewport.js";
 import { drawMapTile, drawMapPlayer, drawExplorationSite, drawChartSite } from "./mapArt.js";
@@ -242,7 +243,7 @@ export function buildWorld(seed = DEFAULT_WORLD_SEED) {
   const noblesByFaction = new Map();
   FACTIONS.forEach((f) => noblesByFaction.set(f.id, (f.nobles || []).map((n) => ({ ...n, factionId: f.id }))));
   const factionCursor = new Map();
-  const fallbackList = Array.from(noblesByFaction.values()).flat();
+  const fallbackList = Array.from(noblesByFaction.values()).flat().filter(n => n.factionId !== "pirates");
   let fallbackCursor = 0;
   // 拠点の所属は島ごとの勢力偏りを持たせる（左上/右上/下の島）。
   const preferredFactionForCell = (x, y) => {
@@ -361,6 +362,9 @@ export function buildWorld(seed = DEFAULT_WORLD_SEED) {
       nobleHome.set(n.id, fallback.id);
       assignedNobles.add(n.id);
     });
+  });
+  buildPirateHavens(mapData, settlements, nobleHome, port => {
+    initSettlementRecruitment(port); refreshSettlementDemand(port); refreshSettlementStock(port);
   });
   lastDemandSeason = { year: state.year, season: state.season };
 }
@@ -759,6 +763,9 @@ function refreshSettlementDemandIfNeeded() {
     refreshSettlementDemand(s);
     refreshSettlementStock(s);
     refreshSettlementRecruitment(s);
+  });
+  buildPirateHavens(mapData, settlements, nobleHome, port => {
+    initSettlementRecruitment(port); refreshSettlementDemand(port); refreshSettlementStock(port);
   });
   lastDemandSeason = { year: state.year, season: state.season };
 }

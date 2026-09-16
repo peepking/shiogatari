@@ -1,3 +1,4 @@
+import { PIRATE_IMAGES } from "./pirateConfig.js";
 import { quantityControl, wireQuantityControls, refreshQuantity } from "./quantityUI.js";
 import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { state } from "./state.js";
@@ -10,6 +11,12 @@ export const BASE_TROOP_CAP = 30;
 
 /** @type {object} 兵種の定義 */
 export const TROOP_STATS = {
+  pirate_shield: { name: "海賊盾兵", hire: 150, upkeep: 3, basePower: 120, hp: 130, atk: 32, def: 30, spd: 3, range: 1, move: 1, terrain: { plain: 110, deck: 110, forest: 100, mountain: 100, shoal: 110, sea: 120 }, level: 1 },
+  pirate_spear: { name: "海賊槍兵", hire: 170, upkeep: 3, basePower: 130, hp: 100, atk: 40, def: 14, spd: 3, range: 2, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
+  pirate_archer: { name: "海賊弓兵", hire: 150, upkeep: 3, basePower: 120, hp: 80, atk: 35, def: 6, spd: 3, range: 4, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
+  raider_cavalry: { name: "略奪騎兵", hire: 250, upkeep: 5, basePower: 150, hp: 150, atk: 32, def: 25, spd: 3, range: 1, move: 2, terrain: { plain: 130, deck: 130, forest: 100, mountain: 100, shoal: 100, sea: 110 }, level: 1 },
+  pirate_axe: { name: "海賊斧兵", hire: 150, upkeep: 3, basePower: 120, hp: 120, atk: 50, def: 12, spd: 3, range: 1, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
+  pirate_assault: { name: "海賊突撃兵", hire: 200, upkeep: 4, basePower: 130, hp: 120, atk: 40, def: 12, spd: 2, range: 1, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
   infantry: {
     name: "歩兵",
     hire: 100,
@@ -215,8 +222,8 @@ const troopTypeKeys = () => Object.keys(TROOP_STATS);
  * @param {boolean} regular 正規軍か。 @param {boolean} strong 強編成か。 @returns {string[]} 抽選前の候補。
  */
 export function enemyTroopPool(regular, strong) {
-  if (regular) return troopTypeKeys().filter(type => !["scout", "medic"].includes(type));
-  return strong ? troopTypeKeys() : ["infantry", "archer", "scout", "marine"];
+  if (regular) return troopTypeKeys().filter(type => !["scout", "medic"].includes(type) && !PIRATE_IMAGES[type]);
+  return strong ? troopTypeKeys() : ["infantry", "archer", "scout", "marine", ...Object.keys(PIRATE_IMAGES)];
 }
 
 /**
@@ -269,7 +276,7 @@ export function initSettlementRecruitment(settlement) {
   if (!settlement) return;
   const slotCount = RECRUIT_SLOTS[settlement.kind] || 0;
   if (!slotCount) return;
-  const pool = troopTypeKeys();
+  const pool = troopTypeKeys().filter(type => settlement.pirateHaven ? !!PIRATE_IMAGES[type] : !PIRATE_IMAGES[type]);
   const weights = buildRecruitWeights(settlement.kind);
   const rareChance = RECRUIT_RARE_CHANCE[settlement.kind] ?? 0;
   const picks = [];

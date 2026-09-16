@@ -9,6 +9,7 @@ async function main() {
   let seed = 12345;
   context.Math.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const dependencies = {
+    "./pirateConfig.js": { PIRATE_IMAGES: {pirate_shield:"p_shield",pirate_spear:"p_spear",pirate_archer:"p_archer",raider_cavalry:"p_cavalry",pirate_axe:"p_axe",pirate_assault:"p_stormtrooper"} },
     "./quantityUI.js": { quantityControl() {}, wireQuantityControls() {}, refreshQuantity() {} },
     "./dom.js": { confirmAction() {}, pushLog() {}, pushToast() {} },
     "./state.js": { state: {} },
