@@ -355,6 +355,37 @@ async function main() {
   assert.equal(fishing.codexRevealState(0.75).baits, true);
   assert.deepEqual(fishing.codexRevealState(1), { regions: true, seasons: true, depth: true, baits: true });
 
+  // 図鑑詳細の公開判定（回帰）: 発見済み魚は完成率に関係なく全項目を公開する
+  assert.deepEqual(fishing.codexDetailReveal(false, 0), { regions: true, seasons: false, depth: false, baits: false });
+  assert.deepEqual(fishing.codexDetailReveal(true, 0), { regions: true, seasons: true, depth: true, baits: true });
+  assert.deepEqual(fishing.codexDetailReveal(true, 0.24), { regions: true, seasons: true, depth: true, baits: true });
+  assert.deepEqual(fishing.codexDetailReveal(true, 0.49), { regions: true, seasons: true, depth: true, baits: true });
+  assert.deepEqual(fishing.codexDetailReveal(true, 0.74), { regions: true, seasons: true, depth: true, baits: true });
+  assert.deepEqual(fishing.codexDetailReveal(true, 1), { regions: true, seasons: true, depth: true, baits: true });
+  // 未発見魚には段階公開を維持（季節25%・水深50%・有効餌75%、境界を含む）
+  assert.deepEqual(fishing.codexDetailReveal(false, 0.25), { regions: true, seasons: true, depth: false, baits: false });
+  assert.deepEqual(fishing.codexDetailReveal(false, 0.5), { regions: true, seasons: true, depth: true, baits: false });
+  assert.deepEqual(fishing.codexDetailReveal(false, 0.75), { regions: true, seasons: true, depth: true, baits: true });
+  assert.deepEqual(fishing.codexDetailReveal(false, 1), { regions: true, seasons: true, depth: true, baits: true });
+
+  // 発見済み魚の季節フィルタ（回帰）: 完成率（seasonsRevealed）に関係なく実データで判定する
+  assert.equal(
+    fishing.matchesCodexFilters(
+      fishing.speciesById("madai"),
+      { categories: new Set(), regions: new Set(), seasons: new Set([0]) },
+      { caught: true, seasonsRevealed: false }
+    ),
+    true
+  );
+  assert.equal(
+    fishing.matchesCodexFilters(
+      fishing.speciesById("madai"),
+      { categories: new Set(), regions: new Set(), seasons: new Set([3]) },
+      { caught: true, seasonsRevealed: true }
+    ),
+    false
+  );
+
   // 未発見魚の季節フィルタ: 完成率25%以上（seasonsRevealed）で公開・未満は季節指定中は対象外
   assert.equal(
     fishing.matchesCodexFilters(
