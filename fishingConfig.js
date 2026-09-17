@@ -52,10 +52,48 @@ export const BAIT_DEFS = freezeDefinition({
   small: { name: "小魚", price: 10 },
 });
 
-/** 釣り竿はアタリ後の入力猶予（実時間の秒数）を延長する装備。 */
+/** 釣り竿はアタリ後の入力猶予（実時間の秒数）を倍率で調整する装備。 */
 export const ROD_DEFS = freezeDefinition({
-  rod_basic: { name: "粗末な釣り竿", windowBonus: 0 },
+  rod_basic: {
+    name: "粗末な釣り竿",
+    windowMultiplier: 0.5,
+    flavor: "岸辺で拾った流木を削っただけの代物だ。それでも潮風を感じ取れるなら、十分な相棒になる。",
+    context: "「まずはこれで海を知れ。竿は使ううちに育つ——お前もな。」\n釣り小屋の主人は、お前の最初の一振りを見届けてそう呟いた。"
+  },
+  rod_sturdy: {
+    name: "丈夫な釣り竿",
+    windowMultiplier: 0.625,
+    flavor: "漁師たちが代々受け継いできた、実用一途の竿だ。派手さはないが、大物が掛かっても折れることはない。",
+    context: "「ようやく一人前の引きを知ったか。これなら荒波でも負けん。」\n釣り小屋の主人は、お前の成長を認めるように竿を差し出した。"
+  },
+  rod_fine: {
+    name: "上等な釣り竿",
+    windowMultiplier: 0.75,
+    flavor: "職人が魂を込めて編み上げた、竹と糸の芸術品だ。魚の息遣いまで手に取るように伝わってくる。",
+    context: "「海の声を聴けるようになったか。この竿なら、さらに深いところへ届く。」\n主人は満足げに頷き、丁寧に手入れされた竿を渡してきた。"
+  },
+  rod_master: {
+    name: "名人の釣り竿",
+    windowMultiplier: 0.875,
+    flavor: "伝説の釣り師が愛用したとされる、幻の逸品だ。海の声を聴き分け、魚の心まで釣り上げるという。",
+    context: "「もはや教えることはない。あとは海と、お前自身の勘だ。」\n主人は静かに、まるで遺物を託すように竿を両手で差し出した。"
+  },
+  rod_ancient: {
+    name: "古き海の釣り竿",
+    windowMultiplier: 1.0,
+    flavor: "太古の巨匠が遺したと伝わる、神代の遺物だ。これを手にすれば、海の全てが味方になるだろう。",
+    context: "「ついにここまで来たか。この竿を預けられるのは、海に愛された者だけだ。」\n主人の瞳には、長き歳月の誇りのようなものが宿っていた。"
+  },
 });
+
+/** 釣り竿アップグレード閾値（図鑑完成率）。順序は昇順。 */
+export const ROD_UPGRADE_THRESHOLDS = freezeDefinition([
+  { rodId: "rod_basic", name: "粗末な釣り竿", requiredRatio: 0.0 },
+  { rodId: "rod_sturdy", name: "丈夫な釣り竿", requiredRatio: 0.10 },
+  { rodId: "rod_fine", name: "上等な釣り竿", requiredRatio: 0.30 },
+  { rodId: "rod_master", name: "名人の釣り竿", requiredRatio: 0.55 },
+  { rodId: "rod_ancient", name: "古き海の釣り竿", requiredRatio: 0.80 },
+]);
 
 /**
  * 釣果の定義。

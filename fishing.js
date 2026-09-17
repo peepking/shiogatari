@@ -1,4 +1,4 @@
-import { FISH_SPECIES, BAIT_DEFS, ROD_DEFS, FISHING_CONFIG } from "./fishingConfig.js";
+import { FISH_SPECIES, BAIT_DEFS, ROD_DEFS, FISHING_CONFIG, ROD_UPGRADE_THRESHOLDS } from "./fishingConfig.js";
 
 /**
  * game時間から絶対日を算出する。questUtils.absDayと同じ式なので、独立して維持する。
@@ -34,7 +34,7 @@ function isPosition(value) {
  * @returns {object} 共有参照を持たない初期状態。
  */
 export function createFishingState() {
-  return { rodId: "rod_basic", counts: {}, codex: {}, bait: { insect: 0, shell: 0, cut: 0, small: 0 }, pending: null };
+  return { rodId: null, counts: {}, codex: {}, bait: { insect: 0, shell: 0, cut: 0, small: 0 }, pending: null };
 }
 
 /**
@@ -206,16 +206,52 @@ export function rollCatch({ regionId, season, depth, baitId }, random) {
 
 /**
  * アタリ発生後の入力猶予（実時間・秒）を返す。
- * 竿の windowBonus は猶予を延長する。最低2秒を保証する。
+ * 竿の windowMultiplier は基本猶予に倍率を掛ける。最低2秒を保証する。
+ * 竿未所持の場合は最低保証の 2 秒を返す（実質釣り上げ不可）。
  * @param {string} speciesId 種ID。
- * @param {string} rodId 竿ID。
+ * @param {string|null} rodId 竿ID。
  * @returns {number} 猶予秒数。
  */
 export function windowFor(speciesId, rodId) {
   const species = SPECIES_INDEX[speciesId];
-  const rod = ROD_DEFS[rodId];
+  const rod = rodId ? ROD_DEFS[rodId] : null;
   const base = species?.baseWindow ?? 3;
-  return Math.max(2, base + (rod?.windowBonus ?? 0));
+  const multiplier = rod?.windowMultiplier ?? 0;
+  const multiplied = Math.floor(base * multiplier);
+  return Math.max(2, multiplied);
+}
+
+/**
+ * 図鑑完成率から現在使用可能な最高ランクの竿IDを返す。
+ * 閾値は ROD_UPGRADE_THRESHOLDS の requiredRatio 以上を満たす最高位。
+ * @param {Object} codex 図鑑登録状態。
+ * @returns {string} 竿ID（ROD_DEFS のキー）。
+ */
+export function getCurrentRod(codex) {
+  const completion = codexCompletion(codex);
+  let current = "rod_basic";
+  for (const t of ROD_UPGRADE_THRESHOLDS) {
+    if (completion.ratio >= t.requiredRatio) current = t.rodId;
+    else break;
+  }
+  return current;
+}
+
+/**
+ * 釣り小屋入店時に報酬が発生するか判定し、取得すべき竿IDを返す。
+ * 現在の竿より上のランクで、かつ完成率条件を満たす最高位があれば返す。
+ * なければ null。
+ * @param {object} state ゲーム状態。
+ * @returns {string|null} 取得すべき竿ID。
+ */
+export function checkRodUpgrade(state) {
+  const fishing = state.expansion.fishing;
+  const availableRod = getCurrentRod(fishing.codex);
+  const currentRod = fishing.rodId || "rod_basic";
+  const currentIdx = ROD_UPGRADE_THRESHOLDS.findIndex(t => t.rodId === currentRod);
+  const availableIdx = ROD_UPGRADE_THRESHOLDS.findIndex(t => t.rodId === availableRod);
+  if (availableIdx > currentIdx) return availableRod;
+  return null;
 }
 
 /**
@@ -459,7 +495,7 @@ export function normalizeFishing(value) {
     bait[id] = Number.isSafeInteger(qty) && qty >= 0 ? qty : 0;
   }
   return {
-    rodId: ROD_DEFS[source.rodId] ? source.rodId : "rod_basic",
+    rodId: source.rodId && ROD_DEFS[source.rodId] ? source.rodId : null,
     counts,
     codex,
     bait,

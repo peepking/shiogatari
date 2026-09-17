@@ -95,10 +95,13 @@ async function main() {
   }
   assert.ok(seen.size >= 3, "複数の種が混ざる");
 
-  // 猶予: 一般魚ほど長く、大物・超大物ほど短い。竿ボーナスは実時間を延長する
+  // 猶予: 一般魚ほど長く、大物・超大物ほど短い。竿倍率で調整（最低2秒）
   assert.ok(fishing.windowFor("aji", "rod_basic") > fishing.windowFor("madai", "rod_basic"));
-  assert.ok(fishing.windowFor("madai", "rod_basic") > fishing.windowFor("kuromaguro", "rod_basic"));
-  assert.equal(fishing.windowFor("madai", "rod_basic"), 4);
+  // madai(base=4) と kuromaguro(base=2) は粗末竿(0.5倍)でともに下限2秒になるため等しい
+  assert.equal(fishing.windowFor("madai", "rod_basic"), 2);
+  assert.equal(fishing.windowFor("kuromaguro", "rod_basic"), 2);
+  // 古き海の竿(1.0倍)なら元の差が保たれる
+  assert.ok(fishing.windowFor("madai", "rod_ancient") > fishing.windowFor("kuromaguro", "rod_ancient"));
 
   // 時間内判定
   assert.equal(fishing.isPullWithinWindow(6, 5999), true);
@@ -137,14 +140,14 @@ async function main() {
 
   // 補完: 欠損・不正値は既定値へ、壊れたセッションは破棄
   const fresh = fishing.normalizeFishing();
-  assert.deepEqual(fresh, { rodId: "rod_basic", counts: {}, codex: {}, bait: { insect: 0, shell: 0, cut: 0, small: 0 }, pending: null });
+  assert.deepEqual(fresh, { rodId: null, counts: {}, codex: {}, bait: { insect: 0, shell: 0, cut: 0, small: 0 }, pending: null });
   const dirty = fishing.normalizeFishing({
     rodId: "unknown",
     counts: { aji: 3, nope: 1, madai: -1 },
     codex: { aji: { count: 2, maxSize: 40, maxSizeAbs: 5, maxSizePos: { x: 1, y: 2 } }, nope: { count: 1 } },
     pending: { baitId: "unknown", castsLeft: 4 },
   });
-  assert.equal(dirty.rodId, "rod_basic");
+  assert.equal(dirty.rodId, null);
   assert.deepEqual(dirty.counts, { aji: 3 });
   assert.ok(dirty.codex.nope === undefined);
   assert.equal(dirty.codex.aji.maxSizePos.x, 1);
@@ -534,6 +537,126 @@ async function main() {
   assert.equal(fishing.purchaseBait(stBuy3, "invalid", 1), false);
 
   console.log("釣り: 海域・抽選・猶予・図鑑・捌き・売却・補完・フィルタ・ヒント公開・アタリ文言・演出トーン・釣果判定・餌システム: 全項目成功");
+
+// 釣り竿アップグレードシステムのテスト
+// ROD_DEFS と ROD_UPGRADE_THRESHOLDS の整合性
+const ROD_DEFS = config.namespace.ROD_DEFS;
+const ROD_UPGRADE_THRESHOLDS = config.namespace.ROD_UPGRADE_THRESHOLDS;
+assert.equal(ROD_DEFS.rod_basic.windowMultiplier, 0.5);
+assert.equal(ROD_DEFS.rod_sturdy.windowMultiplier, 0.625);
+assert.equal(ROD_DEFS.rod_fine.windowMultiplier, 0.75);
+assert.equal(ROD_DEFS.rod_master.windowMultiplier, 0.875);
+assert.equal(ROD_DEFS.rod_ancient.windowMultiplier, 1.0);
+assert.equal(ROD_UPGRADE_THRESHOLDS[0].requiredRatio, 0.0);
+assert.equal(ROD_UPGRADE_THRESHOLDS[1].requiredRatio, 0.10);
+assert.equal(ROD_UPGRADE_THRESHOLDS[2].requiredRatio, 0.30);
+assert.equal(ROD_UPGRADE_THRESHOLDS[3].requiredRatio, 0.55);
+assert.equal(ROD_UPGRADE_THRESHOLDS[4].requiredRatio, 0.80);
+
+// windowFor: 倍率適用・下限維持
+// aji: baseWindow=6
+assert.equal(fishing.windowFor("aji", "rod_basic"), 3);    // 6 * 0.5 = 3
+assert.equal(fishing.windowFor("aji", "rod_sturdy"), 3);   // 6 * 0.625 = 3.75 -> floor 3
+assert.equal(fishing.windowFor("aji", "rod_fine"), 4);     // 6 * 0.75 = 4
+assert.equal(fishing.windowFor("aji", "rod_master"), 5);   // 6 * 0.875 = 5.25 -> floor 5
+assert.equal(fishing.windowFor("aji", "rod_ancient"), 6);  // 6 * 1.0 = 6
+// madai: baseWindow=4 -> 粗末で 2 (下限)
+assert.equal(fishing.windowFor("madai", "rod_basic"), 2);  // 4 * 0.5 = 2 (下限)
+assert.equal(fishing.windowFor("madai", "rod_ancient"), 4); // 4 * 1.0 = 4
+// baseWindow=3 の魚で粗末でも 2 秒保証
+assert.equal(fishing.windowFor("unknown", "rod_basic"), 2);
+
+// getCurrentRod: 閾値境界
+const emptyCodex = {};
+assert.equal(fishing.getCurrentRod(emptyCodex), "rod_basic");
+
+// 10% ちょうど (29/286 ≈ 0.101)
+const codex10 = makeCodexAtRatio(29/286);
+assert.equal(fishing.getCurrentRod(codex10), "rod_sturdy");
+// 30% ちょうど (86/286 ≈ 0.300)
+const codex30 = makeCodexAtRatio(86/286);
+assert.equal(fishing.getCurrentRod(codex30), "rod_fine");
+// 55% ちょうど (158/286 ≈ 0.552)
+const codex55 = makeCodexAtRatio(158/286);
+assert.equal(fishing.getCurrentRod(codex55), "rod_master");
+// 80% ちょうど (229/286 ≈ 0.800)
+const codex80 = makeCodexAtRatio(229/286);
+assert.equal(fishing.getCurrentRod(codex80), "rod_ancient");
+
+// 境界未満
+const codex09 = makeCodexAtRatio(0.09);
+assert.equal(fishing.getCurrentRod(codex09), "rod_basic");
+const codex29 = makeCodexAtRatio(0.29);
+assert.equal(fishing.getCurrentRod(codex29), "rod_sturdy");
+
+// checkRodUpgrade: スキップ・再発生防止
+const stUpgrade = makeState();
+// 完成率 58% (166/286) で粗末 -> 名人へジャンプ
+stUpgrade.expansion.fishing.rodId = "rod_basic";
+stUpgrade.expansion.fishing.codex = makeCodexAtRatio(166/286);
+assert.equal(fishing.checkRodUpgrade(stUpgrade), "rod_master");
+
+// 一度取得したら再発生しない
+stUpgrade.expansion.fishing.rodId = "rod_master";
+assert.equal(fishing.checkRodUpgrade(stUpgrade), null);
+
+// 竿取得前は図鑑完成率だけで現在の竿は変わらない
+const stBefore = makeState();
+stBefore.expansion.fishing.rodId = "rod_basic";
+stBefore.expansion.fishing.codex = makeCodexAtRatio(166/286);
+assert.equal(fishing.getCurrentRod(stBefore.expansion.fishing.codex), "rod_master"); // 取得可能な最高位
+assert.equal(stBefore.expansion.fishing.rodId, "rod_basic"); // 実際の竿は変わらない
+
+// 既存ロジック不変確認: 抽選・餌消費等
+const testState = makeState();
+testState.expansion.fishing.bait = { insect: 1, shell: 0, cut: 0, small: 0 };
+assert.equal(fishing.consumeBait(testState, "insect"), true);
+assert.equal(testState.expansion.fishing.bait.insect, 0);
+
+// ヘルパー: 指定完成率相当の codex を作る（FISH_SPECIES 総数 286 種想定）
+function makeCodexAtRatio(ratio) {
+  const codex = {};
+  const total = 286;
+  const caught = Math.round(total * ratio);
+  const species = config.namespace.FISH_SPECIES;
+  for (let i = 0; i < caught; i++) {
+    codex[species[i].id] = { count: 1, maxSize: species[i].sizeRange[0] };
+  }
+  return codex;
+}
+
+console.log("釣り: 海域・抽選・猶予・図鑑・捌き・売却・補完・フィルタ・ヒント公開・アタリ文言・演出トーン・釣果判定・餌システム・竿アップグレード: 全項目成功");
+
+// 竿なし状態のテスト
+// 初期状態は竿なし
+const fresh2 = fishing.normalizeFishing();
+assert.equal(fresh2.rodId, null);
+
+// 竿なしで windowFor は最低保証 2 秒
+assert.equal(fishing.windowFor("aji", null), 2);
+assert.equal(fishing.windowFor("madai", null), 2);
+assert.equal(fishing.windowFor("unknown", null), 2);
+
+// 竿ありなら倍率適用
+assert.equal(fishing.windowFor("aji", "rod_basic"), 3);
+assert.equal(fishing.windowFor("aji", "rod_sturdy"), 3);
+assert.equal(fishing.windowFor("aji", "rod_fine"), 4);
+assert.equal(fishing.windowFor("aji", "rod_master"), 5);
+assert.equal(fishing.windowFor("aji", "rod_ancient"), 6);
+
+// normalizeFishing で既存有効 rodId は維持
+const kept2 = fishing.normalizeFishing({ rodId: "rod_basic", counts: {}, codex: {}, bait: {}, pending: null });
+assert.equal(kept2.rodId, "rod_basic");
+
+// 無効な rodId は null に
+const fixed2 = fishing.normalizeFishing({ rodId: "invalid", counts: {}, codex: {}, bait: {}, pending: null });
+assert.equal(fixed2.rodId, null);
+
+// 既存 rodId なしの場合は null に
+const noRod2 = fishing.normalizeFishing({ counts: {}, codex: {}, bait: {}, pending: null });
+assert.equal(noRod2.rodId, null);
+
+console.log("釣り: 海域・抽選・猶予・図鑑・捌き・売却・補完・フィルタ・ヒント公開・アタリ文言・演出トーン・釣果判定・餌システム・竿アップグレード・竿なし状態: 全項目成功");
 }
 
 main().catch((error) => {

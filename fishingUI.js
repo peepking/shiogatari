@@ -6,7 +6,7 @@ import { advanceDayWithEvents } from "./time.js";
 import { saveGameToStorage } from "./storage.js";
 import { SEASONS, escapeHtml } from "./util.js";
 import { FISHING_CONFIG, FISH_REGIONS, FISH_CATEGORIES, BAIT_DEFS, ROD_DEFS, FISH_SPECIES, DEPTH_NAMES } from "./fishingConfig.js";
-import { fishingRegionAt, rollCatch, windowFor, rollSize, recordCatch, dressCatch, speciesById, categoryTone, atariMessage, catchRecordFacts, consumeBait, processToBait, sessionDayRule, matchesCodexFilters, codexCompletion, codexRevealState, codexDetailReveal } from "./fishing.js";
+import { fishingRegionAt, rollCatch, windowFor, rollSize, recordCatch, dressCatch, speciesById, categoryTone, atariMessage, catchRecordFacts, consumeBait, processToBait, checkRodUpgrade, sessionDayRule, matchesCodexFilters, codexCompletion, codexRevealState, codexDetailReveal } from "./fishing.js";
 
 /** 釣りパネルを開いた際に渡される表示同期。 bite/キャスト後に使う。 */
 let panelSync = null;
@@ -20,6 +20,11 @@ let biteDeadline = 0;
  * 成功: { success:true, speciesId, size, firstCatch, maxUpdate } / 失敗: { success:false }。
  */
 let resultScreen = null;
+/**
+ * 釣り竿報酬モーダルの表示状態。
+ * { rodId, name } または null。
+ */
+let rodReward = null;
 /** 図鑑の分類フィルタの選択カテゴリ群。空なら全カテゴリ。 */
 let codexCats = new Set();
 /** 図鑑の海域フィルタの選択海域キー群。空なら全海域。 */
@@ -107,6 +112,7 @@ function isWaiting() {
 /**
  * 現在の釣りボタンの表示と動作を更新する。
  * 海上ではセッション開始・継続、街・村では釣果の管理として開く。
+ * 釣り竿未所持の海上では「釣り竿が必要」と表示し無効化する。
  * @param {Function} syncUI 表示同期。
  * @returns {void}
  */
@@ -117,7 +123,9 @@ export function renderFishingControl(syncUI) {
   const env = currentEnv();
   const manage = canSell();
   const fishing = state.expansion.fishing;
+  const hasRod = !!fishing?.rodId;
   const online =
+    hasRod &&
     env.sea &&
     state.modeLabel === MODE_LABEL.NORMAL &&
     !state.pendingEncounter?.active &&
@@ -129,19 +137,58 @@ export function renderFishingControl(syncUI) {
   if (pending) {
     label = "釣り（続き）";
     action = () => openFishingPanel(syncUI);
+    button.disabled = false;
   } else if (online) {
     label = "釣り";
     action = () => openFishingPanel(syncUI);
+    button.disabled = false;
+  } else if (!hasRod && env.sea) {
+    label = "釣り竿が必要";
+    action = null;
+    button.disabled = true;
   } else if (manage) {
     label = "釣り小屋";
     action = () => openFishingPanel(syncUI);
+    button.disabled = false;
   } else {
     label = "魚図鑑";
     action = openCodexModal;
+    button.disabled = false;
   }
   button.hidden = false;
   button.textContent = label;
   button.onclick = action;
+}
+
+/**
+ * 釣り竿報酬モーダルを表示する。
+ * @param {string} rodId 竿ID
+ * @param {string} rodName 竿名
+ * @param {Function} onConfirm 確認時のコールバック
+ */
+function showRodRewardModal(rodId, rodName, onConfirm) {
+  rodReward = { rodId, rodName };
+  const modal = document.getElementById("rodRewardModal");
+  const nameEl = document.getElementById("rodRewardName");
+  const contextEl = document.getElementById("rodRewardContext");
+  const flavorEl = document.getElementById("rodRewardFlavor");
+  const okBtn = document.getElementById("rodRewardOk");
+  if (!modal || !nameEl || !contextEl || !flavorEl || !okBtn) {
+    onConfirm?.();
+    return;
+  }
+  nameEl.textContent = rodName;
+  const rodDef = ROD_DEFS[rodId];
+  contextEl.textContent = rodDef?.context || "";
+  flavorEl.textContent = rodDef?.flavor || "";
+  modal.hidden = false;
+  const handler = () => {
+    okBtn.removeEventListener("click", handler);
+    modal.hidden = true;
+    rodReward = null;
+    onConfirm?.();
+  };
+  okBtn.addEventListener("click", handler);
 }
 
 /**
@@ -152,6 +199,44 @@ export function renderFishingControl(syncUI) {
 export function openFishingPanel(syncUI) {
   if (typeof syncUI === "function") panelSync = syncUI;
   refreshFishingDay();
+
+  const fishing = state.expansion.fishing;
+  const hasRod = !!fishing.rodId;
+
+  // 竿未所持の場合
+  if (!hasRod) {
+    if (canSell()) {
+      // 街・村の釣り小屋で初回入手イベント
+      showRodRewardModal("rod_basic", ROD_DEFS.rod_basic.name, () => {
+        state.expansion.fishing.rodId = "rod_basic";
+        saveGameToStorage();
+        renderFishingPanel();
+        if (elements.fishingModal) elements.fishingModal.hidden = false;
+      });
+      return;
+    }
+    // 海上で竿なしならメッセージ表示してパネルを開く
+    pushToast("釣り", "釣り竿を持っていません。街・村の釣り小屋で入手してください。", "warn");
+    renderFishingPanel();
+    if (elements.fishingModal) elements.fishingModal.hidden = false;
+    return;
+  }
+
+  // 竿所持時の竿アップグレード判定
+  if (canSell()) {
+    const newRod = checkRodUpgrade(state);
+    if (newRod) {
+      const rodDef = ROD_DEFS[newRod];
+      showRodRewardModal(newRod, rodDef.name, () => {
+        state.expansion.fishing.rodId = newRod;
+        saveGameToStorage();
+        renderFishingPanel();
+        if (elements.fishingModal) elements.fishingModal.hidden = false;
+      });
+      return;
+    }
+  }
+
   renderFishingPanel();
   if (elements.fishingModal) elements.fishingModal.hidden = false;
 }
@@ -195,6 +280,10 @@ export function resumeFishing() {
 function beginFishing() {
   const data = state.expansion.fishing;
   if (data.pending) return;
+  if (!data.rodId) {
+    pushToast("釣り", "釣り竿を持っていません。街・村の釣り小屋で入手してください。", "warn");
+    return;
+  }
   const env = currentEnv();
   if (!env.sea || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active || state.expansion.exploration?.pending || state.expansion.charts?.pending) {
     pushToast("釣り", "今は釣りを始められません。", "warn");
@@ -444,12 +533,18 @@ function sessionHtml() {
   if (resultScreen) return resultAnnouncementHtml();
   if (!data.pending) {
     if (!env.sea) return `<div class="tiny">釣りは海上（海・浅瀬）でのみできます。</div>`;
+    const hasRod = !!data.rodId;
+    if (!hasRod) {
+      return `<div class="tiny">釣り竿を持っていません。街・村の釣り小屋で入手してください。</div>`;
+    }
     const opts = Object.entries(BAIT_DEFS)
       .map(([id, b]) => `<option value="${id}">${escapeHtml(b.name)}</option>`)
       .join("");
+    const rodName = ROD_DEFS[data.rodId]?.name || "？";
     return `<div class="row gap-12"><label class="tiny" for="fishingBaitSelect">餌</label><select id="fishingBaitSelect">${opts}</select>
       <button class="btn primary" id="fishingStartBtn">釣り開始</button></div>
-      <div class="tiny mt-6">1日使い、最大${FISHING_CONFIG.castsPerSession}回まで釣れます。日が変わるとやり直しになり、回数は持ち越せません。</div>`;
+      <div class="tiny mt-6">1日使い、最大${FISHING_CONFIG.castsPerSession}回まで釣れます。日が変わるとやり直しになり、回数は持ち越せません。</div>
+      <div class="tiny mt-6">釣り竿: ${rodName}</div>`;
   }
   if (isWaiting() || data.pending.catch) {
     const caught = data.pending.catch;
