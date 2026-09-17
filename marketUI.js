@@ -89,7 +89,8 @@ function collectTrade(eventTrade = false) {
   const settlement = eventTrade ? null : getCurrentSettlement();
   const root = eventTrade ? elements.eventTradeTableBody : elements.tradeTableBody;
   const buys = {}, sells = {};
-  let fundsDelta = 0, quantityDelta = 0, error = "";
+  let fundsDelta = 0, quantityDelta = 0, baitDelta = 0, error = "";
+  const isBaitTrade = getEventTradeSource() === "bait";
   root?.querySelectorAll('input').forEach(input => {
     refreshQuantity(input);
     const id = input.dataset.id;
@@ -114,15 +115,18 @@ function collectTrade(eventTrade = false) {
     else if (value > 0) buys[id] = value;
     else sells[id] = -value;
     fundsDelta += dir === "sell" ? value * price : -value * price;
-    if (dir !== "sell") quantityDelta += value;
+    if (dir !== "sell") {
+      if (isBaitTrade) baitDelta += value;
+      else quantityDelta += value;
+    }
   });
   const after = totalSupplies(state.supplies) + quantityDelta;
   const cap = calcSupplyCap(state.fleet);
   const shortages = [];
   if (state.funds + fundsDelta < 0) shortages.push(`資金が${-(state.funds + fundsDelta)}不足しています。`);
-  if (after > cap) shortages.push(`物資上限を${after - cap}個超えています。`);
+  if (!isBaitTrade && after > cap) shortages.push(`物資上限を${after - cap}個超えています。`);
   error ||= shortages.join(" ");
-  return { buys, sells, fundsDelta, after, cap, error, empty: !Object.keys(buys).length && !Object.keys(sells).length };
+  return { buys, sells, fundsDelta, after, cap, error, empty: !Object.keys(buys).length && !Object.keys(sells).length, isBaitTrade, baitDelta };
 }
 
 /** 既存の資金・エラー表示を更新し、取引後の積載と確定可否を表示する。 */
@@ -135,7 +139,11 @@ function updateTradePreview(eventTrade = false) {
   if (button) button.disabled = !!result.error || result.empty;
   if (delta) {
     delta.hidden = false;
-    delta.textContent = `資金変動: ${result.fundsDelta > 0 ? "+" : ""}${result.fundsDelta} ／ 取引後物資: ${result.after}/${result.cap}`;
+    if (result.isBaitTrade) {
+      delta.textContent = `資金変動: ${result.fundsDelta > 0 ? "+" : ""}${result.fundsDelta} ／ 餌購入: +${result.baitDelta}個`;
+    } else {
+      delta.textContent = `資金変動: ${result.fundsDelta > 0 ? "+" : ""}${result.fundsDelta} ／ 取引後物資: ${result.after}/${result.cap}`;
+    }
     delta.className = "pill " + (result.fundsDelta > 0 ? "delta-pos" : result.fundsDelta < 0 ? "delta-neg" : "delta-zero");
   }
   return result;
@@ -150,11 +158,33 @@ function recalcEventTradeDelta() { return updateTradePreview(true); }
 let currentEventTrade = null;
 
 /**
+ * 現在のイベント取引の種別を取得する（DOMから）。
+ * @returns {"bait"|"fishing"|"smuggle"|""}
+ */
+function getEventTradeSource() {
+  return elements.eventTradeModal?.dataset.tradeSource || "";
+}
+
+/**
+ * イベント取引モーダルを閉じ、状態をリセットする。
+ */
+function closeEventTradeModal() {
+  if (elements.eventTradeModal) {
+    elements.eventTradeModal.dataset.tradeSource = "";
+  }
+  currentEventTrade = null;
+  state.eventTrade = null;
+}
+
+/**
  * イベント取引用のモーダルを描画する。
  * @param {{title:string,note?:string,deals:Array<{id:string,name:string,price:number,stock:number}>}} trade
  */
 export function renderEventTradeModal(trade) {
   currentEventTrade = trade;
+  if (elements.eventTradeModal) {
+    elements.eventTradeModal.dataset.tradeSource = trade?.source || "";
+  }
   const body = elements.eventTradeTableBody;
   if (!body) return;
   const hasSell = (trade?.deals || []).some((d) => d.direction === "sell");
@@ -209,20 +239,26 @@ function confirmEventTrade(closeModal, syncUI) {
   const { buys, sells, fundsDelta, error, empty } = recalcEventTradeDelta();
   if (error || empty) return;
   if (!state.supplies) state.supplies = {};
+  const isBait = getEventTradeSource() === "bait";
   Object.entries(buys).forEach(([id, qty]) => {
-    state.supplies[id] = (state.supplies[id] || 0) + qty;
+    if (isBait) {
+      const data = state.expansion.fishing;
+      data.bait[id] = (data.bait[id] || 0) + qty;
+    } else {
+      state.supplies[id] = (state.supplies[id] || 0) + qty;
+    }
   });
   Object.entries(sells).forEach(([id, qty]) => {
     const deal = currentEventTrade?.deals?.find((item) => item.id === id);
     if (deal?.direction === "sell") {
-      if (currentEventTrade?.source === "fishing") sellCatch(state, id, qty);
+      if (getEventTradeSource() === "fishing") sellCatch(state, id, qty);
       else state.supplies[id] = Math.max(0, (state.supplies[id] ?? 0) - qty);
     }
   });
   state.funds += fundsDelta;
-  if (state.eventTrade?.source === "smuggle") {
-    const sid = state.eventTrade.settlementId;
-    const fid = state.eventTrade.factionId;
+  if (getEventTradeSource() === "smuggle") {
+    const sid = currentEventTrade?.settlementId;
+    const fid = currentEventTrade?.factionId;
     if (sid && fid) adjustSupport(sid, fid, -2);
   }
   const dealName = (id) =>
@@ -233,10 +269,10 @@ function confirmEventTrade(closeModal, syncUI) {
   const sellSummary = Object.entries(sells).map(([id, q]) => `${dealName(id)} x${q}`).join(" / ");
   pushLog(currentEventTrade.title || "取引", `資金${fundsDelta} / 入手: ${buySummary || "なし"} / 売却: ${sellSummary || "なし"}`, "-");
   pushToast(currentEventTrade.title || "取引", `資金${fundsDelta}`, fundsDelta <= 0 ? "info" : "good");
-  if (currentEventTrade?.source === "fishing" && typeof document !== "undefined") {
+  if ((getEventTradeSource() === "fishing" || isBait) && typeof document !== "undefined") {
     document.dispatchEvent(new CustomEvent("fishing-panel-update"));
   }
-  state.eventTrade = null;
+  closeEventTradeModal();
   closeModal?.(elements.eventTradeModal);
   setEventTradeError("");
   recalcEventTradeDelta();
@@ -252,9 +288,10 @@ function confirmEventTrade(closeModal, syncUI) {
 export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage }) {
   bindModal?.(elements.tradeModal, elements.tradeModalClose);
   bindModal?.(elements.eventTradeModal, elements.eventTradeModalClose);
-  elements.eventTradeModalClose?.addEventListener("click", () => {
-    state.eventTrade = null;
-    currentEventTrade = null;
+  // イベント取引モーダル専用の閉じる処理（dataset.tradeSource もリセット）
+  elements.eventTradeModalClose?.addEventListener("click", closeEventTradeModal);
+  elements.eventTradeModal?.addEventListener("click", (e) => {
+    if (e.target === elements.eventTradeModal) closeEventTradeModal();
   });
 
   elements.tradeBtn?.addEventListener("click", () => {

@@ -1,4 +1,4 @@
-import { FISH_SPECIES, BAIT_DEFS, ROD_DEFS, FISHING_CONFIG } from "./fishingConfig.js";
+import { FISH_SPECIES, BAIT_DEFS, ROD_DEFS, FISHING_CONFIG, ROD_UPGRADE_THRESHOLDS } from "./fishingConfig.js";
 
 /**
  * game時間から絶対日を算出する。questUtils.absDayと同じ式なので、独立して維持する。
@@ -34,7 +34,7 @@ function isPosition(value) {
  * @returns {object} 共有参照を持たない初期状態。
  */
 export function createFishingState() {
-  return { rodId: "rod_basic", counts: {}, codex: {}, pending: null };
+  return { rodId: null, counts: {}, codex: {}, bait: { insect: 0, shell: 0, cut: 0, small: 0 }, pending: null };
 }
 
 /**
@@ -44,6 +44,33 @@ export function createFishingState() {
  */
 export function speciesById(id) {
   return SPECIES_INDEX[id] || null;
+}
+
+/**
+ * 釣果カテゴリを演出トーンへ正規化する。未知のカテゴリは一般魚扱いにする。
+ * @param {string} category カテゴリキー。
+ * @returns {"common"|"big"|"giant"} 演出トーン。
+ */
+export function categoryTone(category) {
+  if (category === "big" || category === "giant") return category;
+  return "common";
+}
+
+/**
+ * アタリ時に表示する文言を返す。魚の正体（魚名）は公開しない。
+ * カテゴリごとに演出の強さを変える（一般魚=平穏、大物=強い引き、超大物=とんでもない引き）。
+ * @param {string} category カテゴリキー。
+ * @returns {string} アタリ表示の全文。
+ */
+export function atariMessage(category) {
+  switch (category) {
+    case "big":
+      return "アタリ！ 強い引きだ！";
+    case "giant":
+      return "アタリ！ とんでもない引きだ！";
+    default:
+      return "アタリ！ 魚が掛かった！";
+  }
 }
 
 /**
@@ -179,16 +206,52 @@ export function rollCatch({ regionId, season, depth, baitId }, random) {
 
 /**
  * アタリ発生後の入力猶予（実時間・秒）を返す。
- * 竿の windowBonus は猶予を延長する。最低2秒を保証する。
+ * 竿の windowMultiplier は基本猶予に倍率を掛ける。最低2秒を保証する。
+ * 竿未所持の場合は最低保証の 2 秒を返す（実質釣り上げ不可）。
  * @param {string} speciesId 種ID。
- * @param {string} rodId 竿ID。
+ * @param {string|null} rodId 竿ID。
  * @returns {number} 猶予秒数。
  */
 export function windowFor(speciesId, rodId) {
   const species = SPECIES_INDEX[speciesId];
-  const rod = ROD_DEFS[rodId];
+  const rod = rodId ? ROD_DEFS[rodId] : null;
   const base = species?.baseWindow ?? 3;
-  return Math.max(2, base + (rod?.windowBonus ?? 0));
+  const multiplier = rod?.windowMultiplier ?? 0;
+  const multiplied = Math.floor(base * multiplier);
+  return Math.max(2, multiplied);
+}
+
+/**
+ * 図鑑完成率から現在使用可能な最高ランクの竿IDを返す。
+ * 閾値は ROD_UPGRADE_THRESHOLDS の requiredRatio 以上を満たす最高位。
+ * @param {Object} codex 図鑑登録状態。
+ * @returns {string} 竿ID（ROD_DEFS のキー）。
+ */
+export function getCurrentRod(codex) {
+  const completion = codexCompletion(codex);
+  let current = "rod_basic";
+  for (const t of ROD_UPGRADE_THRESHOLDS) {
+    if (completion.ratio >= t.requiredRatio) current = t.rodId;
+    else break;
+  }
+  return current;
+}
+
+/**
+ * 釣り小屋入店時に報酬が発生するか判定し、取得すべき竿IDを返す。
+ * 現在の竿より上のランクで、かつ完成率条件を満たす最高位があれば返す。
+ * なければ null。
+ * @param {object} state ゲーム状態。
+ * @returns {string|null} 取得すべき竿ID。
+ */
+export function checkRodUpgrade(state) {
+  const fishing = state.expansion.fishing;
+  const availableRod = getCurrentRod(fishing.codex);
+  const currentRod = fishing.rodId || "rod_basic";
+  const currentIdx = ROD_UPGRADE_THRESHOLDS.findIndex(t => t.rodId === currentRod);
+  const availableIdx = ROD_UPGRADE_THRESHOLDS.findIndex(t => t.rodId === availableRod);
+  if (availableIdx > currentIdx) return availableRod;
+  return null;
 }
 
 /**
@@ -218,6 +281,7 @@ export function isPullWithinWindow(windowSeconds, elapsedMs) {
 /**
  * 釣果を在庫へ加算し、図鑑を登録・更新する。
  * 最大サイズを更新した場合は場所と日付も記録する。
+ * 釣り上げ成功時点で確定する（釣果発表の「次へ」は待たない）。
  * @param {object} state ゲーム状態。
  * @param {{species:object,size:number}} catch 釣果。
  * @returns {void}
@@ -232,6 +296,22 @@ export function recordCatch(state, { species, size }) {
     entry.maxSizeAbs = absDay(state);
     entry.maxSizePos = { x: state.position.x, y: state.position.y };
   }
+}
+
+/**
+ * 今回の釣果が「初釣果」と「最大サイズ更新」のどちらに該当するかを判定する。
+ * 登録後の図鑑状態を見るのではなく、登録前のエントリと今回のサイズから事前判定する。
+ * 初釣果（count が 0→1 になる）は必然的に最大サイズ更新にも該当する。
+ * @param {object|undefined} entry 登録前の図鑑エントリ。未登録なら undefined や null を渡す。
+ * @param {number} size 今回の体長(cm)。
+ * @returns {{firstCatch:boolean,maxUpdate:boolean}} 発生イベント。
+ */
+export function catchRecordFacts(entry, size) {
+  const known = !!entry && (entry.count || 0) > 0;
+  return {
+    firstCatch: !known,
+    maxUpdate: size > (entry?.maxSize || 0),
+  };
 }
 
 /**
@@ -285,13 +365,74 @@ export function sellCatch(state, speciesId, qty = 1) {
 }
 
 /**
+ * 指定した餌を1個消費する。所持数が足りない場合は false を返す。
+ * @param {object} state ゲーム状態。
+ * @param {string} baitId 餌ID。
+ * @returns {boolean} 消費できたか。
+ */
+export function consumeBait(state, baitId) {
+  const data = state.expansion.fishing;
+  const current = data.bait?.[baitId] || 0;
+  if (current <= 0) return false;
+  data.bait[baitId] = current - 1;
+  return true;
+}
+
+/**
+ * 魚を餌に加工する。対象魚の全数（qty 指定時はその数）を消費し、feedType に応じた餌を dressFood × 数 だけ増やす。
+ * @param {object} state ゲーム状態。
+ * @param {string} speciesId 種ID。
+ * @param {number} qty 加工する匹数。省略時は所持全数。
+ * @returns {{baitId:string, amount:number}|null} 増えた餌のIDと数量。失敗時は null。
+ */
+export function processToBait(state, speciesId, qty) {
+  const data = state.expansion.fishing;
+  const species = SPECIES_INDEX[speciesId];
+  if (!species || !species.feedType) return null;
+  const have = data.counts[speciesId] || 0;
+  if (have <= 0) return null;
+  const n = Math.min(have, Math.max(1, Math.trunc(qty || have)));
+  if (n <= 0) return null;
+  data.counts[speciesId] -= n;
+  if (data.counts[speciesId] <= 0) delete data.counts[speciesId];
+  const amount = n * (species.dressFood || 1);
+  const baitId = species.feedType;
+  data.bait[baitId] = (data.bait[baitId] || 0) + amount;
+  return { baitId, amount };
+}
+
+/**
+ * 餌を購入する。所持金が足りない場合は false を返す。
+ * @param {object} state ゲーム状態。
+ * @param {string} baitId 餌ID。
+ * @param {number} qty 購入数。
+ * @returns {{cost:number}|boolean} 成功時は {cost: 総額}、失敗時は false。
+ */
+export function purchaseBait(state, baitId, qty) {
+  const bait = BAIT_DEFS[baitId];
+  if (!bait) return false;
+  const n = Math.max(1, Math.trunc(qty || 1));
+  const cost = bait.price * n;
+  if (state.funds < cost) return false;
+  state.funds -= cost;
+  const data = state.expansion.fishing;
+  data.bait[baitId] = (data.bait[baitId] || 0) + n;
+  return { cost };
+}
+
+/**
+ * 未完のセッション情報を検証する。釣果がアタリ中の場合は引き継がない。
+ * @param {*} value 保存値。
+ * @returns {object|null} 有効なセッション情報。
+ */
+/**
  * 未完のセッション情報を検証する。釣果がアタリ中の場合は引き継がない。
  * @param {*} value 保存値。
  * @returns {object|null} 有効なセッション情報。
  */
 function validPending(value) {
   if (!isRecord(value)) return null;
-  if (!BAIT_DEFS[value.baitId]) return null;
+  const baitId = value.baitId && BAIT_DEFS[value.baitId] ? value.baitId : null;
   const castsLeft = Number.isSafeInteger(value.castsLeft) && value.castsLeft > 0 ? value.castsLeft : 0;
   if (castsLeft <= 0) return null;
   const catchInfo =
@@ -305,7 +446,7 @@ function validPending(value) {
   const hookSpeciesId = SPECIES_INDEX[value.hookSpeciesId] ? value.hookSpeciesId : null;
   const waiting = waitUntil != null && hookSpeciesId != null;
   return {
-    baitId: value.baitId,
+    baitId,
     dayApplied: value.dayApplied === true,
     castsLeft,
     catch: waiting ? null : catchInfo,
@@ -353,10 +494,16 @@ export function normalizeFishing(value) {
       };
     }
   }
+  const bait = {};
+  for (const id of Object.keys(BAIT_DEFS)) {
+    const qty = source.bait?.[id];
+    bait[id] = Number.isSafeInteger(qty) && qty >= 0 ? qty : 0;
+  }
   return {
-    rodId: ROD_DEFS[source.rodId] ? source.rodId : "rod_basic",
+    rodId: source.rodId && ROD_DEFS[source.rodId] ? source.rodId : null,
     counts,
     codex,
+    bait,
     pending: validPending(source.pending),
   };
 }
