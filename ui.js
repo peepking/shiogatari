@@ -30,6 +30,7 @@ import { snapshotOutfitting, outfittingBattleLosses } from "./outfitting.js";
 import { renderOutfittingControl } from "./outfittingUI.js";
 import { syncChartReservations, awardBattleFragment, chartLabel } from "./chartWorld.js";
 import { renderChartCards, renderChartControl, resumeChartExploration } from "./chartUI.js";
+import { renderFishingControl, resumeFishing, wireFishingUI } from "./fishingUI.js";
 import {
   addHonorFaction,
   addWarScore,
@@ -1314,8 +1315,9 @@ function syncUI() {
   renderTroopModal(elements.troopsDetail);
   updateModeControls(loc);
   renderNationalPowerControls(getAudienceContext);
-  renderExplorationControl(syncUI);
+renderExplorationControl(syncUI);
   renderChartControl(syncUI);
+  renderFishingControl(syncUI);
   renderOutfittingControl(syncUI);
   renderTideControl(syncUI);
   renderChartCards();
@@ -1516,8 +1518,9 @@ function wireButtons() {
   wireFactionPanel();
   wireMapToggle(renderMap);
 
-  wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage });
+wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage });
   document.addEventListener("event-trade-open", () => openEventTrade(openModal));
+  wireFishingUI();
   wireHireModal({ openModal, bindModal, syncUI });
   wireFaithDetails({ openModal, bindModal });
 
@@ -1833,8 +1836,9 @@ export function initUI() {
   wireSupplyDiscard(elements.suppliesDetail, syncUI);
   wireMapHover();
   updateExplorationWorld();
-  if (state.expansion.exploration.pending) resumeExploration(syncUI);
+if (state.expansion.exploration.pending) resumeExploration(syncUI);
   if (state.expansion.charts.pending) resumeChartExploration(syncUI);
+  if (state.expansion.fishing?.pending) resumeFishing();
   initEventQueueUI();
   renderLogs();
   syncUI();
