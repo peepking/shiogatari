@@ -6,7 +6,7 @@ import { advanceDayWithEvents } from "./time.js";
 import { saveGameToStorage } from "./storage.js";
 import { SEASONS, escapeHtml } from "./util.js";
 import { FISHING_CONFIG, FISH_REGIONS, FISH_CATEGORIES, BAIT_DEFS, ROD_DEFS, FISH_SPECIES, DEPTH_NAMES } from "./fishingConfig.js";
-import { fishingRegionAt, rollCatch, windowFor, rollSize, recordCatch, dressCatch, speciesById, sessionDayRule, matchesCodexFilters, codexCompletion, codexRevealState } from "./fishing.js";
+import { fishingRegionAt, rollCatch, windowFor, rollSize, recordCatch, dressCatch, speciesById, sessionDayRule, matchesCodexFilters, codexCompletion, codexRevealState, codexDetailReveal } from "./fishing.js";
 
 /** 釣りパネルを開いた際に渡される表示同期。 bite/キャスト後に使う。 */
 let panelSync = null;
@@ -602,6 +602,7 @@ function renderCodexList(body) {
  * その下に最大記録と生態・釣り情報を縦方向へ並べる。
  * 未発見の魚では正体（魚名・学名・説明文・記録・カテゴリ）を出さずに「？？？」とし、
  * 図鑑完成率に応じて公開済みの生息域・季節・水深・有効な餌だけを表示する（段階公開）。
+ * 一度でも釣った発見済みの魚は完成率に関係なく全項目を公開する。
  * @param {HTMLElement} body 描画先。
  * @returns {void}
  */
@@ -616,7 +617,7 @@ function renderCodexDetail(body) {
   const entry = data.codex[s.id];
   const discovered = (entry?.count || 0) > 0;
   const completion = codexCompletion(data.codex);
-  const reveal = codexRevealState(completion.ratio);
+  const reveal = codexDetailReveal(discovered, completion.ratio);
   const record =
     entry != null && entry.maxSizeAbs != null && entry.maxSizePos
       ? `${absToGameDate(entry.maxSizeAbs)}\u3000${FISH_REGIONS[fishingRegionAt(entry.maxSizePos.x, entry.maxSizePos.y)] || "?"}`

@@ -121,6 +121,24 @@ export function codexRevealState(ratio) {
 }
 
 /**
+ * 図鑑詳細の生態情報の公開状態を返す。
+ * 発見済み魚は完成率に関係なく全項目を公開し、段階公開（季節25%・水深50%・有効餌75%）は
+ * 未発見魚のみに適用する（項目ごとに「発見済み || 段階公開」で合成する）。
+ * @param {boolean} discovered 発見済みか（図鑑登録済み）。
+ * @param {number} ratio 図鑑完成率（0〜1）。
+ * @returns {{regions:boolean,seasons:boolean,depth:boolean,baits:boolean}} 公開対象ごとの公開可否。
+ */
+export function codexDetailReveal(discovered, ratio) {
+  const reveal = codexRevealState(ratio);
+  return {
+    regions: reveal.regions,
+    seasons: discovered || reveal.seasons,
+    depth: discovered || reveal.depth,
+    baits: discovered || reveal.baits,
+  };
+}
+
+/**
  * 候補プールから餌の重みで釣果を抽選する。
  * 指定餌が未定義・候補内の重みがすべて0・プールが空の場合は null を返す。
  * 乱数が1未満である限り必ずいずれかの種が返る。
