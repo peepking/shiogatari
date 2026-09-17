@@ -1592,14 +1592,29 @@ input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) 
 .codex-ecology dd { margin: 2px 0 0; }
 .fishing-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .fishing-row .tiny { flex: 1 1 180px; }
-.fishing-session { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.04); line-height: 1.6; }
-.fishing-session.is-bite { border-color: #bca16a; background: rgba(188, 161, 106, 0.12); }
+.fishing-session { display: grid; height: 145px; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.04); line-height: 1.6; }
+.fishing-session.is-accent-common { border-color: #69cfca; background: rgba(105, 207, 202, 0.12); }
+.fishing-session.is-accent-big { border-color: #bca16a; background: rgba(188, 161, 106, 0.12); }
+.fishing-session.is-accent-giant { border-color: #e06c6c; background: rgba(224, 108, 108, 0.16); box-shadow: 0 0 12px rgba(224, 108, 108, 0.25); }
 .fishing-session b { font-size: 15px; }
-#fishingSession { flex: 0 0 auto; padding: 5px; }
+.fishing-result-name { font-weight: 700; }
+.fishing-result-size { margin-top: 4px; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fishing-result-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.fishing-badge { padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; color: var(--muted); }
+#fishingSession { flex: 0 0 auto; height: 170px; padding: 5px; }
 .fishing-gauge { width: 100%; height: 10px; margin: 8px 0 0; accent-color: #69cfca; }
 .fishing-gauge::-webkit-progress-bar { background: #24334c; border-radius: 6px; }
 .fishing-gauge::-webkit-progress-value { background: #69cfca; border-radius: 6px; }
 .fishing-gauge::-moz-progress-bar { background: #69cfca; border-radius: 6px; }
+.is-accent-common .fishing-gauge { accent-color: #69cfca; }
+.is-accent-common .fishing-gauge::-webkit-progress-value { background: #69cfca; }
+.is-accent-common .fishing-gauge::-moz-progress-bar { background: #69cfca; }
+.is-accent-big .fishing-gauge { accent-color: #bca16a; }
+.is-accent-big .fishing-gauge::-webkit-progress-value { background: #bca16a; }
+.is-accent-big .fishing-gauge::-moz-progress-bar { background: #bca16a; }
+.is-accent-giant .fishing-gauge { accent-color: #e06c6c; }
+.is-accent-giant .fishing-gauge::-webkit-progress-value { background: #e06c6c; }
+.is-accent-giant .fishing-gauge::-moz-progress-bar { background: #e06c6c; }
 .fishing-gauge.is-low { accent-color: #e06c6c; }
 .fishing-gauge.is-low::-webkit-progress-value { background: #e06c6c; }
 .fishing-gauge.is-low::-moz-progress-bar { background: #e06c6c; }

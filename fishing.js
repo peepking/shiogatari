@@ -47,6 +47,33 @@ export function speciesById(id) {
 }
 
 /**
+ * 釣果カテゴリを演出トーンへ正規化する。未知のカテゴリは一般魚扱いにする。
+ * @param {string} category カテゴリキー。
+ * @returns {"common"|"big"|"giant"} 演出トーン。
+ */
+export function categoryTone(category) {
+  if (category === "big" || category === "giant") return category;
+  return "common";
+}
+
+/**
+ * アタリ時に表示する文言を返す。魚の正体（魚名）は公開しない。
+ * カテゴリごとに演出の強さを変える（一般魚=平穏、大物=強い引き、超大物=とんでもない引き）。
+ * @param {string} category カテゴリキー。
+ * @returns {string} アタリ表示の全文。
+ */
+export function atariMessage(category) {
+  switch (category) {
+    case "big":
+      return "アタリ！ 強い引きだ！";
+    case "giant":
+      return "アタリ！ とんでもない引きだ！";
+    default:
+      return "アタリ！ 魚が掛かった！";
+  }
+}
+
+/**
  * 座標から4海域のどれに属するかを判定する。
  * マップを東西・南北で2等分し、北西・北東・南西・南東に分割する。
  * @param {number} x マップX座標。
@@ -218,6 +245,7 @@ export function isPullWithinWindow(windowSeconds, elapsedMs) {
 /**
  * 釣果を在庫へ加算し、図鑑を登録・更新する。
  * 最大サイズを更新した場合は場所と日付も記録する。
+ * 釣り上げ成功時点で確定する（釣果発表の「次へ」は待たない）。
  * @param {object} state ゲーム状態。
  * @param {{species:object,size:number}} catch 釣果。
  * @returns {void}
@@ -232,6 +260,22 @@ export function recordCatch(state, { species, size }) {
     entry.maxSizeAbs = absDay(state);
     entry.maxSizePos = { x: state.position.x, y: state.position.y };
   }
+}
+
+/**
+ * 今回の釣果が「初釣果」と「最大サイズ更新」のどちらに該当するかを判定する。
+ * 登録後の図鑑状態を見るのではなく、登録前のエントリと今回のサイズから事前判定する。
+ * 初釣果（count が 0→1 になる）は必然的に最大サイズ更新にも該当する。
+ * @param {object|undefined} entry 登録前の図鑑エントリ。未登録なら undefined や null を渡す。
+ * @param {number} size 今回の体長(cm)。
+ * @returns {{firstCatch:boolean,maxUpdate:boolean}} 発生イベント。
+ */
+export function catchRecordFacts(entry, size) {
+  const known = !!entry && (entry.count || 0) > 0;
+  return {
+    firstCatch: !known,
+    maxUpdate: size > (entry?.maxSize || 0),
+  };
 }
 
 /**

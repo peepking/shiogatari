@@ -431,7 +431,36 @@ async function main() {
     true
   );
 
-  console.log("釣り: 海域・抽選・猶予・図鑑・捌き・売却・補完・フィルタ・ヒント公開: 全項目成功");
+  // アタリ文言: カテゴリ別で魚名は公開しない（未知カテゴリは一般魚にフォールバック）
+  assert.equal(fishing.atariMessage("common"), "アタリ！ 魚が掛かった！");
+  assert.equal(fishing.atariMessage("big"), "アタリ！ 強い引きだ！");
+  assert.equal(fishing.atariMessage("giant"), "アタリ！ とんでもない引きだ！");
+  assert.equal(fishing.atariMessage("unknown"), "アタリ！ 魚が掛かった！");
+  assert.equal(fishing.atariMessage(undefined), "アタリ！ 魚が掛かった！");
+
+  // 演出トーン: カテゴリを正規化し未知は一般魚に寄せる
+  assert.equal(fishing.categoryTone("common"), "common");
+  assert.equal(fishing.categoryTone("big"), "big");
+  assert.equal(fishing.categoryTone("giant"), "giant");
+  assert.equal(fishing.categoryTone("mystery"), "common");
+  assert.equal(fishing.categoryTone(undefined), "common");
+
+  // 釣果イベント判定: 登録前のエントリと今回サイズから事前判定する（登録後の状態には依存しない）
+  assert.deepEqual(fishing.catchRecordFacts(undefined, 30), { firstCatch: true, maxUpdate: true });
+  assert.deepEqual(fishing.catchRecordFacts(null, 30), { firstCatch: true, maxUpdate: true });
+  assert.deepEqual(fishing.catchRecordFacts({ count: 1, maxSize: 25 }, 30), { firstCatch: false, maxUpdate: true });
+  assert.deepEqual(fishing.catchRecordFacts({ count: 2, maxSize: 40 }, 30), { firstCatch: false, maxUpdate: false });
+  assert.deepEqual(fishing.catchRecordFacts({ count: 1, maxSize: 0 }, 30), { firstCatch: false, maxUpdate: true });
+
+  // 統合: 初釣果判定と図鑑登録が同じ事象を指す（count 0→1）
+  const integ = makeState();
+  const facts0 = fishing.catchRecordFacts(integ.expansion.fishing.codex.aji, 22);
+  fishing.recordCatch(integ, { species: fishing.speciesById("aji"), size: 22 });
+  assert.deepEqual(facts0, { firstCatch: true, maxUpdate: true });
+  assert.equal(integ.expansion.fishing.codex.aji.count, 1);
+  assert.equal(integ.expansion.fishing.codex.aji.maxSize, 22);
+
+  console.log("釣り: 海域・抽選・猶予・図鑑・捌き・売却・補完・フィルタ・ヒント公開・アタリ文言・演出トーン・釣果判定: 全項目成功");
 }
 
 main().catch((error) => {
