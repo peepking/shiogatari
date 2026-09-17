@@ -132,6 +132,7 @@ export const elements = {
   fishingModal: $("fishingModal"),
   fishingModalClose: $("fishingModalClose"),
   fishingCodexBtn: $("fishingCodexBtn"),
+  fishingBaitBuyBtn: $("fishingBaitBuyBtn"),
   fishingSellBtn: $("fishingSellBtn"),
   codexModal: $("codexModal"),
   codexModalClose: $("codexModalClose"),

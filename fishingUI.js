@@ -6,7 +6,7 @@ import { advanceDayWithEvents } from "./time.js";
 import { saveGameToStorage } from "./storage.js";
 import { SEASONS, escapeHtml } from "./util.js";
 import { FISHING_CONFIG, FISH_REGIONS, FISH_CATEGORIES, BAIT_DEFS, ROD_DEFS, FISH_SPECIES, DEPTH_NAMES } from "./fishingConfig.js";
-import { fishingRegionAt, rollCatch, windowFor, rollSize, recordCatch, dressCatch, speciesById, categoryTone, atariMessage, catchRecordFacts, sessionDayRule, matchesCodexFilters, codexCompletion, codexRevealState, codexDetailReveal } from "./fishing.js";
+import { fishingRegionAt, rollCatch, windowFor, rollSize, recordCatch, dressCatch, speciesById, categoryTone, atariMessage, catchRecordFacts, consumeBait, processToBait, sessionDayRule, matchesCodexFilters, codexCompletion, codexRevealState, codexDetailReveal } from "./fishing.js";
 
 /** 釣りパネルを開いた際に渡される表示同期。 bite/キャスト後に使う。 */
 let panelSync = null;
@@ -133,7 +133,7 @@ export function renderFishingControl(syncUI) {
     label = "釣り";
     action = () => openFishingPanel(syncUI);
   } else if (manage) {
-    label = "釣果売却";
+    label = "釣り小屋";
     action = () => openFishingPanel(syncUI);
   } else {
     label = "魚図鑑";
@@ -245,6 +245,11 @@ function doCast() {
   const data = state.expansion.fishing;
   const pending = data.pending;
   if (!pending || biteActive() || isWaiting() || (pending.castsLeft ?? 0) <= 0) return;
+  // 餌消費
+  if (!consumeBait(state, pending.baitId)) {
+    pushToast("餌が足りません", `${BAIT_DEFS[pending.baitId]?.name || pending.baitId} がありません。`, "warn");
+    return;
+  }
   const env = currentEnv();
   const species = rollCatch({ regionId: env.regionId, season: env.season, depth: env.depth, baitId: pending.baitId }, Math.random);
   const snapshot = structuredClone(data.pending);
@@ -473,18 +478,25 @@ function sessionHtml() {
 function inventoryHtml() {
   const data = state.expansion.fishing;
   const busy = biteActive() || isWaiting();
+  // 餌所持数表示
+  const baitList = Object.entries(data.bait || {})
+    .map(([id, qty]) => `<span class="pill">${BAIT_DEFS[id]?.name || id} x${qty}</span>`)
+    .join(" ");
   const rows = Object.entries(data.counts)
     .map(([id, qty]) => {
       const s = speciesById(id);
       if (!s) return "";
+      const feedInfo = s.feedType ? ` / 餌:${BAIT_DEFS[s.feedType]?.name || s.feedType}+${s.dressFood}` : "";
       return `<div class="fishing-row">
         <span class="pill">${escapeHtml(s.name)} x${qty}</span>
-        <span class="tiny">売値${s.sellPrice} / 捌いて食料+${s.dressFood}</span>
+        <span class="tiny">売値${s.sellPrice} / 捌いて食料+${s.dressFood}${feedInfo}</span>
         <button class="btn" data-dress="${id}" ${busy ? "disabled" : ""}>全部捌く</button>
+        <button class="btn" data-process="${id}" ${busy ? "disabled" : ""}>餌に加工</button>
       </div>`;
     })
     .join("");
   return `<div class="tiny">釣果インベントリ（上限なし）</div>
+    <div class="tiny mt-6">餌所持: ${baitList || "なし"}</div>
     ${rows || `<div class="tiny">まだ釣果はありません。</div>`}`;
 }
 
@@ -934,6 +946,23 @@ function wireInventoryButtons() {
       panelSync?.();
     });
   }
+  for (const btn of document.querySelectorAll("#fishingInventory [data-process]")) {
+    btn.addEventListener("click", () => {
+      const id = btn.getAttribute("data-process");
+      const data = state.expansion.fishing;
+      const held = data.counts[id] || 0;
+      const s = speciesById(id);
+      if (!held || !s || !s.feedType) return;
+      const result = processToBait(state, id, held);
+      if (!result) return;
+      const baitName = BAIT_DEFS[result.baitId]?.name || result.baitId;
+      pushLog("餌加工", `${s.name} x${held} を加工し、${baitName} x${result.amount} を得た。`, "-");
+      pushToast("餌加工", `${baitName} +${result.amount}`, "good");
+      saveGameToStorage();
+      renderFishingPanel();
+      panelSync?.();
+    });
+  }
 }
 
 /**
@@ -955,6 +984,19 @@ function openFishSale() {
 }
 
 /**
+ * 餌購入UIを開く。eventTrade パターンを再利用する。
+ * @returns {void}
+ */
+function openBaitPurchase() {
+  const deals = Object.keys(BAIT_DEFS).map((id) => {
+    const b = BAIT_DEFS[id];
+    return { id, name: b.name, price: b.price, stock: 999, have: 0, direction: "buy" };
+  });
+  state.eventTrade = { source: "bait", title: "餌購入", note: "釣り用の餌を購入します。", deals };
+  if (typeof document !== "undefined") document.dispatchEvent(new CustomEvent("event-trade-open"));
+}
+
+/**
  * 釣り画面の閉じる操作と、売却後の再描画を配線する。
  * @returns {void}
  */
@@ -965,6 +1007,7 @@ export function wireFishingUI() {
   });
   elements.fishingModalClose?.addEventListener("click", closeFishingPanel);
   elements.fishingCodexBtn?.addEventListener("click", openCodexModal);
+  elements.fishingBaitBuyBtn?.addEventListener("click", openBaitPurchase);
   elements.fishingSellBtn?.addEventListener("click", openFishSale);
   document.addEventListener("fishing-panel-update", () => {
     if (!elements.fishingModal.hidden) renderFishingPanel();

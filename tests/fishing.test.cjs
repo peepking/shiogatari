@@ -137,7 +137,7 @@ async function main() {
 
   // 補完: 欠損・不正値は既定値へ、壊れたセッションは破棄
   const fresh = fishing.normalizeFishing();
-  assert.deepEqual(fresh, { rodId: "rod_basic", counts: {}, codex: {}, pending: null });
+  assert.deepEqual(fresh, { rodId: "rod_basic", counts: {}, codex: {}, bait: { insect: 0, shell: 0, cut: 0, small: 0 }, pending: null });
   const dirty = fishing.normalizeFishing({
     rodId: "unknown",
     counts: { aji: 3, nope: 1, madai: -1 },
@@ -148,6 +148,7 @@ async function main() {
   assert.deepEqual(dirty.counts, { aji: 3 });
   assert.ok(dirty.codex.nope === undefined);
   assert.equal(dirty.codex.aji.maxSizePos.x, 1);
+  assert.deepEqual(dirty.bait, { insect: 0, shell: 0, cut: 0, small: 0 });
   assert.equal(dirty.pending, null);
   const kept = fishing.normalizeFishing({
     rodId: "rod_basic",
@@ -460,7 +461,79 @@ async function main() {
   assert.equal(integ.expansion.fishing.codex.aji.count, 1);
   assert.equal(integ.expansion.fishing.codex.aji.maxSize, 22);
 
-  console.log("釣り: 海域・抽選・猶予・図鑑・捌き・売却・補完・フィルタ・ヒント公開・アタリ文言・演出トーン・釣果判定: 全項目成功");
+  // BAIT_DEFS の価格・名称（config.namespace から取得）
+  const BAIT_DEFS = config.namespace.BAIT_DEFS;
+  const FISH_SPECIES = config.namespace.FISH_SPECIES;
+  assert.deepEqual(BAIT_DEFS.insect, { name: "虫餌", price: 2 });
+  assert.deepEqual(BAIT_DEFS.shell, { name: "甲殻類", price: 5 });
+  assert.deepEqual(BAIT_DEFS.cut, { name: "魚肉団子", price: 7 });
+  assert.deepEqual(BAIT_DEFS.small, { name: "小魚", price: 10 });
+
+  // feedType 全種網羅チェック
+  for (const s of FISH_SPECIES) {
+    assert.ok(["shell", "cut", "small"].includes(s.feedType), `${s.id} feedType不正: ${s.feedType}`);
+    assert.notEqual(s.feedType, "insect");
+  }
+
+  // 餌消費: consumeBait
+  const stBait = makeState();
+  stBait.expansion.fishing.bait = { insect: 3, shell: 0, cut: 0, small: 0 };
+  assert.equal(fishing.consumeBait(stBait, "insect"), true);
+  assert.equal(stBait.expansion.fishing.bait.insect, 2);
+  assert.equal(fishing.consumeBait(stBait, "insect"), true);
+  assert.equal(stBait.expansion.fishing.bait.insect, 1);
+  assert.equal(fishing.consumeBait(stBait, "insect"), true);
+  assert.equal(stBait.expansion.fishing.bait.insect, 0);
+  assert.equal(fishing.consumeBait(stBait, "insect"), false);
+
+  // 餌加工: processToBait (count × dressFood)
+  const stProc = makeState();
+  stProc.expansion.fishing.counts.aji = 3;  // dressFood:1, feedType:"small"
+  stProc.expansion.fishing.bait = { insect:0, shell:0, cut:0, small:0 };
+  const res = fishing.processToBait(stProc, "aji", 3);
+  assert.deepEqual(res, { baitId: "small", amount: 3 });
+  assert.equal(stProc.expansion.fishing.bait.small, 3);
+  assert.equal(stProc.expansion.fishing.counts.aji || 0, 0);
+
+  // 加工: feedType に対応した餌だけが増える
+  const stProc2 = makeState();
+  stProc2.expansion.fishing.counts.madai = 2; // dressFood:3, feedType:"cut"
+  stProc2.expansion.fishing.bait = { insect:0, shell:0, cut:0, small:0 };
+  const res2 = fishing.processToBait(stProc2, "madai", 2);
+  assert.deepEqual(res2, { baitId: "cut", amount: 6 });
+  assert.equal(stProc2.expansion.fishing.bait.cut, 6);
+  assert.equal(stProc2.expansion.fishing.bait.small, 0);
+  assert.equal(stProc2.expansion.fishing.counts.madai || 0, 0);
+
+  // 加工: 所持数を超える指定は所持数分だけ
+  const stProc3 = makeState();
+  stProc3.expansion.fishing.counts.aji = 2;
+  stProc3.expansion.fishing.bait = { insect:0, shell:0, cut:0, small:0 };
+  const res3 = fishing.processToBait(stProc3, "aji", 5);
+  assert.deepEqual(res3, { baitId: "small", amount: 2 });
+  assert.equal(stProc3.expansion.fishing.counts.aji || 0, 0);
+
+  // 購入: purchaseBait
+  const stBuy = makeState();
+  stBuy.funds = 100;
+  stBuy.expansion.fishing.bait = { insect:0, shell:0, cut:0, small:0 };
+  assert.deepEqual(fishing.purchaseBait(stBuy, "insect", 3), { cost: 6 });
+  assert.equal(stBuy.funds, 94);
+  assert.equal(stBuy.expansion.fishing.bait.insect, 3);
+
+  // 購入: 所持金不足
+  const stBuy2 = makeState();
+  stBuy2.funds = 5;
+  stBuy2.expansion.fishing.bait = { insect:0, shell:0, cut:0, small:0 };
+  assert.equal(fishing.purchaseBait(stBuy2, "small", 1), false); // price 10
+
+  // 購入: 存在しない餌ID
+  const stBuy3 = makeState();
+  stBuy3.funds = 100;
+  stBuy3.expansion.fishing.bait = { insect:0, shell:0, cut:0, small:0 };
+  assert.equal(fishing.purchaseBait(stBuy3, "invalid", 1), false);
+
+  console.log("釣り: 海域・抽選・猶予・図鑑・捌き・売却・補完・フィルタ・ヒント公開・アタリ文言・演出トーン・釣果判定・餌システム: 全項目成功");
 }
 
 main().catch((error) => {

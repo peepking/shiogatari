@@ -34,7 +34,7 @@ function isPosition(value) {
  * @returns {object} 共有参照を持たない初期状態。
  */
 export function createFishingState() {
-  return { rodId: "rod_basic", counts: {}, codex: {}, pending: null };
+  return { rodId: "rod_basic", counts: {}, codex: {}, bait: { insect: 0, shell: 0, cut: 0, small: 0 }, pending: null };
 }
 
 /**
@@ -329,6 +329,62 @@ export function sellCatch(state, speciesId, qty = 1) {
 }
 
 /**
+ * 指定した餌を1個消費する。所持数が足りない場合は false を返す。
+ * @param {object} state ゲーム状態。
+ * @param {string} baitId 餌ID。
+ * @returns {boolean} 消費できたか。
+ */
+export function consumeBait(state, baitId) {
+  const data = state.expansion.fishing;
+  const current = data.bait?.[baitId] || 0;
+  if (current <= 0) return false;
+  data.bait[baitId] = current - 1;
+  return true;
+}
+
+/**
+ * 魚を餌に加工する。対象魚の全数（qty 指定時はその数）を消費し、feedType に応じた餌を dressFood × 数 だけ増やす。
+ * @param {object} state ゲーム状態。
+ * @param {string} speciesId 種ID。
+ * @param {number} qty 加工する匹数。省略時は所持全数。
+ * @returns {{baitId:string, amount:number}|null} 増えた餌のIDと数量。失敗時は null。
+ */
+export function processToBait(state, speciesId, qty) {
+  const data = state.expansion.fishing;
+  const species = SPECIES_INDEX[speciesId];
+  if (!species || !species.feedType) return null;
+  const have = data.counts[speciesId] || 0;
+  if (have <= 0) return null;
+  const n = Math.min(have, Math.max(1, Math.trunc(qty || have)));
+  if (n <= 0) return null;
+  data.counts[speciesId] -= n;
+  if (data.counts[speciesId] <= 0) delete data.counts[speciesId];
+  const amount = n * (species.dressFood || 1);
+  const baitId = species.feedType;
+  data.bait[baitId] = (data.bait[baitId] || 0) + amount;
+  return { baitId, amount };
+}
+
+/**
+ * 餌を購入する。所持金が足りない場合は false を返す。
+ * @param {object} state ゲーム状態。
+ * @param {string} baitId 餌ID。
+ * @param {number} qty 購入数。
+ * @returns {{cost:number}|boolean} 成功時は {cost: 総額}、失敗時は false。
+ */
+export function purchaseBait(state, baitId, qty) {
+  const bait = BAIT_DEFS[baitId];
+  if (!bait) return false;
+  const n = Math.max(1, Math.trunc(qty || 1));
+  const cost = bait.price * n;
+  if (state.funds < cost) return false;
+  state.funds -= cost;
+  const data = state.expansion.fishing;
+  data.bait[baitId] = (data.bait[baitId] || 0) + n;
+  return { cost };
+}
+
+/**
  * 未完のセッション情報を検証する。釣果がアタリ中の場合は引き継がない。
  * @param {*} value 保存値。
  * @returns {object|null} 有効なセッション情報。
@@ -397,10 +453,16 @@ export function normalizeFishing(value) {
       };
     }
   }
+  const bait = {};
+  for (const id of Object.keys(BAIT_DEFS)) {
+    const qty = source.bait?.[id];
+    bait[id] = Number.isSafeInteger(qty) && qty >= 0 ? qty : 0;
+  }
   return {
     rodId: ROD_DEFS[source.rodId] ? source.rodId : "rod_basic",
     counts,
     codex,
+    bait,
     pending: validPending(source.pending),
   };
 }
