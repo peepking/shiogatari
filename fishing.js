@@ -235,6 +235,20 @@ export function recordCatch(state, { species, size }) {
 }
 
 /**
+ * 図鑑を全開放する。未登録の魚種のみ「発見済み」として登録し、
+ * 既存のエントリ（釣獲回数・最大サイズ等）は上書きしない。
+ * @param {object} state ゲーム状態。
+ * @returns {void}
+ */
+export function unlockAllCodex(state) {
+  const data = state.expansion.fishing;
+  for (const s of FISH_SPECIES) {
+    if (data.codex[s.id]?.count > 0) continue;
+    data.codex[s.id] = { count: 1, maxSize: 0, maxSizeAbs: null, maxSizePos: null };
+  }
+}
+
+/**
  * 釣果を食料へ変換する。所持数を超える指定は所持数の分だけ変換する。
  * @param {object} state ゲーム状態。
  * @param {string} speciesId 種ID。

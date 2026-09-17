@@ -31,6 +31,7 @@ import { renderOutfittingControl } from "./outfittingUI.js";
 import { syncChartReservations, awardBattleFragment, chartLabel } from "./chartWorld.js";
 import { renderChartCards, renderChartControl, resumeChartExploration } from "./chartUI.js";
 import { renderFishingControl, resumeFishing, wireFishingUI } from "./fishingUI.js";
+import { unlockAllCodex } from "./fishing.js";
 import {
   addHonorFaction,
   addWarScore,
@@ -1704,6 +1705,14 @@ function bindCoreUtilityButtons() {
     state.logs = [];
     renderLogs();
     scheduleGameSave();
+  });
+
+  document.getElementById("unlockCodexBtn")?.addEventListener("click", () => {
+    if (!confirm("魚図鑑を全開放しますか？")) return;
+    unlockAllCodex(state);
+    syncUI();
+    const completion = Object.keys(state.expansion.fishing.codex).length;
+    pushLog("魚図鑑全開放", `全 ${completion} 種を図鑑に登録しました。`);
   });
 
   document.getElementById("resetBtn")?.addEventListener("click", () => {
