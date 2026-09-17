@@ -1,9 +1,10 @@
 import { OUTFITTING_CONFIG, OUTFITTING_ITEMS } from "./expansionConfig.js";
 import { validateExploration } from "./exploration.js";
 import { normalizeCharts } from "./charts.js";
+import { createFishingState, normalizeFishing } from "./fishing.js";
 
 /**
- * 探索・海図・艤装の空の保存領域を生成する。地点生成は地図準備後に別途実行する。
+ * 探索・海図・艤装・釣りの空の保存領域を生成する。地点生成は地図準備後に別途実行する。
  * @returns {object} 共有参照を持たない初期状態。
  */
 export function createExpansionState() {
@@ -12,6 +13,7 @@ export function createExpansionState() {
     exploration: { initialized: false, nextId: 1, sites: [], pending: null, lastTickAbs: null },
     charts: { nextId: 1, active: [], rumorSeasons: {}, merchantSeasons: {}, pending: null },
     outfitting: { slots: OUTFITTING_CONFIG.initialSlots, owned: [], equipped: [null] },
+    fishing: createFishingState(),
   };
 }
 
@@ -69,5 +71,6 @@ export function normalizeExpansionState(value) {
   result.exploration = validateExploration(result.exploration);
   result.charts = normalizeCharts(charts);
   result.outfitting = normalizeOutfitting(value.outfitting);
+  result.fishing = normalizeFishing(value.fishing);
   return result;
 }
