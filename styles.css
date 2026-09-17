@@ -1619,3 +1619,20 @@ input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) 
 .fishing-gauge.is-low::-webkit-progress-value { background: #e06c6c; }
 .fishing-gauge.is-low::-moz-progress-bar { background: #e06c6c; }
 #fishingCastBtn, #fishingStartBtn, #fishingPullBtn { white-space: nowrap; word-break: keep-all; overflow-wrap: anywhere; }
+
+.fishing-end-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.fishing-end-wrapper .btn {
+  white-space: nowrap;
+}
+
+.modal.rod-reward-modal {
+  height: auto;
+  min-height: 0;
+  max-height: 86vh;
+}

@@ -168,12 +168,13 @@ export function renderFishingControl(syncUI) {
  */
 function showRodRewardModal(rodId, rodName, onConfirm) {
   rodReward = { rodId, rodName };
-  const modal = document.getElementById("rodRewardModal");
+  const backdrop = document.getElementById("rodRewardModal");
+  const modal = backdrop?.querySelector(".modal.rod-reward-modal");
   const nameEl = document.getElementById("rodRewardName");
   const contextEl = document.getElementById("rodRewardContext");
   const flavorEl = document.getElementById("rodRewardFlavor");
   const okBtn = document.getElementById("rodRewardOk");
-  if (!modal || !nameEl || !contextEl || !flavorEl || !okBtn) {
+  if (!backdrop || !modal || !nameEl || !contextEl || !flavorEl || !okBtn) {
     onConfirm?.();
     return;
   }
@@ -181,10 +182,10 @@ function showRodRewardModal(rodId, rodName, onConfirm) {
   const rodDef = ROD_DEFS[rodId];
   contextEl.textContent = rodDef?.context || "";
   flavorEl.textContent = rodDef?.flavor || "";
-  modal.hidden = false;
+  backdrop.hidden = false;
   const handler = () => {
     okBtn.removeEventListener("click", handler);
-    modal.hidden = true;
+    backdrop.hidden = true;
     rodReward = null;
     onConfirm?.();
   };
@@ -289,20 +290,17 @@ function beginFishing() {
     pushToast("釣り", "今は釣りを始められません。", "warn");
     return;
   }
-  const select = document.getElementById("fishingBaitSelect");
-  const baitId = select?.value || Object.keys(BAIT_DEFS)[0];
-  if (!BAIT_DEFS[baitId]) return;
   const pos = { ...state.position };
   const mode = state.modeLabel;
   confirmAction({
     title: "釣りを始める",
-    body: `1日使って最大${FISHING_CONFIG.castsPerSession}回釣ります。\n餌: ${BAIT_DEFS[baitId].name}。食料消費や維持費は通常どおり発生します。`,
+    body: `1日使って最大${FISHING_CONFIG.castsPerSession}回釣ります。食料消費や維持費は通常どおり発生します。`,
     confirmText: "1日使って釣る",
     cancelText: "キャンセル",
     onConfirm: () => {
       if (state.modeLabel !== mode || state.position.x !== pos.x || state.position.y !== pos.y) return;
       if (state.pendingEncounter?.active || state.expansion.exploration?.pending || state.expansion.charts?.pending) return;
-      data.pending = { baitId, dayApplied: false, castsLeft: FISHING_CONFIG.castsPerSession, catch: null, lastResult: null, lastDay: null };
+      data.pending = { dayApplied: false, castsLeft: FISHING_CONFIG.castsPerSession, catch: null, lastResult: null, lastDay: null };
       if (!saveGameToStorage()) {
         data.pending = null;
         pushToast("保存できません", "釣りは開始していません。", "warn");
@@ -334,13 +332,22 @@ function doCast() {
   const data = state.expansion.fishing;
   const pending = data.pending;
   if (!pending || biteActive() || isWaiting() || (pending.castsLeft ?? 0) <= 0) return;
-  // 餌消費
-  if (!consumeBait(state, pending.baitId)) {
-    pushToast("餌が足りません", `${BAIT_DEFS[pending.baitId]?.name || pending.baitId} がありません。`, "warn");
+  // 現在選択中の餌を取得
+  const select = document.getElementById("fishingBaitSelect");
+  const currentBaitId = select?.value;
+  if (!currentBaitId || !BAIT_DEFS[currentBaitId]) {
+    pushToast("餌が選択されていません", "餌を選択してから釣るを押してください。", "warn");
     return;
   }
+  // 餌消費
+  if (!consumeBait(state, currentBaitId)) {
+    pushToast("餌が足りません", `${BAIT_DEFS[currentBaitId]?.name || currentBaitId} がありません。`, "warn");
+    return;
+  }
+  // このキャストで使用する餌を確定
+  pending.currentBaitId = currentBaitId;
   const env = currentEnv();
-  const species = rollCatch({ regionId: env.regionId, season: env.season, depth: env.depth, baitId: pending.baitId }, Math.random);
+  const species = rollCatch({ regionId: env.regionId, season: env.season, depth: env.depth, baitId: currentBaitId }, Math.random);
   const snapshot = structuredClone(data.pending);
   pending.castsLeft -= 1;
   pending.lastResult = null;
@@ -537,32 +544,58 @@ function sessionHtml() {
     if (!hasRod) {
       return `<div class="tiny">釣り竿を持っていません。街・村の釣り小屋で入手してください。</div>`;
     }
-    const opts = Object.entries(BAIT_DEFS)
-      .map(([id, b]) => `<option value="${id}">${escapeHtml(b.name)}</option>`)
-      .join("");
     const rodName = ROD_DEFS[data.rodId]?.name || "？";
-    return `<div class="row gap-12"><label class="tiny" for="fishingBaitSelect">餌</label><select id="fishingBaitSelect">${opts}</select>
+    return `<div class="row gap-12">
       <button class="btn primary" id="fishingStartBtn">釣り開始</button></div>
       <div class="tiny mt-6">1日使い、最大${FISHING_CONFIG.castsPerSession}回まで釣れます。日が変わるとやり直しになり、回数は持ち越せません。</div>
       <div class="tiny mt-6">釣り竿: ${rodName}</div>`;
+  }
+  // キャスト待ち（セッション中、待機・アタリでない状態）
+  if (!data.pending.catch && !isWaiting()) {
+    const pending = data.pending;
+    // 前回使用した餌が残っていればそれを選択、なければ所持数>0の最初の餌
+    let selectedBaitId = pending.currentBaitId;
+    if (selectedBaitId && !(data.bait?.[selectedBaitId] > 0)) {
+      selectedBaitId = Object.keys(BAIT_DEFS).find(id => (data.bait?.[id] || 0) > 0) || null;
+    }
+    const baitOpts = Object.entries(BAIT_DEFS)
+      .map(([id, b]) => {
+        const qty = data.bait?.[id] || 0;
+        const disabled = qty <= 0;
+        const selected = id === selectedBaitId;
+        return `<option value="${id}" ${disabled ? "disabled" : ""} ${selected ? "selected" : ""}>${escapeHtml(b.name)}（${qty}）</option>`;
+      })
+      .join("");
+    const allDisabled = Object.values(data.bait || {}).every(qty => qty <= 0);
+    return `<div class="row gap-12">
+      <label class="tiny" for="fishingBaitSelect">餌</label>
+      <select id="fishingBaitSelect" ${allDisabled ? "disabled" : ""}>${baitOpts}</select>
+      <button class="btn primary" id="fishingCastBtn" ${allDisabled ? "disabled" : ""}>釣る（残り${pending.castsLeft}回）</button>
+    </div>
+    <div class="tiny mt-6">釣り竿: ${ROD_DEFS[data.rodId]?.name || "？"}</div>
+    ${lastResultText()}
+    <div class="fishing-end-wrapper">
+      <button class="btn" id="fishingEndBtn" style="white-space: nowrap;">釣りを終了</button>
+    </div>`;
   }
   if (isWaiting() || data.pending.catch) {
     const caught = data.pending.catch;
     const s = caught ? speciesById(caught.speciesId) : null;
     const tone = s ? categoryTone(s.category) : "common";
     const status = caught ? `<b>${escapeHtml(atariMessage(s?.category))}</b>` : `<b>糸を垂れています…</b>`;
+    const baitName = BAIT_DEFS[data.pending.currentBaitId || data.pending.baitId]?.name || "？";
     return `<div class="fishing-session${caught ? ` is-bite is-accent-${tone}` : ""}">
       <div class="fishing-status">${status}</div>
       <div class="row gap-12 mt-6"><button class="btn primary" id="fishingPullBtn">引く</button></div>
       <progress class="fishing-gauge" id="fishingGauge" max="100" value="${caught ? 100 : 0}" aria-label="猶予時間"></progress>
     </div>
-    <div class="tiny mt-6">釣り竿: ${ROD_DEFS[data.rodId]?.name || "？"} / 餌: ${BAIT_DEFS[data.pending.baitId]?.name || "？"}</div>`;
+    <div class="tiny mt-6">釣り竿: ${ROD_DEFS[data.rodId]?.name || "？"} / 餌: ${baitName}</div>`;
   }
   return `<div class="row gap-12">
       <button class="btn primary" id="fishingCastBtn">釣る（残り${data.pending.castsLeft}回）</button>
       <button class="btn" id="fishingEndBtn">終了する</button>
     </div>
-    <div class="tiny mt-6">釣り竿: ${ROD_DEFS[data.rodId]?.name || "？"} / 餌: ${BAIT_DEFS[data.pending.baitId]?.name || "？"}</div>
+    <div class="tiny mt-6">釣り竿: ${ROD_DEFS[data.rodId]?.name || "？"}</div>
     ${lastResultText()}`;
 }
 
@@ -958,6 +991,9 @@ function renderFishingPanel() {
     elements.fishingSellBtn.hidden = !sellable;
     elements.fishingSellBtn.disabled = busy;
   }
+  if (elements.fishingBaitBuyBtn) {
+    elements.fishingBaitBuyBtn.hidden = !canSell();
+  }
   if (isWaiting() || biteActive()) startSessionTimer();
 }
 
@@ -1083,6 +1119,10 @@ function openFishSale() {
  * @returns {void}
  */
 function openBaitPurchase() {
+  if (!canSell()) {
+    pushToast("餌購入", "街・村の釣り小屋でのみ購入できます。", "warn");
+    return;
+  }
   const deals = Object.keys(BAIT_DEFS).map((id) => {
     const b = BAIT_DEFS[id];
     return { id, name: b.name, price: b.price, stock: 999, have: 0, direction: "buy" };

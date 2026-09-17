@@ -425,9 +425,14 @@ export function purchaseBait(state, baitId, qty) {
  * @param {*} value 保存値。
  * @returns {object|null} 有効なセッション情報。
  */
+/**
+ * 未完のセッション情報を検証する。釣果がアタリ中の場合は引き継がない。
+ * @param {*} value 保存値。
+ * @returns {object|null} 有効なセッション情報。
+ */
 function validPending(value) {
   if (!isRecord(value)) return null;
-  if (!BAIT_DEFS[value.baitId]) return null;
+  const baitId = value.baitId && BAIT_DEFS[value.baitId] ? value.baitId : null;
   const castsLeft = Number.isSafeInteger(value.castsLeft) && value.castsLeft > 0 ? value.castsLeft : 0;
   if (castsLeft <= 0) return null;
   const catchInfo =
@@ -441,7 +446,7 @@ function validPending(value) {
   const hookSpeciesId = SPECIES_INDEX[value.hookSpeciesId] ? value.hookSpeciesId : null;
   const waiting = waitUntil != null && hookSpeciesId != null;
   return {
-    baitId: value.baitId,
+    baitId,
     dayApplied: value.dayApplied === true,
     castsLeft,
     catch: waiting ? null : catchInfo,

@@ -152,7 +152,10 @@ async function main() {
   assert.ok(dirty.codex.nope === undefined);
   assert.equal(dirty.codex.aji.maxSizePos.x, 1);
   assert.deepEqual(dirty.bait, { insect: 0, shell: 0, cut: 0, small: 0 });
-  assert.equal(dirty.pending, null);
+  // baitId が不正な場合、baitId: null で正規化される（互換維持）
+  assert.ok(dirty.pending);
+  assert.equal(dirty.pending.baitId, null);
+  assert.equal(dirty.pending.castsLeft, 4);
   const kept = fishing.normalizeFishing({
     rodId: "rod_basic",
     pending: { baitId: "cut", dayApplied: true, castsLeft: 3, lastDay: 7, catch: { speciesId: "madai", windowSeconds: 4 }, lastResult: { speciesId: "madai" } },
