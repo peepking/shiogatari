@@ -11,7 +11,7 @@ export function initWorkspaceLayout() {
   toolbar.prepend(document.getElementById("gameTime"), assets);
   assets.classList.remove("mb-12");
   document.getElementById("gameMenu").append(
-    document.getElementById("manualModalBtn"), document.getElementById("resetBtn")
+    document.getElementById("manualModalBtn"), document.getElementById("unlockCodexBtn"), document.getElementById("resetBtn")
   );
   navigator.querySelector(".hd").remove();
   for (const asset of assets.children) {

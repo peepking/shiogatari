@@ -337,8 +337,8 @@ async function main() {
   // 完成率: 発見済み数 / 総数で、既存の図鑑登録状態のみから算出
   const completion = fishing.codexCompletion({ aji: { count: 3 }, madai: { count: 1 }, hamadai: { count: 1 } });
   assert.equal(completion.caught, 3);
-  assert.equal(completion.total, 275);
-  assert.ok(Math.abs(completion.ratio - 3 / 275) < 1e-12);
+  assert.equal(completion.total, 286);
+  assert.ok(Math.abs(completion.ratio - 3 / 286) < 1e-12);
   assert.equal(fishing.codexCompletion({}).caught, 0);
   assert.equal(fishing.codexCompletion({}).ratio, 0);
 
