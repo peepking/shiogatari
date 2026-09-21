@@ -1,4 +1,5 @@
 import { state } from "./state.js";
+import { codexSilhouette } from "./fishingCodexArt.js";
 import { MODE_LABEL } from "./constants.js";
 import { elements, confirmAction, pushLog, pushToast } from "./dom.js";
 import { getTerrainAt, snapshotWorld, restoreWorld } from "./map.js";
@@ -10,6 +11,8 @@ import { fishingRegionAt, rollCatch, windowFor, rollSize, recordCatch, dressCatc
 
 /** 釣りパネルを開いた際に渡される表示同期。 bite/キャスト後に使う。 */
 let panelSync = null;
+/** パネルを開いた場所と操作モード。移動や戦闘移行で閉じるために使う。 */
+let panelLocation = null;
 /** 待機とアタリの経過を監視するタイマー。 */
 let sessionTimer = null;
 /** アタリの猶予時間切れ基準時刻。 */
@@ -35,6 +38,9 @@ let codexSeasons = new Set();
 let codexSearchText = "";
 /** 図鑑の詳細表示中の魚種ID。 null は一覧表示。 */
 let codexSelectedId = null;
+/** 詳細から一覧へ戻る際の位置とフォーカス対象。 */
+let codexListScroll = 0;
+let codexReturnId = null;
 
 /**
  * game時間から絶対日を算出する。fishing.js の absDay と同じ式。questUtils への依存を避けて独立して維持する。
@@ -117,6 +123,11 @@ function isWaiting() {
  * @returns {void}
  */
 export function renderFishingControl(syncUI) {
+  if (panelLocation && (panelLocation.x !== state.position.x || panelLocation.y !== state.position.y || panelLocation.mode !== state.modeLabel)) {
+    if (elements.fishingModal) elements.fishingModal.hidden = true;
+    panelLocation = null;
+    cancelBite();
+  }
   const button = elements.fishBtn;
   if (!button) return;
   refreshFishingDay();
@@ -199,6 +210,10 @@ function showRodRewardModal(rodId, rodName, onConfirm) {
  */
 export function openFishingPanel(syncUI) {
   if (typeof syncUI === "function") panelSync = syncUI;
+  if (elements.fishingModal && !elements.fishingModal.hidden) {
+    document.getElementById("fishingTitle")?.focus({ preventScroll: true });
+    return;
+  }
   refreshFishingDay();
 
   const fishing = state.expansion.fishing;
@@ -212,14 +227,14 @@ export function openFishingPanel(syncUI) {
         state.expansion.fishing.rodId = "rod_basic";
         saveGameToStorage();
         renderFishingPanel();
-        if (elements.fishingModal) elements.fishingModal.hidden = false;
+        showFishingWorkspace();
       });
       return;
     }
     // 海上で竿なしならメッセージ表示してパネルを開く
     pushToast("釣り", "釣り竿を持っていません。街・村の釣り小屋で入手してください。", "warn");
     renderFishingPanel();
-    if (elements.fishingModal) elements.fishingModal.hidden = false;
+    showFishingWorkspace();
     return;
   }
 
@@ -232,14 +247,27 @@ export function openFishingPanel(syncUI) {
         state.expansion.fishing.rodId = newRod;
         saveGameToStorage();
         renderFishingPanel();
-        if (elements.fishingModal) elements.fishingModal.hidden = false;
+        showFishingWorkspace();
       });
       return;
     }
   }
 
   renderFishingPanel();
-  if (elements.fishingModal) elements.fishingModal.hidden = false;
+  showFishingWorkspace();
+}
+
+/** @returns {void} 他の中央パネルを閉じ、釣り画面へフォーカスを移す。 */
+function showFishingWorkspace() {
+  if (!elements.fishingModal) return;
+  document.getElementById("outfittingClose")?.click();
+  document.getElementById("tideClose")?.click();
+  document.dispatchEvent(new CustomEvent("auto-move-stop"));
+  panelLocation = { ...state.position, mode: state.modeLabel };
+  elements.fishingModal.hidden = false;
+  const inventory = document.querySelector(".fishing-storage");
+  if (inventory && canSell()) inventory.open = true;
+  document.getElementById("fishingTitle")?.focus({ preventScroll: true });
 }
 
 /**
@@ -270,7 +298,8 @@ export function resumeFishing() {
       return false;
     }
   }
-  openFishingPanel();
+  if (elements.fishingModal && !elements.fishingModal.hidden) renderFishingPanel();
+  else openFishingPanel();
   return true;
 }
 
@@ -510,28 +539,43 @@ function lastResultText() {
  */
 function resultAnnouncementHtml() {
   const info = resultScreen;
-  if (!info.success) {
-    return `<div class="fishing-session is-result">
-      <div class="fishing-result-name">魚に逃げられた！</div>
-      <div class="row gap-12 mt-6"><button class="btn primary" id="fishingNextBtn">次へ</button></div>
-    </div>`;
-  }
-  const s = info.speciesId ? speciesById(info.speciesId) : null;
+  const s = info.success && info.speciesId ? speciesById(info.speciesId) : null;
   const tone = s ? categoryTone(s.category) : "common";
   const badges = [];
-  if (info.maxUpdate) badges.push(`<span class="fishing-badge">最大サイズ更新！</span>`);
-  if (info.firstCatch) badges.push(`<span class="fishing-badge">初めて釣った魚！</span>`);
-  return `<div class="fishing-session is-result is-accent-${tone}">
-    <div class="fishing-result-name">${escapeHtml(s?.name || "？")} (${info.size}cm) を釣り上げた！</div>
-    ${badges.length ? `<div class="fishing-result-badges">${badges.join("")}</div>` : ""}
-    <div class="row gap-12 mt-6"><button class="btn primary" id="fishingNextBtn">次へ</button></div>
+  if (info.maxUpdate) badges.push('<span class="fishing-badge">最大記録更新</span>');
+  if (info.firstCatch) badges.push('<span class="fishing-badge">初めての釣果</span>');
+  const content = info.success
+    ? `<div class="fishing-result-caption">釣り上げた！</div>
+       <h3 class="fishing-result-name">${escapeHtml(s?.name || "？")}</h3>
+       <div class="fishing-result-size">${info.size}<span>cm</span></div>
+       <div class="fishing-result-badges">${badges.join("")}</div>`
+    : '<div class="fishing-result-caption">波間に姿が消えた</div><h3 class="fishing-result-name">魚に逃げられた…</h3><p>次のアタリを待ちましょう。</p>';
+  const more = (state.expansion.fishing.pending?.castsLeft || 0) > 0;
+  return fishingStage(content,
+    `<button class="btn primary fishing-main-action" id="fishingNextBtn">${more ? "次の一投へ" : "釣果を確認"}</button>`,
+    `is-result is-accent-${tone}`);
+}
+
+/**
+ * 水面・案内・操作を固定した枠へ配置する。装飾は読み上げ対象にしない。
+ * @param {string} content 状態説明。 @param {string} controls 操作HTML。
+ * @param {string} phase 状態クラス。 @returns {string} 共通の釣り画面。
+ */
+function fishingStage(content, controls = "", phase = "") {
+  const data = state.expansion.fishing;
+  const rod = escapeHtml(ROD_DEFS[data.rodId]?.name || "竿なし");
+  const remaining = data.pending ? `残り ${data.pending.castsLeft} / ${FISHING_CONFIG.castsPerSession} 回` : "1日を使って釣りをする";
+  return `<div class="fishing-stage ${phase}">
+    <div class="fishing-stage-meta"><span>${rod}</span><span>${remaining}</span></div>
+    <div class="fishing-water"><div class="fishing-float" aria-hidden="true"></div>
+      <div class="fishing-stage-message" role="status">${content}</div>
+    </div>
+    <div class="fishing-command">${controls}</div>
   </div>`;
 }
 
 /**
- * 釣りセッション部を描画する。
- * アタリ中は魚名を公開せず、カテゴリに応じた文言とアクセント色を表示する。
- * 釣果発表（resultScreen）中はその画面を優先して描画する。
+ * 待機・アタリ・釣果で水面と操作欄の高さを共有する。魚名は釣果確定後だけ公開する。
  * @returns {string} 表示用HTML。
  */
 function sessionHtml() {
@@ -539,64 +583,38 @@ function sessionHtml() {
   const env = currentEnv();
   if (resultScreen) return resultAnnouncementHtml();
   if (!data.pending) {
-    if (!env.sea) return `<div class="tiny">釣りは海上（海・浅瀬）でのみできます。</div>`;
-    const hasRod = !!data.rodId;
-    if (!hasRod) {
-      return `<div class="tiny">釣り竿を持っていません。街・村の釣り小屋で入手してください。</div>`;
-    }
-    const rodName = ROD_DEFS[data.rodId]?.name || "？";
-    return `<div class="row gap-12">
-      <button class="btn primary" id="fishingStartBtn">釣り開始</button></div>
-      <div class="tiny mt-6">1日使い、最大${FISHING_CONFIG.castsPerSession}回まで釣れます。日が変わるとやり直しになり、回数は持ち越せません。</div>
-      <div class="tiny mt-6">釣り竿: ${rodName}</div>`;
+    if (!env.sea) return fishingStage("<p>釣りは海・浅瀬で楽しめます。</p>");
+    if (!data.rodId) return fishingStage("<p>街・村の釣り小屋で竿を手に入れましょう。</p>");
+    return fishingStage(`<h3>波に耳を澄ませて</h3><p>1日使い、最大${FISHING_CONFIG.castsPerSession}回まで釣れます。</p><p class="tiny">日が変わると残り回数は持ち越せません。</p>`,
+      '<button class="btn primary fishing-main-action" id="fishingStartBtn">釣りを始める</button>', "is-ready");
   }
-  // キャスト待ち（セッション中、待機・アタリでない状態）
-  if (!data.pending.catch && !isWaiting()) {
-    const pending = data.pending;
-    // 前回使用した餌が残っていればそれを選択、なければ所持数>0の最初の餌
+  const pending = data.pending;
+  if (!pending.catch && !isWaiting()) {
     let selectedBaitId = pending.currentBaitId;
-    if (selectedBaitId && !(data.bait?.[selectedBaitId] > 0)) {
+    if (!selectedBaitId || !(data.bait?.[selectedBaitId] > 0)) {
       selectedBaitId = Object.keys(BAIT_DEFS).find(id => (data.bait?.[id] || 0) > 0) || null;
     }
-    const baitOpts = Object.entries(BAIT_DEFS)
-      .map(([id, b]) => {
-        const qty = data.bait?.[id] || 0;
-        const disabled = qty <= 0;
-        const selected = id === selectedBaitId;
-        return `<option value="${id}" ${disabled ? "disabled" : ""} ${selected ? "selected" : ""}>${escapeHtml(b.name)}（${qty}）</option>`;
-      })
-      .join("");
+    const baitOpts = Object.entries(BAIT_DEFS).map(([id, b]) => {
+      const qty = data.bait?.[id] || 0;
+      return `<option value="${id}" ${qty <= 0 ? "disabled" : ""} ${id === selectedBaitId ? "selected" : ""}>${escapeHtml(b.name)}（${qty}）</option>`;
+    }).join("");
     const allDisabled = Object.values(data.bait || {}).every(qty => qty <= 0);
-    return `<div class="row gap-12">
-      <label class="tiny" for="fishingBaitSelect">餌</label>
-      <select id="fishingBaitSelect" ${allDisabled ? "disabled" : ""}>${baitOpts}</select>
-      <button class="btn primary" id="fishingCastBtn" ${allDisabled ? "disabled" : ""}>釣る（残り${pending.castsLeft}回）</button>
-    </div>
-    <div class="tiny mt-6">釣り竿: ${ROD_DEFS[data.rodId]?.name || "？"}</div>
-    ${lastResultText()}
-    <div class="fishing-end-wrapper">
-      <button class="btn" id="fishingEndBtn" style="white-space: nowrap;">釣りを終了</button>
-    </div>`;
+    return fishingStage(`<h3>次は何が釣れるだろう</h3><p>${allDisabled ? "餌がありません。街・村で購入するか、釣果を加工できます。" : "餌を選んで、糸を垂らしましょう。"}</p>${lastResultText()}`,
+      `<label class="fishing-bait-control" for="fishingBaitSelect">餌<select id="fishingBaitSelect" ${allDisabled ? "disabled" : ""}>${baitOpts}</select></label>
+       <button class="btn primary fishing-main-action" id="fishingCastBtn" ${allDisabled ? "disabled" : ""}>糸を垂らす</button>
+       <button class="btn ghost fishing-end-action" id="fishingEndBtn">釣りを終了</button>`, "is-ready");
   }
-  if (isWaiting() || data.pending.catch) {
-    const caught = data.pending.catch;
-    const s = caught ? speciesById(caught.speciesId) : null;
-    const tone = s ? categoryTone(s.category) : "common";
-    const status = caught ? `<b>${escapeHtml(atariMessage(s?.category))}</b>` : `<b>糸を垂れています…</b>`;
-    const baitName = BAIT_DEFS[data.pending.currentBaitId || data.pending.baitId]?.name || "？";
-    return `<div class="fishing-session${caught ? ` is-bite is-accent-${tone}` : ""}">
-      <div class="fishing-status">${status}</div>
-      <div class="row gap-12 mt-6"><button class="btn primary" id="fishingPullBtn">引く</button></div>
-      <progress class="fishing-gauge" id="fishingGauge" max="100" value="${caught ? 100 : 0}" aria-label="猶予時間"></progress>
-    </div>
-    <div class="tiny mt-6">釣り竿: ${ROD_DEFS[data.rodId]?.name || "？"} / 餌: ${baitName}</div>`;
-  }
-  return `<div class="row gap-12">
-      <button class="btn primary" id="fishingCastBtn">釣る（残り${data.pending.castsLeft}回）</button>
-      <button class="btn" id="fishingEndBtn">終了する</button>
-    </div>
-    <div class="tiny mt-6">釣り竿: ${ROD_DEFS[data.rodId]?.name || "？"}</div>
-    ${lastResultText()}`;
+  const caught = pending.catch;
+  const s = caught ? speciesById(caught.speciesId) : null;
+  const tone = s ? categoryTone(s.category) : "common";
+  const bait = escapeHtml(BAIT_DEFS[pending.currentBaitId || pending.baitId]?.name || "？");
+  return fishingStage(
+    `<h3>${caught ? escapeHtml(atariMessage(s?.category)) : "糸を垂れています…"}</h3>
+     <p>${caught ? "今です！ 引き上げましょう。" : "浮きの動きを見守りましょう。"}</p>
+     <progress class="fishing-gauge" id="fishingGauge" max="100" value="${caught ? 100 : 0}" aria-label="猶予時間"></progress>`,
+    `<div class="fishing-bait-control"><span>使用中の餌</span><strong>${bait}</strong></div>
+     <button class="btn primary fishing-main-action" id="fishingPullBtn">引く</button>`,
+    caught ? `is-bite is-accent-${tone}` : "is-waiting");
 }
 
 /**
@@ -703,6 +721,12 @@ function absToGameDate(abs) {
 function renderCodexModal() {
   const body = elements.codexBody;
   if (!body) return;
+  const completion = codexCompletion(state.expansion.fishing.codex);
+  const progress = document.getElementById("codexProgress");
+  if (progress) progress.innerHTML = `<div><span>航海で出会った魚たち</span><strong>発見 ${completion.caught}<small> / ${completion.total}種</small></strong></div><progress max="${completion.total}" value="${completion.caught}" aria-label="図鑑の発見数"></progress>`;
+  const filterCount = document.getElementById("codexFilterCount");
+  const count = codexCats.size + codexRegions.size + codexSeasons.size;
+  if (filterCount) filterCount.textContent = count ? `（${count}件選択中）` : "";
   const toolsHidden = !!codexSelectedId;
   if (elements.codexModal) {
     const tools = elements.codexModal.querySelector(".codex-tools");
@@ -717,7 +741,7 @@ function renderCodexModal() {
 
 /**
  * 図鑑の一覧を描画する。
- * 図鑑No.（number）の昇順に並べ、No.・魚名・分類・最大サイズ・主な海域・季節を1行に収める。
+ * 図鑑No.順のカードへ、魚名・分類・最大記録と公開済みの手がかりをまとめる。
  * 未発見魚は魚名等を非公開としつつ、図鑑完成率に応じて公開済みの海域・季節だけを表示する。
  * @param {HTMLElement} body 描画先。
  * @returns {void}
@@ -733,48 +757,22 @@ function renderCodexList(body) {
       { caught, seasonsRevealed: completion.ratio >= 0.25, search: codexSearchText }
     );
   }).sort((a, b) => a.number - b.number);
-  const rows = filterable
-    .map((s) => {
-      const entry = data.codex[s.id];
-      const caught = !!entry && entry.count > 0;
-      const no = `No.${String(s.number).padStart(3, "0")}`;
-      if (!caught) {
-        const reveal = codexRevealState(completion.ratio);
-        return `<tr class="codex-not-discovered" data-codex="${s.id}">
-        <td class="ta-center">${no}</td>
-        <td class="ta-left">？？？</td>
-        <td class="ta-center">未発見</td>
-        <td class="ta-center">？？？</td>
-        <td class="ta-left">${regionShortLabel(s)}</td>
-        <td class="ta-center">${reveal.seasons ? seasonShortLabel(s.seasons) : "？？？"}</td>
-      </tr>`;
-      }
-      return `<tr data-codex="${s.id}">
-        <td class="ta-center">${no}</td>
-        <td class="ta-left">${escapeHtml(s.name)}</td>
-        <td class="ta-center">${FISH_CATEGORIES[s.category] || s.category}</td>
-        <td class="ta-center">${entry.maxSize}cm</td>
-        <td class="ta-left">${regionShortLabel(s)}</td>
-        <td class="ta-center">${seasonShortLabel(s.seasons)}</td>
-      </tr>`;
-    })
-    .join("");
-  body.innerHTML = `<div class="tiny">釣り図鑑（${completion.caught}/${completion.total}）${codexSearchText ? ` / 「${escapeHtml(codexSearchText)}」の検索結果 ${filterable.length}件` : ""}</div>
-    <div class="table mt-10">
-      <table class="trade-table">
-        <thead>
-          <tr>
-            <th class="ta-center">No.</th>
-            <th class="ta-left">魚</th>
-            <th class="ta-center">分類</th>
-            <th class="ta-center">最大</th>
-            <th class="ta-left">主な海域</th>
-            <th class="ta-center">季節</th>
-          </tr>
-        </thead>
-        <tbody>${rows || `<tr><td class="ta-center" colspan="6">該当する釣果はありません。</td></tr>`}</tbody>
-      </table>
-    </div>`;
+  const rows = filterable.map(s => {
+    const entry = data.codex[s.id];
+    const caught = (entry?.count || 0) > 0;
+    const reveal = codexRevealState(completion.ratio);
+    const category = caught ? s.category : "unknown";
+    const no = `No.${String(s.number).padStart(3, "0")}`;
+    return `<button type="button" class="codex-card is-${category}" data-codex="${s.id}">
+      <span class="codex-card-top"><span class="codex-number">${no}</span><span class="codex-category">${caught ? FISH_CATEGORIES[s.category] : "未発見"}</span></span>
+      <span class="codex-card-main">${codexSilhouette(caught ? s.category : null)}
+        <span><strong class="codex-card-name">${caught ? escapeHtml(s.name) : "？？？"}</strong>
+          <span class="codex-card-record">${caught ? `最大 <b>${entry.maxSize}</b> cm` : "海に残された手がかり"}</span></span></span>
+      <span class="codex-card-hints"><span>${regionShortLabel(s)}</span><span>${caught || reveal.seasons ? seasonShortLabel(s.seasons) : "季節はまだ不明"}</span></span>
+    </button>`;
+  }).join("");
+  body.innerHTML = `<div class="codex-list-caption">${codexSearchText ? `「${escapeHtml(codexSearchText)}」 · ` : ""}${filterable.length}件を表示<span>カードを選んで詳しく見る</span></div>
+    <div class="codex-cards">${rows || '<p class="codex-empty">該当する魚はいません。検索や絞り込みを変更してください。</p>'}</div>`;
 }
 
 /**
@@ -814,7 +812,7 @@ function renderCodexDetail(body) {
     : `<div class="codex-number">${no}</div>
       <h3>？？？</h3>
       <div class="tiny">未発見</div>`;
-  const description = discovered && s.description ? `<p class="codex-desc">${escapeHtml(s.description)}</p>` : "";
+  const description = discovered && s.description ? `<p class="codex-desc">${escapeHtml(s.description)}</p>` : !discovered ? '<p class="codex-desc">まだ出会っていない魚。公開された手がかりを頼りに、航海の途中で探してみましょう。</p>' : "";
   const recordBlock = discovered
     ? `<div class="codex-record">
       <span class="codex-record-label">最大記録</span>
@@ -830,8 +828,9 @@ function renderCodexDetail(body) {
     </dl>`;
   body.innerHTML = `<div class="codex-detail">
     <div class="row gap-12 mt-6"><button class="btn" id="codexBackBtn">一覧に戻る</button></div>
-    <div class="codex-detail-head">
-      ${topInfo}
+    <div class="codex-detail-head is-${discovered ? s.category : "unknown"}">
+      ${codexSilhouette(discovered ? s.category : null)}
+      <div>${topInfo}</div>
     </div>
     ${description}
     ${recordBlock}
@@ -845,7 +844,10 @@ function renderCodexDetail(body) {
  */
 function openCodexModal() {
   codexSelectedId = null;
+  codexListScroll = 0;
   renderCodexModal();
+  wireCodexFilters();
+  elements.codexBody?.closest(".codex-list")?.scrollTo(0, 0);
   if (elements.codexModal) elements.codexModal.hidden = false;
 }
 
@@ -915,10 +917,13 @@ function wireCodexFilters() {
       btn.type = "button";
       btn.className = "btn" + (selected ? " primary" : "");
       btn.setAttribute("aria-pressed", String(selected));
-      btn.textContent = filterLabel(group, label);
+      const species = FISH_SPECIES.filter(s => s.category === key);
+      const found = species.filter(s => (state.expansion.fishing.codex[s.id]?.count || 0) > 0).length;
+      btn.textContent = filterLabel(group, label) + (group === "category" ? ` ${found}/${species.length}` : "");
       btn.addEventListener("click", () => {
         toggleCodexFilter(group, key);
         renderCodexModal();
+        elements.codexBody?.closest(".codex-list")?.scrollTo(0, 0);
         wireCodexFilters();
       });
       box.appendChild(btn);
@@ -939,17 +944,24 @@ function wireCodexModal() {
   elements.codexSearch?.addEventListener("input", (e) => {
     codexSearchText = e.target.value.trim();
     renderCodexModal();
+    elements.codexBody?.closest(".codex-list")?.scrollTo(0, 0);
   });
   elements.codexBody?.addEventListener("click", (e) => {
     const row = e.target.closest("[data-codex]");
     if (row) {
+      codexListScroll = elements.codexBody.closest(".codex-list").scrollTop;
+      codexReturnId = row.dataset.codex;
       codexSelectedId = row.dataset.codex;
       renderCodexModal();
+      elements.codexBody.closest(".codex-list").scrollTop = 0;
+      document.getElementById("codexBackBtn")?.focus({ preventScroll: true });
       return;
     }
     if (e.target.closest("#codexBackBtn")) {
       codexSelectedId = null;
       renderCodexModal();
+      elements.codexBody.closest(".codex-list").scrollTop = codexListScroll;
+      elements.codexBody.querySelector(`[data-codex="${codexReturnId}"]`)?.focus({ preventScroll: true });
     }
   });
   document.addEventListener("fishing-panel-update", () => {
@@ -977,6 +989,7 @@ function renderFishingPanel() {
   const envEl = document.getElementById("fishingEnv");
   const invEl = document.getElementById("fishingInventory");
   if (!sessionEl) return;
+  const restoreFocus = sessionEl.contains(document.activeElement);
   envEl ? (envEl.textContent = envText()) : null;
   const data = state.expansion.fishing;
   const busy = biteActive() || isWaiting();
@@ -986,6 +999,7 @@ function renderFishingPanel() {
   if (invEl) invEl.innerHTML = inventoryHtml();
   wireSessionButtons();
   wireInventoryButtons();
+  if (restoreFocus) sessionEl.querySelector(".fishing-main-action")?.focus({ preventScroll: true });
   if (elements.fishingSellBtn) {
     const sellable = canSell() && !busy && hasAnyFish();
     elements.fishingSellBtn.hidden = !sellable;
@@ -1053,6 +1067,10 @@ function wireSessionButtons() {
       resultScreen = null;
       panelSync?.();
       renderFishingPanel();
+      if (!state.expansion.fishing.pending) {
+        const inventory = document.querySelector(".fishing-storage");
+        if (inventory) inventory.open = true;
+      }
     });
   }
 }
@@ -1137,9 +1155,10 @@ function openBaitPurchase() {
  */
 export function wireFishingUI() {
   if (!elements.fishingModal || typeof document === "undefined") return;
-  elements.fishingModal.addEventListener("click", (e) => {
-    if (e.target === elements.fishingModal) closeFishingPanel();
-  });
+  document.querySelector(".workspace-actions")?.addEventListener("click", (e) => {
+    const button = e.target.closest("button");
+    if (button && button !== elements.fishBtn && !elements.fishingModal.hidden) closeFishingPanel();
+  }, true);
   elements.fishingModalClose?.addEventListener("click", closeFishingPanel);
   elements.fishingCodexBtn?.addEventListener("click", openCodexModal);
   elements.fishingBaitBuyBtn?.addEventListener("click", openBaitPurchase);
@@ -1155,6 +1174,9 @@ export function wireFishingUI() {
  * @returns {void}
  */
 function closeFishingPanel() {
-  cancelBite();
   if (elements.fishingModal) elements.fishingModal.hidden = true;
+  panelLocation = null;
+  cancelBite();
+  panelSync?.();
+  elements.fishBtn?.focus({ preventScroll: true });
 }

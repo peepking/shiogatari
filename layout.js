@@ -26,6 +26,7 @@ export function initWorkspaceLayout() {
   const roster = document.getElementById("rosterCard");
   const strategy = document.getElementById("strategyCard");
   mapCard.classList.add("workspace-map");
+  mapCard.querySelector(".bd").append(document.getElementById("fishingModal"));
   modeCard.classList.add("workspace-actions");
   const battleSide = document.createElement("div");
   battleSide.className = "battle-side";

@@ -675,26 +675,27 @@
     </div>
   </div>
 
-  <div class="modal-backdrop" id="fishingModal" hidden>
-    <div class="modal fishing-modal">
-      <div class="modal-hd">
-        <div>釣り</div>
-        <button class="modal-close" id="fishingModalClose">閉じる</button>
+  <section class="fishing-workspace" id="fishingModal" aria-labelledby="fishingTitle" hidden>
+    <div class="fishing-workspace-inner">
+      <div class="outfitting-heading">
+        <h2 id="fishingTitle" tabindex="-1">潮待ちの釣り</h2>
+        <button class="btn ghost" id="fishingModalClose">地図に戻る</button>
       </div>
-      <div class="modal-bd with-footer">
-        <div class="tiny" id="fishingEnv"></div>
-        <div class="section" id="fishingSession"></div>
-        <div class="modal-scroll">
+      <div class="fishing-workspace-body">
+        <div class="fishing-environment" id="fishingEnv"></div>
+        <div id="fishingSession"></div>
+        <details class="fishing-storage">
+          <summary>釣果と餌を確認</summary>
           <div class="section" id="fishingInventory"></div>
-        </div>
-        <div class="sticky-footer row gap-12 w-100">
+        </details>
+        <div class="fishing-tools">
           <button class="btn" id="fishingCodexBtn">図鑑</button>
           <button class="btn" id="fishingBaitBuyBtn">餌購入</button>
           <button class="btn good" id="fishingSellBtn" hidden>魚を売る</button>
         </div>
 </div>
   </div>
-</div>
+  </section>
 
 <div class="modal-backdrop" id="rodRewardModal" hidden>
   <div class="modal rod-reward-modal">
@@ -720,7 +721,11 @@
         <button class="modal-close" id="codexModalClose">閉じる</button>
       </div>
       <div class="modal-bd codex-bd">
+        <div id="codexProgress" class="codex-progress"></div>
         <div class="codex-tools">
+          <input id="codexSearch" type="search" placeholder="魚名で検索" aria-label="魚名で検索">
+          <details class="codex-filter-disclosure">
+            <summary>絞り込み <span id="codexFilterCount"></span></summary>
           <div class="codex-filters" id="codexFilterWrap">
             <div class="codex-filter-row">
               <span class="codex-filter-label">分類</span>
@@ -735,7 +740,7 @@
               <div class="codex-filter-btns" data-group="season"></div>
             </div>
           </div>
-          <input id="codexSearch" type="text" placeholder="魚名で検索" class="mt-6" aria-label="魚名で検索">
+          </details>
         </div>
         <div class="codex-list">
           <div class="section" id="codexBody"></div>

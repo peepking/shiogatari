@@ -1557,7 +1557,7 @@ input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) 
 .national-power-preview { white-space: pre-line; line-height: 1.8; }
 .fishing-modal .section { margin-top: 0px; }
 .modal.fishing-modal { height: 650px; max-height: 86vh; }
-.modal.codex-modal { height: 620px; max-height: 86vh; }
+.modal.codex-modal { width: min(920px, 96vw); height: 760px; max-height: 90dvh; background: #111d30; }
 .codex-bd { display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
 .codex-tools { flex: 0 0 auto; }
 .codex-filters { display: flex; flex-direction: column; gap: 6px; }
@@ -1590,6 +1590,53 @@ input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) 
 .codex-ecology { margin: 0 2px; font-size: 14px; }
 .codex-ecology dt { font-size: 12px; color: var(--muted); }
 .codex-ecology dd { margin: 2px 0 0; }
+.codex-progress { flex: none; padding: 14px 16px; border: 1px solid #345369; border-radius: 12px; background: #14283a; }
+.codex-progress > div { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; color: #b2c7d1; font-size: 12px; }
+.codex-progress strong { color: #c6ece4; font-size: 19px; font-variant-numeric: tabular-nums; }
+.codex-progress small { color: #a2b7c3; font-size: 12px; font-weight: 400; }
+.codex-progress progress { display: block; width: 100%; height: 5px; margin-top: 12px; accent-color: #69cfca; }
+.codex-tools { display: grid; gap: 10px; }
+.codex-tools[hidden] { display: none; }
+.codex-tools input { width: 100%; box-sizing: border-box; }
+.codex-filter-disclosure { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.codex-filter-disclosure summary { cursor: pointer; color: #b2c7d1; font-size: 12px; }
+.codex-filter-disclosure .codex-filters { padding-top: 10px; max-height: 180px; overflow: auto; }
+.codex-list-caption { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; color: var(--muted); font-size: 11px; margin: 0 0 12px; }
+.codex-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.codex-card { --codex-accent: #82c9c5; appearance: none; text-align: left; font: inherit; color: var(--text); border: 1px solid #34485c; border-radius: 12px; background: linear-gradient(140deg, #1b3043, #142034); padding: 14px; min-width: 0; cursor: pointer; display: grid; gap: 14px; }
+.codex-card:hover { background: #243b50; border-color: #86b7c0; }
+.codex-card:focus-visible { outline: 2px solid #a5dbdc; outline-offset: -3px; }
+.codex-card.is-big, .codex-detail-head.is-big { --codex-accent: #d5bb82; }
+.codex-card.is-giant, .codex-detail-head.is-giant { --codex-accent: #e2a497; }
+.codex-card.is-unknown, .codex-detail-head.is-unknown { --codex-accent: #71889d; }
+.codex-card.is-unknown { background: #121e30; border-style: dashed; }
+.codex-card-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.codex-category { color: var(--codex-accent); font-size: 10px; }
+.codex-card-main { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; align-items: center; }
+.codex-silhouette { display: block; width: 100%; color: var(--codex-accent, #82c9c5); }
+.codex-fish-eye { fill: #142034; }
+.codex-card-name { display: block; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.codex-card-record { display: block; font-size: 10px; color: #a2b7c3; margin-top: 7px; }
+.codex-card-record b { color: #d6e7ed; font-size: 19px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.codex-card-hints { display: flex; flex-wrap: wrap; gap: 5px 10px; border-top: 1px solid #34485c; padding-top: 10px; color: #9bb3c5; font-size: 10px; line-height: 1.5; }
+.codex-empty { grid-column: 1 / -1; color: var(--muted); padding: 20px; text-align: center; }
+.codex-detail { padding: 0 8px 16px; }
+.codex-detail-head { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 24px; align-items: center; padding: 24px 12px; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.codex-detail-head h3 { font-size: 28px; margin: 8px 0; line-height: 1.4; }
+.codex-detail .codex-desc { max-width: none; font-size: 14px; color: #beced9; }
+.codex-detail .codex-record { padding: 18px; border: 1px solid #345369; border-radius: 12px; background: #14283a; }
+.codex-detail .codex-record strong { font-size: 34px; color: #9bd8d3; }
+.codex-detail .codex-ecology { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.codex-ecology > div { padding: 14px; border-bottom: 1px solid var(--line); }
+@media (max-width: 800px) { .codex-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) {
+  .codex-cards { grid-template-columns: 1fr; }
+  .codex-card-main { grid-template-columns: 64px minmax(0, 1fr); }
+  .codex-detail-head { grid-template-columns: 76px minmax(0, 1fr); padding: 18px 0; gap: 14px; }
+  .codex-detail-head h3 { font-size: 23px; }
+  .codex-detail .codex-ecology { grid-template-columns: 1fr; gap: 0; }
+  .codex-filter-disclosure .codex-filters { max-height: 130px; }
+}
 .fishing-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .fishing-row .tiny { flex: 1 1 180px; }
 .fishing-session { display: grid; height: 145px; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.04); line-height: 1.6; }
@@ -1619,6 +1666,51 @@ input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) 
 .fishing-gauge.is-low::-webkit-progress-value { background: #e06c6c; }
 .fishing-gauge.is-low::-moz-progress-bar { background: #e06c6c; }
 #fishingCastBtn, #fishingStartBtn, #fishingPullBtn { white-space: nowrap; word-break: keep-all; overflow-wrap: anywhere; }
+
+.workspace-map:has(.fishing-workspace:not([hidden])) #mapBlock,
+.workspace-map:has(.fishing-workspace:not([hidden])) #outfittingPanel,
+.workspace-map:has(.fishing-workspace:not([hidden])) #tidePanel { display: none; }
+.fishing-workspace { width: 100%; min-width: 0; box-sizing: border-box; padding: 4px; }
+.fishing-workspace-inner, .fishing-workspace-body { display: grid; gap: 16px; min-width: 0; }
+.fishing-workspace h2 { font-size: 19px; }
+.fishing-environment { color: #a8c6d4; font-size: 12px; letter-spacing: .04em; }
+.fishing-workspace #fishingSession { height: auto; padding: 0; }
+.fishing-stage { --fishing-accent: #69cfca; border: 1px solid #345369; border-radius: 16px; overflow: hidden; background: #122338; }
+.fishing-stage.is-accent-big { --fishing-accent: #e2c17e; }
+.fishing-stage.is-accent-giant { --fishing-accent: #f29d8c; }
+.fishing-stage-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 14px 18px; font-size: 12px; color: #b6cbd6; border-bottom: 1px solid #2e465b; }
+.fishing-water { height: 300px; box-sizing: border-box; position: relative; display: grid; place-items: center; padding: 24px; background: radial-gradient(ellipse at 50% 80%, #22586666, transparent 70%), repeating-linear-gradient(174deg, transparent 0 42px, #6daebb0a 43px 45px, transparent 46px 80px); }
+.fishing-stage-message { text-align: center; z-index: 1; max-width: 100%; }
+.fishing-stage-message h3 { margin: 0 0 12px; font-size: clamp(19px, 3vw, 26px); }
+.fishing-stage-message p { font-size: 13px; color: #b6cbd6; line-height: 1.8; margin: 8px 0; }
+.fishing-stage-message .fishing-result-caption { color: var(--fishing-accent); font-size: 12px; letter-spacing: .15em; margin-bottom: 12px; }
+.fishing-stage-message .fishing-result-size { font-size: 48px; line-height: 1.2; color: var(--fishing-accent); }
+.fishing-result-size span { font-size: 16px; margin-left: 6px; }
+.fishing-stage .fishing-result-badges { justify-content: center; min-height: 28px; }
+.fishing-stage .fishing-badge { border-color: var(--fishing-accent); color: var(--fishing-accent); }
+.fishing-command { display: grid; grid-template-columns: minmax(0, 1fr) minmax(130px, 1fr); grid-template-rows: 72px 32px; align-items: end; gap: 12px 16px; padding: 16px; border-top: 1px solid #345369; background: #15283e; }
+.fishing-main-action { grid-column: 2; grid-row: 1; height: 48px; box-sizing: border-box; width: 100%; white-space: nowrap; font-size: 15px; margin-bottom:6px; }
+.fishing-bait-control { grid-column: 1; grid-row: 1; display: grid; grid-template-rows: 18px 48px; gap: 6px; line-height: 18px; font-size: 12px; color: #b6cbd6; min-width: 0; }
+.fishing-bait-control select { width: 100%; min-width: 0; height: 48px; box-sizing: border-box; }
+.fishing-bait-control strong { display: flex; align-items: center; }
+.fishing-end-action { grid-column: 1 / -1; grid-row: 2; justify-self: end; height: 32px; box-sizing: border-box; padding: 4px 12px; font-size: 12px; }
+.fishing-storage { border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; }
+.fishing-storage summary { cursor: pointer; color: #b6cbd6; font-size: 13px; }
+.fishing-storage #fishingInventory { max-height: 240px; overflow: auto; }
+.fishing-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.fishing-float { position: absolute; bottom: 28px; width: 8px; height: 25px; border-radius: 4px; background: linear-gradient(#e5b49a 0 45%, #e9e7d7 45% 85%, #578f99 85%); transform: rotate(8deg); }
+.fishing-float::after { content: ""; position: absolute; width: 62px; height: 14px; border: 1px solid #8ccec955; border-radius: 50%; left: -27px; bottom: -5px; }
+.is-result .fishing-float { display: none; }
+.is-waiting .fishing-float { animation: fishing-bob 2s ease-in-out infinite; }
+.is-bite .fishing-float { animation: fishing-bob .35s ease-in-out infinite; }
+.is-bite .fishing-main-action { background: #287c77; border-color: var(--fishing-accent); box-shadow: 0 0 18px #69cfca33; }
+@keyframes fishing-bob { 50% { transform: translateY(5px) rotate(-8deg); } }
+@media (prefers-reduced-motion: reduce) { .fishing-float { animation: none !important; } }
+@media (max-width: 520px) {
+  .fishing-water { height: 280px; padding: 18px; }
+  .fishing-command { gap: 8px; padding: 12px; grid-template-columns: minmax(0, 1fr) minmax(110px, 1fr); }
+  .fishing-stage-meta { padding: 12px; font-size: 11px; }
+}
 
 .fishing-end-wrapper {
   display: flex;

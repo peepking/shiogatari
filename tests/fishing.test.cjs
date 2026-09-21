@@ -659,7 +659,40 @@ assert.equal(fixed2.rodId, null);
 const noRod2 = fishing.normalizeFishing({ counts: {}, codex: {}, bait: {}, pending: null });
 assert.equal(noRod2.rodId, null);
 
-console.log("釣り: 海域・抽選・猶予・図鑑・捌き・売却・補完・フィルタ・ヒント公開・アタリ文言・演出トーン・釣果判定・餌システム・竿アップグレード・竿なし状態: 全項目成功");
+// 画面を開いたまま釣りを再開しても、日数適用後にキャスト待ちへ描画し直す。
+const uiSource = await fs.readFile(path.join(__dirname, "../fishingUI.js"), "utf8");
+const restartState = makeState();
+restartState.modeLabel = "normal";
+restartState.expansion.fishing.rodId = "rod_basic";
+let redraws = 0;
+const restartContext = vm.createContext({
+  state: restartState, MODE_LABEL: { NORMAL: "normal" }, FISHING_CONFIG: { castsPerSession: 5 },
+  elements: { fishingModal: { hidden: false } }, structuredClone,
+  currentEnv: () => ({ sea: true }), refreshFishingDay() {},
+  absDay: s => s.year * 120 + s.season * 30 + s.day,
+  confirmAction: options => options.onConfirm(), saveGameToStorage: () => true,
+  snapshotWorld: () => ({}), restoreWorld() {}, pushToast() {},
+  advanceDayWithEvents: days => { restartState.day += days; },
+  renderFishingPanel: () => {
+    assert.equal(restartState.expansion.fishing.pending.castsLeft, 5);
+    assert.equal(restartState.expansion.fishing.pending.dayApplied, true);
+    redraws++;
+  },
+  openFishingPanel: () => assert.fail("表示済み画面の再開は直接再描画する"),
+});
+for (const name of ["beginFishing", "resumeFishing"]) {
+  const body = uiSource.match(new RegExp(`function ${name}\\([^\\n]*\\) \\{[\\s\\S]*?\\n\\}`))?.[0];
+  assert.ok(body);
+  vm.runInContext(body, restartContext);
+}
+for (let session = 0; session < 2; session++) {
+  restartState.expansion.fishing.pending = null;
+  vm.runInContext("beginFishing()", restartContext);
+}
+assert.equal(redraws, 2);
+assert.equal(restartState.day, 3);
+
+console.log("釣り: 餌・竿・釣果・画面を閉じない連続セッション開始: 全項目成功");
 }
 
 main().catch((error) => {
