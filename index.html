@@ -124,6 +124,7 @@
               <div class="row flex-wrap">
                 <span class="pill"><span id="gameTime">神歴1000年 / 春 / 1日</span></span>
                 <button class="btn ghost" id="manualModalBtn">状態手動上書き</button>
+                <button class="btn ghost" id="unlockCodexBtn">魚図鑑全開放</button>
                 <button class="btn bad" id="resetBtn">リセット</button>
               </div>
             </div>
@@ -310,6 +311,7 @@
                 <button class="btn" id="modeWaitBtn">1日待機</button>
                 <button class="btn" id="exploreBtn" hidden>探索する</button>
                 <button class="btn" id="chartExploreBtn" hidden>海図の地点を探索</button>
+                <button class="btn" id="fishBtn" hidden>釣り</button>
                 <div class="tiny" id="exploreInfo" hidden></div>
                 <button class="btn" id="modePrayBtn">海に祈る</button>
                 <button class="btn ghost" id="enterVillageBtn" hidden>村に入る</button>
@@ -652,8 +654,8 @@
                   <th class="ta-left"> </th>
                   <th class="ta-left">品目</th>
                   <th class="ta-center">単価</th>
-                  <th class="ta-center">在庫</th>
-                  <th class="ta-center">購入</th>
+                  <th class="ta-center" id="eventTradeStockHead">在庫</th>
+                  <th class="ta-center" id="eventTradeBuyHead">購入</th>
                 </tr>
               </thead>
               <tbody id="eventTradeTableBody"></tbody>
@@ -662,11 +664,81 @@
           <div id="eventTradeError" class="msg error mt-10" hidden></div>
         </div>
         <div class="sticky-footer row gap-12 w-100">
+          <button class="btn" id="eventTradeSellAll" hidden>全売却</button>
           <button class="btn primary" id="eventTradeConfirm">取引を確定</button>
           <div class="modal-summary">
             <span class="pill">現在の資金: <b id="eventTradeFunds">0</b></span>
             <div id="eventTradeDelta" class="pill" hidden></div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="fishingModal" hidden>
+    <div class="modal fishing-modal">
+      <div class="modal-hd">
+        <div>釣り</div>
+        <button class="modal-close" id="fishingModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd with-footer">
+        <div class="tiny" id="fishingEnv"></div>
+        <div class="section" id="fishingSession"></div>
+        <div class="modal-scroll">
+          <div class="section" id="fishingInventory"></div>
+        </div>
+        <div class="sticky-footer row gap-12 w-100">
+          <button class="btn" id="fishingCodexBtn">図鑑</button>
+          <button class="btn" id="fishingBaitBuyBtn">餌購入</button>
+          <button class="btn good" id="fishingSellBtn" hidden>魚を売る</button>
+        </div>
+</div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="rodRewardModal" hidden>
+  <div class="modal rod-reward-modal">
+    <div class="modal-hd">
+      <div>釣り竿ゲット</div>
+    </div>
+    <div class="modal-bd">
+      <p>新しい釣り竿を手に入れた！</p>
+      <h3 id="rodRewardName" class="mt-6"></h3>
+      <p id="rodRewardContext" class="mt-6" style="font-size: 14px; line-height: 1.8; color: var(--muted); white-space: pre-line;"></p>
+      <p id="rodRewardFlavor" class="mt-6" style="font-size: 14px; line-height: 1.8; color: var(--muted); white-space: pre-line;"></p>
+      <div class="row gap-12 mt-12">
+        <button class="btn primary" id="rodRewardOk">受け取る</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="codexModal" hidden>
+    <div class="modal fishing-modal codex-modal">
+      <div class="modal-hd">
+        <div>釣り図鑑</div>
+        <button class="modal-close" id="codexModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd codex-bd">
+        <div class="codex-tools">
+          <div class="codex-filters" id="codexFilterWrap">
+            <div class="codex-filter-row">
+              <span class="codex-filter-label">分類</span>
+              <div class="codex-filter-btns" data-group="category"></div>
+            </div>
+            <div class="codex-filter-row">
+              <span class="codex-filter-label">海域</span>
+              <div class="codex-filter-btns" data-group="region"></div>
+            </div>
+            <div class="codex-filter-row">
+              <span class="codex-filter-label">季節</span>
+              <div class="codex-filter-btns" data-group="season"></div>
+            </div>
+          </div>
+          <input id="codexSearch" type="text" placeholder="魚名で検索" class="mt-6" aria-label="魚名で検索">
+        </div>
+        <div class="codex-list">
+          <div class="section" id="codexBody"></div>
         </div>
       </div>
     </div>

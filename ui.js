@@ -30,6 +30,8 @@ import { snapshotOutfitting, outfittingBattleLosses } from "./outfitting.js";
 import { renderOutfittingControl } from "./outfittingUI.js";
 import { syncChartReservations, awardBattleFragment, chartLabel } from "./chartWorld.js";
 import { renderChartCards, renderChartControl, resumeChartExploration } from "./chartUI.js";
+import { renderFishingControl, resumeFishing, wireFishingUI } from "./fishingUI.js";
+import { unlockAllCodex } from "./fishing.js";
 import {
   addHonorFaction,
   addWarScore,
@@ -1315,8 +1317,9 @@ function syncUI() {
   renderTroopModal(elements.troopsDetail);
   updateModeControls(loc);
   renderNationalPowerControls(getAudienceContext);
-  renderExplorationControl(syncUI);
+renderExplorationControl(syncUI);
   renderChartControl(syncUI);
+  renderFishingControl(syncUI);
   renderOutfittingControl(syncUI);
   renderTideControl(syncUI);
   renderChartCards();
@@ -1517,8 +1520,9 @@ function wireButtons() {
   wireFactionPanel();
   wireMapToggle(renderMap);
 
-  wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage });
+wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage });
   document.addEventListener("event-trade-open", () => openEventTrade(openModal));
+  wireFishingUI();
   wireHireModal({ openModal, bindModal, syncUI });
   wireFaithDetails({ openModal, bindModal });
 
@@ -1704,6 +1708,14 @@ function bindCoreUtilityButtons() {
     scheduleGameSave();
   });
 
+  document.getElementById("unlockCodexBtn")?.addEventListener("click", () => {
+    if (!confirm("魚図鑑を全開放しますか？")) return;
+    unlockAllCodex(state);
+    syncUI();
+    const completion = Object.keys(state.expansion.fishing.codex).length;
+    pushLog("魚図鑑全開放", `全 ${completion} 種を図鑑に登録しました。`);
+  });
+
   document.getElementById("resetBtn")?.addEventListener("click", () => {
     if (!confirm("状態とログをリセットしますか？")) return;
     resetAndSeedAll();
@@ -1834,8 +1846,9 @@ export function initUI() {
   wireSupplyDiscard(elements.suppliesDetail, syncUI);
   wireMapHover();
   updateExplorationWorld();
-  if (state.expansion.exploration.pending) resumeExploration(syncUI);
+if (state.expansion.exploration.pending) resumeExploration(syncUI);
   if (state.expansion.charts.pending) resumeChartExploration(syncUI);
+  if (state.expansion.fishing?.pending) resumeFishing();
   initEventQueueUI();
   renderLogs();
   syncUI();

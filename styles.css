@@ -368,6 +368,8 @@ label {
 }
 
 input[type="number"],
+input[type="text"],
+input[type="search"],
 select,
 textarea {
   width: 100%;
@@ -693,6 +695,10 @@ option {
 
 #confirmModal {
   z-index: 60;
+}
+
+#eventTradeModal {
+  z-index: 50;
 }
 
 .modal {
@@ -1302,6 +1308,7 @@ option {
   .trade-table tbody td:last-child { flex: 0 0 100%; box-sizing: border-box; }
   .trade-table .quantity-control { min-width: 0; width: fit-content; }
   #tradeTableBody td:nth-child(4)::before, #eventTradeTableBody td:nth-child(4)::before { content: "在庫 "; }
+  #eventTradeTableBody tr[data-direction="sell"] td:nth-child(4)::before { content: "所持 "; }
   #tradeTableBody td:nth-child(5)::before { content: "所持 "; }
   #suppliesDetail .trade-table td:nth-child(3)::before { content: "所持 "; }
 }
@@ -1548,3 +1555,84 @@ input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) 
 .number-compact[data-number-width="17"] { --number-text-width: 17ch; }
 .number-compact[data-number-width="18"] { --number-text-width: 18ch; }
 .national-power-preview { white-space: pre-line; line-height: 1.8; }
+.fishing-modal .section { margin-top: 0px; }
+.modal.fishing-modal { height: 650px; max-height: 86vh; }
+.modal.codex-modal { height: 620px; max-height: 86vh; }
+.codex-bd { display: flex; flex-direction: column; gap: 10px; overflow: hidden; }
+.codex-tools { flex: 0 0 auto; }
+.codex-filters { display: flex; flex-direction: column; gap: 6px; }
+.codex-filter-row { display: flex; align-items: flex-start; gap: 8px; }
+.codex-filter-label { flex: 0 0 34px; font-size: 12px; color: var(--muted); line-height: 30px; }
+.codex-filter-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.codex-filter-btns .btn { padding: 3px 10px; font-size: 12px; }
+.codex-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: auto; padding-right: 2px; scrollbar-gutter: stable; }
+#codexBody .trade-table td { vertical-align: top; white-space: nowrap; }
+#codexBody .trade-table { table-layout: fixed; width: 100%; }
+#codexBody .trade-table th:nth-child(1) { width: 56px; }
+#codexBody .trade-table th:nth-child(2) { width: 160px; }
+#codexBody .trade-table th:nth-child(3) { width: 64px; }
+#codexBody .trade-table th:nth-child(4) { width: 60px; }
+#codexBody .trade-table th:nth-child(5) { width: 200px; }
+#codexBody .trade-table th:nth-child(6) { width: 56px; }
+#codexBody .trade-table td:nth-child(2),
+#codexBody .trade-table td:nth-child(5) { overflow: hidden; text-overflow: ellipsis; }
+#codexBody tbody tr[data-codex] { cursor: pointer; }
+.codex-not-discovered { cursor: pointer; }
+.codex-detail-head { margin: 14px 2px 4px; }
+.codex-detail-head h3 { margin: 0 0 2px; font-size: 20px; line-height: 1.2; }
+.codex-number { margin: 0 0 2px; font-size: 12px; letter-spacing: 0.08em; color: var(--muted); }
+.codex-scientific { margin: 0 0 6px; font-size: 14px; color: var(--muted); font-style: italic; }
+.codex-desc { margin: 0 2px 16px; max-width: 32em; line-height: 1.8; }
+.codex-record { margin: 0 2px 14px; }
+.codex-record-label { display: block; font-size: 12px; color: var(--muted); }
+.codex-record strong { display: block; margin: 2px 0 0; font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.codex-record-note { margin-top: 4px; font-size: 12px; color: var(--muted); }
+.codex-ecology { margin: 0 2px; font-size: 14px; }
+.codex-ecology dt { font-size: 12px; color: var(--muted); }
+.codex-ecology dd { margin: 2px 0 0; }
+.fishing-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
+.fishing-row .tiny { flex: 1 1 180px; }
+.fishing-session { display: grid; height: 145px; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.04); line-height: 1.6; }
+.fishing-session.is-accent-common { border-color: #69cfca; background: rgba(105, 207, 202, 0.12); }
+.fishing-session.is-accent-big { border-color: #bca16a; background: rgba(188, 161, 106, 0.12); }
+.fishing-session.is-accent-giant { border-color: #e06c6c; background: rgba(224, 108, 108, 0.16); box-shadow: 0 0 12px rgba(224, 108, 108, 0.25); }
+.fishing-session b { font-size: 15px; }
+.fishing-result-name { font-weight: 700; }
+.fishing-result-size { margin-top: 4px; font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.fishing-result-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.fishing-badge { padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; font-size: 12px; color: var(--muted); }
+#fishingSession { flex: 0 0 auto; height: 170px; padding: 5px; }
+.fishing-gauge { width: 100%; height: 10px; margin: 8px 0 0; accent-color: #69cfca; }
+.fishing-gauge::-webkit-progress-bar { background: #24334c; border-radius: 6px; }
+.fishing-gauge::-webkit-progress-value { background: #69cfca; border-radius: 6px; }
+.fishing-gauge::-moz-progress-bar { background: #69cfca; border-radius: 6px; }
+.is-accent-common .fishing-gauge { accent-color: #69cfca; }
+.is-accent-common .fishing-gauge::-webkit-progress-value { background: #69cfca; }
+.is-accent-common .fishing-gauge::-moz-progress-bar { background: #69cfca; }
+.is-accent-big .fishing-gauge { accent-color: #bca16a; }
+.is-accent-big .fishing-gauge::-webkit-progress-value { background: #bca16a; }
+.is-accent-big .fishing-gauge::-moz-progress-bar { background: #bca16a; }
+.is-accent-giant .fishing-gauge { accent-color: #e06c6c; }
+.is-accent-giant .fishing-gauge::-webkit-progress-value { background: #e06c6c; }
+.is-accent-giant .fishing-gauge::-moz-progress-bar { background: #e06c6c; }
+.fishing-gauge.is-low { accent-color: #e06c6c; }
+.fishing-gauge.is-low::-webkit-progress-value { background: #e06c6c; }
+.fishing-gauge.is-low::-moz-progress-bar { background: #e06c6c; }
+#fishingCastBtn, #fishingStartBtn, #fishingPullBtn { white-space: nowrap; word-break: keep-all; overflow-wrap: anywhere; }
+
+.fishing-end-wrapper {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+.fishing-end-wrapper .btn {
+  white-space: nowrap;
+}
+
+.modal.rod-reward-modal {
+  height: auto;
+  min-height: 0;
+  max-height: 86vh;
+}
