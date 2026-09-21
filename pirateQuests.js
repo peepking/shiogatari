@@ -1,11 +1,12 @@
-import { PIRATE_CONFIG, CONTRABAND } from "./pirateConfig.js";
+import { PIRATE_CONFIG, CONTRABAND, pirateRelation, PIRATE_RELATION_LABELS } from "./pirateConfig.js";
 import { state } from "./state.js";
 import { settlements } from "./map.js";
 import { buildEnemyFormation } from "./actions.js";
 import { adjustNobleFavor, adjustSupport, getNobleFavor } from "./faction.js";
 import { enqueueEvent } from "./events.js";
 import { pushLog } from "./dom.js";
-import { manhattan } from "./questUtils.js";
+import { manhattan, randomHuntTarget } from "./questUtils.js";
+import { FACTIONS } from "./lore.js";
 
 /**
  * 依頼の基準地点から最寄りの通常拠点を固定する。同距離はID順。
@@ -25,6 +26,9 @@ function bindVictim(q, origin) {
  * @param {object} origin 発注港。 @param {object} factories 既存の依頼生成関数。 @returns {Array} 依頼。
  */
 export function makePirateQuests(origin, factories) {
+  const existing = [...(state.quests?.active || []), ...Object.values(state.quests?.availableBySettlement || {}).flat(),
+    ...Object.values(state.nobleQuests?.availableByNoble || {}).flat()];
+  const occupied = existing.flatMap(q => [q.target, ...(q.fights || []).map(f => f.target)]).filter(Boolean);
   const kinds = ["raid","fleetRaid","smuggle","courier","supply"];
   for (let i=kinds.length-1;i>0;i--) {
     const j=Math.floor(Math.random()*(i+1)); [kinds[i],kinds[j]]=[kinds[j],kinds[i]];
@@ -43,7 +47,9 @@ export function makePirateQuests(origin, factories) {
       q.title=`${kind === "smuggle" ? "密輸" : "運び屋"}：${target.name}へ${item.name}`;
       q.desc=`${target.name}へ${item.name}を${q.qty}個届ける。禁制品は検問で没収される場合があります。`;
     } else if (kind === "raid" || kind === "fleetRaid") {
-      q.fixedEnemy=buildEnemyFormation(kind === "fleetRaid" ? "elite" : "normal", "pirates", {scale:PIRATE_CONFIG.raidScale});
+      q.target=randomHuntTarget(origin.coords,2,5,occupied);
+      occupied.push(q.target);
+      q.fixedEnemy=buildEnemyFormation(kind === "fleetRaid" ? "elite" : "normal", "pirates", {scale:PIRATE_CONFIG.raidScale,regularPool:true});
       q.estimatedTotal=q.fixedEnemy.total;
       q.reward=Math.round((q.estimatedTotal*50+100)*PIRATE_CONFIG.raidRewardScale);
       q.rewardFame=Math.floor(q.estimatedTotal/2)+5;
@@ -54,9 +60,6 @@ export function makePirateQuests(origin, factories) {
     return q;
   }).filter(Boolean);
 }
-
-/** @param {number} favor 好感度。 @returns {string} 海賊との関係段階。 */
-function pirateRelation(favor) { return favor >= 30 ? "厚遇" : favor >= 0 ? "中立" : favor > -30 ? "警戒" : "敵対"; }
 
 /**
  * 完了した海賊依頼だけで固定対象へ変化を適用し、通常討伐では黒ひげだけを減点する。
@@ -76,10 +79,16 @@ export function resolvePirateRelations(q) {
   if (q.pirateKind && victim) {
     const set=settlements.find(s=>s.id===victim.settlementId);
     if (set) { adjustSupport(set.id,victim.factionId,-delta); messages.push(`${set.name}の支持度 −${delta}`); }
-    if (victim.nobleId) { adjustNobleFavor(victim.nobleId,-delta); messages.push(`担当貴族の好感度 −${delta}`); }
+    if (victim.nobleId) {
+      adjustNobleFavor(victim.nobleId,-delta);
+      const noble=FACTIONS.flatMap(f=>f.nobles || []).find(n=>n.id===victim.nobleId);
+      messages.push(`${noble?.name || "担当貴族"}の好感度 −${delta}`);
+    }
   }
   const after=getNobleFavor(PIRATE_CONFIG.nobleId);
-  if (pirateRelation(before)!==pirateRelation(after)) messages.push(`海賊との関係：${pirateRelation(before)} → ${pirateRelation(after)}`);
+  q.pirateImpact=messages.join(" / ");
+  const changed=pirateRelation(before)!==pirateRelation(after);
+  if (changed) messages.push(`海賊との関係：${PIRATE_RELATION_LABELS[pirateRelation(before)]} → ${PIRATE_RELATION_LABELS[pirateRelation(after)]}`);
   pushLog("関係の変化",messages.join(" / "),"-");
-  enqueueEvent({title:"関係の変化",body:messages.join("\n")});
+  if (changed) enqueueEvent({title:"関係の変化",body:messages.join("\n")});
 }

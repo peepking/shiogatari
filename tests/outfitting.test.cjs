@@ -56,10 +56,10 @@ async function main() {
   for (let tick = 0; tick <= 60; tick++) fired.push(...fireOutfitting(tick, units, attacks, () => 46, () => 0).map(shot => ({ ...shot, tick })));
   assert.deepEqual(fired.filter(s => s.id === "cannon").map(s => s.tick), [20, 40, 60]);
   assert.equal(fired.filter(s => s.id === "harpoon").length, 12);
-  assert.equal(fired.find(s => s.tick === 20 && s.id === "cannon").damage, 171);
-  assert.equal(units[1].hp, 10000 - 171 * 3 - 21 * 12);
+  assert.equal(fired.find(s => s.tick === 20 && s.id === "cannon").damage, 205);
+  assert.equal(units[1].hp, 10000 - 205 * 3 - 21 * 12);
   units[0].hp = 0; assert.equal(fireOutfitting(80, units, attacks, () => 0).length, 0);
-  for (const [id, interval, power] of [["grape_ballista",6,30],["fire_grape_ballista",12,60]]) {
+  for (const [id, interval, power] of [["grape_ballista",6,30],["fire_grape_ballista",12,70]]) {
     const owner={funds:15000,expansion:createExpansionState(),fleet:{counts:{galleass:2}}};
     assert.equal(changeOutfitting(owner,"buy",id),true); assert.equal(owner.funds,0);
     assert.equal(changeOutfitting(owner,"equip",id,0),true);

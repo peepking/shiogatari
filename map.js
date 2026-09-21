@@ -404,6 +404,7 @@ export function ensureNobleHomes() {
   });
   // 勢力に拠点が無い貴族がいる場合のフォールバック
   FACTIONS.forEach((f) => {
+    if (f.id === "pirates") return;
     (f.nobles || []).forEach((n) => {
       if (nobleHome.has(n.id)) return;
       if (fallbackSet) {
@@ -763,9 +764,6 @@ function refreshSettlementDemandIfNeeded() {
     refreshSettlementDemand(s);
     refreshSettlementStock(s);
     refreshSettlementRecruitment(s);
-  });
-  buildPirateHavens(mapData, settlements, nobleHome, port => {
-    initSettlementRecruitment(port); refreshSettlementDemand(port); refreshSettlementStock(port);
   });
   lastDemandSeason = { year: state.year, season: state.season };
 }

@@ -17,7 +17,9 @@ async function main() {
   const mod = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, '../supplies.js'), 'utf8'));
   const faith = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, '../faith.js'), 'utf8'));
   await faith.link(() => {});
-  await mod.link(name => name === './faith.js' ? faith : new vm.SyntheticModule(Object.keys(dependencies[name]), function () {
+  const pirate = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, '../pirateConfig.js'), 'utf8'));
+  await pirate.link(() => {});
+  await mod.link(name => name === './pirateConfig.js' ? pirate : name === './faith.js' ? faith : new vm.SyntheticModule(Object.keys(dependencies[name]), function () {
     for (const [key, value] of Object.entries(dependencies[name])) this.setExport(key, value);
   }));
   await mod.evaluate();

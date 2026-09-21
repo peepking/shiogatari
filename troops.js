@@ -1,4 +1,4 @@
-import { PIRATE_IMAGES } from "./pirateConfig.js";
+import { PIRATE_IMAGES, troopImage } from "./pirateConfig.js";
 import { quantityControl, wireQuantityControls, refreshQuantity } from "./quantityUI.js";
 import { confirmAction, pushLog, pushToast } from "./dom.js";
 import { state } from "./state.js";
@@ -218,12 +218,12 @@ const RECRUIT_RARE_CHANCE = {
 const troopTypeKeys = () => Object.keys(TROOP_STATS);
 
 /**
- * 正規軍は補助兵を除く全兵種、強編成は全兵種、通常編成は基本4兵種を候補にする。
+ * 正規軍は海賊兵・補助兵を除き、強編成は全兵種、通常編成は基本4兵種だけを候補にする。
  * @param {boolean} regular 正規軍か。 @param {boolean} strong 強編成か。 @returns {string[]} 抽選前の候補。
  */
 export function enemyTroopPool(regular, strong) {
   if (regular) return troopTypeKeys().filter(type => !["scout", "medic"].includes(type) && !PIRATE_IMAGES[type]);
-  return strong ? troopTypeKeys() : ["infantry", "archer", "scout", "marine", ...Object.keys(PIRATE_IMAGES)];
+  return strong ? troopTypeKeys() : ["infantry", "archer", "scout", "marine"];
 }
 
 /**
@@ -499,7 +499,7 @@ export function renderTroopModal(detailEl) {
     const count = entries.reduce((sum, [, qty]) => sum + Number(qty), 0);
     if (!count) return "";
     return `<details class="troop-group" data-type="${type}" ${opened.has(type) ? "open" : ""}>
-      <summary class="troop-group-heading"><img src="image/troops/${type}.gif" alt="" class="troop-icon"><b>${stat.name}</b><span class="troop-group-total">${count.toLocaleString()}<small>人</small></span></summary>
+      <summary class="troop-group-heading"><img src="${troopImage(type)}" alt="" class="troop-icon"><b>${stat.name}</b><span class="troop-group-total">${count.toLocaleString()}<small>人</small></span></summary>
       <div class="troop-group-body"><p class="tiny">レベル別人数（出撃・控えの合計）</p>
       <div class="troop-level-list">${entries.map(([level, qty]) => `<div class="troop-level-item"><div><b>Lv${Number(level)}</b><strong>${Number(qty).toLocaleString()}人</strong></div><div class="troop-dismiss-field"><span>解雇する人数</span>${quantityControl(`<input type="number" min="0" max="${Number(qty)}" step="1" value="0" data-type="${type}" data-level="${Number(level)}" aria-label="${stat.name} Lv${Number(level)}の解雇人数" class="troop-dismiss">`, false, true)}</div></div>`).join("")}</div>
       <p class="troop-base-stats tiny">基礎能力（レベル・地形・船団補正前）<br>HP ${stat.hp ?? 0} / ATK ${stat.atk ?? stat.basePower ?? 0} / DEF ${stat.def ?? 0} / SPD ${stat.spd ?? 0} / RNG ${stat.range ?? 1} / MOV ${stat.move ?? 1}<br>維持費 ${stat.upkeep ?? 0}資金／人・季節（軽減前）</p></div>

@@ -17,7 +17,7 @@ export function contrabandCount() { return CONTRABAND.reduce((n,item)=>n+(state.
 /** @returns {object|null} 現在地から近い通常拠点。海賊港は国家の検問や追跡の基準にしない。 */
 export function nearestLawfulSettlement() {
   return settlements.filter(s=>!s.pirateHaven && s.factionId !== "pirates")
-    .map(s=>({s,d:manhattan(s.coords,state.position)})).filter(row=>row.d<=8)
+    .map(s=>({s,d:manhattan(s.coords,state.position)})).filter(row=>row.d<=PIRATE_CONFIG.lawfulRadius)
     .sort((a,b)=>a.d-b.d || a.s.id.localeCompare(b.s.id))[0]?.s || null;
 }
 

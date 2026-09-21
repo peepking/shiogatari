@@ -1,4 +1,5 @@
 import { elements, pushToast } from "./dom.js";
+import { PIRATE_CONFIG, pirateRelation, PIRATE_RELATION_LABELS } from "./pirateConfig.js";
 import { nextMapMode } from "./mapViewport.js";
 import { scheduleGameSave } from "./storage.js";
 import {
@@ -32,6 +33,10 @@ const factionName = (id) => FACTIONS.find((f) => f.id === id)?.name || id;
  * @returns {string}
  */
 function factionStatusText(fid) {
+  if (fid === "pirates") {
+    const favor=getNobleFavor(PIRATE_CONFIG.nobleId);
+    return `${PIRATE_RELATION_LABELS[pirateRelation(favor)]} / 黒ひげとの好感度 ${favor}`;
+  }
   const pf = getPlayerFactionId();
   const rel = getRelation(pf, fid);
   const relLabel = displayRelationLabel(rel === "war" ? "cold" : rel === "ally" ? "ally" : "wary");

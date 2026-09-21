@@ -8,7 +8,28 @@ export const PIRATE_CONFIG = {
   minScale: 0.5, maxScale: 1.5, raidScale: 1.25, raidRewardScale: 1.5,
   minimum: { normal: 3, elite: 30, bounty: 20, regular: 40 },
   contrabandStock: 12, demandLow: [1,3], demandHigh: [8,10],
+  relationHostile: -30, relationNeutral: 0, lawfulRadius: 8,
 };
+
+/** @param {number} favor 好感度。 @returns {string} 比較用の関係ID。 */
+export function pirateRelation(favor) {
+  return favor >= PIRATE_CONFIG.wantedFavor ? "welcomed" : favor >= PIRATE_CONFIG.relationNeutral ? "neutral"
+    : favor > PIRATE_CONFIG.relationHostile ? "wary" : "hostile";
+}
+
+/** 表示用の関係名。論理判定には関係IDを使う。 */
+export const PIRATE_RELATION_LABELS = {welcomed:"厚遇",neutral:"中立",wary:"警戒",hostile:"敵対"};
+
+/** @param {object} value 保存データ。 @returns {object} 欠損した旧セーブの値を補完した海賊イベント状態。 */
+export function normalizePiracy(value) {
+  const check = value?.checkpoint;
+  const checkpoint = check && Number.isSafeInteger(check.id) && check.id > 0 &&
+    ["north","archipelago","citadel"].includes(check.factionId)
+    ? {id:check.id,nobleId:typeof check.nobleId === "string" ? check.nobleId : null,
+      factionId:check.factionId,bribeFailed:check.bribeFailed === true} : null;
+  return {lastTrade:Number.isFinite(value?.lastTrade) ? value.lastTrade : null,checkpoint,
+    nextId:Math.max(1, Number.isSafeInteger(value?.nextId) ? value.nextId : 1, (checkpoint?.id || 0)+1)};
+}
 
 /** 内部兵種IDと提供済み画像名の対応。 */
 export const PIRATE_IMAGES = {

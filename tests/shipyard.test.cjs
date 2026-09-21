@@ -33,7 +33,7 @@ async function main() {
   const outfittingModule = await load("./outfitting.js"); await outfittingModule.evaluate();
   const { getOutfittingEffects, snapshotOutfitting, applyCapacityBonus, fireOutfitting } = outfittingModule.namespace;
   const equipment = { slots: 3, owned: ["harpoon", "ballista", "cannon"], equipped: ["harpoon", "ballista", "cannon"] };
-  for (const [count, power, cannonPower] of [[0,30,250],[1,33,275],[2,36,300],[3,36,300]]) {
+  for (const [count, power, cannonPower] of [[0,30,300],[1,33,330],[2,36,360],[3,36,360]]) {
     const f = normalizeFleet({ counts: { galleass: count } });
     const attacks = getOutfittingEffects(equipment, f).attacks;
     assert.equal(attacks[0].power, power); assert.equal(attacks[1].power, 100 + Math.min(count,2)*10);
@@ -48,15 +48,15 @@ async function main() {
     if (fireOutfitting(tick, units, [snapshot.effects.attacks[2]], () => 0, () => 0).length) ticks.push(tick);
   }
   assert.deepEqual(ticks, [20,40,60]);
-  assert.equal(units[1].hp, 9100);
+  assert.equal(units[1].hp, 8920);
   assert.equal(getOutfittingEffects(null, fleet).attacks.length, 0);
   const fireEquipment={slots:1,owned:["fire_ballista"],equipped:["fire_ballista"]};
   const fire=getOutfittingEffects(fireEquipment,normalizeFleet({counts:{galleass:2}})).attacks;
-  assert.equal(fire[0].power,180); assert.equal(fire[0].interval,15);
+  assert.equal(fire[0].power,216); assert.equal(fire[0].interval,15);
   const fireUnits=[{side:"ally",hp:100},{side:"enemy",hp:1000}];
   assert.equal(fireOutfitting(14,fireUnits,fire,()=>100,()=>0).length,0);
   assert.equal(fireOutfitting(15,fireUnits,fire,()=>100,()=>0).length,1);
-  assert.equal(fireUnits[1].hp,910);
+  assert.equal(fireUnits[1].hp,892);
   const cargo = { slots: 1, owned: ["cargo_tent"], equipped: ["cargo_tent"] };
   const cargoEffects = getOutfittingEffects(cargo, fleet);
   assert.equal(cargoEffects.supplyCap, 30);

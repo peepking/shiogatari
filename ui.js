@@ -881,7 +881,7 @@ function processBattleOutcome(resultCode, meta) {
       if (setId && fid) adjustSupport(setId, fid, -1);
       if (nobId) adjustNobleFavor(nobId, -1);
     } else if (eventTag === "merchant_rescue_help") {
-      const fid = eventContext?.enemyFactionId || enemyFactionId;
+      const fid = eventContext?.beneficiaryFactionId || eventContext?.enemyFactionId || enemyFactionId;
       const setId = eventContext?.settlementId;
       const nobId = eventContext?.nobleId;
       if (isWin) {
@@ -930,6 +930,7 @@ function processBattleOutcome(resultCode, meta) {
     // 依頼以外の海賊遭遇に勝利したら、近傍拠点の貴族好感度をわずかに上げる
     if (!questId && enemyFactionId === "pirates" && isWin) {
       const nearest = settlements
+        .filter(s => !s.pirateHaven)
         .map((s) => ({ s, d: manhattan(s.coords, state.position) }))
         .filter((o) => o.d != null)
         .sort((a, b) => a.d - b.d);

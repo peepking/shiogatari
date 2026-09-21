@@ -115,6 +115,7 @@ export function randomSeaTarget(origin) {
       const cell = mapData[y][x];
       if (blocked.has(`${x},${y}`)) continue;
       if (cell.terrain !== "sea" && cell.terrain !== "shoal") continue;
+      if (cell.settlement || (cell.building && cell.building !== "none")) continue;
       const d = manhattan(origin, { x, y });
       if (d >= minDist && d <= maxDist) {
         candidates.push({ x, y });
@@ -128,6 +129,7 @@ export function randomSeaTarget(origin) {
         const cell = mapData[y][x];
         if (blocked.has(`${x},${y}`)) continue;
         if (cell.terrain !== "sea" && cell.terrain !== "shoal") continue;
+        if (cell.settlement || (cell.building && cell.building !== "none")) continue;
         const d = manhattan(origin, { x, y });
         if (d >= 10 && d <= 40) candidates.push({ x, y });
       }

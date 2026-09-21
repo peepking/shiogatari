@@ -54,9 +54,11 @@ export function initEventQueueUI() {
   }
 }
 
-/**
- * 現在のイベントを解決し、次のイベントを表示する。
- */
+  /**
+   * 現在のイベントを解決し、次のイベントを表示する。
+   * @param {boolean} force 行動処理済みの場合だけ、未解決検問の閉じる制限を解除する。
+   * @returns {void}
+   */
 export function resolveCurrentEvent(force = false) {
   ensureQueue();
   if (!force && state.piracy?.checkpoint && state.eventQueue[0]?.actions?.some(a => a.type?.startsWith("pirate_"))) return;

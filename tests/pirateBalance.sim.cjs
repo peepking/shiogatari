@@ -7,27 +7,8 @@ const vm = require("node:vm");
 function read(file) { return fs.readFileSync(path.join(__dirname, "..", file), "utf8"); }
 
 /**
- * 草案の兵種をテスト内だけに定義する。地形順は平原・甲板・森・山岳・浅瀬・海。
- * @returns {object} 草案の能力値。ゲーム本体の兵種定義には登録しない。
- */
-function pirateStats() {
-  const rows = [
-    ["pirate_shield", "海賊盾兵", 130, 32, 30, 3, 1, 1, [110,110,100,100,110,120]],
-    ["pirate_spear", "海賊槍兵", 100, 40, 14, 3, 2, 1, [120,120,100,100,120,130]],
-    ["pirate_archer", "海賊弓兵", 80, 35, 6, 3, 4, 1, [120,120,100,100,120,130]],
-    ["raider_cavalry", "略奪騎兵", 150, 32, 25, 3, 1, 2, [130,130,100,100,100,110]],
-    ["pirate_axe", "海賊斧兵", 120, 50, 12, 3, 1, 1, [120,120,100,100,120,130]],
-    ["pirate_assault", "海賊突撃兵", 120, 40, 12, 2, 1, 1, [120,120,100,100,120,130]],
-  ];
-  return Object.fromEntries(rows.map(([id,name,hp,atk,def,spd,range,move,rates]) => [id, {
-    name,hp,atk,def,spd,range,move,
-    terrain: Object.fromEntries(["plain","deck","forest","mountain","shoal","sea"].map((key,i) => [key,rates[i]])),
-  }]));
-}
-
-/**
  * 描画・終了後の報酬処理だけを差し替え、実際の戦闘処理を読み込む。
- * 艤装・信仰は不使用。新兵種の標的優先は近接HP、弓兵後衛を暫定採用する。
+ * 艤装・信仰は不使用。兵種の能力値・標的優先は本体の実装を使用する。
  * @returns {object} 独立した実行環境。
  */
 function createSimulation() {
@@ -40,8 +21,6 @@ function createSimulation() {
     fireOutfitting: () => [],
   });
   vm.runInContext(`const TROOP_STATS = ${troops[1]};`, context);
-  context.draft = pirateStats();
-  vm.runInContext("Object.assign(TROOP_STATS, draft)", context);
   const damage = read("outfitting.js").match(/export function defendedDamage\([^\n]+/);
   assert.ok(damage, "本体のダメージ式を読み込めること");
   vm.runInContext(damage[0].replace("export ", ""), context);
@@ -49,7 +28,6 @@ function createSimulation() {
   vm.runInContext(`
     /** @returns {void} 戦後のUIと報酬処理を省略する。 */
     finishBattle = function () {};
-    Object.keys(draft).forEach(id => { UNIT_TARGET_MODE[id] = id === 'pirate_archer' ? 'rear' : 'hp'; });
     battleStrategy.chargeMode = 'none';
     battleStrategy.kiteMode = 'kite';
     battleState.outfitting = { effects: { attacks: [] } };

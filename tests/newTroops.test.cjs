@@ -9,7 +9,6 @@ async function main() {
   let seed = 12345;
   context.Math.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
   const dependencies = {
-    "./pirateConfig.js": { PIRATE_IMAGES: {pirate_shield:"p_shield",pirate_spear:"p_spear",pirate_archer:"p_archer",raider_cavalry:"p_cavalry",pirate_axe:"p_axe",pirate_assault:"p_stormtrooper"} },
     "./quantityUI.js": { quantityControl() {}, wireQuantityControls() {}, refreshQuantity() {} },
     "./dom.js": { confirmAction() {}, pushLog() {}, pushToast() {} },
     "./state.js": { state: {} },
@@ -18,11 +17,18 @@ async function main() {
     "./fleet.js": { fleetEffects() {} },
   };
   const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../troops.js"), "utf8"), { context });
-  await module.link(name => new vm.SyntheticModule(Object.keys(dependencies[name]), function () {
+  const pirates = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../pirateConfig.js"), "utf8"), {context});
+  await pirates.link(() => {});
+  await module.link(name => name === "./pirateConfig.js" ? pirates : new vm.SyntheticModule(Object.keys(dependencies[name]), function () {
     for (const [key, value] of Object.entries(dependencies[name])) this.setExport(key, value);
   }, { context }));
   await module.evaluate();
   const { TROOP_STATS: stats, enemyTroopPool, initSettlementRecruitment, refreshSettlementRecruitment } = module.namespace;
+  assert.deepEqual(Array.from(enemyTroopPool(false, false)), ["infantry", "archer", "scout", "marine"]);
+  for (const id of Object.keys(pirates.namespace.PIRATE_IMAGES)) {
+    assert.ok(!enemyTroopPool(false, false).includes(id));
+    assert.ok(enemyTroopPool(false, true).includes(id));
+  }
   for (const [id, reference, values] of [
     ["halberd", "infantry", [110, 36, 18, 3, 2, 1, 170, 3]],
     ["cavalier", "cavalry", [170, 32, 35, 4, 1, 2, 250, 5]],

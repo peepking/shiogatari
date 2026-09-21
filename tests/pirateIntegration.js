@@ -79,4 +79,19 @@ function run() {
   check(restoreWorld(world) && settlements.filter(s=>s.pirateHaven).length===10,"無法港を保存・復元");
   output.textContent=notes.join("\n")+"\n全項目成功";
 }
-try { run(); } catch(error) {output.textContent=notes.join("\n")+"\n失敗："+error.stack;throw error;}
+const previousSave=localStorage.getItem("shiogatari-save");
+const previousRandom=Math.random;
+let seed=20260921;
+/** @returns {number} 毎回同じ世界と依頼を検証するための疑似乱数。 */
+function seededRandom() { seed=(Math.imul(seed,1664525)+1013904223)>>>0; return seed/4294967296; }
+try { Math.random=seededRandom; run(); }
+catch(error) {output.textContent=notes.join("\n")+"\n失敗："+error.stack;throw error;}
+finally {
+  Math.random=previousRandom;
+  queueMicrotask(restorePreviousSave);
+}
+/** @returns {void} 検証中に予約された自動保存の後で、元の保存データを戻す。 */
+function restorePreviousSave() {
+  if(previousSave===null) localStorage.removeItem("shiogatari-save");
+  else localStorage.setItem("shiogatari-save",previousSave);
+}

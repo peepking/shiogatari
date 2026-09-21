@@ -2,11 +2,12 @@ import { PIRATE_CONFIG } from "./pirateConfig.js";
 
 /**
  * 最大の連続した海域へ無法港を分散配置する。最初は左上、その後は既設港から最も遠い候補を優先する。
- * 新規世界生成だけで呼び、既存セーブの地図へ暗黙に追加しない。
+ * 新規世界生成だけで呼び、既設の無法港がある場合は何も変更しない。
  * @param {Array} grid 地図。 @param {Array} settlements 拠点。 @param {Map} homes 人物本拠地。
  * @param {Function} initialize 雇用・物資の初期化。 @returns {void}
  */
 export function buildPirateHavens(grid, settlements, homes, initialize) {
+  if (settlements.some(settlement => settlement.pirateHaven)) return;
   const seen = new Set(); let largest = [];
   for (let y = 0; y < grid.length; y++) for (let x = 0; x < grid[y].length; x++) {
     const key = `${x},${y}`;

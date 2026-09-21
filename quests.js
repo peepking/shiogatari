@@ -71,6 +71,7 @@ const QUEST_TYPES = {
  * @returns {void}
  */
 function enqueueQuestResult(title, q, rewards, note = "") {
+  if (q.pirateImpact) note = [note,q.pirateImpact].filter(Boolean).join(" / ");
   if (q.rewardFragment) rewards = [...rewards, { id: "chart", label: `${chartLabel(q.rewardFragment)}の断片`, value: 1 }];
   const resources = rewards.filter(reward => Number(reward.value) !== 0).map(reward => ({ ...reward, value: `+${reward.value}` }));
   resources.push(...nationalPowerResources(q.powerChanges));
