@@ -70,6 +70,34 @@ async function main() {
     assert.equal(JSON.stringify(sets),originalPorts);
   }
   assert.deepEqual(refreshed,{demand:80,stock:80,recruit:80});
+  const actionSource=await fs.readFile(path.join(__dirname,"..","actions.js"),"utf8");
+  const encounterState={position:{x:0,y:0},fame:0,warLedger:{entries:[]}};
+  let relation="peace", builtFaction=null, rescued=null;
+  const encounterMath=Object.create(Math);encounterMath.random=()=>0.99;
+  const encounterContext=vm.createContext({state:encounterState,Math:encounterMath,
+    settlements:[{id:"enemyTown",factionId:"north",coords:{x:1,y:0}}],
+    FACTIONS:[{id:"north",name:"North"},{id:"pirates",name:"Pirates"}],
+    FRONT_ENCOUNTER_RADIUS:3,getPlayerFactionId:()=>"citadel",getRelation:()=>relation,
+    manhattan:(a,b)=>Math.abs(a.x-b.x)+Math.abs(a.y-b.y),getWarEntry:()=>null,
+    warScoreLabel:()=>"neutral",getTerrainAt:()=>"plain",STRONG_ANCHORS:[],
+    pickAnchorRange:()=>({min:encounterState.fame,max:encounterState.fame}),
+    PIRATE_CONFIG:c.PIRATE_CONFIG,MODE_LABEL:{PREP:"prep"},resetEncounterMeter:()=>{},
+    buildEnemyFormation:(_strength,faction)=>{builtFaction=faction;return {formation:[],total:40,strength:"elite",kind:"regular"};},
+    startTravelEncounter:options=>{rescued=options;}});
+  for(const name of ["pickFrontEncounter","pickEncounterFaction","triggerEncounter","handleMerchantAction"]) {
+    const body=actionSource.match(new RegExp(`function ${name}\\([^\\n]*\\) \\{[\\s\\S]*?\\n\\}`))?.[0];
+    assert.ok(body,name);vm.runInContext(body,encounterContext);
+  }
+  vm.runInContext("triggerEncounter()",encounterContext);assert.equal(builtFaction,"pirates");
+  encounterState.fame=1000;
+  vm.runInContext("triggerEncounter()",encounterContext);assert.equal(builtFaction,"pirates");
+  relation="war";encounterState.fame=0;
+  vm.runInContext("triggerEncounter()",encounterContext);assert.equal(builtFaction,"north");
+  encounterState.position={x:20,y:20};
+  vm.runInContext("triggerEncounter()",encounterContext);assert.equal(builtFaction,"pirates");
+  vm.runInContext('handleMerchantAction({type:"merchant_rescue_help",payload:{enemyFactionId:"north",nobleId:"n"}})',encounterContext);
+  assert.equal(rescued.enemyFactionId,"pirates");
+  assert.equal(rescued.eventContext.nobleId,"n");
   const enc=await load("pirateEncounters.js");await enc.evaluate();
   const e=enc.namespace;
   Object.assign(modules.get("rosterOptions.js").namespace.rosterOptions,options);
