@@ -1,3 +1,4 @@
+import { troopImage } from "./pirateConfig.js";
 import { faithRecruitSlot } from "./faith.js";
 import { getCurrentSettlement } from "./actions.js";
 import { MODE_LABEL } from "./constants.js";
@@ -75,7 +76,7 @@ export function renderHireModal(settlement) {
       const hire = stat?.hire ?? 0;
       const remaining = Math.max(0, Number(slot.remaining) || 0);
       const disabled = remaining <= 0 ? "disabled" : "";
-      const imgSrc = `image/troops/${slot.type}.gif`;
+      const imgSrc = troopImage(slot.type);
       return `
         <tr>
           <td class="ta-center"><img src="${imgSrc}" alt="${name}" class="hire-icon"></td>

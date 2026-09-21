@@ -1,3 +1,4 @@
+import { troopImage } from "./pirateConfig.js";
 import { faithEffects } from "./faith.js";
 import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL } from "./constants.js";
 import { elements, pushLog, pushToast } from "./dom.js";
@@ -167,6 +168,7 @@ const battleStrategy = {
 };
 
 const UNIT_TARGET_MODE = {
+  pirate_shield: "hp", pirate_spear: "hp", pirate_archer: "rear", raider_cavalry: "hp", pirate_axe: "hp", pirate_assault: "hp",
   infantry: "hp",
   marine: "hp",
   shield: "hp",
@@ -1112,7 +1114,7 @@ function advanceBattleTick(dtMs = BASE_TICK_MS) {
     const restrictCharge =
       unit.side === "ally" &&
       unit.move > 1 &&
-      (chargeMode === "all" || (chargeMode === "cavalry" && ["cavalry", "cavalier"].includes(unit.type)));
+      (chargeMode === "all" || (chargeMode === "cavalry" && ["cavalry", "cavalier", "raider_cavalry"].includes(unit.type)));
     if (restrictCharge) {
       const friends = (unit.side === "ally" ? allies : enemies).filter(
         (u) => u.hp > 0 && u.id !== unit.id
@@ -1618,7 +1620,7 @@ function getUnitImage(type) {
   if (!type) return null;
   if (unitImages[type]) return unitImages[type];
   const img = new Image();
-  img.src = `image/troops/${type}.gif`;
+  img.src = troopImage(type);
   img.decoding = "async";
   img.onload = () => {
     if (battleState.ready) renderBattle();

@@ -136,7 +136,7 @@ async function main() {
   const questSource=await fs.readFile(path.join(__dirname,"../quests.js"),"utf8");
   Object.assign(context,{ensureState(){},addFrontScore(){},absDay:()=>nationalPowerDay(game),
     awardQuestNationalPower:q=>rules.completeQuestPower(game,q,[],places,atWar),
-    payQuestFunds:()=>0,adjustNobleFavor(){},enqueueQuestResult(){}});
+    payQuestFunds:()=>0,adjustNobleFavor(){},enqueueQuestResult(){},resolvePirateRelations(){}});
   vm.runInContext(questSource.match(/const QUEST_TYPES = \{[\s\S]*?\n\};/)[0],context);
   for (const name of ["applyWarFrontScore","completeWarBattleQuest","completeNobleBattleQuest"]) {
     const offset=questSource.indexOf(`function ${name}(`);

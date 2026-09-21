@@ -1,4 +1,5 @@
 import { normalizeTide } from "./tideAlliance.js";
+import { normalizePiracy } from "./pirateConfig.js";
 import { normalizeFaith } from "./faith.js";
 import { MODE_LABEL } from "./constants.js";
 import { restoreWorld, snapshotWorld } from "./map.js";
@@ -102,6 +103,7 @@ export function loadGameFromStorage() {
       restoreWorld(snapshot.world);
     }
     Object.assign(state, snapshot.state);
+    state.piracy = normalizePiracy(snapshot.state.piracy);
     state.tideAlliance = normalizeTide(snapshot.state.tideAlliance);
     state.faithBenefits = normalizeFaith(snapshot.state.faithBenefits);
     if (!snapshot.state.fleet) delete state.fleet;

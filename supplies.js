@@ -1,3 +1,4 @@
+import { CONTRABAND, PIRATE_CONFIG } from "./pirateConfig.js";
 import { faithEffects } from "./faith.js";
 import { quantityControl, wireQuantityControls, refreshQuantity } from "./quantityUI.js";
 import { confirmAction, pushLog, pushToast } from "./dom.js";
@@ -22,6 +23,7 @@ export const SUPPLY_TYPES = {
 
 /** @type {Array} 物資定義 */
 export const SUPPLY_ITEMS = [
+  ...CONTRABAND,
   { id: "food", name: "食料", type: SUPPLY_TYPES.food, basePrice: 5 },
   { id: "wood", name: "木材", type: SUPPLY_TYPES.raw, basePrice: 10 },
   { id: "stone", name: "石材", type: SUPPLY_TYPES.raw, basePrice: 10 },
@@ -356,6 +358,8 @@ export function createSettlementDemand(settlementKind = "town", specialtyId = nu
  */
 export function refreshSettlementDemand(settlement) {
   settlement.demand = createSettlementDemand(settlement.kind, settlement.specialty);
+  const range = settlement.pirateHaven ? PIRATE_CONFIG.demandLow : PIRATE_CONFIG.demandHigh;
+  CONTRABAND.forEach(item => { settlement.demand[item.id] = randInt(...range); });
 }
 
 /**
@@ -394,6 +398,12 @@ export function refreshSettlementStock(settlement) {
     settlement.stock[id] = (settlement.stock[id] || 0) + n;
   };
   settlement.stock = {};
+  if (settlement.pirateHaven) {
+    add("food", rollDice(10, 10));
+    pickTopByDemand(settlement, SUPPLY_TYPES.raw, 3).forEach(id => add(id, rollDice(5, 5)));
+    CONTRABAND.forEach(item => add(item.id, PIRATE_CONFIG.contrabandStock));
+    return;
+  }
 
   if (settlement.kind === "village") {
     // 村の在庫: 食料5D10、特産品6D6、原料上位2=5D5、加工品上位2=3D3。

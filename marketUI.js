@@ -4,6 +4,9 @@ import { elements, pushLog, pushToast, setInlineMessage } from "./dom.js";
 import { adjustSupport } from "./faction.js";
 import { sellCatch } from "./fishing.js";
 import { state } from "./state.js";
+import { CONTRABAND } from "./pirateConfig.js";
+import { piracyState } from "./pirateEncounters.js";
+import { absDay } from "./questUtils.js";
 import { SUPPLY_ITEMS, calcSupplyCap, calcSupplyPrice, totalSupplies } from "./supplies.js";
 import { resourceIcon } from "./resourceUI.js";
 
@@ -312,7 +315,9 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
     for (const id of allIds) {
       const buy = buys[id] ?? 0;
       const sell = sells[id] ?? 0;
-      settlement.stock[id] = (settlement.stock?.[id] ?? 0) - buy + sell;
+      const contraband = CONTRABAND.some(item => item.id === id);
+      settlement.stock[id] = contraband && !settlement.pirateHaven ? 0 : (settlement.stock?.[id] ?? 0) - buy + sell;
+      if (contraband && settlement.pirateHaven && (buy || sell)) piracyState().lastTrade = absDay(state);
       state.supplies[id] = Math.max(0, (state.supplies[id] ?? 0) + buy - sell);
     }
     state.funds += fundsDelta;

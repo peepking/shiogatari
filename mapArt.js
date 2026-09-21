@@ -144,6 +144,7 @@ export function drawMapTile(ctx, cell, x, y, size, detailed, factionColor, varia
   const settlement = cell.building === "town" || cell.building === "village";
   if (detailed) {
     if (!settlement) drawTerrainPattern(ctx, cell.terrain, variant);
+    else if (cell.settlement?.pirateHaven) drawPirateHarbor(ctx);
     else drawSettlement(ctx, cell.building, factionColor);
     ctx.lineWidth = 0.45;
     ctx.strokeStyle = "#b9d5d533";
@@ -152,13 +153,31 @@ export function drawMapTile(ctx, cell, x, y, size, detailed, factionColor, varia
     ctx.fillStyle = factionColor || "#f0dbb0";
     ctx.strokeStyle = "#f5eed2";
     ctx.lineWidth = 2;
-    if (cell.building === "town") {
+    if (cell.settlement?.pirateHaven) {
+      polygon(ctx, [[6,24],[26,24],[23,28],[9,28]], "#dbb98b", "#172333");
+      line(ctx, [[14,5],[14,24]], "#f5eed2");
+      polygon(ctx, [[15,5],[27,8],[15,15]], "#292b39", "#edb0a2");
+    } else if (cell.building === "town") {
       ctx.fillRect(8,8,16,16); ctx.strokeRect(8,8,16,16);
     } else {
       ctx.beginPath(); ctx.arc(16,16,6,0,Math.PI*2); ctx.fill(); ctx.stroke();
     }
   }
   ctx.restore();
+}
+
+/** @param {CanvasRenderingContext2D} ctx 描画先。 @returns {void} マスの内側に桟橋と黒旗の無法港を描く。 */
+function drawPirateHarbor(ctx) {
+  polygon(ctx, [[3,24],[29,24],[27,28],[5,28]], "#98724f", "#18313b");
+  polygon(ctx, [[5,14],[15,14],[15,24],[5,24]], "#d0bd93", "#24313b");
+  polygon(ctx, [[3,14],[10,7],[17,14]], "#5a5963", "#24313b");
+  line(ctx, [[20,4],[20,24]], "#e4cfaa");
+  polygon(ctx, [[21,4],[30,7],[28,14],[21,12]], "#242837", "#d9978d");
+  ctx.fillStyle = "#eee0c5";
+  ctx.beginPath(); ctx.arc(25,8,2,0,Math.PI*2); ctx.fill();
+  line(ctx, [[24,11],[27,12]], "#eee0c5");
+  line(ctx, [[9,27],[9,30]], "#decaa3");
+  line(ctx, [[25,27],[25,30]], "#decaa3");
 }
 
 /**
@@ -177,6 +196,7 @@ export function drawMapPlayer(ctx, cell, x, y, size) {
   if (cell.exploration) { ctx.translate(-1, 17); ctx.scale(0.48, 0.48); }
   ctx.lineWidth = 0.9;
   if (cell.terrain === "sea" || cell.terrain === "shoal") {
+    if (cell.settlement?.pirateHaven) { ctx.translate(-1,17); ctx.scale(0.48,0.48); }
     polygon(ctx, [[7,23],[26,23],[22,28],[11,28]], "#dfdfcd", "#193d58");
     polygon(ctx, [[16,5],[16,21],[5,21]], "#f7f0d9", "#193d58");
     polygon(ctx, [[18,9],[25,20],[18,20]], "#d0e2e4", "#193d58");

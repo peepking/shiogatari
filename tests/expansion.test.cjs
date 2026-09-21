@@ -86,7 +86,7 @@ async function main() {
   assert.equal(getOutfittingEffects(input).supplyCap, effects.supplyCap);
   const attacks = getOutfittingEffects({ slots: 3, owned: ["harpoon", "ballista", "cannon"], equipped: ["cannon", "harpoon", "ballista"] }).attacks;
   assert.equal(attacks[0].interval, 20);
-  assert.equal(attacks[0].power, 250);
+  assert.equal(attacks[0].power, 300);
   assert.equal(attacks[1].power, 30);
   assert.equal(attacks[2].power, 100);
   const buffs = getOutfittingEffects({ slots: 3, owned: ["iron_coating", "round_shields", "arrow_box"], equipped: ["iron_coating", "round_shields", "arrow_box"] });

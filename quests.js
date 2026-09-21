@@ -1,3 +1,4 @@
+import { makePirateQuests, resolvePirateRelations } from "./pirateQuests.js";
 import { tideOracleReward } from "./tideAlliance.js";
 import { pushLog, pushToast } from "./dom.js";
 import { enqueueEvent } from "./events.js";
@@ -70,6 +71,7 @@ const QUEST_TYPES = {
  * @returns {void}
  */
 function enqueueQuestResult(title, q, rewards, note = "") {
+  if (q.pirateImpact) note = [note,q.pirateImpact].filter(Boolean).join(" / ");
   if (q.rewardFragment) rewards = [...rewards, { id: "chart", label: `${chartLabel(q.rewardFragment)}の断片`, value: 1 }];
   const resources = rewards.filter(reward => Number(reward.value) !== 0).map(reward => ({ ...reward, value: `+${reward.value}` }));
   resources.push(...nationalPowerResources(q.powerChanges));
@@ -206,10 +208,11 @@ function usedTargets() {
  * @returns {object}
  */
 function genDeliveryQuest(settlement) {
-  const item = SUPPLY_ITEMS[randInt(0, SUPPLY_ITEMS.length - 1)];
+  const ordinaryItems = SUPPLY_ITEMS.filter(item => item.type !== "contraband");
+  const item = ordinaryItems[randInt(0, ordinaryItems.length - 1)];
   const current = settlement.coords;
   const candidates = settlements
-    .filter((s) => s.id !== settlement.id)
+    .filter((s) => s.id !== settlement.id && !s.pirateHaven)
     .map((s) => ({ s, dist: manhattan(s.coords, current) }))
     .filter((o) => o.dist <= 25)
     .sort((a, b) => a.dist - b.dist);
@@ -217,7 +220,7 @@ function genDeliveryQuest(settlement) {
     candidates.length
       ? candidates[randInt(0, candidates.length - 1)]
       : settlements
-        .filter((s) => s.id !== settlement.id)
+        .filter((s) => s.id !== settlement.id && !s.pirateHaven)
         .map((s) => ({ s, dist: manhattan(s.coords, current) }))
         .sort((a, b) => a.dist - b.dist)[0];
   const target = pick?.s || settlement;
@@ -249,6 +252,11 @@ function genDeliveryQuest(settlement) {
 function generateSeasonQuestsForSettlement(settlement) {
   ensureState();
   if (!settlement) return;
+  if (settlement.pirateHaven) {
+    state.quests.availableBySettlement[settlement.id] = makePirateQuests(settlement, {supply:genSupplyQuest,delivery:genDeliveryQuest,hunt:genPirateHuntQuest,bounty:genBountyHuntQuest});
+    state.quests.lastSeasonBySettlement[settlement.id] = {year:state.year,season:state.season};
+    return;
+  }
   const candidates = [];
   candidates.push(genSupplyQuest(settlement));
   candidates.push(genDeliveryQuest(settlement));
@@ -333,7 +341,7 @@ export function seedInitialQuests() {
  */
 function generateNobleQuestsForNoble(noble, settlement) {
   ensureState();
-  if (!noble || !settlement) return;
+  if (!noble || !settlement || settlement.pirateHaven) return;
   const pool = [
     genNobleSupplyQuest(settlement, noble),
     genNobleScoutQuest(settlement, noble),
@@ -356,7 +364,7 @@ function generateNobleQuestsForNoble(noble, settlement) {
  */
 export function ensureNobleQuests(noble, settlement) {
   ensureState();
-  if (!noble || !settlement) return;
+  if (!noble || !settlement || settlement.pirateHaven) return;
   const last = state.nobleQuests.lastSeasonByNoble[noble.id];
   if (!last || last.year !== state.year || last.season !== state.season) {
     generateNobleQuestsForNoble(noble, settlement);
@@ -401,6 +409,7 @@ export function acceptQuest(id, settlement) {
   const list = state.quests.availableBySettlement[settlement.id] || [];
   const idx = list.findIndex((q) => q.id === id);
   if (idx === -1) return null;
+  if (list[idx].pirateKind && state.honorFactions?.length) return null;
   if (!reserveQuestFragment(list[idx])) return null;
   const q = list.splice(idx, 1)[0];
   const now = absDay(state);
@@ -411,7 +420,7 @@ export function acceptQuest(id, settlement) {
     q.powerFactionId = settlement.factionId;
   }
   // 受注拠点基準で報酬を確定
-  if (q.type === QUEST_TYPES.SUPPLY && !q.rewardFragment) {
+  if (q.type === QUEST_TYPES.SUPPLY && !q.rewardFragment && !q.pirateKind) {
     const demand = settlement.demand || {};
     const price = calcSupplyPrice(q.itemId, demand[q.itemId] ?? 10, {
       factionId: settlement.factionId,
@@ -419,7 +428,7 @@ export function acceptQuest(id, settlement) {
     }) ?? 0;
     q.reward = price * q.qty * 2;
   }
-  if (q.type === QUEST_TYPES.DELIVERY && !q.rewardFragment) {
+  if (q.type === QUEST_TYPES.DELIVERY && !q.rewardFragment && !q.pirateKind) {
     const target = settlements.find((s) => s.id === q.targetId);
     const dist = target ? manhattan(target.coords, settlement.coords) : 1;
     q.reward = dist * 50;
@@ -447,6 +456,7 @@ export function acceptNobleQuest(id, noble, settlement) {
   const list = state.nobleQuests.availableByNoble[noble.id] || [];
   const idx = list.findIndex((q) => q.id === id);
   if (idx === -1) return null;
+  if (list[idx].pirateKind && state.honorFactions?.length) return null;
   if (!reserveQuestFragment(list[idx])) return null;
   const q = list.splice(idx, 1)[0];
   const now = absDay(state);
@@ -1113,10 +1123,10 @@ export function completeQuest(id) {
   if (q.type === QUEST_TYPES.SUPPLY) {
     if (!here || here.id !== q.originId) return false;
     if ((state.supplies?.[q.itemId] ?? 0) < q.qty) return false;
-    adjustSupport(q.originId, here.factionId, 3);
-    addWarScore(getPlayerFactionId(), "pirates", 0, absDay(state), 3, 0);
+    if (!q.pirateKind) adjustSupport(q.originId, here.factionId, 3);
+    if (!q.pirateKind) addWarScore(getPlayerFactionId(), "pirates", 0, absDay(state), 3, 0);
     const set = getSettlementById(q.originId);
-    if (set?.nobleId) adjustNobleFavor(set.nobleId, 3);
+    if (set?.nobleId && !q.pirateKind) adjustNobleFavor(set.nobleId, 3);
     state.supplies[q.itemId] -= q.qty;
     fameReward = rollDice(5, 2);
     state.fame += fameReward;
@@ -1124,10 +1134,10 @@ export function completeQuest(id) {
   if (q.type === QUEST_TYPES.DELIVERY) {
     if (!here || here.id !== q.targetId) return false;
     if ((state.supplies?.[q.itemId] ?? 0) < q.qty) return false;
-    adjustSupport(q.targetId, here.factionId, 3);
-    addWarScore(getPlayerFactionId(), "pirates", 0, absDay(state), 3, 0);
+    if (!q.pirateKind) adjustSupport(q.targetId, here.factionId, 3);
+    if (!q.pirateKind) addWarScore(getPlayerFactionId(), "pirates", 0, absDay(state), 3, 0);
     const set = getSettlementById(q.targetId);
-    if (set?.nobleId) adjustNobleFavor(set.nobleId, 3);
+    if (set?.nobleId && !q.pirateKind) adjustNobleFavor(set.nobleId, 3);
     state.supplies[q.itemId] -= q.qty;
     fameReward = rollDice(5, 2);
     state.fame += fameReward;
@@ -1238,7 +1248,8 @@ export function completeQuest(id) {
   if (q.type === QUEST_TYPES.PIRATE_HUNT || q.type === QUEST_TYPES.BOUNTY_HUNT) {
     return false;
   }
-  awardQuestNationalPower(q);
+  if (!q.pirateKind) awardQuestNationalPower(q);
+  resolvePirateRelations(q);
   payQuestFunds(q);
   state.quests.active.splice(idx, 1);
   const rewards = [];
@@ -1396,7 +1407,8 @@ export function completeHuntBattleQuest(id, success, reason = "") {
   if (idx === -1) return false;
   const q = state.quests.active[idx];
   if (success) {
-    awardQuestNationalPower(q);
+    if (!q.pirateKind) awardQuestNationalPower(q);
+    resolvePirateRelations(q);
     payQuestFunds(q);
     if (q.rewardFame) state.fame += q.rewardFame;
     state.quests.active.splice(idx, 1);
@@ -1408,7 +1420,7 @@ export function completeHuntBattleQuest(id, success, reason = "") {
     pushLog("討伐達成", `${q.title} / ${rewardText}`, "-");
     pushToast("討伐達成", `${q.title} / ${rewardText}`, "good");
     const fid = q.enemyFactionId || "pirates";
-    addWarScore(getPlayerFactionId(), fid, 8, absDay(state));
+    if (!q.pirateKind) addWarScore(getPlayerFactionId(), fid, 8, absDay(state));
     enqueueQuestResult("討伐達成", q, [{ id: "funds", label: "資金", value: q.reward || 0 }, { id: "fame", label: "名声", value: q.rewardFame || 0 }]);
   } else {
     state.quests.active.splice(idx, 1);
@@ -1416,7 +1428,7 @@ export function completeHuntBattleQuest(id, success, reason = "") {
     pushLog("討伐失敗", `${q.title}${note}`, "-");
     pushToast("討伐失敗", `${q.title}${note}`, "bad");
     const fid = q.enemyFactionId || "pirates";
-    addWarScore(getPlayerFactionId(), fid, -6, absDay(state));
+    if (!q.pirateKind) addWarScore(getPlayerFactionId(), fid, -6, absDay(state));
     enqueueEvent({ title: "討伐失敗", body: `${q.title}${note}` });
   }
   return true;
@@ -1458,7 +1470,8 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
       return true;
     }
     const totalSize = Math.max(0, q.fightTotals.reduce((a, b) => a + (b || 0), 0));
-    awardQuestNationalPower(q);
+    if (!q.pirateKind) awardQuestNationalPower(q);
+    resolvePirateRelations(q);
     const reward = payQuestFunds(q, totalSize * 150);
     const fameReward = Math.floor(totalSize / 2);
     state.fame += fameReward;
@@ -1480,7 +1493,8 @@ export function completeNobleBattleQuest(id, success, enemyTotal, fightIdx = nul
       pushToast("依頼失敗", `${q.title} / 戦闘に敗北`, "bad");
       return true;
     }
-    awardQuestNationalPower(q);
+    if (!q.pirateKind) awardQuestNationalPower(q);
+    resolvePirateRelations(q);
     const reward = payQuestFunds(q, (enemyTotal || 0) * 200);
     const fameReward = enemyTotal || 0;
     state.fame += fameReward;
@@ -1810,7 +1824,8 @@ export function completeNobleRefugeeAt(settlement) {
   const q = state.quests.active[idx];
   state.quests.active.splice(idx, 1);
   const fameReward = q.rewardFame || 0;
-  awardQuestNationalPower(q);
+  if (!q.pirateKind) awardQuestNationalPower(q);
+  resolvePirateRelations(q);
   payQuestFunds(q);
   state.fame += fameReward;
   if (q.nobleId) adjustNobleFavor(q.nobleId, 4);

@@ -42,6 +42,8 @@ assert.equal(vm.runInContext(terrainSelection, context), true);
 const actionsSource = fs.readFileSync(require("node:path").join(__dirname, "../actions.js"), "utf8");
 const formationStart = actionsSource.indexOf("function buildEnemyFormation(");
 context.state = { fame: 5611 };
+context.pirateEnemyCount = range => range.min;
+context.PIRATE_IMAGES = {};
 context.NORMAL_ANCHORS = []; context.STRONG_ANCHORS = [];
 context.enemyTroopPool = () => ["basic"];
 vm.runInContext(actionsSource.slice(formationStart, actionsSource.indexOf("\n}", formationStart) + 2), context);

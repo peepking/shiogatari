@@ -89,7 +89,7 @@ export const FACTIONS = [
     color: "#ff7a7a",
     sigil: "./image/factions/pirates.svg",
     attitude: "hostile",
-    nobles: [],
+    nobles: [{ id: "pirate_blackbeard", name: "黒ひげ", title: "無法港の顔役", img: "./image/factions/pirates.svg" }],
   },
 ];
 

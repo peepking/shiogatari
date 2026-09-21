@@ -1,3 +1,5 @@
+import { PIRATE_CONFIG, PIRATE_IMAGES, pirateEnemyCount } from "./pirateConfig.js";
+import { enqueuePirateCheckpoint, handlePirateCheckpoint } from "./pirateEncounters.js";
 import { visitTideSite } from "./tideAlliance.js";
 import { activateAfterglow, rollFaithRecruitment } from "./faith.js";
 import { MODE_LABEL, PLACE } from "./constants.js";
@@ -57,7 +59,7 @@ let travelSync = null;
 const travelEventTags = new Set(["merchant_attack", "merchant_rescue_help", "merchant_rescue_raid", "smuggle_raid", "refugee_raid", "checkpoint_force", "omen_attack", "wreck_attack"]);
 
 /**
- * 前線拠点からの距離を見て、交戦中フロントの情報を返す。
+ * 交戦中の敵が所有する前線拠点からの距離を見て、最も近いフロントを返す。
  * @param {{x:number,y:number}} pos 現在位置
  * @returns {{enemyFactionId:string,frontId:string,d:number}|null}
  */
@@ -71,9 +73,10 @@ function pickFrontEncounter(pos) {
       if (!front || front.resolved) return;
       const set = settlements.find((s) => s.id === front.settlementId);
       if (!set?.coords) return;
+      const enemy = front.attacker === pf ? front.defender : front.attacker;
+      if (set.factionId !== enemy || getRelation(pf, enemy) !== "war") return;
       const d = manhattan(set.coords, pos);
       if (d <= FRONT_ENCOUNTER_RADIUS && (!best || d < best.d)) {
-        const enemy = front.attacker === pf ? front.defender : front.attacker;
         best = { enemyFactionId: enemy, frontId: front.id, d };
       }
     });
@@ -105,13 +108,15 @@ function notifyAutoMoveStop() {
 
 /**
  * 名声と強敵フラグから敵編成を生成する。
+ * 名声レンジの中央値へ50～150%の一様乱数を適用する。強敵の自然遭遇は最低規模に達してから解禁する。
  * 各部隊は5～10人を抽選するが、残り枠へ全兵員が収まる最低人数を優先する。
  * 最大20部隊・各10人とし、人数上限200人まで全員を配分する。兵種・レベルの抽選は従来どおり。
  * @param {"normal"|"elite"|null} forceStrength 強敵プール強制指定
  * @param {string|null} enemyFactionId 敵勢力ID（正規軍プール判定用）
+ * @param {{kind?:string,scale?:number,regularPool?:boolean}} options 賞金稼ぎ、襲撃規模、商船護衛の兵種指定。
  * @returns {{formation:Array, total:number, strength:string, terrain?:string}} 生成結果
  */
-export function buildEnemyFormation(forceStrength, enemyFactionId = null) {
+export function buildEnemyFormation(forceStrength, enemyFactionId = null, options = {}) {
   const fame = Math.max(0, state.fame || 0);
   const useRegular = enemyFactionId && enemyFactionId !== "pirates";
   const useStrong =
@@ -119,13 +124,14 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null) {
       ? true
       : forceStrength === "normal"
         ? false
-        : fame >= 100 && Math.random() < STRONG_POOL_CHANCE;
+        : fame >= 100 && (pickAnchorRange(fame, STRONG_ANCHORS).min + pickAnchorRange(fame, STRONG_ANCHORS).max) / 2 >= PIRATE_CONFIG.minimum.elite && Math.random() < STRONG_POOL_CHANCE;
   const useStrongScale = useStrong || useRegular;
   const range = useStrongScale ? pickAnchorRange(fame, STRONG_ANCHORS) : pickAnchorRange(fame, NORMAL_ANCHORS);
   const maxSquads = 20;
   const maxUnitCount = 10;
-  const total = Math.min(maxSquads * maxUnitCount, randInt(range.min, range.max));
-  const basePool = enemyTroopPool(useRegular, useStrong);
+  const kind = options.kind || (useRegular ? "regular" : useStrong ? "elite" : "normal");
+  const total = pirateEnemyCount(range, kind, options.scale || 1);
+  const basePool = options.kind === "bounty" ? Object.keys(PIRATE_IMAGES) : enemyTroopPool(useRegular || options.regularPool, useStrong);
   const pool = basePool.slice().sort(() => Math.random() - 0.5).slice(0, Math.min(6, basePool.length));
   if (!pool.length) pool.push("infantry");
   const formation = [];
@@ -139,7 +145,7 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null) {
     formation.push({ type, count: chunk, level });
     remain -= chunk;
   }
-  return { formation, total, strength: useStrongScale ? "elite" : "normal" };
+  return { formation, total, strength: useStrongScale ? "elite" : "normal", kind };
 }
 
 /**
@@ -201,8 +207,11 @@ function pickEncounterFaction(pos, terrain) {
 function triggerEncounter() {
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   const frontHint = pickFrontEncounter(state.position);
+  const strongRange = pickAnchorRange(state.fame || 0, STRONG_ANCHORS);
+  const basis = (strongRange.min + strongRange.max) / 2;
   const enemyFactionId = frontHint?.enemyFactionId || pickEncounterFaction(state.position, terrain);
-  const { formation, total, strength } = buildEnemyFormation(null, enemyFactionId);
+  const bounty = enemyFactionId === "pirates" && basis >= PIRATE_CONFIG.minimum.bounty && Math.random() < PIRATE_CONFIG.bountyChance;
+  const { formation, total, strength, kind } = buildEnemyFormation(bounty ? "elite" : null, enemyFactionId, bounty ? {kind:"bounty"} : {});
   state.pendingEncounter = {
     active: true,
     enemyFormation: formation,
@@ -211,10 +220,11 @@ function triggerEncounter() {
     terrain,
     enemyFactionId,
     frontId: frontHint?.frontId || null,
+    encounterKind: kind,
   };
   state.modeLabel = MODE_LABEL.PREP;
   resetEncounterMeter();
-  const enemyName = FACTIONS.find((f) => f.id === enemyFactionId)?.name || "敵勢力";
+  const enemyName = enemyFactionId === "pirates" ? (kind === "bounty" ? "賞金稼ぎ" : kind === "elite" ? "略奪船団" : "ならず者船団") : `${FACTIONS.find(f => f.id === enemyFactionId)?.name || "敵勢力"}の正規軍`;
   const strengthLabel =
     strength === "elite"
       ? enemyFactionId !== "pirates"
@@ -365,7 +375,7 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
     return false;
   }
   state.modeLabel = insideLabel;
-  visitTideSite(state, hereSettlement?.id);
+  if (!hereSettlement?.pirateHaven) visitTideSite(state, hereSettlement?.id);
   const recruit = rollFaithRecruitment(state, hereSettlement, TROOP_STATS);
   if (recruit) enqueueEvent({ title: "潮盟の便り", body: `潮の縁者の紹介で、${TROOP_STATS[recruit.type].name} Lv${recruit.level} ${recruit.remaining}人が雇用候補に加わりました。` });
   rollChartRumor(hereSettlement);
@@ -617,7 +627,7 @@ function handleMerchantAction(action) {
       const ctx = action.payload || {};
       startTravelEncounter({
         forceStrength: "elite",
-        enemyFactionId: ctx.enemyFactionId || "pirates",
+        enemyFactionId: "pirates",
         title: "行商人救助",
         flavor: "襲撃者を撃退します。戦闘準備へ移行します。",
         eventTag: "merchant_rescue_help",
@@ -957,7 +967,8 @@ function handleWreckAction(action) {
       pushLog("廃船調査", `${ship}を回収しました。`, "-");
       pushToast("廃船調査", `${ship}を回収しました。`, "good");
     } else {
-      const id = SUPPLY_ITEMS[randInt(0, SUPPLY_ITEMS.length - 1)].id;
+      const items = SUPPLY_ITEMS.filter(item => item.type !== "contraband");
+      const id = items[randInt(0, items.length - 1)].id;
       const qty = randInt(2, 6);
       state.supplies[id] = (state.supplies[id] || 0) + qty;
       const name = supplyName(id);
@@ -1010,7 +1021,7 @@ function handleTraitorAction(action) {
 
 /** 部隊員がいない場合、選択によって直ちに戦闘へ進む行動を禁止する。 */
 export function isBattleEventActionBlocked(action) {
-  return ["merchant_attack", "merchant_rescue_help", "merchant_rescue_attack", "smuggle_attack", "refugee_attack", "checkpoint_force"].includes(action?.type) && totalTroops() <= 0;
+  return ["merchant_attack", "merchant_rescue_help", "merchant_rescue_attack", "smuggle_attack", "refugee_attack", "checkpoint_force", "pirate_force"].includes(action?.type) && totalTroops() <= 0;
 }
 
 /**
@@ -1022,6 +1033,7 @@ export function handleTravelEventAction(action) {
   if (isBattleEventActionBlocked(action)) return false;
   if (!action?.type) return false;
   const handlers = [
+    handlePirateCheckpoint,
     handleChartPurchase,
     handleMerchantAction,
     handleFrontAction,
@@ -1044,6 +1056,7 @@ export function handleTravelEventAction(action) {
  */
 function nearestSettlementInfo() {
   const entries = settlements
+    .filter(s => !s.pirateHaven)
     .map((s) => ({ s, d: manhattan(s.coords, state.position) }))
     .filter((o) => o.d != null && o.d <= TRAVEL_EVENT_RADIUS)
     .sort((a, b) => a.d - b.d);
@@ -1086,12 +1099,7 @@ function enqueueMerchantEvent(terrain) {
 }
 
 /**
- * 行商人救助イベントをキューに積む。
- * @param {string} terrain
- * @returns {boolean}
- */
-/**
- * 行商人救助イベントをキューに積む。
+ * 行商人救助イベントを積む。襲撃者は海賊とし、救助先の勢力は別に保持する。
  * @param {string} terrain
  * @returns {boolean}
  */
@@ -1105,7 +1113,7 @@ function enqueueMerchantRescueEvent(terrain) {
         id: "help",
         label: "救助する",
         type: "merchant_rescue_help",
-        payload: { enemyFactionId: info?.factionId || "pirates", nobleId: info?.nobleId, settlementId: info?.settlementId },
+        payload: { enemyFactionId: "pirates", beneficiaryFactionId: info?.factionId, nobleId: info?.nobleId, settlementId: info?.settlementId },
       },
       { id: "ignore", label: "立ち去る", type: "merchant_rescue_leave" },
       {
@@ -1127,7 +1135,7 @@ function enqueueMerchantRescueEvent(terrain) {
  */
 function pickDeals(marketPrice = true) {
   const demand = createSettlementDemand("village");
-  const candidates = SUPPLY_ITEMS.slice();
+  const candidates = SUPPLY_ITEMS.filter(item => item.type !== "contraband");
   const deals = [];
   while (candidates.length && deals.length < 7) {
     const totalW = candidates.reduce((s, i) => s + (demand[i.id] || 1), 0);
@@ -1250,6 +1258,7 @@ function enqueueRefugeeEvent(terrain) {
  * @returns {boolean}
  */
 function enqueueCheckpointEvent() {
+  if (enqueuePirateCheckpoint()) return true;
   const info = nearestSettlementInfo();
   if (!info?.settlementId) return false;
   const bribeCost = 50;

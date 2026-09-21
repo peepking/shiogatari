@@ -12,6 +12,7 @@ import { createNationalPower, nationalPowerDay } from "./nationalPower.js";
  */
 const createState = () => {
   const initial = {
+  piracy: {lastTrade:null,checkpoint:null,nextId:1},
   fleet: normalizeFleet(),
   expansion: createExpansionState(),
   troops: {
