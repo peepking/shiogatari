@@ -8,14 +8,13 @@ async function main() {
   const context = vm.createContext({ structuredClone });
   const modules = new Map();
   const state = { year: 1000, season: 0, day: 1, funds: 0, honorFactions: [], troops: {} };
-  const favors = {}, ships = {};
+  const favors = {};
   const factions = ["north", "archipelago", "citadel", "pirates"].map(id => ({ id, nobles: [{ id: id + "1" }, { id: id + "2" }] }));
   const stubs = {
     "state.js": { state }, "map.js": { mapData: [] },
     "questUtils.js": { absDay: s => s.year * 120 + s.season * 30 + s.day },
     "faction.js": { adjustNobleFavor: (id, n) => { favors[id] = (favors[id] || 0) + n; } },
     "lore.js": { FACTIONS: factions }, "dom.js": { pushLog() {} },
-    "fleet.js": { addShips: (_s, counts) => { for (const [id, n] of Object.entries(counts)) ships[id] = (ships[id] || 0) + n; } },
   };
   /** @param {string} name モジュール。 @returns {Promise<vm.Module>} 検証対象。 */
   async function load(name) {
@@ -85,11 +84,13 @@ async function main() {
   assert.equal(w.normalizeWanted({history:[{kind:"unknown",day:1},{kind:"merchant_attack",day:NaN},null]}).history.length, 0);
   state.bounties = b.normalizeBounties(JSON.parse(saved));
   const world = await load("bountyWorld.js"); await world.evaluate();
-  const shark = state.bounties.active.find(s => s.ship === "longship");
+  const shark = state.bounties.active.find(s => s.templateId === "shark");
   assert.ok(world.namespace.finishBounty(shark.id).length);
-  assert.equal(state.funds, shark.reward); assert.equal(ships.longship, 1);
+  assert.equal(state.funds, shark.reward); assert.equal(state.fleet.variants.length, 1);
+  assert.equal(state.fleet.variants[0].variantId, "shark");
+  assert.equal(state.fleet.variants[0].sourceName, b.bountyName(shark));
   for (const f of factions) for (const n of f.nobles) assert.equal(favors[n.id], f.id === shark.factionId ? -3 : 1);
-  assert.equal(world.namespace.finishBounty(shark.id).length, 0); assert.equal(ships.longship, 1); assert.equal(state.funds, shark.reward);
+  assert.equal(world.namespace.finishBounty(shark.id).length, 0); assert.equal(state.fleet.variants.length, 1); assert.equal(state.funds, shark.reward);
   // 公開UIの制限とイベント成立経路も、実際の関数を抽出して検証する。
   const uiSource = await fs.readFile(path.join(__dirname, "..", "bountyUI.js"), "utf8");
   const checks = vm.createContext({ state, totalTroops: () => 10 });

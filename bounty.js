@@ -1,5 +1,6 @@
 import { BOUNTY_CONFIG as CONFIG, BOUNTY_TEMPLATES } from "./bountyConfig.js";
 import { REGIONAL_NAMES } from "./name.js";
+import { VARIANT_SHIPS } from "./variantShips.js";
 
 /** @param {object} site 賞金首。 @returns {string} 保存済み表示名。 */
 export function bountyName(site) { return `${site.epithet}${site.name}`; }
@@ -23,7 +24,7 @@ export function normalizeBounties(value) {
       || !Number.isSafeInteger(s.reward) || s.reward < 0 || !Array.isArray(s.formation) || !s.formation.length || s.formation.length > 20
       || !s.formation.every(u => Object.keys(BOUNTY_TEMPLATES.find(t => t.id === s.templateId).troops).includes(u.type) && Number.isInteger(u.count) && u.count > 0 && u.count <= 10 && Number.isInteger(u.level) && u.level >= 1 && u.level <= 5)) return false;
     seen.add(s.id); used.add(s.templateId); return true;
-  }).slice(0, CONFIG.count).map(s => ({ ...s, total: s.formation.reduce((n, u) => n + u.count, 0), description: typeof s.description === "string" ? s.description : "", ship: ["longship", "carrack"].includes(s.ship) ? s.ship : null }));
+  }).slice(0, CONFIG.count).map(s => ({ ...s, total: s.formation.reduce((n, u) => n + u.count, 0), description: typeof s.description === "string" ? s.description : "", ship: VARIANT_SHIPS[s.templateId].base, flagship: VARIANT_SHIPS[s.templateId].name }));
   const history = (Array.isArray(value?.history) ? value.history : []).filter(s => s && Number.isSafeInteger(s.id) && typeof s.name === "string" && typeof s.epithet === "string" && Number.isSafeInteger(s.reward) && s.reward >= 0).slice(0, CONFIG.historyLimit);
   return { version: 1, initialized: value?.initialized === true, nextId: Math.max(1, Number.isSafeInteger(value?.nextId) ? value.nextId : 1, ...[...active, ...history].map(s => s.id + 1)),
     lastSeason: Number.isInteger(value?.lastSeason) ? value.lastSeason : null, active, history };
@@ -66,7 +67,7 @@ export function tickBounties(data, candidates, now, season, blocked = new Set(),
     const total = formation.reduce((n, u) => n + u.count, 0);
     data.active.push({ id: data.nextId++, templateId: template.id, epithet: template.epithet, name: rollBountyName(template.factionId, random),
       factionId: template.factionId, description: template.description, formation, total, reward: Math.floor((total * CONFIG.perTroop + CONFIG.base) * CONFIG.multiplier),
-      position, spawnedAbs: now, expiresAbs: now + CONFIG.lifetime, ship: template.ship || null, flagship: template.flagship || null });
+      position, spawnedAbs: now, expiresAbs: now + CONFIG.lifetime, ship: VARIANT_SHIPS[template.id].base, flagship: VARIANT_SHIPS[template.id].name });
   }
 }
 

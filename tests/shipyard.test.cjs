@@ -96,6 +96,54 @@ async function main() {
   assert.deepEqual(savedReward.shipTypes,{caravel:2});
   const lossState = {fleet:normalizeFleet({counts:{caravel:2,cog:3,galleon:1}})};
   assert.deepEqual(loseShips(lossState,4),{caravel:2,cog:2}); assert.equal(totalShips(lossState.fleet),2);
+  // 固有船は個体ごとに保存し、基礎船種のバフ上限と維持費を共有する。
+  const { addVariantShip, fleetCounts, shipListText } = fleetModule.namespace;
+  const { VARIANT_SHIPS } = modules.get("./variantShips.js").namespace;
+  assert.equal(Object.keys(VARIANT_SHIPS).length, 27);
+  for (const id of Object.keys(SHIP_TYPES)) assert.equal(Object.values(VARIANT_SHIPS).filter(v => v.base === id).length, 3);
+  const named = { funds: 100000, fleet: normalizeFleet({ counts: { longship: 4 } }) };
+  const first = addVariantShip(named, "crown", "灰冠の船長", 120001);
+  const second = addVariantShip(named, "crown", "灰冠の別の船長", 120031);
+  assert.notEqual(first.id, second.id);
+  assert.equal(fleetCounts(named.fleet).longship, 6);
+  assert.equal(fleetEffects(named.fleet).atk, 10);
+  assert.equal(fleetEffects(named.fleet).supplies, 200);
+  assert.equal(fleetEffects(named.fleet).troops, 90);
+  assert.equal(totalShips(named.fleet), 6);
+  assert.deepEqual(normalizeFleet(JSON.parse(JSON.stringify(named.fleet))), named.fleet);
+  assert.ok(quoteShipTrade(named, town, "longship", "sell", 5).error);
+  const token = `variant:${first.id}`;
+  const preview = quoteShipTrade(named, town, token, "sell", 1);
+  assert.equal(preview.fleet.variants.length, 1); assert.equal(named.fleet.variants.length, 2);
+  assert.equal(tradeShip(named, town, token, "sell", 1).amount, 4000);
+  assert.equal(town.shipyard.variants[0].sourceName, "灰冠の船長");
+  refreshShipyard(town, 99); assert.equal(town.shipyard.variants.length, 1);
+  assert.ok(tradeShip(named, town, token, "sell", 1).error);
+  assert.ok(quoteShipTrade(named, town, token, "buy", 2).error);
+  assert.equal(tradeShip(named, town, token, "buy", 1).amount, 5000);
+  assert.deepEqual(named.fleet.variants.find(v => v.id === first.id), first);
+  const upkeep = modules.get("./shipUpkeep.js").namespace;
+  assert.equal(upkeep.shipUpkeepCost(named), 600);
+  const loss = { funds: 0, fleet: normalizeFleet({ counts: { galleon: 1 } }) };
+  addVariantShip(loss, "gull", "潮鴎の船長", 120001);
+  assert.deepEqual(loseShips(loss, 1), { galleon: 1 });
+  assert.equal(loss.fleet.variants.length, 1);
+  assert.ok(shipListText(loseShips(loss, 1)).includes("潮鴎号"));
+  addShips(loss, { galleon: 1 }); addVariantShip(loss, "gull", "潮鴎の船長", 120001);
+  assert.equal(upkeep.payShipUpkeep(loss, 100).sold[0].id, "galleon");
+  assert.equal(loss.fleet.variants.length, 1);
+  loss.funds = 0;
+  assert.equal(upkeep.payShipUpkeep(loss, 100).sold[0].name, "潮鴎号");
+  assert.equal(totalShips(loss.fleet), 0);
+  const templatesModule = await load("./bountyConfig.js"); await templatesModule.evaluate();
+  const templates = templatesModule.namespace.BOUNTY_TEMPLATES;
+  assert.equal(templates.length, 27);
+  assert.equal(new Set(templates.map(t => t.epithet)).size, 27);
+  for (const a of templates) for (const b of templates) {
+    const size = t => Object.values(t.troops).reduce((n, count) => n + count, 0);
+    assert.ok(size(a) <= 20);
+    if (size(a) < size(b)) assert.ok(SHIP_TYPES[VARIANT_SHIPS[a.id].base].price <= SHIP_TYPES[VARIANT_SHIPS[b.id].base].price);
+  }
   console.log("船種・バフ上限・射撃・売買・補充・移行・報酬・喪失: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

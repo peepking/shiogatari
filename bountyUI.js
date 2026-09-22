@@ -10,6 +10,7 @@ import { CRIME_LABELS, CRIME_HISTORY_LIMIT } from "./bountyConfig.js";
 import { DAY_PER_YEAR, DAY_PER_SEASON } from "./questUtils.js";
 import { resourceIcon } from "./resourceUI.js";
 import { SHIP_TYPES } from "./shipConfig.js";
+import { variantBonusText } from "./variantShips.js";
 import { saveGameToStorage } from "./storage.js";
 import { pushToast } from "./dom.js";
 
@@ -35,7 +36,7 @@ function bountyCard(s) {
   return `<article class="bounty-card"><div class="bounty-heading"><h3>${escapeHtml(bountyName(s))}</h3><strong>${resourceIcon("funds")}${s.reward.toLocaleString()}</strong></div>
     <div class="bounty-affiliation">${factionLabel(s.factionId)}</div><p>${escapeHtml(s.description)}</p>
     <div class="bounty-meta">${s.total}人・${s.formation.length}部隊 / Lv${s.formation[0].level} / (${s.position.x + 1}, ${s.position.y + 1})</div>
-    <details><summary>編成・討伐の影響</summary><p>${Object.entries(troops).map(([id, n]) => `${escapeHtml(TROOP_STATS[id]?.name || id)} ${n}人`).join(" / ")}</p><p>所属勢力の貴族全員 −3 / その他の勢力の貴族全員 ＋1</p><p>賞金に加えて通常の戦闘報酬を獲得します。</p>${s.ship ? `<p>${escapeHtml(s.flagship)}：${escapeHtml(SHIP_TYPES[s.ship]?.name || "船")} 1隻</p>` : ""}</details>
+    <details><summary>編成・討伐の影響</summary><p>${Object.entries(troops).map(([id, n]) => `${escapeHtml(TROOP_STATS[id]?.name || id)} ${n}人`).join(" / ")}</p><p>所属勢力の貴族全員 −3 / その他の勢力の貴族全員 ＋1</p><p>賞金に加えて通常の戦闘報酬を獲得します。</p>${s.ship ? `<p>${escapeHtml(s.flagship)}：${escapeHtml(SHIP_TYPES[s.ship]?.name || "船")} 1隻<br>${variantBonusText(s.templateId)}</p>` : ""}</details>
     ${reason ? `<p class="tiny">${escapeHtml(reason)}</p>` : ""}<div class="row"><button class="btn" data-bounty-map="${s.id}">地図で確認</button>${bountyAt(state.position)?.id === s.id ? `<button class="btn good" data-bounty-fight="${s.id}" ${reason ? "disabled" : ""}>討伐の準備</button>` : ""}</div></article>`;
 }
 

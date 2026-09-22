@@ -168,6 +168,11 @@ function renderFleetDetailsControl() {
   modal.onclick = event => { if (event.target === modal) close(); };
   modal.onkeydown = event => {
     if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
-    if (event.key === "Tab") { event.preventDefault(); closeButton.focus(); }
+    if (event.key === "Tab") {
+      const controls = [...modal.querySelectorAll('button:not([disabled]), summary, [tabindex="0"]')].filter(el => el.getClientRects().length);
+      const first = controls[0], last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    }
   };
 }

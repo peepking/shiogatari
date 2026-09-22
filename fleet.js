@@ -1,11 +1,13 @@
 import { SHIP_TYPES, SHIP_REWARD_WEIGHT_EXPONENT } from "./shipConfig.js";
+import { VARIANT_SHIPS, normalizeVariants } from "./variantShips.js";
 
 /** @param {unknown} value 数量。 @returns {number} 非負の安全な整数。 */
 export function shipCount(value) { return Number.isSafeInteger(value) && value >= 0 ? value : 0; }
 
 /** @param {object|number} value 船団または旧隻数。 @returns {object} 正規化した独立の船団状態。 */
 export function normalizeFleet(value) {
-  return { version: 1, counts: Object.fromEntries(Object.keys(SHIP_TYPES).map(id =>
+  const variants = normalizeVariants(value?.variants);
+  return { version: 2, variants, nextVariantId: Math.max(1, shipCount(value?.nextVariantId), ...variants.map(v => v.id + 1)), counts: Object.fromEntries(Object.keys(SHIP_TYPES).map(id =>
     [id, shipCount(typeof value === "number" ? (id === "cog" ? value : 0) : value?.counts?.[id])])) };
 }
 
@@ -16,16 +18,37 @@ export function migrateFleet(state) {
 }
 
 /** @param {object|number} fleet 船団。 @returns {number} 従船合計。 */
-export function totalShips(fleet) { return Object.values(normalizeFleet(fleet).counts).reduce((sum, n) => sum + n, 0); }
+export function totalShips(fleet) { return Object.values(fleetCounts(fleet)).reduce((sum, n) => sum + n, 0); }
+
+/** 通常船と固有船は同じ船種のバフ上限を共有する。 @param {object} value 船団。 @returns {object} 合算隻数。 */
+export function fleetCounts(value) {
+  const fleet = normalizeFleet(value), counts = { ...fleet.counts };
+  for (const v of fleet.variants) counts[VARIANT_SHIPS[v.variantId].base]++;
+  return counts;
+}
+
+/** 同種の固有船も別個体として来歴を保存する。 @param {object} state 状態。 @param {string} variantId 固有船種。 @param {string} sourceName 元の船長。 @param {number} acquiredAbs 獲得日。 @returns {object} 獲得個体。 */
+export function addVariantShip(state, variantId, sourceName, acquiredAbs) {
+  if (!Object.hasOwn(VARIANT_SHIPS, variantId)) throw new Error("不明な固有船です。");
+  const fleet = normalizeFleet(state.fleet);
+  if (!Number.isSafeInteger(fleet.nextVariantId + 1)) throw new Error("船の記録が上限に達しました。");
+  const record = { id: fleet.nextVariantId++, variantId, sourceName, acquiredAbs };
+  fleet.variants.push(record); state.fleet = fleet;
+  return record;
+}
 
 /** @param {object|number} fleet 船団。 @returns {object} 全容量と上限付き固有効果。 */
 export function fleetEffects(fleet) {
   const result = { supplies: 0, troops: 0, upkeepReduction: 0, shipUpkeepReduction: 0, supplyCap: 0, troopCap: 0, atk: 0, def: 0, supportPower: 0 };
-  for (const [id, count] of Object.entries(normalizeFleet(fleet).counts)) {
+  for (const [id, count] of Object.entries(fleetCounts(fleet))) {
     const ship = SHIP_TYPES[id];
     result.supplies += ship.supplies * count;
     result.troops += ship.troops * count;
     for (const [key, amount] of Object.entries(ship.effects)) result[key] += amount * Math.min(count, ship.limit);
+  }
+  for (const v of normalizeFleet(fleet).variants) {
+    result.supplies += VARIANT_SHIPS[v.variantId].supplies;
+    result.troops += VARIANT_SHIPS[v.variantId].troops;
   }
   return result;
 }
@@ -66,7 +89,7 @@ export function addShips(state, counts) {
 /** @param {object} counts 船種別隻数。 @returns {string} 獲得・喪失船の説明。 */
 export function shipListText(counts) {
   return Object.entries(normalizeFleet({ counts }).counts).filter(([, n]) => n > 0)
-    .map(([id, n]) => `${SHIP_TYPES[id].name} ${n}隻`).join(" / ");
+    .map(([id, n]) => `${SHIP_TYPES[id].name} ${n}隻`).concat((counts.variants || []).map(v => `${VARIANT_SHIPS[v.variantId].name} 1隻`)).join(" / ");
 }
 
 /** @param {object} state 状態。 @param {number} count 隻数。 @returns {string} 抽選して加算した船の説明。 */
@@ -77,7 +100,7 @@ export function awardShips(state, count = 1) {
 }
 
 /**
- * 最安船から順に喪失させる。同額は定義順、所持を超える要求は残存数までとする。
+ * 通常船を優先し、その後に固有船を失う。各区分内は最安船から、同額は保存順とする。
  * @param {object} state 状態。 @param {number} count 喪失隻数。 @returns {object} 喪失した船種別隻数。
  */
 export function loseShips(state, count) {
@@ -88,6 +111,10 @@ export function loseShips(state, count) {
     const take = Math.min(remaining, fleet.counts[id]);
     if (take) { fleet.counts[id] -= take; lost[id] = take; remaining -= take; }
   }
+  const victims = [...fleet.variants].sort((a, b) => SHIP_TYPES[VARIANT_SHIPS[a.variantId].base].price - SHIP_TYPES[VARIANT_SHIPS[b.variantId].base].price).slice(0, remaining);
+  if (victims.length) lost.variants = victims;
+  const ids = new Set(victims.map(v => v.id));
+  fleet.variants = fleet.variants.filter(v => !ids.has(v.id));
   state.fleet = fleet;
   return lost;
 }

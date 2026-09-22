@@ -85,7 +85,7 @@ function applySeasonUpkeep() {
   }
   const shipPayment = payShipUpkeep(state, forecast.shipFunds);
   if (shipPayment.sold.length) {
-    const soldText = shipPayment.sold.map(row => `${SHIP_TYPES[row.id].name} ${row.count}隻（資金＋${row.proceeds}）`).join(" / ");
+    const soldText = shipPayment.sold.map(row => `${row.name || SHIP_TYPES[row.id].name} ${row.count}隻（資金＋${row.proceeds}）`).join(" / ");
     enqueueEvent({ title: "船維持費のため自動売却", body: `${soldText}\n船維持費 ${shipPayment.cost}を支払いました。残り資金 ${state.funds}。積載上限が減るため、物資・兵員の超過を確認してください。` });
     pushLog("船の自動売却", soldText, "-");
   }

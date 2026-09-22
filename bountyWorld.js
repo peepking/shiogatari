@@ -5,7 +5,8 @@ import { bountySeaPositions, normalizeBounties, tickBounties, claimBounty, bount
 import { BOUNTY_CONFIG } from "./bountyConfig.js";
 import { FACTIONS } from "./lore.js";
 import { adjustNobleFavor } from "./faction.js";
-import { addShips } from "./fleet.js";
+import { addVariantShip } from "./fleet.js";
+import { VARIANT_SHIPS, variantBonusText } from "./variantShips.js";
 import { SHIP_TYPES } from "./shipConfig.js";
 import { pushLog } from "./dom.js";
 import { expireWanted } from "./playerWanted.js";
@@ -38,9 +39,10 @@ export function finishBounty(id) {
   if (!site) return [];
   state.funds += site.reward;
   const summary = [{ text: `${bountyName(site)} 討伐賞金 +${site.reward}`, icon: "funds" }];
-  if (site.ship && SHIP_TYPES[site.ship]) {
-    addShips(state, { [site.ship]: 1 });
-    summary.push({ text: `${site.flagship}：${SHIP_TYPES[site.ship].name} +1隻`, icon: "ships" });
+  const variant = VARIANT_SHIPS[site.templateId];
+  if (variant) {
+    addVariantShip(state, variant.id, bountyName(site), absDay(state));
+    summary.push({ text: `${variant.name}：${SHIP_TYPES[variant.base].name} +1隻（${variantBonusText(variant.id)}）`, icon: "ships" });
   }
   for (const faction of FACTIONS) {
     const delta = faction.id === site.factionId ? BOUNTY_CONFIG.ownFavor : BOUNTY_CONFIG.otherFavor;

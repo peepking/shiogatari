@@ -1,5 +1,6 @@
 import { SHIP_TYPES, SHIP_SELL_RATE, SHIP_STOCK_TIERS } from "./shipConfig.js";
 import { normalizeFleet, shipCount } from "./fleet.js";
+import { VARIANT_SHIPS, normalizeVariants } from "./variantShips.js";
 
 /** @param {object} state 日付状態。 @returns {number} 年をまたぐ季節番号。 */
 export function shipyardSeason(state) { return state.year * 4 + state.season; }
@@ -27,6 +28,7 @@ export function refreshShipyard(settlement, season, random = Math.random) {
     settlement.shipyard = { regular, stock: Object.fromEntries(regular.map(r => [r.type, r.targetStock])), lastRestockSeason: season };
   }
   const yard = settlement.shipyard;
+  yard.variants = normalizeVariants(yard.variants);
   yard.stock = Object.fromEntries(Object.keys(SHIP_TYPES).map(id => [id, shipCount(yard.stock?.[id])]));
   if (!Number.isFinite(yard.lastRestockSeason) || yard.lastRestockSeason < season) {
     for (const row of yard.regular) yard.stock[row.type] = Math.max(yard.stock[row.type], row.targetStock);
@@ -45,6 +47,7 @@ export function shipTradePrice(type, mode) { return Math.floor(SHIP_TYPES[type].
  */
 export function quoteShipTrade(state, settlement, type, mode, quantity) {
   if (settlement?.kind !== "town" || !settlement.shipyard) return { error: "街の造船所で取引してください。" };
+  if (typeof type === "string" && type.startsWith("variant:")) return quoteVariantTrade(state, settlement, Number(type.slice(8)), mode, quantity);
   if (!Object.hasOwn(SHIP_TYPES, type) || !["buy", "sell"].includes(mode) || !Number.isSafeInteger(quantity) || quantity <= 0)
     return { error: "取引数は1以上の整数を入力してください。" };
   const fleet = normalizeFleet(state.fleet);
@@ -65,5 +68,21 @@ export function tradeShip(state, settlement, type, mode, quantity) {
   const result = quoteShipTrade(state, settlement, type, mode, quantity);
   if (result.error) return result;
   state.fleet = result.fleet; state.funds = result.funds; settlement.shipyard.stock = result.stock;
+  if (result.variants) settlement.shipyard.variants = result.variants;
   return result;
+}
+
+/** 個体と来歴をそのまま買い取り在庫へ移し、買い戻しにも対応する。 @param {object} state 状態。 @param {object} settlement 街。 @param {number} id 個体ID。 @param {string} mode 売買方向。 @param {number} quantity 数量。 @returns {object} 検証結果。 */
+function quoteVariantTrade(state, settlement, id, mode, quantity) {
+  if (!["buy", "sell"].includes(mode) || quantity !== 1) return { error: "固有船は1隻ずつ取引してください。" };
+  const fleet = normalizeFleet(state.fleet), variants = normalizeVariants(settlement.shipyard.variants);
+  const source = mode === "buy" ? variants : fleet.variants, target = mode === "buy" ? fleet.variants : variants;
+  const index = source.findIndex(v => v.id === id);
+  if (index < 0 || target.some(v => v.id === id)) return { error: "この固有船は取引できません。" };
+  const record = source[index], amount = shipTradePrice(VARIANT_SHIPS[record.variantId].base, mode);
+  const funds = state.funds + (mode === "buy" ? -amount : amount);
+  if (!Number.isSafeInteger(funds) || funds < 0) return { error: "資金が不足しています。" };
+  source.splice(index, 1); target.push(record);
+  fleet.nextVariantId = Math.max(fleet.nextVariantId, id + 1);
+  return { fleet, variants, stock: { ...settlement.shipyard.stock }, funds, amount };
 }

@@ -1,5 +1,7 @@
 import { SHIP_TYPES, SHIP_UPKEEP_RATE } from "./shipConfig.js";
-import { normalizeFleet, fleetEffects } from "./fleet.js";
+import { normalizeFleet, fleetEffects, fleetCounts } from "./fleet.js";
+import { VARIANT_SHIPS, variantBonusText } from "./variantShips.js";
+import { escapeHtml, SEASONS } from "./util.js";
 import { getOutfittingEffects, snapshotOutfitting } from "./outfitting.js";
 import { calcSupplyCap } from "./supplies.js";
 import { calcTroopCap, TROOP_STATS } from "./troops.js";
@@ -53,9 +55,19 @@ export function fleetDetails(state) {
   const fleet = normalizeFleet(state.fleet);
   const e = fleetEffects(fleet);
   const attacks = getOutfittingEffects(state.expansion?.outfitting, fleet).attacks;
-  const rows = Object.entries(fleet.counts).filter(([, n]) => n > 0).map(([id, n]) => {
+  const rows = Object.entries(fleetCounts(fleet)).filter(([, n]) => n > 0).map(([id, n]) => {
     const ship = SHIP_TYPES[id];
-    return `<div class="outfitting-equipped ship-owned">${shipIcon(id)}<div><b>${ship.name} ${n}隻</b><p>物資容量＋${ship.supplies * n} / 部隊容量＋${ship.troops * n}</p><p>船維持費（軽減前）${ship.price * SHIP_UPKEEP_RATE * n}資金／季節</p><p>${shipEffectText(id)}${ship.limit ? ` / 有効${Math.min(n, ship.limit)}隻分${n >= ship.limit ? "・上限到達" : ""}` : ""}</p></div></div>`;
+    const variants = fleet.variants.filter(v => VARIANT_SHIPS[v.variantId].base === id);
+    const supplies = ship.supplies * n + variants.reduce((sum, v) => sum + VARIANT_SHIPS[v.variantId].supplies, 0);
+    const troops = ship.troops * n + variants.reduce((sum, v) => sum + VARIANT_SHIPS[v.variantId].troops, 0);
+    return `<div class="outfitting-equipped ship-owned">${shipIcon(id)}<div><b>${ship.name} ${n}隻</b>${variants.length ? `<p class="tiny">通常船 ${fleet.counts[id]}隻 / 固有船 ${variants.length}隻</p>` : ""}<p>物資容量＋${supplies} / 部隊容量＋${troops}</p><p>船維持費（軽減前）${ship.price * SHIP_UPKEEP_RATE * n}資金／季節</p><p>${shipEffectText(id)}${ship.limit ? ` / 有効${Math.min(n, ship.limit)}隻分${n >= ship.limit ? "・上限到達" : ""}` : ""}</p>${variants.length ? `<details><summary>固有船と来歴（${variants.length}隻）</summary><div class="variant-ship-history">${variants.map(variantShipDetails).join("")}</div></details>` : ""}</div></div>`;
   }).join("");
   return `<h3>保有船と固有効果</h3>${rows || '<p class="tiny">従船はありません。</p>'}<p class="tiny">船のバフ合計：物資上限＋${e.supplyCap}% / 部隊上限＋${e.troopCap}% / 部隊維持費−${e.upkeepReduction}% / 船維持費−${e.shipUpkeepReduction}% / ATK＋${e.atk}% / DEF＋${e.def}% / 支援射撃威力＋${e.supportPower}%</p>${e.supportPower && !attacks.length ? '<p class="tiny">ガレアス：対応する支援射撃艤装は未装備です。</p>' : ""}`;
+}
+
+/** @param {object} record 所有個体。 @returns {string} 船名・容量補正・船長と獲得日。 */
+export function variantShipDetails(record) {
+  const v = VARIANT_SHIPS[record.variantId], day = Math.max(0, record.acquiredAbs - 1);
+  const date = record.acquiredAbs ? `神歴${Math.floor(day / 120)}年 ${SEASONS[Math.floor(day % 120 / 30)]} ${day % 30 + 1}日` : "獲得日不明";
+  return `<div class="variant-ship-record"><b>${escapeHtml(v.name)} #${record.id}</b><p>${variantBonusText(v.id)}</p><p class="tiny">${escapeHtml(record.sourceName)}の船を拿捕<br>${date}</p></div>`;
 }
