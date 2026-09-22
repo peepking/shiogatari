@@ -1,7 +1,8 @@
-import { CONTRABAND, PIRATE_CONFIG } from "./pirateConfig.js";
+import { CONTRABAND, PIRATE_CONFIG, entryCheckpointChance } from "./pirateConfig.js";
 import { state } from "./state.js";
 import { settlements } from "./map.js";
-import { getNobleFavor, adjustNobleFavor } from "./faction.js";
+import { adjustNobleFavor } from "./faction.js";
+import { expireWanted } from "./playerWanted.js";
 import { absDay, manhattan } from "./questUtils.js";
 import { enqueueEvent } from "./events.js";
 import { pushLog } from "./dom.js";
@@ -21,11 +22,11 @@ export function nearestLawfulSettlement() {
     .sort((a,b)=>a.d-b.d || a.s.id.localeCompare(b.s.id))[0]?.s || null;
 }
 
-/** @returns {string|null} 厚遇と現地貴族の警戒が重なる場合だけ追跡勢力を返す。 */
+/** @returns {string|null} 手配中は近隣国家が追跡する。自分の所属勢力と期限切れは除外する。 */
 export function wantedFaction() {
+  expireWanted(state.wanted, absDay(state));
   const set=nearestLawfulSettlement();
-  return set && getNobleFavor(PIRATE_CONFIG.nobleId)>=PIRATE_CONFIG.wantedFavor &&
-    getNobleFavor(set.nobleId)<=PIRATE_CONFIG.wantedNobleFavor ? set.factionId : null;
+  return set && state.wanted?.amount > 0 && !(state.honorFactions || []).includes(set.factionId) ? set.factionId : null;
 }
 
 /**
@@ -63,15 +64,30 @@ function showCheckpoint() {
   enqueueEvent({title:"禁制品の摘発",body:`${count ? `禁制品${count}個が発見されました。引き渡すと全て没収されます。` : "無法港での取引を追及されました。警告を受け入れると現地貴族の好感度が下がります。"}\n賄賂は失敗しても資金を消費します。${check.bribeFailed ? "\n賄賂は拒絶されました。別の対応を選んでください。" : ""}`,actions});
 }
 
-/** @returns {boolean} 検問発生時、所持または30日以内の売買記録があれば発見を一度抽選する。 */
-export function enqueuePirateCheckpoint() {
-  const data=piracyState(), set=nearestLawfulSettlement();
+/** @param {object|null} settlement 入場時の対象。省略時は移動中の近隣拠点。 @returns {boolean} 所持または30日以内の売買記録があれば摘発を50%で抽選する。 */
+export function enqueuePirateCheckpoint(settlement = null) {
+  const data=piracyState(), set=settlement || nearestLawfulSettlement();
   if (!set || data.checkpoint) return false;
   const recorded=Number.isFinite(data.lastTrade) && absDay(state)-data.lastTrade<PIRATE_CONFIG.recordDays;
   if (!contrabandCount() && !recorded) return false;
   if (Math.random()>=PIRATE_CONFIG.inspectionChance) return false;
   data.checkpoint={id:data.nextId++,nobleId:set.nobleId,factionId:set.factionId,bribeFailed:false};
   showCheckpoint(); return true;
+}
+
+/** 街・村への入場ごとに抽選し、発生時だけ拠点ごとの季節枠を消費する。通常検問と摘発で枠を共有し、移動中の検問とは独立させる。 @param {object} settlement 入った拠点。 @param {Function} normal 通常検問の表示。 @returns {boolean} 発生したか。 */
+export function enqueueSettlementCheckpoint(settlement, normal) {
+  if (!settlement || !["town", "village"].includes(settlement.kind) || settlement.pirateHaven || settlement.factionId === "pirates" || state.pendingEncounter?.active) return false;
+  const data = piracyState();
+  if (data.checkpoint) return false;
+  data.entrySeasons ||= {};
+  const season = state.year * 4 + state.season;
+  if (data.entrySeasons[settlement.id] === season) return false;
+  const chance = entryCheckpointChance(contrabandCount(), settlement.support?.[settlement.factionId] ?? 0);
+  if (chance <= 0 || Math.random() >= chance) return false;
+  data.entrySeasons[settlement.id] = season;
+  if (!enqueuePirateCheckpoint(settlement)) normal(settlement);
+  return true;
 }
 
 /**

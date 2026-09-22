@@ -3,6 +3,7 @@ export const PIRATE_CONFIG = {
   ports: 10, nobleId: "pirate_blackbeard", favorDelta: 3,
   wantedFavor: 30, wantedNobleFavor: -20, wantedChance: 0.3, bountyChance: 0.15,
   recordDays: 30, inspectionChance: 0.5, bribeBase: 200, bribePerItem: 10,
+  entryContrabandCap: 100, entryCheckpointMax: 0.2, entrySupportReduction: 0.9,
   bribeBaseChance: 0.4, bribeFameScale: 2000, bribeTroopScale: 1000, bribeItemPenalty: 0.005,
   bribeMin: 0.2, bribeMax: 0.8, bribeFailureFavor: -3, recordPenalty: -3,
   minScale: 0.5, maxScale: 1.5, raidScale: 1.25, raidRewardScale: 1.5,
@@ -27,8 +28,15 @@ export function normalizePiracy(value) {
     ["north","archipelago","citadel"].includes(check.factionId)
     ? {id:check.id,nobleId:typeof check.nobleId === "string" ? check.nobleId : null,
       factionId:check.factionId,bribeFailed:check.bribeFailed === true} : null;
-  return {lastTrade:Number.isFinite(value?.lastTrade) ? value.lastTrade : null,checkpoint,
+  const entrySeasons = Object.fromEntries(Object.entries(value?.entrySeasons || {}).filter(([id, season]) => id && Number.isSafeInteger(season) && season >= 0));
+  return {lastTrade:Number.isFinite(value?.lastTrade) ? value.lastTrade : null,checkpoint,entrySeasons,
     nextId:Math.max(1, Number.isSafeInteger(value?.nextId) ? value.nextId : 1, (checkpoint?.id || 0)+1)};
+}
+
+/** 禁制品100個で20%、正の支持度だけで最大90%軽減する。 @param {number} count 禁制品合計。 @param {number} support 所属勢力への支持度。 @returns {number} 入場時の検問確率。 */
+export function entryCheckpointChance(count, support = 0) {
+  return PIRATE_CONFIG.entryCheckpointMax * Math.min(1, Math.max(0, count) / PIRATE_CONFIG.entryContrabandCap)
+    * (1 - PIRATE_CONFIG.entrySupportReduction * Math.min(100, Math.max(0, support)) / 100);
 }
 
 /** 内部兵種IDと提供済み画像名の対応。 */

@@ -25,6 +25,8 @@ import { elements, pushLog, pushToast, renderLogs, setInlineMessage, setOutput }
 import { initEventQueueUI, showNextEvent } from "./events.js";
 import { renderLocationHeader } from "./locationHeader.js";
 import { updateExplorationWorld, renderExplorationControl, resumeExploration, finishExploration } from "./explorationUI.js";
+import { updateBountyWorld, finishBounty } from "./bountyWorld.js";
+import { renderBountyControls, bountyRestriction } from "./bountyUI.js";
 import { processScheduledOmens } from "./time.js";
 import { snapshotOutfitting, outfittingBattleLosses } from "./outfitting.js";
 import { renderOutfittingControl } from "./outfittingUI.js";
@@ -674,6 +676,7 @@ function killedEnemyCount(meta) {
  */
 function processBattleOutcome(resultCode, meta) {
   const pending = state.pendingEncounter || {};
+  if (pending.bountyId != null && !state.bounties?.active.some(s => s.id === pending.bountyId)) { clearBattlePrep(true); syncUI(); return; }
   const enemyTotal = pending.enemyTotal || enemyTotalEstimate(meta);
   const fameDelta = Math.floor(enemyTotal / 4);
   const isStrong = meta?.enemyFormation?.some((e) => (e.level || 1) > 1) || pending.strength === "elite";
@@ -846,10 +849,10 @@ function processBattleOutcome(resultCode, meta) {
       } else if (questType === QUEST_TYPES.PIRATE_HUNT || questType === QUEST_TYPES.BOUNTY_HUNT) {
         if (isWin) {
           completeHuntBattleQuest(questId, true);
-          summary.push(`討伐達成: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "賞金首" : "海賊"}`);
+          summary.push(`討伐達成: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "海賊船団" : "海賊"}`);
         } else {
           completeHuntBattleQuest(questId, false, "戦闘に敗北しました");
-          summary.push(`討伐失敗: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "賞金首" : "海賊"}`);
+          summary.push(`討伐失敗: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "海賊船団" : "海賊"}`);
         }
       } else if (
         questType === QUEST_TYPES.NOBLE_SECURITY ||
@@ -930,7 +933,7 @@ function processBattleOutcome(resultCode, meta) {
       summary.push("廃船の罠: 戦況に影響");
     }
     // 依頼以外の海賊遭遇に勝利したら、近傍拠点の貴族好感度をわずかに上げる
-    if (!questId && enemyFactionId === "pirates" && isWin) {
+    if (pending.bountyId == null && !questId && enemyFactionId === "pirates" && isWin) {
       const nearest = settlements
         .filter(s => !s.pirateHaven)
         .map((s) => ({ s, d: manhattan(s.coords, state.position) }))
@@ -945,18 +948,19 @@ function processBattleOutcome(resultCode, meta) {
     }
     // 戦況スコア反映（敵勢力ID必須化）
     let delta = isWin ? 8 : resultCode === BATTLE_RESULT.LOSE ? -6 : 0;
-    if (!questId && !questType && enemyFactionId !== "pirates") {
+    if (pending.bountyId == null && !questId && !questType && enemyFactionId !== "pirates") {
       delta = isWin ? 3 : resultCode === BATTLE_RESULT.LOSE ? -2 : 0;
       if (delta > 0) summary.push("戦況がわずかに有利に傾いた");
       if (delta < 0) summary.push("戦況がわずかに不利に傾いた");
     }
-    if (delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
+    if (pending.bountyId == null && delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
 
     if (pending.explorationId != null) {
       const resources = finishExploration(isWin);
       summary.push(resources.length ? { label: "探索報酬", text: `探索報酬: ${resources.map(r => `${r.label} ${r.value}`).join(" / ")}`, resources } : "探索失敗: 探索地点は消滅しました。");
     }
-    const powerResources = nationalPowerResources(completeBattlePower(state, pending, isWin));
+    if (pending.bountyId != null && isWin) summary.push(...finishBounty(pending.bountyId));
+    const powerResources = pending.bountyId != null ? [] : nationalPowerResources(completeBattlePower(state, pending, isWin));
     if (powerResources.length) summary.push({ label: "国力への貢献", text: powerResources.map(r => `${r.label} ${r.value}`).join(" / "), resources: powerResources });
     renderBattleSummary(summary, resultLabel, pending, enemyTotal, isWin);
   } finally {
@@ -971,6 +975,11 @@ function processBattleOutcome(resultCode, meta) {
  */
 function startPrepBattle() {
   if (!state.pendingEncounter?.active) return;
+  if (state.pendingEncounter.bountyId != null) {
+    const site = state.bounties?.active.find(s => s.id === state.pendingEncounter.bountyId);
+    const reason = bountyRestriction(site);
+    if (reason) { pushToast("討伐不可", reason, "warn"); clearBattlePrep(); syncUI(); return; }
+  }
   state.pendingEncounter.powerContext ||= snapshotBattlePower(state, state.pendingEncounter, nationalPowerAtWar);
   setEnemyFormation(state.pendingEncounter.enemyFormation || []);
   const enemyFactionId = state.pendingEncounter?.enemyFactionId || "pirates";
@@ -1238,7 +1247,7 @@ function updateModeControls(loc) {
       const strong = state.pendingEncounter.strength === "elite";
       const enemyFactionId = state.pendingEncounter?.enemyFactionId || "pirates";
       elements.battlePrepInfo.hidden = false;
-      elements.battlePrepInfo.textContent = `敵推定: ${total}人${
+      elements.battlePrepInfo.textContent = state.pendingEncounter.bountyId != null ? `${state.pendingEncounter.enemyName} / ${total}人（強編成）` : `敵推定: ${total}人${
         strong ? (enemyFactionId !== "pirates" ? "（正規軍）" : "（強編成）") : ""
       }`;
     }
@@ -1276,6 +1285,7 @@ function updateModeControls(loc) {
 function syncUI() {
   renderFaithDetails();
   updateExplorationWorld();
+  updateBountyWorld();
   syncChartReservations();
   if (!state.expansion.exploration.pending && !state.expansion.charts.pending && !state.pendingEncounter?.active && !state.eventQueue?.length && (!elements.battleBlock || elements.battleBlock.hidden) && (!elements.battleResultModal || elements.battleResultModal.hidden)) processScheduledOmens(absDay(state));
   const {
@@ -1318,6 +1328,7 @@ function syncUI() {
   updateModeControls(loc);
   renderNationalPowerControls(getAudienceContext);
 renderExplorationControl(syncUI);
+  renderBountyControls(syncUI);
   renderChartControl(syncUI);
   renderFishingControl(syncUI);
   renderOutfittingControl(syncUI);

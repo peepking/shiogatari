@@ -81,7 +81,7 @@ async function main() {
     buildLossesMap:n=>n,applyTroopLosses:n=>{fixture.troops.infantry-=n;},pushLog(){},enqueueEvent:e=>notices.push(e),
     pushToast:(title,body)=>toasts.push({title,body}),
     baseAdvanceDay:()=>{fixture.day++;if(fixture.day>30){fixture.day=1;fixture.season++;if(fixture.season>3){fixture.season=0;fixture.year++;}}},
-    settlements:[],FOOD_CONSUMPTION_DAYS:[],absDay:()=>0,updateExplorationWorld(){},tickDailyWar(){},tickRelationDrift(){},
+    settlements:[],FOOD_CONSUMPTION_DAYS:[],absDay:()=>0,updateExplorationWorld(){},updateBountyWorld(){},tickDailyWar(){},tickRelationDrift(){},
     maybeQueueHonorInvite(){},applySupportDrift(){},processScheduledOmens(){},questTickDay(){}});
   for (const name of ["applySeasonUpkeep","advanceDayWithEvents"]) {
     const offset=timeSource.indexOf(`function ${name}(`);

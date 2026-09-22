@@ -74,7 +74,7 @@ async function main() {
   const encounterState={position:{x:0,y:0},fame:0,warLedger:{entries:[]}};
   let relation="peace", builtFaction=null, rescued=null;
   const encounterMath=Object.create(Math);encounterMath.random=()=>0.99;
-  const encounterContext=vm.createContext({state:encounterState,Math:encounterMath,
+  const encounterContext=vm.createContext({state:encounterState,Math:encounterMath,wantedFaction:()=>null,
     settlements:[{id:"enemyTown",factionId:"north",coords:{x:1,y:0}}],
     FACTIONS:[{id:"north",name:"North"},{id:"pirates",name:"Pirates"}],
     FRONT_ENCOUNTER_RADIUS:3,getPlayerFactionId:()=>"citadel",getRelation:()=>relation,
@@ -102,8 +102,12 @@ async function main() {
   const e=enc.namespace;
   Object.assign(modules.get("rosterOptions.js").namespace.rosterOptions,options);
   state.position={x:2,y:2};
+  assert.equal(e.wantedFaction(),null);
+  state.wanted={amount:1000,lastCrimeAbs:120001};
   assert.equal(e.wantedFaction(),"north");
-  favors.n=-19;assert.equal(e.wantedFaction(),null);favors.n=-20;
+  state.honorFactions=["north"];assert.equal(e.wantedFaction(),null);state.honorFactions=[];
+  state.wanted.lastCrimeAbs=119401;assert.equal(e.wantedFaction(),null);
+  state.wanted={amount:1000,lastCrimeAbs:120001};
   state.position={x:20,y:20};assert.equal(e.wantedFaction(),null);state.position={x:2,y:2};
   state.supplies.illegal_drug=5;math.random=()=>0;
   assert.equal(e.enqueuePirateCheckpoint(),true);
@@ -132,6 +136,44 @@ async function main() {
   e.handlePirateCheckpoint({type:"pirate_bribe",payload:{id:state.piracy.checkpoint.id}});
   assert.equal(state.piracy.checkpoint,null);
   assert.equal(battles.length,0);
+  for (const [count,support,chance] of [[0,0,0],[100,0,0.2],[200,-100,0.2],[100,100,0.02],[50,50,0.055]]) {
+    assert.ok(Math.abs(c.entryCheckpointChance(count,support)-chance)<1e-12);
+  }
+  const town={id:"entryTown",kind:"town",factionId:"citadel",nobleId:"entryNoble",support:{citadel:0}};
+  let normalCount=0;
+  const normal=set=>{assert.equal(set.id,town.id);normalCount++;};
+  state.supplies={};state.piracy.lastTrade=today;
+  assert.equal(e.enqueueSettlementCheckpoint(town,normal),false);
+  state.supplies={illegal_drug:50,stolen_arms:50};
+  math.random=()=>0.21;
+  assert.equal(e.enqueueSettlementCheckpoint(town,normal),false);
+  assert.equal(state.piracy.entrySeasons[town.id],undefined);
+  let rolls=[0.19,0.5];math.random=()=>rolls.shift();
+  assert.equal(e.enqueueSettlementCheckpoint(town,normal),true);
+  assert.equal(normalCount,1);assert.equal(state.piracy.checkpoint,null);
+  state.piracy=c.normalizePiracy(JSON.parse(JSON.stringify(state.piracy)));
+  math.random=()=>{throw Error("同じ季節に再抽選されました");};
+  assert.equal(e.enqueueSettlementCheckpoint(town,normal),false);
+  state.season++;
+  rolls=[0.1,0.49];math.random=()=>rolls.shift();
+  assert.equal(e.enqueueSettlementCheckpoint(town,normal),true);
+  assert.equal(state.piracy.checkpoint.factionId,"citadel");
+  assert.equal(state.piracy.checkpoint.nobleId,"entryNoble");
+  state.piracy.checkpoint=null;
+  math.random=()=>{throw Error("同じ季節に摘発が再抽選されました");};
+  assert.equal(e.enqueueSettlementCheckpoint(town,normal),false);
+  const village={...town,id:"entryVillage",kind:"village"};
+  rolls=[0,0];math.random=()=>rolls.shift();
+  assert.equal(e.enqueueSettlementCheckpoint(village,normal),true);
+  state.piracy.checkpoint=null;
+  math.random=()=>{throw Error("無法港を抽選しました");};
+  assert.equal(e.enqueueSettlementCheckpoint({...town,id:"haven",pirateHaven:true},normal),false);
+  assert.equal(e.enqueueSettlementCheckpoint({...town,id:"pirates",factionId:"pirates"},normal),false);
+  state.season++;town.support.citadel=100;math.random=()=>0.03;
+  assert.equal(e.enqueueSettlementCheckpoint(town,normal),false);
+  math.random=()=>0;
+  assert.equal(e.enqueuePirateCheckpoint(),true);
+  assert.equal(normalCount,1);
   console.log("海賊の規模・画像・無法港配置・関係条件・賄賂失敗と復元・記録期限: 全項目成功");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

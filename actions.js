@@ -1,5 +1,6 @@
 import { PIRATE_CONFIG, PIRATE_IMAGES, pirateEnemyCount } from "./pirateConfig.js";
-import { enqueuePirateCheckpoint, handlePirateCheckpoint } from "./pirateEncounters.js";
+import { enqueuePirateCheckpoint, enqueueSettlementCheckpoint, handlePirateCheckpoint, wantedFaction } from "./pirateEncounters.js";
+import { recordCrime } from "./playerWanted.js";
 import { visitTideSite } from "./tideAlliance.js";
 import { activateAfterglow, rollFaithRecruitment } from "./faith.js";
 import { MODE_LABEL, PLACE } from "./constants.js";
@@ -155,6 +156,8 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null, option
  * @returns {string} 勢力ID
  */
 function pickEncounterFaction(pos, terrain) {
+  const pursuit = wantedFaction();
+  if (pursuit && Math.random() < PIRATE_CONFIG.wantedChance) return pursuit;
   const regionWeight = new Map();
   settlements.forEach((s) => {
     if (!s?.factionId) return;
@@ -359,6 +362,7 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
   const loc = getLocationStatus();
   const targetPlace = target === "village" ? PLACE.VILLAGE : PLACE.TOWN;
   const insideLabel = target === "village" ? MODE_LABEL.IN_VILLAGE : MODE_LABEL.IN_TOWN;
+  if (state.modeLabel === insideLabel) return false;
   if (loc?.place !== targetPlace) {
     setOutput("入場できません", `${targetPlace}にいません。`, [
       { text: targetPlace, kind: "warn" },
@@ -375,6 +379,7 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
     return false;
   }
   state.modeLabel = insideLabel;
+  enqueueSettlementCheckpoint(hereSettlement, enqueueCheckpointEvent);
   if (!hereSettlement?.pirateHaven) visitTideSite(state, hereSettlement?.id);
   const recruit = rollFaithRecruitment(state, hereSettlement, TROOP_STATS);
   if (recruit) enqueueEvent({ title: "潮盟の便り", body: `潮の縁者の紹介で、${TROOP_STATS[recruit.type].name} Lv${recruit.level} ${recruit.remaining}人が雇用候補に加わりました。` });
@@ -857,7 +862,7 @@ function handleRefugeeAction(action) {
 function handleCheckpointAction(action) {
   switch (action.type) {
     case "checkpoint_ok": {
-      const info = nearestSettlementInfo();
+      const info = action.payload?.settlementId ? action.payload : nearestSettlementInfo();
       if (info?.settlementId && info?.factionId) adjustSupport(info.settlementId, info.factionId, 2);
       const spend = Math.min(2, state.supplies?.raw || 0);
       if (spend > 0) state.supplies.raw = Math.max(0, state.supplies.raw - spend);
@@ -866,7 +871,7 @@ function handleCheckpointAction(action) {
       return true;
     }
     case "checkpoint_bribe": {
-      const info = nearestSettlementInfo();
+      const info = action.payload?.settlementId ? action.payload : nearestSettlementInfo();
       const cost = 50;
       if ((state.funds || 0) < cost) {
         pushToast("資金不足", "賄賂の資金が足りません。", "warn");
@@ -879,7 +884,7 @@ function handleCheckpointAction(action) {
       return true;
     }
     case "checkpoint_force": {
-      const info = nearestSettlementInfo();
+      const info = action.payload?.settlementId ? action.payload : nearestSettlementInfo();
       if (info?.settlementId && info?.factionId) adjustSupport(info.settlementId, info.factionId, -2);
       startTravelEncounter({
         forceStrength: "normal",
@@ -1030,6 +1035,7 @@ export function isBattleEventActionBlocked(action) {
  * @returns {boolean} 処理した場合true
  */
 export function handleTravelEventAction(action) {
+  if (state.pendingEncounter?.active && action?.crimeRecorded) return true;
   if (isBattleEventActionBlocked(action)) return false;
   if (!action?.type) return false;
   const handlers = [
@@ -1045,7 +1051,19 @@ export function handleTravelEventAction(action) {
     handleTraitorAction,
   ];
   for (const h of handlers) {
-    if (h(action)) return true;
+    const before = state.pendingEncounter;
+    if (h(action)) {
+      if (state.pendingEncounter?.active && state.pendingEncounter !== before) {
+        const kinds = { merchant_attack: "merchant_attack", merchant_rescue_attack: "merchant_attack", refugee_attack: "refugee_raid", checkpoint_force: "checkpoint_force", pirate_force: "pirate_checkpoint" };
+        const amount = recordCrime(state, kinds[action.type], action, absDay(state));
+        if (amount) {
+          state.pendingEncounter.crimeRecorded = true;
+          pushLog("指名手配", `賞金 +${amount}（現在 ${state.wanted.amount}）`, "-");
+          pushToast("指名手配", `あなたへの賞金が${state.wanted.amount}資金になりました。`, "warn");
+        }
+      }
+      return true;
+    }
   }
   return false;
 }
@@ -1197,7 +1215,7 @@ export function startTravelEncounter({ forceStrength, enemyFactionId, title, fla
     strength,
     terrain,
     enemyFactionId: enemyFactionId || "pirates",
-    eventTag: travelEventTags.has(eventTag) ? eventTag : null,
+    eventTag: travelEventTags.has(eventTag) || eventTag === "pirate_checkpoint" ? eventTag : null,
     eventContext: eventContext || null,
   };
   state.modeLabel = MODE_LABEL.PREP;
@@ -1255,20 +1273,21 @@ function enqueueRefugeeEvent(terrain) {
 
 /**
  * 検問強化イベントを積む（拠点近傍のみ）。
+ * @param {object|null} settlement 入場時の拠点。省略時は移動中の抽選。
  * @returns {boolean}
  */
-function enqueueCheckpointEvent() {
-  if (enqueuePirateCheckpoint()) return true;
-  const info = nearestSettlementInfo();
+function enqueueCheckpointEvent(settlement = null) {
+  if (!settlement && enqueuePirateCheckpoint()) return true;
+  const info = settlement ? { settlementId: settlement.id, factionId: settlement.factionId, nobleId: settlement.nobleId } : nearestSettlementInfo();
   if (!info?.settlementId) return false;
   const bribeCost = 50;
   enqueueEvent({
     title: "検問強化",
     body: `臨時検問に遭遇しました。どうしますか？\n賄賂コスト: 資金${bribeCost}`,
     actions: [
-      { id: "cp-ok", label: "正規に応じる", type: "checkpoint_ok" },
-      { id: "cp-bribe", label: "賄賂を渡す", type: "checkpoint_bribe" },
-      { id: "cp-force", label: "強行突破", type: "checkpoint_force" },
+      { id: "cp-ok", label: "正規に応じる", type: "checkpoint_ok", payload: info },
+      { id: "cp-bribe", label: "賄賂を渡す", type: "checkpoint_bribe", payload: info },
+      { id: "cp-force", label: "強行突破", type: "checkpoint_force", payload: info },
     ],
   });
   return true;

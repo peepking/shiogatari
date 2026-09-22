@@ -49,7 +49,7 @@ async function main() {
   }
   const modules = {
     "./state.js": mockModule({ state, resetState }),
-    "./constants.js": mockModule({ MODE_LABEL: { NORMAL: "normal", BATTLE: "battle" } }),
+    "./constants.js": mockModule({ MODE_LABEL: { NORMAL: "normal", PREP: "prep", BATTLE: "battle" } }),
     "./map.js": mockModule({ snapshotWorld, restoreWorld }),
   };
   /** @param {string} specifier @returns {Promise<vm.Module>} 実ファイルを読み込む。 */
@@ -235,6 +235,21 @@ async function main() {
   assert.equal(loadGameFromStorage(), true);
   assert.equal(JSON.stringify(state.nationalPower), powerBefore);
   const validSave = saved;
+  state.modeLabel = "prep";
+  state.pendingEncounter = { active: true, bountyId: 5, enemyName: "赤帆の保存名", enemyFormation: [{ type: "infantry", count: 10, level: 2 }] };
+  state.wanted = { amount: 1000, lastCrimeAbs: 120001 };
+  assert.equal(saveGameToStorage(), true);
+  resetState(); assert.equal(loadGameFromStorage(), true);
+  assert.equal(state.modeLabel, "prep"); assert.equal(state.pendingEncounter.bountyId, 5);
+  assert.equal(state.pendingEncounter.enemyName, "赤帆の保存名"); assert.equal(state.wanted.amount, 1000);
+  state.modeLabel = "battle";
+  const preparationSave = saved;
+  assert.equal(saveGameToStorage(), false); assert.equal(saved, preparationSave);
+  state.modeLabel = "prep"; state.pendingEncounter = { active: true, crimeRecorded: true, enemyTotal: 40 };
+  assert.equal(saveGameToStorage(), true);
+  resetState(); assert.equal(loadGameFromStorage(), true); assert.equal(state.pendingEncounter.crimeRecorded, true);
+  state.modeLabel = "normal"; state.pendingEncounter = { active: false };
+  saved = validSave;
   failWrite = true;
   assert.equal(saveGameToStorage(), false);
   assert.equal(saved, validSave);

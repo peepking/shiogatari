@@ -18,6 +18,7 @@ import { initializeExploration, tickExploration, describeDanger, rollExploration
  */
 function blockedPositions() {
   const result = new Set();
+  for (const site of state.bounties?.active || []) result.add(`${site.position.x},${site.position.y}`);
   const quests = [...(state.quests?.active || []), ...Object.values(state.quests?.availableBySettlement || {}).flat(), ...Object.values(state.nobleQuests?.availableByNoble || {}).flat()];
   for (const quest of quests) {
     for (const pos of [quest.target, ...(quest.fights || []).map(f => f.target)]) {

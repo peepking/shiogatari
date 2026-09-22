@@ -149,6 +149,7 @@ export function randomSeaTarget(origin) {
  */
 export function randomHuntTarget(origin, minDist = 3, maxDist = 7, avoid = []) {
   const avoidSet = new Set([...explorationPositions(), ...(avoid || []).filter(Boolean).map((p) => `${p.x},${p.y}`)]);
+  for (const site of state.bounties?.active || []) avoidSet.add(`${site.position.x},${site.position.y}`);
   const pickFrom = (lo, hi) => {
     const list = [];
     for (let y = 0; y < mapData.length; y++) {

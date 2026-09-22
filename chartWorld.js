@@ -14,6 +14,7 @@ export function chartLabel(offer) { return `${CONFIG.rewards[offer.kind]?.name |
  */
 export function reservedChartPositions() {
   const positions = (state.expansion.exploration.sites || []).map(s => s.position);
+  positions.push(...(state.bounties?.active || []).map(s => s.position));
   for (const c of state.expansion.charts.active) positions.push(c.destination, c.rumor);
   const quests = [...(state.quests?.active || []), ...Object.values(state.quests?.availableBySettlement || {}).flat(), ...Object.values(state.nobleQuests?.availableByNoble || {}).flat()];
   for (const q of quests) positions.push(q.target, ...(q.fights || []).map(f => f.target));

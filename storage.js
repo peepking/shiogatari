@@ -1,4 +1,6 @@
 import { normalizeTide } from "./tideAlliance.js";
+import { normalizeBounties } from "./bounty.js";
+import { normalizeWanted } from "./playerWanted.js";
 import { normalizePiracy } from "./pirateConfig.js";
 import { normalizeFaith } from "./faith.js";
 import { MODE_LABEL } from "./constants.js";
@@ -49,13 +51,14 @@ function simpleHash(str) {
 
 /**
  * ゲーム状態をローカルストレージへ保存する。
- * 戦闘準備・戦闘中は保存しない。戦後処理完了時だけ通常画面として保存する。
+ * 原則として戦闘準備・戦闘中は保存しない。固定賞金首・犯罪成立後だけ準備を保存し、再読込で同じ敵へ戻す。
  * @param {{battleComplete?:boolean}} [options] 戦後処理完了の指定
  * @returns {boolean}
  */
 export function saveGameToStorage({ battleComplete = false } = {}) {
   const unsafe = state.modeLabel === MODE_LABEL.BATTLE || state.pendingEncounter?.active;
-  if (!battleComplete && unsafe) return false;
+  const fixedPreparation = state.modeLabel === MODE_LABEL.PREP && state.pendingEncounter?.active && (state.pendingEncounter.bountyId != null || state.pendingEncounter.crimeRecorded === true);
+  if (!battleComplete && unsafe && !fixedPreparation) return false;
   try {
     const data = {
       state: {
@@ -104,6 +107,14 @@ export function loadGameFromStorage() {
     }
     Object.assign(state, snapshot.state);
     state.piracy = normalizePiracy(snapshot.state.piracy);
+    state.bounties = normalizeBounties(snapshot.state.bounties);
+    state.wanted = normalizeWanted(snapshot.state.wanted);
+    for (const q of [...(state.quests?.active || []), ...Object.values(state.quests?.availableBySettlement || {}).flat()]) {
+      if (q.type === "bounty_hunt" && !q.pirateKind) {
+        q.title = "海賊船団討伐";
+        if (q.target) q.desc = `(${q.target.x + 1}, ${q.target.y + 1})で海賊船団を討伐（推定${q.estimatedTotal}人 / 強編成）`;
+      }
+    }
     state.tideAlliance = normalizeTide(snapshot.state.tideAlliance);
     state.faithBenefits = normalizeFaith(snapshot.state.faithBenefits);
     if (!snapshot.state.fleet) delete state.fleet;

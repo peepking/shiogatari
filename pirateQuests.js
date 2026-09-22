@@ -5,7 +5,7 @@ import { buildEnemyFormation } from "./actions.js";
 import { adjustNobleFavor, adjustSupport, getNobleFavor } from "./faction.js";
 import { enqueueEvent } from "./events.js";
 import { pushLog } from "./dom.js";
-import { manhattan, randomHuntTarget } from "./questUtils.js";
+import { absDay, manhattan, randomHuntTarget } from "./questUtils.js";
 import { FACTIONS } from "./lore.js";
 
 /**
@@ -71,6 +71,7 @@ export function resolvePirateRelations(q) {
   const hunt=["pirate_hunt","bounty_hunt"].includes(q.type);
   if (!q.pirateKind && !hunt) return;
   q.pirateRelationsApplied=true;
+  if (q.pirateKind) recordCrime(state, "pirate_quest", q, absDay(state));
   const delta=q.pirateKind ? PIRATE_CONFIG.favorDelta : -PIRATE_CONFIG.favorDelta;
   const before=getNobleFavor(PIRATE_CONFIG.nobleId);
   adjustNobleFavor(PIRATE_CONFIG.nobleId,delta);
@@ -92,3 +93,4 @@ export function resolvePirateRelations(q) {
   pushLog("関係の変化",messages.join(" / "),"-");
   if (changed) enqueueEvent({title:"関係の変化",body:messages.join("\n")});
 }
+import { recordCrime } from "./playerWanted.js";

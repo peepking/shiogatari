@@ -1,4 +1,6 @@
 import { normalizeTide } from "./tideAlliance.js";
+import { normalizeBounties } from "./bounty.js";
+import { normalizeWanted } from "./playerWanted.js";
 import { normalizeFaith } from "./faith.js";
 import { MODE_LABEL } from "./constants.js";
 import { FACTIONS } from "./lore.js";
@@ -13,6 +15,8 @@ import { createNationalPower, nationalPowerDay } from "./nationalPower.js";
 const createState = () => {
   const initial = {
   piracy: {lastTrade:null,checkpoint:null,nextId:1},
+  bounties: normalizeBounties(),
+  wanted: normalizeWanted(),
   fleet: normalizeFleet(),
   expansion: createExpansionState(),
   troops: {

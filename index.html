@@ -304,6 +304,8 @@
                 <button class="btn good" id="outfittingOpenBtn" hidden>造船所</button>
                 <button class="btn good" id="tideOpen" hidden>潮盟の拠点</button>
                 <button class="btn good" id="questOpenBtn" hidden>依頼受注</button>
+                <button class="btn" id="bountyOpenBtn" hidden>賞金首</button>
+                <button class="btn warn" id="bountyVisitBtn" hidden>賞金首を確認</button>
                 <button class="btn good" id="hireBtn" hidden>部隊員雇用</button>
                 <button class="btn good" id="audienceBtn" hidden>謁見する</button>
                 <button class="btn primary" id="oracleBtn">神託を授かる</button>
@@ -397,6 +399,12 @@
 
   <div id="toastContainer" aria-live="polite"></div>
 
+  <div class="modal-backdrop" id="bountyModal" hidden>
+    <div class="modal bounty-modal" role="dialog" aria-modal="true" aria-labelledby="bountyTitle">
+      <div class="modal-hd"><h2 id="bountyTitle">賞金首</h2><button class="btn" id="bountyCloseBtn">閉じる</button></div>
+      <div class="modal-bd" id="bountyBody"></div>
+    </div>
+  </div>
   <div class="modal-backdrop" id="confirmModal" hidden>
     <div class="modal modal-sm">
       <div class="modal-hd">

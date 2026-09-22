@@ -642,7 +642,7 @@ function genBountyHuntQuest(settlement) {
   return {
     id: nextId(),
     type: QUEST_TYPES.BOUNTY_HUNT,
-    title: "賞金首討伐",
+    title: "海賊船団討伐",
     originId: settlement?.id ?? null,
     target,
     enemyFactionId: "pirates",
@@ -652,7 +652,7 @@ function genBountyHuntQuest(settlement) {
     strength: "elite",
     acceptedAbs: null,
     deadlineAbs: null,
-    desc: `(${target.x + 1}, ${target.y + 1})で賞金首を討伐（推定${estimatedTotal}人 / 強編成）`,
+    desc: `(${target.x + 1}, ${target.y + 1})で海賊船団を討伐（推定${estimatedTotal}人 / 強編成）`,
   };
 }
 

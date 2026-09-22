@@ -1,4 +1,5 @@
 import { settleTideSeason } from "./tideAlliance.js";
+import { updateBountyWorld } from "./bountyWorld.js";
 import { grantFaithSeason } from "./faith.js";
 import { calcSupplyCap } from "./supplies.js";
 import { startTravelEncounter } from "./actions.js";
@@ -45,6 +46,7 @@ export function advanceDayWithEvents(days = 1) {
     }
     const today = absDay(state);
     updateExplorationWorld(true);
+    updateBountyWorld();
     tickDailyWar(today);
     tickRelationDrift(today);
     maybeQueueHonorInvite(today);
