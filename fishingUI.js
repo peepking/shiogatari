@@ -116,8 +116,8 @@ function isWaiting() {
 }
 
 /**
- * 現在の釣りボタンの表示と動作を更新する。
- * 海上ではセッション開始・継続、街・村では釣果の管理として開く。
+ * 旅の釣り・図鑑ボタンと、施設の釣り小屋ボタンを別々に更新する。
+ * 海上ではセッション開始・継続、それ以外では図鑑を開く。街・村の管理は釣り小屋へ分離する。
  * 釣り竿未所持の海上では「釣り竿が必要」と表示し無効化する。
  * @param {Function} syncUI 表示同期。
  * @returns {void}
@@ -133,6 +133,12 @@ export function renderFishingControl(syncUI) {
   refreshFishingDay();
   const env = currentEnv();
   const manage = canSell();
+  const hut = elements.fishingHutBtn;
+  if (hut) {
+    hut.hidden = !manage;
+    hut.disabled = !manage;
+    hut.onclick = () => { if (canSell()) openFishingPanel(syncUI); };
+  }
   const fishing = state.expansion.fishing;
   const hasRod = !!fishing?.rodId;
   const online =
@@ -153,14 +159,10 @@ export function renderFishingControl(syncUI) {
     label = "釣り";
     action = () => openFishingPanel(syncUI);
     button.disabled = false;
-  } else if (!hasRod && env.sea) {
+  } else if (!hasRod && env.sea && !manage) {
     label = "釣り竿が必要";
     action = null;
     button.disabled = true;
-  } else if (manage) {
-    label = "釣り小屋";
-    action = () => openFishingPanel(syncUI);
-    button.disabled = false;
   } else {
     label = "魚図鑑";
     action = openCodexModal;
@@ -1157,7 +1159,7 @@ export function wireFishingUI() {
   if (!elements.fishingModal || typeof document === "undefined") return;
   document.querySelector(".workspace-actions")?.addEventListener("click", (e) => {
     const button = e.target.closest("button");
-    if (button && button !== elements.fishBtn && !elements.fishingModal.hidden) closeFishingPanel();
+    if (button && button !== elements.fishBtn && button !== elements.fishingHutBtn && !elements.fishingModal.hidden) closeFishingPanel();
   }, true);
   elements.fishingModalClose?.addEventListener("click", closeFishingPanel);
   elements.fishingCodexBtn?.addEventListener("click", openCodexModal);
@@ -1178,5 +1180,5 @@ function closeFishingPanel() {
   panelLocation = null;
   cancelBite();
   panelSync?.();
-  elements.fishBtn?.focus({ preventScroll: true });
+  (canSell() ? elements.fishingHutBtn : elements.fishBtn)?.focus({ preventScroll: true });
 }

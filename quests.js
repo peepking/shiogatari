@@ -1001,7 +1001,7 @@ export function genWarFrontQuest(settlement, front, role, kind) {
  * 神託が受注中かどうかを判定する。
  * @returns {boolean}
  */
-function hasActiveOracle() {
+export function hasActiveOracle() {
   ensureState();
   return state.quests.active.some(
     (q) =>

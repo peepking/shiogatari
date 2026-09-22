@@ -299,43 +299,68 @@
               </div>
             </div>
             <div class="bd">
-              <div class="mode-actions">
+              <div class="location-actions" id="locationActions">
+                <section class="location-action-group" aria-labelledby="facilityActionsTitle">
+                <h3 id="facilityActionsTitle">施設<span>旅の支度</span></h3>
+                <div class="location-action-grid">
                 <button class="btn good" id="tradeBtn" hidden>物資取引</button>
                 <button class="btn good" id="outfittingOpenBtn" hidden>造船所</button>
-                <button class="btn good" id="tideOpen" hidden>潮盟の拠点</button>
+                <button class="btn good" id="hireBtn" hidden>部隊員雇用</button>
+                <button class="btn" id="fishingHutBtn" hidden>釣り小屋</button>
+                </div>
+                </section>
+                <section class="location-action-group" aria-labelledby="socialActionsTitle">
+                <h3 id="socialActionsTitle">依頼・交流<span>人々を訪ねる</span></h3>
+                <div class="location-action-grid">
                 <button class="btn good" id="questOpenBtn" hidden>依頼受注</button>
                 <button class="btn" id="bountyOpenBtn" hidden>賞金首</button>
-                <button class="btn warn" id="bountyVisitBtn" hidden>賞金首を確認</button>
-                <button class="btn good" id="hireBtn" hidden>部隊員雇用</button>
                 <button class="btn good" id="audienceBtn" hidden>謁見する</button>
+                <button class="btn good" id="tideOpen" hidden>潮盟の拠点</button>
+                </div>
+                </section>
+                <section class="location-action-group journey-action-group" aria-labelledby="journeyActionsTitle">
+                <h3 id="journeyActionsTitle">旅の行動<span>潮と向き合う</span></h3>
+                <div class="location-action-grid">
+                <button class="btn" id="fishBtn" hidden>釣り</button>
+                <button class="btn warn" id="bountyVisitBtn" hidden>賞金首を確認</button>
                 <button class="btn primary" id="oracleBtn">神託を授かる</button>
                 <button class="btn primary" id="oracleBattleBtn" hidden>討伐</button>
+                <button class="btn" id="modePrayBtn">海に祈る</button>
                 <button class="btn" id="modeWaitBtn">1日待機</button>
                 <button class="btn" id="exploreBtn" hidden>探索する</button>
                 <button class="btn" id="chartExploreBtn" hidden>海図の地点を探索</button>
-                <button class="btn" id="fishBtn" hidden>釣り</button>
                 <div class="tiny" id="exploreInfo" hidden></div>
-                <button class="btn" id="modePrayBtn">海に祈る</button>
+                </div>
+                <p class="location-action-note" id="oracleUnavailable" hidden></p>
+                </section>
+                <div class="location-action-exit">
                 <button class="btn ghost" id="enterVillageBtn" hidden>村に入る</button>
                 <button class="btn ghost" id="enterTownBtn" hidden>街に入る</button>
                 <button class="btn ghost" id="exitVillageBtn" hidden>村を出る</button>
                 <button class="btn ghost" id="exitTownBtn" hidden>街を出る</button>
+                </div>
               </div>
-              <div class="mode-actions" id="battlePrepRow" hidden>
+              <section class="location-actions command-actions" id="battlePrepRow" aria-labelledby="battlePrepActionsTitle" hidden>
+                <h3 class="command-actions-title" id="battlePrepActionsTitle">戦闘準備<span>次の行動を選ぶ</span></h3>
+                <div class="location-action-grid">
                 <button class="btn primary" id="battlePrepFightBtn">戦闘する</button>
                 <button class="btn" id="battlePrepRunBtn">逃走する</button>
                 <button class="btn good" id="battlePrepPrayBtn">海に祈る</button>
                 <button class="btn bad" id="battlePrepSurrenderBtn">降伏する</button>
+                </div>
                 <span class="pill" id="battlePrepInfo" hidden>敵推定: - 人</span>
-              </div>
-              <div class="mode-actions" id="warActionRow" hidden>
+              </section>
+              <section class="location-actions command-actions" id="warActionRow" aria-labelledby="warActionsTitle" hidden>
+                <h3 class="command-actions-title" id="warActionsTitle">前線行動<span>戦況に働きかける</span></h3>
+                <div class="location-action-grid">
                 <button class="btn" id="warDefendRaidBtn">補給路迎撃</button>
                 <button class="btn" id="warAttackRaidBtn">補給路襲撃</button>
                 <button class="btn" id="warSkirmishBtn">小規模戦闘</button>
                 <button class="btn" id="warSupplyFoodBtn">食糧搬入</button>
                 <button class="btn" id="warEscortBtn">輸送護衛</button>
                 <button class="btn" id="warBlockBtn">補給封鎖</button>
-              </div>
+                </div>
+              </section>
               <div class="mode-actions" id="audienceRow" hidden>
                 <button class="btn good" id="nationalPowerDonate" hidden>軍資金を提供</button>
                 <button class="btn" id="audienceBribeBtn">賄賂を渡す</button>

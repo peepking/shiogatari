@@ -129,6 +129,7 @@ export const elements = {
   eventTradeNote: $("eventTradeNote"),
   eventTradeSellAll: $("eventTradeSellAll"),
   fishBtn: $("fishBtn"),
+  fishingHutBtn: $("fishingHutBtn"),
   fishingModal: $("fishingModal"),
   fishingModalClose: $("fishingModalClose"),
   fishingCodexBtn: $("fishingCodexBtn"),

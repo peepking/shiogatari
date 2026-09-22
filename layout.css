@@ -56,6 +56,58 @@ main .grid > * { min-width: 0; }
 .map-header { flex-wrap: wrap; }
 .workspace-actions .mode-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .workspace-actions .mode-actions .btn { flex: 1 1 110px; }
+
+/* 拠点の操作は目的別にまとめ、表示できる幅に合わせて列数を変える。 */
+.workspace-actions { container-type: inline-size; }
+.location-actions { display: grid; gap: 18px; }
+.location-action-group { min-width: 0; }
+.location-action-group:not(:has(button:not([hidden]))), .location-action-exit:not(:has(button:not([hidden]))) { display: none; }
+.location-action-group h3 { display: none; }
+.is-settlement .location-action-group h3, .journey-action-group h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0 0 9px; font-size: 11px; letter-spacing: .08em; color: #b6c9dd; font-weight: 600; }
+.location-action-group h3 span { font-size: 10px; letter-spacing: 0; font-weight: 400; color: var(--muted); }
+.location-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.location-actions .btn { display: flex; align-items: center; justify-content: flex-start; gap: 9px; width: 100%; min-width: 0; min-height: 48px; padding: 11px 10px; border: 1px solid #afc8e21c; border-radius: 10px; background: #b7cce609; color: #e3ecf7; font-size: 12px; font-weight: 600; line-height: 1.5; text-align: left; white-space: normal; transition: background .15s, border-color .15s; }
+.location-actions .btn::before { content: ""; width: 23px; height: 23px; flex: 0 0 23px; background: var(--action-icon, url('./image/ui/chart.svg')) center / contain no-repeat; opacity: .85; }
+.location-actions .btn:hover:not(:disabled) { background: #87cbb21a; border-color: #87cbb26b; }
+.location-actions .btn:active:not(:disabled) { background: #87cbb22b; }
+.location-actions .btn:focus-visible { outline: 2px solid var(--accent2); outline-offset: 3px; }
+.location-actions .btn:disabled { opacity: .42; cursor: not-allowed; }
+.location-action-note { margin: 8px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
+.location-action-exit { display: grid; gap: 7px; padding-top: 12px; border-top: 1px solid var(--line); }
+.location-action-exit .btn { justify-content: center; min-height: 44px; background: transparent; color: #b4c8dd; --action-icon: url('./image/ui/action-exit.svg'); }
+.location-action-grid #exploreInfo { grid-column: 1 / -1; }
+#tradeBtn { --action-icon: url('./image/ui/supplies.svg'); }
+#outfittingOpenBtn { --action-icon: url('./image/ui/ship.svg'); }
+#hireBtn { --action-icon: url('./image/ui/troops.svg'); }
+#fishBtn, #fishingHutBtn { --action-icon: url('./image/ui/action-fish.svg'); }
+#questOpenBtn { --action-icon: url('./image/ui/action-quest.svg'); }
+#bountyOpenBtn, #bountyVisitBtn, #oracleBattleBtn { --action-icon: url('./image/ui/arms.svg'); }
+#audienceBtn { --action-icon: url('./image/ui/fame.svg'); }
+#tideOpen, #oracleBtn, #modePrayBtn { --action-icon: url('./image/ui/faith.svg'); }
+#modeWaitBtn { --action-icon: url('./image/ui/action-wait.svg'); }
+.command-actions { padding-top: 15px; border-top: 1px solid var(--line); gap: 9px; }
+.command-actions-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 11px; letter-spacing: .08em; color: #b6c9dd; font-weight: 600; }
+.command-actions-title span { font-size: 10px; letter-spacing: 0; font-weight: 400; color: var(--muted); }
+#battlePrepInfo { justify-self: start; max-width: 100%; box-sizing: border-box; white-space: normal; line-height: 1.6; border: 0; border-left: 2px solid #b6c9dd55; border-radius: 0; background: transparent; padding: 4px 9px; color: #b6c9dd; }
+#battlePrepFightBtn, #warAttackRaidBtn, #warSkirmishBtn { --action-icon: url('./image/ui/arms.svg'); }
+#battlePrepRunBtn { --action-icon: url('./image/ui/action-exit.svg'); }
+#battlePrepPrayBtn { --action-icon: url('./image/ui/faith.svg'); }
+#battlePrepSurrenderBtn { --action-icon: url('./image/ui/action-surrender.svg'); }
+#warDefendRaidBtn, #warEscortBtn { --action-icon: url('./image/ui/action-shield.svg'); }
+#warSupplyFoodBtn { --action-icon: url('./image/ui/food.svg'); }
+#warBlockBtn { --action-icon: url('./image/ui/action-blockade.svg'); }
+.command-actions #battlePrepFightBtn { background: #2c426b; border-color: #698dc16b; }
+.command-actions #battlePrepPrayBtn { background: #23403f; border-color: #78beae4d; }
+.command-actions #battlePrepSurrenderBtn { background: #ad626210; border-color: #c5797947; color: #e0bcbc; }
+.command-actions #battlePrepFightBtn:hover:not(:disabled) { background: #365383; border-color: #87ade3; }
+.command-actions #battlePrepSurrenderBtn:hover:not(:disabled) { background: #ad62622b; border-color: #c57979; }
+@container (max-width: 290px) { .location-action-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 600px) {
+  .location-action-grid { grid-template-columns: minmax(0, 1fr); }
+  .location-actions { gap: 16px; }
+  .command-actions { gap: 9px; }
+  .location-actions .btn { min-height: 46px; padding: 10px 13px; gap: 12px; }
+}
 #questBody { max-height: calc(100dvh - 190px); }
 .quest-progress-card { padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
 .quest-card-meta, .quest-progress-label { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }

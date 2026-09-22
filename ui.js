@@ -71,6 +71,7 @@ import { absDay, manhattan } from "./questUtils.js";
 import {
   acceptNobleQuest,
   canReceiveOracle,
+  hasActiveOracle,
   completeHuntBattleQuest,
   completeNobleBattleQuest,
   completeOracleBattleQuest,
@@ -1091,6 +1092,12 @@ function updateModeControls(loc) {
   const prepActive = prep && !!state.pendingEncounter?.active;
   const battleQuestMeta = getBattleQuestAt(state.position);
   const visible = state.modeLabel === MODE_LABEL.IN_TOWN || state.modeLabel === MODE_LABEL.IN_VILLAGE;
+  document.getElementById("locationActions")?.classList.toggle("is-settlement", visible);
+  const oracleNote = document.getElementById("oracleUnavailable");
+  if (oracleNote) {
+    oracleNote.hidden = !visible || lockActions || canReceiveOracle();
+    oracleNote.textContent = hasActiveOracle() ? "神託：進行中の神託があります" : "神託：今季は授与済みです";
+  }
   const hereSettlement = getCurrentSettlement();
   const underSiege = hereSettlement ? isSettlementUnderSiege(hereSettlement.id) : false;
   const audienceCtx = getAudienceContext();
