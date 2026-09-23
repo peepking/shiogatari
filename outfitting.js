@@ -75,13 +75,13 @@ export function defendedDamage(power, def) { return Math.max(1, Math.round(power
 
 /**
  * 撃破された味方だけへ戦闘開始時の衛生兵効果を適用し、部隊ごとの損耗を四捨五入する。
- * 救護率は40%＋20%×有効人数^log10(2.5)。0人40%、1人60%、10人90%となり、
+ * 救護率は40%＋12%×有効人数^log10(2.5)。損耗率は0人60%、1人48%、10人30%となり、
  * 追加人数による伸びは徐々に小さくなる。設備を含む有効人数は0～10人に制限する。
  * @param {Array} units 結果部隊。 @param {number} medics 固定済み効果人数。 @returns {object} 損耗と損耗率。
  */
 export function outfittingBattleLosses(units, medics) {
   const count = Math.max(0, Math.min(10, Number(medics) || 0));
-  const lossProb = Math.max(0.1, 0.6 - 0.2 * Math.pow(count, Math.log10(2.5)));
+  const lossProb = Math.max(0.3, 0.6 - 0.12 * Math.pow(count, Math.log10(2.5)));
   const losses = {};
   for (const unit of units.filter(u => u.side === "ally" && u.hp <= 0)) {
     const lost = Math.round((unit.count || 0) * lossProb);

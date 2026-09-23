@@ -82,9 +82,9 @@ async function main() {
   assert.equal(outfittedStat(40, 4, "atk", effects), 42);
   const lostUnits = [{ side: "ally", type: "infantry", count: 10, hp: 0 }];
   s.troops.medic = 5;
-  assert.equal(outfittingBattleLosses(lostUnits, snapshotOutfitting(s).medics).losses.infantry, 2);
-  assert.ok(Math.abs(outfittingBattleLosses(lostUnits, snapshot.medics).lossProb - 0.1) < 1e-12);
-  for (const [medics, expected] of [[0, 0.6], [1, 0.4], [10, 0.1], [15, 0.1]]) {
+  assert.equal(outfittingBattleLosses(lostUnits, snapshotOutfitting(s).medics).losses.infantry, 4);
+  assert.ok(Math.abs(outfittingBattleLosses(lostUnits, snapshot.medics).lossProb - 0.3) < 1e-12);
+  for (const [medics, expected] of [[0, 0.6], [1, 0.48], [10, 0.3], [15, 0.3]]) {
     const result = outfittingBattleLosses(lostUnits, medics);
     assert.ok(Math.abs(result.lossProb - expected) < 1e-12);
     assert.equal(result.losses.infantry, Math.round(10 * expected));
