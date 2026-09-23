@@ -361,14 +361,19 @@
                 <button class="btn" id="warBlockBtn">補給封鎖</button>
                 </div>
               </section>
-              <div class="mode-actions" id="audienceRow" hidden>
+              <section class="location-actions command-actions" id="audienceRow" aria-labelledby="audienceActionsTitle" hidden>
+                <h3 class="command-actions-title" id="audienceActionsTitle">謁見での行動<span>貴族と話す</span></h3>
+                <div class="location-action-grid">
                 <button class="btn good" id="nationalPowerDonate" hidden>軍資金を提供</button>
                 <button class="btn" id="audienceBribeBtn">賄賂を渡す</button>
                 <button class="btn primary" id="audienceHonorBtn" hidden>仕官する</button>
                 <button class="btn good" id="audienceRequestBtn" hidden>貴族依頼受注</button>
                 <button class="btn bad" id="audienceResignBtn" hidden>勢力を去る</button>
+                </div>
+                <div class="location-action-exit">
                 <button class="btn ghost" id="audienceExitBtn">村/街に戻る</button>
-              </div>
+                </div>
+              </section>
             </div>
           </section>
 

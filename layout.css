@@ -86,6 +86,13 @@ main .grid > * { min-width: 0; }
 #tideOpen, #oracleBtn, #modePrayBtn { --action-icon: url('./image/ui/faith.svg'); }
 #modeWaitBtn { --action-icon: url('./image/ui/action-wait.svg'); }
 .command-actions { padding-top: 15px; border-top: 1px solid var(--line); gap: 9px; }
+#audienceRow { margin-top: 16px; }
+#nationalPowerDonate, #audienceBribeBtn { --action-icon: url('./image/ui/funds.svg'); }
+#audienceHonorBtn { --action-icon: url('./image/ui/fame.svg'); }
+#audienceRequestBtn { --action-icon: url('./image/ui/action-quest.svg'); }
+#audienceResignBtn { --action-icon: url('./image/ui/action-exit.svg'); }
+.command-actions #audienceResignBtn { background: #ad626210; border-color: #c5797947; color: #e0bcbc; }
+.command-actions #audienceResignBtn:hover:not(:disabled) { background: #ad62622b; border-color: #c57979; }
 .command-actions-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 11px; letter-spacing: .08em; color: #b6c9dd; font-weight: 600; }
 .command-actions-title span { font-size: 10px; letter-spacing: 0; font-weight: 400; color: var(--muted); }
 #battlePrepInfo { justify-self: start; max-width: 100%; box-sizing: border-box; white-space: normal; line-height: 1.6; border: 0; border-left: 2px solid #b6c9dd55; border-radius: 0; background: transparent; padding: 4px 9px; color: #b6c9dd; }
