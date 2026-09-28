@@ -53,6 +53,9 @@ main .grid > * { min-width: 0; }
 .workspace-map .map-block, .workspace-map .battle-block { border: 0; padding: 0; margin: 0; }
 .workspace-map .footer { display: none; }
 #mapCanvas, #battleCanvas { width: 100%; max-width: min(100%, calc(100dvh - 240px)); height: auto; aspect-ratio: 1; }
+.battle-viewport { max-width: 100%; overflow: auto; }
+.battle-viewport.is-zoomed { max-height: 70dvh; overscroll-behavior: contain; }
+#battleViewport.is-zoomed #battleCanvas { width: 720px; min-width: 720px; max-width: none; display: block; }
 .map-header { flex-wrap: wrap; }
 .workspace-actions .mode-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .workspace-actions .mode-actions .btn { flex: 1 1 110px; }

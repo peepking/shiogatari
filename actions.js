@@ -1,3 +1,4 @@
+import { buildGrandReserve } from "./grandBattle.js";
 import { PIRATE_CONFIG, PIRATE_IMAGES, pirateEnemyCount } from "./pirateConfig.js";
 import { enqueuePirateCheckpoint, enqueueSettlementCheckpoint, handlePirateCheckpoint, wantedFaction } from "./pirateEncounters.js";
 import { recordCrime } from "./playerWanted.js";
@@ -580,6 +581,11 @@ export function triggerWarAction(kind) {
   if (!q) {
     pushToast("依頼重複", "同じ前線で進行中の行動があります。", "info");
     return false;
+  }
+  if (kind === "grand") {
+    q.fixedEnemy = buildEnemyFormation("elite", q.enemyFactionId);
+    q.enemyReserve = buildGrandReserve(q.fixedEnemy.formation);
+    q.estimatedTotal = q.fixedEnemy.total;
   }
   pushLog("前線行動", `${q.title} を受注しました`, "-");
   pushToast("前線行動", `${q.title} を受注しました。`, "info");

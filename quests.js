@@ -934,16 +934,18 @@ export function genWarFrontQuest(settlement, front, role, kind) {
       desc: `${settlement.name} で停戦工作を行う。資金${costFunds}を支払い、時間を稼ぐ。`,
     };
   }
-  if (kind === "skirmish") {
+  if (kind === "skirmish" || kind === "grand") {
     const estimatedTotal = predictEnemyTotal("elite");
     return {
       ...common,
       type: QUEST_TYPES.WAR_SKIRMISH,
-      title: "小規模戦闘",
+      title: kind === "grand" ? "大会戦" : "小規模戦闘",
+      battleKind: kind === "grand" ? "grand" : "normal",
+      warScoreMultiplier: kind === "grand" ? 2 : 1,
       target: { ...settlement.coords },
       strength: "elite",
       estimatedTotal,
-      desc: `${settlement.name} 外縁で敵前衛を叩く。`,
+      desc: kind === "grand" ? `${settlement.name} 外縁で予備隊を伴う大会戦に挑む。戦況への影響は小規模戦闘の2倍。` : `${settlement.name} 外縁で敵前衛を叩く。`,
     };
   }
   if (kind === "supplyFood") {
@@ -1028,6 +1030,7 @@ export function addWarFrontQuest(settlement, front, role, kind, opts = {}) {
     defendRaid: QUEST_TYPES.WAR_DEFEND_RAID,
     attackRaid: QUEST_TYPES.WAR_ATTACK_RAID,
     skirmish: QUEST_TYPES.WAR_SKIRMISH,
+    grand: QUEST_TYPES.WAR_SKIRMISH,
     supplyFood: QUEST_TYPES.WAR_SUPPLY,
     escort: QUEST_TYPES.WAR_ESCORT,
     blockade: QUEST_TYPES.WAR_BLOCKADE,
@@ -1036,7 +1039,7 @@ export function addWarFrontQuest(settlement, front, role, kind, opts = {}) {
   const tgtType = typeMap[kind];
   if (!tgtType) return null;
   if (Array.isArray(front.usedKinds) && front.usedKinds.includes(kind)) return null;
-  const dup = state.quests.active.some((q) => q.frontSettlementId === settlement.id && q.type === tgtType);
+  const dup = state.quests.active.some((q) => q.frontSettlementId === settlement.id && q.type === tgtType && (q.battleKind === "grand") === (kind === "grand"));
   if (dup) return null;
   const q = genWarFrontQuest(settlement, front, role, kind);
   if (!q) return null;
@@ -1074,7 +1077,7 @@ function applyWarFrontScore(q, success) {
   };
   const base = q.scoreDelta != null ? q.scoreDelta : deltaMap[q.type] || 0;
   const delta = success ? base : base ? -Math.round(base * 2 / 3) : 0;
-  if (delta) addFrontScore(pf, q.enemyFactionId, q.frontSettlementId, delta, absDay(state), 0, 0);
+  if (delta) addFrontScore(pf, q.enemyFactionId, q.frontSettlementId, delta * (q.warScoreMultiplier || 1), absDay(state), 0, 0);
   if (delta) state.fame = Math.max(0, (state.fame || 0) + (success ? base : -Math.abs(base)));
 }
 

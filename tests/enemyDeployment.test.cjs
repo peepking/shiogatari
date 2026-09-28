@@ -3,6 +3,8 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const source = fs.readFileSync(require("node:path").join(__dirname, "../battle.js"), "utf8");
 const context = vm.createContext({
+  MORALE_RULES: { initial: 100 },
+  deploymentDepth: size => Math.max(2, Math.ceil(20 / size)),
   MAX_SQUADS: 20, MAX_UNIT_COUNT: 10, DECK_KEY: "deck",
   TROOP_STATS: {
     basic: { hp: 100, atk: 30, def: 20, spd: 3, terrain: { plain: 100, forest: 100 } },

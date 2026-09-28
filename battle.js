@@ -1,6 +1,12 @@
+import { REINFORCEMENT_RULES } from "./battleReinforcements.js";
+import { restoreGrandRoster } from "./grandBattle.js";
+import { selectBattleSize, deploymentDepth, battleCellAt, BATTLE_SIZE_RULES } from "./battleGeometry.js";
+import { takeBattlePersonnel, returnBattlePersonnel } from "./battlePersonnel.js";
+import { stepBattle, battleResult, createBattleRandom, BATTLE_RULES, battleAttackRate, COMBAT_TRAIT_RULES } from "./battleCore.js";
+import { isBattleActive, isBattleOnBoard, MORALE_RULES } from "./battleMorale.js";
 import { troopImage } from "./pirateConfig.js";
 import { faithEffects } from "./faith.js";
-import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL } from "./constants.js";
+import { BATTLE_RESULT_LABEL, MODE_LABEL } from "./constants.js";
 import { elements, pushLog, pushToast } from "./dom.js";
 import { getTerrainAt } from "./map.js";
 import { state } from "./state.js";
@@ -15,18 +21,15 @@ import { OUTFITTING_ITEMS } from "./expansionConfig.js";
 import { planBattleFormation } from "./battleFormation.js";
 import { orderRosterCandidates } from "./rosterPriority.js";
 
-const BASE_TICK_MS = 1000;
-const MAX_TICKS = 60;
-const FIXED_BATTLE_SIZE = 10;
-const SEARCH_RANGE = 4;
-const MELEE_SEARCH_RANGE = 3;
-const TARGET_SWITCH_RATIO = 1.5;
+const BASE_TICK_MS = BATTLE_RULES.tickMs;
+const MOVE_FX_TTL = BATTLE_RULES.moveFxTtl;
+const DEFAULT_BATTLE_SIZE = 10;
 const SPEED_OPTIONS = [1, 2, 4];
 const MAX_UNIT_COUNT = 10;
 const MAX_SQUADS = 20;
 const BATTLE_HP_MULTIPLIER = 3;
 let appliedRosterSignature = "";
-const ATTACK_FX_TTL = 2;
+const ATTACK_FX_TTL = BATTLE_RULES.attackFxTtl;
 const SUPPORT_FX = {
   harpoon: { color: "#70e8ff", width: 3.5, glow: 6, rays: 5, radius: 0.18 },
   ballista: { color: "#c49aff", width: 5.5, glow: 10, rays: 7, radius: 0.25 },
@@ -35,7 +38,6 @@ const SUPPORT_FX = {
   fire_grape_ballista: { color: "#ff7050", width: 2.5, glow: 6, rays: 6, radius: 0.17 },
   cannon: { color: "#ff9955", width: 8, glow: 16, rays: 10, radius: 0.34 },
 };
-const MOVE_FX_TTL = 3;
 const MOVE_COLORS = {
   ally: "#4ec7f0",
   enemy: "#f26b6b",
@@ -55,10 +57,10 @@ const DECK_KEY = "deck";
 function resizeBattleCanvas() {
   const canvas = elements.battleCanvas;
   if (!canvas) return;
-  const size = battleState.size || FIXED_BATTLE_SIZE;
+  const size = battleState.size || DEFAULT_BATTLE_SIZE;
   const dpr = window.devicePixelRatio || 1;
   const drawSize = canvas.clientWidth || 640;
-  const cellDisplay = Math.max(24, Math.floor(drawSize / size));
+  const cellDisplay = drawSize / size;
   canvas.width = Math.floor(drawSize * dpr);
   canvas.height = Math.floor(drawSize * dpr);
   if (!battleState.ctx) battleState.ctx = canvas.getContext("2d");
@@ -157,7 +159,29 @@ const battleState = {
 const battleRoster = {
   standby: {},
   sortie: [],
+  reserve: [],
 };
+
+/** @returns {Array} 現在編集する編成。 */
+function selectedRoster() {
+  return battleState.battleKind === "grand" && document.getElementById("rosterGroup")?.value === "reserve" ? battleRoster.reserve : battleRoster.sortie;
+}
+
+/** @returns {number} 現在編集する編成の上限。 */
+function selectedRosterLimit() { return selectedRoster() === battleRoster.reserve ? REINFORCEMENT_RULES.reserveLimit : MAX_SQUADS; }
+
+/** 大会戦の反映済み編成と盤面だけを保存する。戦闘途中の保存はしない。 */
+function saveGrandPreparation() {
+  if (battleState.battleKind !== "grand" || battleState.started || !state.pendingEncounter?.active) return;
+  if (appliedRosterSignature !== JSON.stringify([battleRoster.sortie, battleRoster.reserve])) return;
+  state.pendingEncounter.preparation = JSON.parse(JSON.stringify({
+    version: 2, size: battleState.size, seed: battleState.randomSeed, grid: battleState.grid,
+    roster: { sortie: battleRoster.sortie, reserve: battleRoster.reserve },
+    formation: battleState.allyFormation, strategy: battleStrategy,
+    customCoordinates: Object.fromEntries(Object.entries(battleState.customSlots).map(([id, index]) => [id, buildDeploySlots("ally", battleState.size)[index]])),
+  }));
+  saveGameToStorage({ battlePreparation: true });
+}
 
 const battleStrategy = {
   targetMode: "type", // "type" = 兵種準拠
@@ -165,21 +189,6 @@ const battleStrategy = {
   retreatThreshold: 30, // 退却判定に使う残HP割合
   chargeMode: "cavalry", // "cavalry" | "all" | "none"
   speed: 1,
-};
-
-const UNIT_TARGET_MODE = {
-  pirate_shield: "hp", pirate_spear: "hp", pirate_archer: "rear", raider_cavalry: "hp", pirate_axe: "hp", pirate_assault: "hp",
-  infantry: "hp",
-  marine: "hp",
-  shield: "hp",
-  cavalry: "hp",
-  cavalier: "hp",
-  halberd: "hp",
-  medic: "hp",
-  scout: "hp",
-  archer: "rear",
-  crossbow: "rear",
-  seaArcher: "rear",
 };
 
 /**
@@ -195,10 +204,11 @@ function applyRoster() {
 
 /**
  * 戦闘マップの一辺サイズを計算する。
+ * @param {number} squads 同時展開予定の多い側の部隊数。
  * @returns {number}
  */
-function calcBattleSize() {
-  return FIXED_BATTLE_SIZE;
+function calcBattleSize(squads) {
+  return selectBattleSize(squads);
 }
 
 /**
@@ -211,7 +221,7 @@ function buildBattleGrid(size, baseTerrain = "plain") {
   const weights = TERRAIN_WEIGHTS_BY_BASE[baseTerrain] || TERRAIN_WEIGHTS_BY_BASE.plain;
   const pickWeightedTerrain = () => {
     const total = weights.reduce((sum, item) => sum + item.weight, 0);
-    let roll = Math.random() * total;
+    let roll = battleState.fieldRandom() * total;
     for (const item of weights) {
       roll -= item.weight;
       if (roll <= 0) return item.key;
@@ -231,7 +241,7 @@ function buildBattleGrid(size, baseTerrain = "plain") {
   if (baseTerrain === "shoal" || baseTerrain === "sea") {
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
-        if (x < 2 || x >= size - 2) {
+        if (x < deploymentDepth(size) || x >= size - deploymentDepth(size)) {
           grid[y][x] = DECK_KEY;
         }
       }
@@ -273,6 +283,7 @@ function aggregateTroops() {
 function resetRoster() {
   battleRoster.standby = aggregateTroops();
   battleRoster.sortie = [];
+  battleRoster.reserve = [];
 }
 
 /**
@@ -311,38 +322,16 @@ function standbyAverageLevel(type) {
  * @returns {{count:number, level:number}}
  */
 function takeFromStandby(type, amount) {
-  const list = battleRoster.standby[type] || [];
-  let remain = Math.max(0, amount);
-  let used = 0;
-  let wSum = 0;
-  while (remain > 0 && list.length) {
-    const bucket = list[0];
-    const take = Math.min(bucket.count, remain);
-    used += take;
-    wSum += take * bucket.level;
-    bucket.count -= take;
-    if (bucket.count <= 0) list.shift();
-    remain -= take;
-  }
-  if (!list.length) delete battleRoster.standby[type];
-  if (used === 0) return { count: 0, level: 1 };
-  const avg = Math.round((wSum / used) * 10) / 10;
-  return { count: used, level: avg };
+  return takeBattlePersonnel(battleRoster.standby, type, amount);
 }
 
 /**
  * スタンバイに人数を戻す（レベル付）。
  * @param {string} type
- * @param {number} count
- * @param {number} level
+ * @param {object} sources 出撃元のレベル別人数。
  */
-function pushToStandby(type, count, level) {
-  if (count <= 0) return;
-  if (!battleRoster.standby[type]) battleRoster.standby[type] = [];
-  battleRoster.standby[type].push({ level, count });
-  battleRoster.standby[type] = battleRoster.standby[type]
-    .filter((e) => e.count > 0)
-    .sort((a, b) => b.level - a.level);
+function pushToStandby(type, sources) {
+  returnBattlePersonnel(battleRoster.standby, type, sources);
 }
 
 /**
@@ -383,11 +372,12 @@ function autoDeployRoster() {
     });
 
   battleRoster.sortie = [];
+  battleRoster.reserve = [];
   for (const chunk of orderRosterCandidates(chunks)) {
-    if (battleRoster.sortie.length >= MAX_SQUADS) break;
+    if (battleRoster.sortie.length + battleRoster.reserve.length >= MAX_SQUADS + (battleState.battleKind === "grand" ? REINFORCEMENT_RULES.reserveLimit : 0)) break;
     const pulled = takeFromStandby(chunk.type, chunk.size);
     if (pulled.count <= 0) continue;
-    battleRoster.sortie.push({ type: chunk.type, count: pulled.count, level: pulled.level });
+    (battleRoster.sortie.length < MAX_SQUADS ? battleRoster.sortie : battleRoster.reserve).push({ type: chunk.type, count: pulled.count, level: pulled.level, sources: pulled.sources });
   }
 }
 
@@ -408,10 +398,14 @@ function renderRosterUI() {
   const countEl = elements.rosterCount;
   const disableAll = battleState.started || !!battleState.result;
   document.getElementById("rosterOptions").disabled = disableAll;
-  const sortieCount = battleRoster.sortie.length;
-  if (countEl) countEl.textContent = `${sortieCount}/${MAX_SQUADS}`;
-  const sortieFull = sortieCount >= MAX_SQUADS;
-  if (elements.rosterApply) elements.rosterApply.disabled = sortieCount === 0 || disableAll;
+  const group = document.getElementById("rosterGroup");
+  if (group) { group.hidden = battleState.battleKind !== "grand"; group.disabled = disableAll; }
+  const list = selectedRoster();
+  const limit = selectedRosterLimit();
+  const sortieCount = list.length;
+  if (countEl) countEl.textContent = `${sortieCount}/${limit}`;
+  const sortieFull = sortieCount >= limit;
+  if (elements.rosterApply) elements.rosterApply.disabled = battleRoster.sortie.length === 0 || disableAll;
 
   // 合計人数を先に算出
   const totals = standbyTotals();
@@ -445,7 +439,7 @@ function renderRosterUI() {
   }
 
   if (sortieEl) {
-    const rows = battleRoster.sortie
+    const rows = list
       .map((s, idx) => {
         const stat = TROOP_STATS[s.type];
         const name = stat?.name || s.type;
@@ -453,7 +447,7 @@ function renderRosterUI() {
           <div class="roster-row" data-idx="${idx}" data-type="${s.type}" data-count="${s.count}">
             <div class="roster-line">
               <div><b>${name}</b></div>
-              <div class="tiny">出撃 ${s.count}人</div>
+              <div class="tiny">${list === battleRoster.reserve ? `予備 ${idx + 1}番` : "前衛"} ${s.count}人</div>
             </div>
             <button class="btn ghost" data-action="to-standby" ${disableAll ? "disabled" : ""}>待機</button>
           </div>
@@ -499,19 +493,17 @@ function applyStrategyFromUI() {
   setBattleSpeed(battleStrategy.speed);
   renderStrategyUI();
   pushToast("作戦を更新", "戦闘方針を反映しました", "info", 2500);
+  saveGrandPreparation();
 }
 
 /**
- * 配置可能な座標リスト（手前2列）を作成する。
+ * 20部隊を収容できる自軍側2〜3列の配置可能座標を作成する。
  * @param {"ally"|"enemy"} side
  * @param {number} size
  * @returns {{x:number,y:number}[]}
  */
 function buildDeploySlots(side, size) {
-  const frontCols =
-    side === "ally"
-      ? [0, 1]
-      : [size - 1, size - 2].filter((n) => n >= 0);
+  const frontCols = Array.from({ length: deploymentDepth(size) }, (_, index) => side === "ally" ? index : size - 1 - index);
   const slots = [];
   frontCols.forEach((x) => {
     for (let y = 0; y < size; y++) slots.push({ x, y });
@@ -546,14 +538,17 @@ function createUnit(type, side, index, pos, count, level = 1) {
     id: `${side}-${index + 1}`,
     side,
     type,
+    role: stat?.role || "melee",
+    traits: [...(stat?.traits || [])],
     name: stat?.name || type,
     count: unitCount,
     maxCount: MAX_UNIT_COUNT,
     level: lvlRounded,
+    morale: MORALE_RULES.initial,
     hp: hpVal,
     maxHp: hpVal,
-    atk: side === "ally" ? outfittedStat(atkVal, stat?.range || 1, "atk", battleState.outfitting.effects) : atkVal,
-    def: side === "ally" ? outfittedStat(defVal, stat?.range || 1, "def", battleState.outfitting.effects) : defVal,
+    atk: side === "ally" ? outfittedStat(atkVal, stat?.role || "melee", "atk", battleState.outfitting.effects) : atkVal,
+    def: side === "ally" ? outfittedStat(defVal, stat?.role || "melee", "def", battleState.outfitting.effects) : defVal,
     spd: stat?.spd ?? 3,
     range: stat?.range ?? 1,
     move: stat?.move ?? 1,
@@ -598,33 +593,15 @@ function createUnits(entries, side, size, slots) {
     const count = typeof entry === "string" ? MAX_UNIT_COUNT : entry?.count;
     const level = typeof entry === "string" ? 1 : entry?.level ?? 1;
     const pos = positions[i];
-    return createUnit(type, side, i, pos, count, level);
+    const unit = createUnit(type, side, i, pos, count, level);
+    unit.sources = side === "ally" ? { ...entry.sources } : { [Math.round(unit.level)]: unit.count };
+    unit.status = "active";
+    unit.deployedAt = 0;
+    return unit;
   });
 }
 
-/**
- * マンハッタン距離を返す。
- * @param {object} a
- * @param {object} b
- * @returns {number}
- */
-function manhattan(a, b) {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-}
 
-/**
- * ユニットがいるマスを占有表にまとめる。
- * @param {object[]} units
- * @returns {Set<string>}
- */
-function buildOccupied(units) {
-  const occupied = new Set();
-  units.forEach((u) => {
-    if (u.hp <= 0) return;
-    occupied.add(`${u.x},${u.y}`);
-  });
-  return occupied;
-}
 
 /**
  * 地形補正倍率を返す。
@@ -670,53 +647,6 @@ function calcStrength(unit) {
 }
 
 /**
- * 目標優先モードを取得する。
- * @param {object} unit
- * @returns {"hp"|"rear"|"strong"}
- */
-function targetMode(unit) {
-  if (unit.side === "ally") {
-    const mode = battleStrategy.targetMode;
-    if (mode && mode !== "type") return mode;
-  }
-  return UNIT_TARGET_MODE[unit.type] || "strong";
-}
-
-/**
- * モードに応じたターゲットを選ぶ。
- * @param {"hp"|"rear"|"strong"} mode
- * @param {object} unit
- * @param {object[]} enemies
- * @returns {object|null}
- */
-function pickTargetByMode(mode, unit, enemies) {
-  if (!enemies.length) return null;
-  if (mode === "rear") {
-    const ranged = enemies.filter((e) => e.range > 1);
-    if (ranged.length) {
-      return ranged.reduce((best, cur) => (cur.hp < (best?.hp ?? Infinity) ? cur : best), null);
-    }
-    // 遠隔がいない場合はHP優先にフォールバック
-    mode = "hp";
-  }
-  if (mode === "close") {
-    return enemies.reduce((best, cur) => {
-      if (!best) return cur;
-      return manhattan(unit, cur) < manhattan(unit, best) ? cur : best;
-    }, null);
-  }
-  if (mode === "hp") {
-    return enemies.reduce((best, cur) => (cur.hp < (best?.hp ?? Infinity) ? cur : best), null);
-  }
-  // strong
-  return enemies.reduce((best, cur) => {
-    if (!best) return cur;
-    return calcStrength(cur) > calcStrength(best) ? cur : best;
-  }, null);
-}
-
-
-/**
  * ユニットへスロットを割り当てる。
  * @param {object[]} units
  * @param {{x:number,y:number}[]} slots
@@ -757,18 +687,17 @@ function assignSlots(units, slots, customMap = {}, keepExisting = false) {
 }
 
 /**
- * 配置を適用する（味方は指定フォーメーション、敵はランダム）。
+ * 配置を適用する（味方は指定フォーメーション、敵はバランスの左右反転）。
  * @param {Record<string, number>} [customOverride]
  */
 function applyFormations(customOverride) {
-  const allies = battleState.units.filter((u) => u.side === "ally");
-  const enemies = battleState.units.filter((u) => u.side === "enemy");
+  const allies = battleState.units.filter((u) => u.side === "ally" && u.status !== "reserve");
+  const enemies = battleState.units.filter((u) => u.side === "enemy" && u.status !== "reserve");
   const allySlots = buildDeploySlots("ally", battleState.size);
   const enemySlotsBase = buildDeploySlots("enemy", battleState.size);
   if (!battleState.enemySlotOrder || battleState.enemySlotOrder.length !== enemySlotsBase.length) {
     battleState.enemySlotOrder = [...enemySlotsBase];
   }
-  const enemySlots = battleState.enemySlotOrder;
   const kind = battleState.allyFormation;
   const useCustom = kind === "custom";
   if (useCustom) {
@@ -779,7 +708,10 @@ function applyFormations(customOverride) {
       unit.y = y;
     });
   }
-  assignSlots(enemies, enemySlots);
+  planBattleFormation(enemies, "balance", battleState.size).forEach(({ unit, x, y }) => {
+    unit.x = battleState.size - 1 - x;
+    unit.y = y;
+  });
 }
 
 /**
@@ -795,7 +727,7 @@ function renderCustomEditor() {
  * @param {Record<string, number>} map
  */
 function applyCustomDraftToAllies(map) {
-  const allies = battleState.units.filter((u) => u.side === "ally");
+  const allies = battleState.units.filter((u) => u.side === "ally" && u.status !== "reserve");
   const slots = buildDeploySlots("ally", battleState.size);
   assignSlots(allies, slots, map, true);
 }
@@ -822,48 +754,6 @@ function syncFormationUI() {
 }
 
 /**
- * ターゲットを選択する。
- * @param {object} unit
- * @param {object[]} enemies
- * @returns {object|null}
- */
-function selectTarget(unit, enemies) {
-  const alive = enemies.filter((e) => e.hp > 0);
-  if (!alive.length) return null;
-  const isMelee = (unit.range ?? 1) <= 1;
-  const searchRange = isMelee ? MELEE_SEARCH_RANGE : SEARCH_RANGE;
-  // 敵側は「最も近い敵」を常に狙う（弱った味方への集中攻撃を緩和）
-  if (unit.side === "enemy") {
-    return alive.reduce((best, cur) => {
-      if (!best) return cur;
-      return manhattan(unit, cur) < manhattan(unit, best) ? cur : best;
-    }, null);
-  }
-  const current = alive.find((e) => e.id === unit.targetId);
-  const candidates = alive.filter((e) => manhattan(unit, e) <= searchRange);
-  const mode = targetMode(unit);
-  const modePick = pickTargetByMode(mode, unit, candidates);
-  const strongPick = pickTargetByMode("strong", unit, candidates);
-  const bestCandidate = modePick || strongPick;
-  if (current && manhattan(unit, current) <= searchRange) {
-    if (!bestCandidate) return current;
-    const currentStrength = calcStrength(current);
-    const nextStrength = calcStrength(bestCandidate);
-    // HP優先時はHPがより低いなら切替を許容
-    if (mode === "hp" && bestCandidate.hp < current.hp * 0.8) return bestCandidate;
-    // 後衛狙い時はrange>1の敵が優先対象なら切替
-    if (mode === "rear" && bestCandidate.range > 1 && current.range <= 1) return bestCandidate;
-    if (nextStrength < currentStrength * TARGET_SWITCH_RATIO) return current;
-  }
-  if (bestCandidate) return bestCandidate;
-  if (current) return current;
-  return alive.reduce((best, cur) => {
-    if (!best) return cur;
-    return manhattan(unit, cur) < manhattan(unit, best) ? cur : best;
-  }, null);
-}
-
-/**
  * 地形名を返す。
  * @param {string} key
  * @returns {string}
@@ -882,304 +772,25 @@ function getUnitById(id, allowDead = false) {
   if (!id) return null;
   const u = battleState.units.find((v) => v.id === id);
   if (!u) return null;
-  if (!allowDead && u.hp <= 0) return null;
+  if (!allowDead && !isBattleOnBoard(u)) return null;
   return u;
 }
 
 /**
- * 対象へ移動する。
- * @param {object} unit
- * @param {object} target
- * @param {Set<string>} occupied
- */
-function moveToward(unit, target, occupied, maxStep = unit.move) {
-  let { x, y } = unit;
-  const steps = Math.max(1, maxStep);
-  for (let step = 0; step < steps; step++) {
-    const dx = target.x - x;
-    const dy = target.y - y;
-    if (dx === 0 && dy === 0) break;
-    const primary = Math.abs(dx) >= Math.abs(dy);
-    const tries = primary
-      ? [
-          { x: x + Math.sign(dx), y },
-          { x, y: y + Math.sign(dy) },
-        ]
-      : [
-          { x, y: y + Math.sign(dy) },
-          { x: x + Math.sign(dx), y },
-        ];
-    let moved = false;
-    for (const next of tries) {
-      if (next.x < 0 || next.y < 0 || next.x >= battleState.size || next.y >= battleState.size)
-        continue;
-      const key = `${next.x},${next.y}`;
-      if (occupied.has(key)) continue;
-      occupied.delete(`${x},${y}`);
-      occupied.add(key);
-      x = next.x;
-      y = next.y;
-      moved = true;
-      break;
-    }
-    if (!moved) break;
-  }
-  unit.x = x;
-  unit.y = y;
-}
-
-/**
- * 移動軌跡を記録する。
- * @param {object} unit
- * @param {number} fromX
- * @param {number} fromY
- * @param {boolean} retreatMove
- */
-function recordMoveTrail(unit, fromX, fromY, retreatMove = false) {
-  if (unit.x === fromX && unit.y === fromY) return;
-  if (!battleState.moveFx) battleState.moveFx = [];
-  battleState.moveFx.push({
-    fromX,
-    fromY,
-    toX: unit.x,
-    toY: unit.y,
-    side: unit.side,
-    retreat: retreatMove,
-    ttl: MOVE_FX_TTL,
-  });
-  if (battleState.moveFx.length > 400) {
-    battleState.moveFx = battleState.moveFx.slice(-400);
-  }
-}
-
-/**
- * 有利地形へ1歩退避する（現在地より補正が高い隣接マスがあれば移動）。
- * @param {object} unit
- * @param {Set<string>} occupied
- * @returns {boolean} moved
- */
-function retreatToBetterTerrain(unit, occupied) {
-  const curRate = terrainRate(unit);
-  let best = null;
-  const dirs = [
-    { x: 1, y: 0 },
-    { x: -1, y: 0 },
-    { x: 0, y: 1 },
-    { x: 0, y: -1 },
-  ];
-  dirs.forEach((d) => {
-    const nx = unit.x + d.x;
-    const ny = unit.y + d.y;
-    if (nx < 0 || ny < 0 || nx >= battleState.size || ny >= battleState.size) return;
-    const key = `${nx},${ny}`;
-    if (occupied.has(key)) return;
-    const rate = (unit.terrain?.[battleState.grid[ny]?.[nx]] ?? 100) / 100;
-    if (rate > curRate && (!best || rate > best.rate)) {
-      best = { x: nx, y: ny, rate };
-    }
-  });
-  if (!best) return false;
-  occupied.delete(`${unit.x},${unit.y}`);
-  occupied.add(`${best.x},${best.y}`);
-  unit.x = best.x;
-  unit.y = best.y;
-  return true;
-}
-
-/**
- * 近接に張り付かれた遠隔ユニットが1歩下がる（射程を維持できる場合のみ）。
- * @param {object} unit
- * @param {object[]} enemies
- * @param {object|null} target
- * @param {Set<string>} occupied
- * @returns {boolean} moved
- */
-function kiteForRanged(unit, enemies, target, occupied) {
-  if ((unit.range ?? 1) <= 1) return false;
-  const melee = enemies.filter((e) => e.hp > 0 && (e.range ?? 1) <= 1);
-  if (!melee.length) return false;
-  const adjMelee = melee.filter((m) => manhattan(unit, m) === 1);
-  if (!adjMelee.length) return false;
-  const currentMin = Math.min(...adjMelee.map((m) => manhattan(unit, m)));
-  const dirs = [
-    { x: 1, y: 0 },
-    { x: -1, y: 0 },
-    { x: 0, y: 1 },
-    { x: 0, y: -1 },
-  ];
-  let best = null;
-  dirs.forEach((d) => {
-    const nx = unit.x + d.x;
-    const ny = unit.y + d.y;
-    if (nx < 0 || ny < 0 || nx >= battleState.size || ny >= battleState.size) return;
-    const key = `${nx},${ny}`;
-    if (occupied.has(key)) return;
-    const minMelee = Math.min(...melee.map((m) => Math.abs(nx - m.x) + Math.abs(ny - m.y)));
-    if (minMelee <= currentMin) return;
-    const distToTarget = target ? Math.abs(nx - target.x) + Math.abs(ny - target.y) : 0;
-    if (distToTarget > unit.range) return; // 射程を外すなら下がらない
-    if (!best || minMelee > best.min || distToTarget < best.dist) {
-      best = { x: nx, y: ny, min: minMelee, dist: distToTarget };
-    }
-  });
-  if (!best) return false;
-  occupied.delete(`${unit.x},${unit.y}`);
-  occupied.add(`${best.x},${best.y}`);
-  unit.x = best.x;
-  unit.y = best.y;
-  return true;
-}
-
-/**
- * 攻撃処理を実行する。
- * @param {object} attacker
- * @param {object} target
- */
-function applyAttack(attacker, target) {
-  const atk = effectiveAtk(attacker);
-  const def = effectiveDef(target);
-  const dmg = defendedDamage(atk, def);
-  target.hp = Math.max(0, target.hp - dmg);
-  // 攻撃エフェクトのため記録
-  battleState.attackFx.push({ from: attacker.id, to: target.id, ttl: ATTACK_FX_TTL });
-  battleState.attackFx.push({ from: attacker.id, to: target.id, ttl: ATTACK_FX_TTL, impact: true, crit: dmg > atk * 0.8 });
-  if (target.hp <= 0) {
-    addBattleLog(`${target.side === "ally" ? "味方" : "敵"}の${target.name}が撃破された。`);
-  }
-}
-
-/**
- * 通常行動、枠順の支援射撃、勝敗、制限時間の順に1ティックを処理する。
- * @param {number} dtMs 進行時間(ms)
- * @returns {boolean}
+ * 戦闘計算の通知を画面と戦後処理へ接続する。
+ * @param {number} dtMs 進行時間。
+ * @returns {boolean} 決着したか。
  */
 function advanceBattleTick(dtMs = BASE_TICK_MS) {
-  battleState.elapsedMs += dtMs;
-  battleState.tick += 1;
-  const alive = battleState.units.filter((u) => u.hp > 0);
-  const allies = alive.filter((u) => u.side === "ally");
-  const enemies = alive.filter((u) => u.side === "enemy");
-  const occupied = buildOccupied(alive);
-  // 攻撃エフェクトの寿命を減衰
-  battleState.attackFx = (battleState.attackFx || [])
-    .map((fx) => ({ ...fx, ttl: (fx.ttl || 0) - 1 }))
-    .filter((fx) => fx.ttl > 0);
-  // 移動軌跡の寿命を減衰
-  battleState.moveFx = (battleState.moveFx || [])
-    .map((fx) => ({ ...fx, ttl: (fx.ttl || 0) - 1 }))
-    .filter((fx) => fx.ttl > 0);
-
-  alive.forEach((unit) => {
-    if (unit.hp <= 0) return;
-    const startX = unit.x;
-    const startY = unit.y;
-    let movedTrail = false;
-    let retreatTrail = false;
-    unit.switchLock = Math.max(0, (unit.switchLock || 0) - 1);
-    unit.cooldown = Math.max(0, unit.cooldown - 1);
-    const enemyList = unit.side === "ally" ? enemies : allies;
-    if (!enemyList.length) return;
-    // 目標選択（切替クールダウン考慮）
-    let target = getUnitById(unit.targetId, true);
-    const needsRetarget =
-      !target || target.hp <= 0 || manhattan(unit, target) > (unit.range ?? 1) + 5 || unit.switchLock <= 0;
-    if (needsRetarget) {
-      target = selectTarget(unit, enemyList);
-      if (target && target.id !== unit.targetId) {
-        unit.switchLock = (unit.range ?? 1) > 1 ? 2 : 3; // 遠隔は短め、近接は長め
-      }
-    }
-    if (!target) return;
-    unit.targetId = target.id;
-    let dist = manhattan(unit, target);
-    const hpRatio = unit.hp / Math.max(1, unit.maxHp);
-    const retreatLimit =
-      unit.side === "ally"
-        ? battleStrategy.kiteMode === "retreat" || battleStrategy.kiteMode === "kite"
-          ? (battleStrategy.retreatThreshold || 30) / 100
-          : null
-        : 0.3;
-    if (retreatLimit && hpRatio < retreatLimit) {
-      // 有利地形へ退避を試みる
-      const moved = retreatToBetterTerrain(unit, occupied);
-      if (moved) {
-        movedTrail = true;
-        retreatTrail = true;
-        recordMoveTrail(unit, startX, startY, true);
-        return;
-      }
-    }
-    let cappedMove = unit.move;
-    const chargeMode = battleStrategy.chargeMode || "cavalry";
-    const restrictCharge =
-      unit.side === "ally" &&
-      unit.move > 1 &&
-      (chargeMode === "all" || (chargeMode === "cavalry" && ["cavalry", "cavalier", "raider_cavalry"].includes(unit.type)));
-    if (restrictCharge) {
-      const friends = (unit.side === "ally" ? allies : enemies).filter(
-        (u) => u.hp > 0 && u.id !== unit.id
-      );
-      const friendMin = friends.length
-        ? Math.min(...friends.map((f) => manhattan(f, target)))
-        : Infinity;
-      // 目標への距離が味方先頭より2マス以上近い場合は突っ込みを抑制
-      if (Number.isFinite(friendMin) && dist <= friendMin - 2) {
-        cappedMove = 1;
-      }
-    }
-    const allowKite =
-      unit.range > 1 &&
-      (unit.side !== "ally" || battleStrategy.kiteMode !== "none");
-    if (allowKite) {
-      const kited = kiteForRanged(unit, enemyList, target, occupied);
-      if (kited) {
-        movedTrail = true;
-        retreatTrail = true;
-        // 位置が変わるので距離を更新
-        const distAfter = manhattan(unit, target);
-        dist = distAfter;
-        if (distAfter <= unit.range) {
-          if (unit.cooldown <= 0) {
-            applyAttack(unit, target);
-            unit.cooldown = unit.spd;
-          }
-          recordMoveTrail(unit, startX, startY, true);
-          return;
-        }
-      }
-    }
-    dist = manhattan(unit, target);
-    if (dist <= unit.range) {
-      if (unit.cooldown > 0) return;
-      applyAttack(unit, target);
-      unit.cooldown = unit.spd;
-      if (movedTrail) recordMoveTrail(unit, startX, startY, retreatTrail);
-      return;
-    }
-    const beforeX = unit.x;
-    const beforeY = unit.y;
-    moveToward(unit, target, occupied, cappedMove);
-    if (unit.x !== beforeX || unit.y !== beforeY) {
-      movedTrail = true;
-    }
-    if (movedTrail) recordMoveTrail(unit, startX, startY, retreatTrail);
-  });
-
-  for (const shot of fireOutfitting(battleState.tick, battleState.units, battleState.outfitting.effects.attacks, effectiveDef)) {
-    battleState.attackFx.push({ support: true, equipmentId: shot.id, to: shot.target.id, ttl: ATTACK_FX_TTL, impact: true });
-    addBattleLog(`${OUTFITTING_ITEMS[shot.id].name}: 敵の${shot.target.name}に${shot.damage}ダメージ${shot.target.hp <= 0 ? "・撃破" : ""}。`);
-  }
-  const nextAllies = alive.filter((u) => u.hp > 0 && u.side === "ally");
-  const nextEnemies = alive.filter((u) => u.hp > 0 && u.side === "enemy");
-  if (!nextAllies.length || !nextEnemies.length) {
-    finishBattle();
-    return true;
-  }
-  if (battleState.tick >= MAX_TICKS) {
-    finishBattle(true);
-    return true;
-  }
-  return false;
+  const result = stepBattle(battleState, battleStrategy, {
+    defendedDamage, fireOutfitting,
+    equipmentNames: Object.fromEntries(Object.entries(OUTFITTING_ITEMS).map(([id, item]) => [id, item.name])),
+    random: battleState.random || Math.random,
+  }, dtMs);
+  (battleState.observations ||= []).push(result.observation);
+  result.logs.forEach(addBattleLog);
+  if (result.ended) finishBattle(result.forceDraw);
+  return result.ended;
 }
 
 /**
@@ -1188,20 +799,10 @@ function advanceBattleTick(dtMs = BASE_TICK_MS) {
  */
 function finishBattle(forceDraw = false) {
   pauseBattle();
-  const alive = battleState.units.filter((u) => u.hp > 0);
-  const allies = alive.filter((u) => u.side === "ally");
-  const enemies = alive.filter((u) => u.side === "enemy");
-  let result = BATTLE_RESULT.DRAW;
-  if (!forceDraw) {
-    if (allies.length && !enemies.length) result = BATTLE_RESULT.WIN;
-    else if (!allies.length && enemies.length) result = BATTLE_RESULT.LOSE;
-  }
-  if (result === BATTLE_RESULT.DRAW && (allies.length || enemies.length)) {
-    const allyHp = allies.reduce((sum, u) => sum + u.hp, 0);
-    const enemyHp = enemies.reduce((sum, u) => sum + u.hp, 0);
-    if (allyHp > enemyHp) result = BATTLE_RESULT.WIN;
-    else if (enemyHp > allyHp) result = BATTLE_RESULT.LOSE;
-  }
+  const alive = battleState.units.filter(isBattleOnBoard);
+  const allies = alive.filter((u) => isBattleActive(u) && u.side === "ally");
+  const enemies = alive.filter((u) => isBattleActive(u) && u.side === "enemy");
+  const result = battleResult(battleState.units, forceDraw, battleState);
   battleState.resultCode = result;
   const resultLabel = BATTLE_RESULT_LABEL[result] || "";
   battleState.result = resultLabel;
@@ -1219,6 +820,7 @@ function finishBattle(forceDraw = false) {
       enemyFormation: battleState.enemyFormation,
       enemyFactionId: battleState.enemyFactionId,
       resultLabel,
+      resultReason: battleState.resultReason,
       supportMedics: battleState.outfitting.medics,
       faithRescue: battleState.faithRescue || 0,
     });
@@ -1243,15 +845,23 @@ function addBattleLog(text) {
  * @returns {void}
  */
 function updateBattleStatus() {
-  const alive = battleState.units.filter((u) => u.hp > 0);
-  const allies = alive.filter((u) => u.side === "ally");
-  const enemies = alive.filter((u) => u.side === "enemy");
+  const alive = battleState.units.filter(isBattleOnBoard);
+  const allies = alive.filter((u) => isBattleActive(u) && u.side === "ally");
+  const enemies = alive.filter((u) => isBattleActive(u) && u.side === "enemy");
   if (elements.battleTime)
     elements.battleTime.textContent = `${Math.floor((battleState.elapsedMs || 0) / 1000)}s`;
   if (elements.battleCount) {
     const allyCount = allies.reduce((sum, unit) => sum + unit.count, 0);
     const enemyCount = enemies.reduce((sum, unit) => sum + unit.count, 0);
-    elements.battleCount.textContent = `味方 ${allyCount}人（${allies.length}部隊） / 敵 ${enemyCount}人（${enemies.length}部隊）`;
+    const routing = side => alive.filter(unit => unit.side === side && unit.status === "routing").length;
+    elements.battleCount.textContent = `味方 ${allyCount}人（${allies.length}部隊・敗走${routing("ally")}） / 敵 ${enemyCount}人（${enemies.length}部隊・敗走${routing("enemy")}）`;
+    if (battleState.battleKind === "grand") {
+      const reserveText = side => {
+        const units = battleState.units.filter(unit => unit.side === side && unit.status === "reserve");
+        return `${units.reduce((sum, unit) => sum + unit.count, 0)}人・${units.length}部隊`;
+      };
+      elements.battleCount.textContent += ` / 予備: 味方${reserveText("ally")}・敵${reserveText("enemy")}`;
+    }
   }
   if (elements.battleStatus) {
     const status = battleState.result
@@ -1295,7 +905,12 @@ function updateBattleInfo() {
   const terrainKey = battleState.grid[unit.y]?.[unit.x];
   const terrName = getTerrainName(terrainKey);
   const terrRate = terrainRate(unit);
-  const effAtk = fmt(effectiveAtk(unit));
+  const effAtk = fmt(effectiveAtk(unit) * battleAttackRate(unit, battleState.units));
+  const traits = [];
+  if (unit.traits?.includes("steadfast")) traits.push(`堅固（士気低下−${Math.round((1 - MORALE_RULES.steadfast) * 100)}%）`);
+  if (unit.traits?.includes("antiCavalry")) traits.push(`対騎兵（騎乗への通常ダメージ＋${Math.round((COMBAT_TRAIT_RULES.antiCavalry - 1) * 100)}%）`);
+  if (unit.traits?.includes("mounted")) traits.push("騎乗");
+  if (unit.role === "ranged") traits.push(`敵近接隣接時ATK−${Math.round((1 - COMBAT_TRAIT_RULES.rangedEngaged) * 100)}%`);
   const effDef = fmt(effectiveDef(unit));
   const hpText = `${fmt(unit.hp)}/${fmt(unit.maxHp)}`;
   const side = unit.side === "ally" ? "味方" : "敵";
@@ -1305,7 +920,9 @@ function updateBattleInfo() {
   infoEl.innerHTML = `
     <div><b>${side}</b> ${unit.name} x${unit.count ?? MAX_UNIT_COUNT} / Lv${(unit.level ?? 1).toFixed(1)}</div>
     <div>${status}</div>
+    <div>士気 ${Math.round(unit.morale ?? 100)} / ${unit.status === "routing" ? "敗走中" : unit.status === "escaped" ? "退出済み" : unit.shaken ? "動揺" : "平静"}・圧力 ${(unit.pressure || 0).toFixed(1)}</div>
     <div>射程 ${unit.range} / 移動 ${unit.move}</div>
+    ${traits.length ? `<div>特性 ${traits.join("・")}</div>` : ""}
     <div>座標 ${coords}</div>
     <div>地形 ${terrName} (補正 x${Math.round(terrRate * 100) / 100})</div>
   `;
@@ -1329,7 +946,7 @@ function updateSpeedUI() {
  */
 function updateBattleButtons() {
   const hasSortie = battleRoster.sortie.length > 0;
-  const applied = appliedRosterSignature === JSON.stringify(battleRoster.sortie);
+  const applied = appliedRosterSignature === JSON.stringify([battleRoster.sortie, battleRoster.reserve]);
   if (elements.battleStartBtn)
     elements.battleStartBtn.disabled = battleState.running || !!battleState.result || battleState.editing || !hasSortie || !applied;
   if (elements.battlePauseBtn) elements.battlePauseBtn.disabled = !battleState.running;
@@ -1381,12 +998,12 @@ function renderBattle() {
     ctx.lineTo(drawSize, pos);
     ctx.stroke();
   }
-  const alive = battleState.units.filter((u) => u.hp > 0);
+  const alive = battleState.units.filter(isBattleOnBoard);
   if (battleState.editing) {
     ctx.strokeStyle = "rgba(255, 122, 122, 0.9)";
     ctx.lineWidth = 2;
-    // 左から2マスと3マスの間の線を赤く
-    const lineX = 2 * cell;
+    // 初期配置領域の境界を赤く示す。
+    const lineX = deploymentDepth(battleState.size) * cell;
     ctx.beginPath();
     ctx.moveTo(lineX, 0);
     ctx.lineTo(lineX, canvas.height);
@@ -1434,6 +1051,11 @@ function renderBattle() {
     ctx.fillRect(centerX - barW / 2, centerY + cell * 0.22, barW, barH);
     ctx.fillStyle = "#7dffb2";
     ctx.fillRect(centerX - barW / 2, centerY + cell * 0.22, barW * hpRatio, barH);
+    if (unit.status === "routing" || unit.shaken) {
+      ctx.fillStyle = unit.status === "routing" ? "#ffb47a" : "#ffe08a";
+      ctx.font = `bold ${Math.max(10, Math.round(cell * 0.24))}px sans-serif`;
+      ctx.fillText(unit.status === "routing" ? "逃" : "!", centerX + cell * 0.2, centerY - cell * 0.2);
+    }
   });
 
   // 攻撃エフェクト（ライン + スパーク）
@@ -1508,7 +1130,7 @@ function renderBattle() {
  */
 function findUnitAt(x, y) {
   return (
-    battleState.units.find((u) => u.hp > 0 && u.x === x && u.y === y) || null
+    battleState.units.find((u) => isBattleOnBoard(u) && u.x === x && u.y === y) || null
   );
 }
 
@@ -1559,10 +1181,19 @@ function pauseBattle() {
  */
 function resetBattle(useDraft = false, preserveField = true) {
   pauseBattle();
+  if (!preserveField || battleState.randomSeed == null) {
+    battleState.randomSeed = Math.floor(Math.random() * 4294967296);
+  }
+  battleState.random = createBattleRandom(battleState.randomSeed);
+  battleState.fieldRandom = createBattleRandom(battleState.randomSeed ^ 0x9e3779b9);
   battleState.outfitting = snapshotOutfitting(state);
   const equipmentLabel = document.getElementById("battleOutfitting");
   if (equipmentLabel) equipmentLabel.textContent = `艤装: ${battleState.outfitting.equipped.map(id => OUTFITTING_ITEMS[id].name).join(" / ") || "なし"}`;
+  battleState.observations = [];
   battleState.tick = 0;
+  battleState.moraleShocks = [];
+  battleState.entryBlockedTicks = { ally: 0, enemy: 0 };
+  battleState.resultReason = null;
   battleState.elapsedMs = 0;
   battleState.resultCode = "";
   battleState.result = "";
@@ -1577,7 +1208,7 @@ function resetBattle(useDraft = false, preserveField = true) {
     ? battleState.enemyFormation
     : DEFAULT_ENEMY_FORMATION;
   const maxUnits = Math.max(allies.length, enemiesFormation.length);
-  battleState.size = calcBattleSize(maxUnits);
+  if (!preserveField || !battleState.grid?.length) battleState.size = calcBattleSize(maxUnits);
   if (!preserveField || !battleState.grid || !battleState.grid.length) {
     battleState.grid = buildBattleGrid(battleState.size, battleState.battleTerrain || "plain");
     battleState.enemySlotOrder = null;
@@ -1585,7 +1216,7 @@ function resetBattle(useDraft = false, preserveField = true) {
   const allySlots = buildDeploySlots("ally", battleState.size);
   const enemySlotsBase = buildDeploySlots("enemy", battleState.size);
   if (!battleState.enemySlotOrder || battleState.enemySlotOrder.length !== enemySlotsBase.length) {
-    battleState.enemySlotOrder = [...enemySlotsBase].sort(() => Math.random() - 0.5);
+    battleState.enemySlotOrder = [...enemySlotsBase].sort(() => battleState.fieldRandom() - 0.5);
   }
   const enemySlots = battleState.enemySlotOrder;
   battleState.units = [
@@ -1599,9 +1230,19 @@ function resetBattle(useDraft = false, preserveField = true) {
         ? battleState.customSlots
         : undefined;
   applyFormations(override);
+  if (battleState.battleKind === "grand") {
+    for (const [side, entries] of [["ally", battleRoster.reserve], ["enemy", state.pendingEncounter?.enemyReserve || []]]) {
+      entries.slice(0, REINFORCEMENT_RULES.reserveLimit).forEach((entry, index) => {
+        const unit = createUnit(entry.type, side, index, { x: -1, y: -1 }, entry.count, entry.level);
+        unit.id = `${side}-reserve-${index}`; unit.status = "reserve"; unit.deployedAt = null;
+        unit.sources = side === "ally" ? { ...entry.sources } : { [Math.round(unit.level)]: unit.count };
+        battleState.units.push(unit);
+      });
+    }
+  }
   battleState.logLines = [];
   battleState.ready = true;
-  appliedRosterSignature = JSON.stringify(battleRoster.sortie);
+  appliedRosterSignature = JSON.stringify([battleRoster.sortie, battleRoster.reserve]);
   syncFormationUI();
   updateSpeedUI();
   updateBattleStatus();
@@ -1609,6 +1250,7 @@ function resetBattle(useDraft = false, preserveField = true) {
   addBattleLog("配置を初期化しました。");
   renderBattle();
   updateBattleInfo();
+  saveGrandPreparation();
 }
 
 /**
@@ -1676,6 +1318,11 @@ function scheduleBattleTimer() {
  */
 function openBattleView() {
   battleState.started = false;
+  battleState.battleKind = state.pendingEncounter?.battleKind === "grand" ? "grand" : "normal";
+  const saved = battleState.battleKind === "grand" ? state.pendingEncounter?.preparation : null;
+  if (saved?.strategy) Object.assign(battleStrategy, saved.strategy);
+  const group = document.getElementById("rosterGroup");
+  if (group) group.value = "sortie";
   if (elements.mapBlock) elements.mapBlock.hidden = true;
   if (elements.battleBlock) elements.battleBlock.hidden = false;
   if (elements.battleInfoCard) elements.battleInfoCard.hidden = false;
@@ -1690,10 +1337,25 @@ function openBattleView() {
   battleState.result = "";
   battleState.editing = false;
   resetRoster();
-  autoDeployRoster();
+  const restored = saved ? restoreGrandRoster(battleRoster.standby, saved.roster) : null;
+  if (restored) Object.assign(battleRoster, restored);
+  else autoDeployRoster();
+  const validField = saved && Number.isInteger(saved.seed) && Array.isArray(saved.grid)
+    && BATTLE_SIZE_RULES.some(rule => rule.size === saved.grid.length)
+    && saved.grid.every(row => Array.isArray(row) && row.length === saved.grid.length);
+  if (validField) {
+    battleState.size = saved.grid.length;
+    battleState.randomSeed = saved.seed; battleState.grid = saved.grid;
+    battleState.allyFormation = saved.formation || "balance";
+    const slots = buildDeploySlots("ally", battleState.size);
+    battleState.customSlots = saved.customCoordinates
+      ? Object.fromEntries(Object.entries(saved.customCoordinates).map(([id, point]) => [id, slots.findIndex(slot => slot.x === point?.x && slot.y === point?.y)]).filter(([, index]) => index >= 0))
+      : saved.customSlots || {};
+  }
   renderRosterUI();
   renderStrategyUI();
-  resetBattle(false, false);
+  if (!validField) { battleState.customSlots = {}; battleState.customSlotsDraft = {}; }
+  resetBattle(false, Boolean(validField && restored));
 }
 
 /**
@@ -1726,6 +1388,15 @@ export function wireBattleUI() {
   resizeBattleCanvas();
   resetRoster();
   renderRosterUI();
+  document.getElementById("rosterGroup")?.addEventListener("change", renderRosterUI);
+  document.getElementById("battleZoomBtn")?.addEventListener("click", () => {
+    const viewport = document.getElementById("battleViewport");
+    const zoomed = viewport.classList.toggle("is-zoomed");
+    const button = document.getElementById("battleZoomBtn");
+    button.textContent = zoomed ? "全体表示" : "拡大表示";
+    button.setAttribute("aria-pressed", String(zoomed));
+    renderBattle();
+  });
   elements.battleBtn?.addEventListener("click", openBattleView);
   elements.battleBackBtn?.addEventListener("click", closeBattleView);
   elements.battleStartBtn?.addEventListener("click", startBattle);
@@ -1766,7 +1437,7 @@ export function wireBattleUI() {
     const type = row.getAttribute("data-type");
     const max = Number(row.getAttribute("data-count") || 0);
     if (!type || max <= 0) return;
-    if (battleRoster.sortie.length >= MAX_SQUADS) return;
+    if (selectedRoster().length >= selectedRosterLimit()) return;
     const slider = row.querySelector(".roster-slider");
     const number = row.querySelector(".roster-number");
     const val = Math.max(
@@ -1780,7 +1451,7 @@ export function wireBattleUI() {
     if (val <= 0) return;
     const pulled = takeFromStandby(type, val);
     if (pulled.count > 0) {
-      battleRoster.sortie.push({ type, count: pulled.count, level: pulled.level });
+      selectedRoster().push({ type, count: pulled.count, level: pulled.level, sources: pulled.sources });
     }
     renderRosterUI();
   });
@@ -1790,10 +1461,10 @@ export function wireBattleUI() {
     const row = btn.closest(".roster-row");
     if (!row) return;
     const idx = Number(row.getAttribute("data-idx"));
-    if (!Number.isFinite(idx) || idx < 0 || idx >= battleRoster.sortie.length) return;
-    const entry = battleRoster.sortie[idx];
-    battleRoster.sortie.splice(idx, 1);
-    pushToStandby(entry.type, entry.count, entry.level || 1);
+    if (!Number.isFinite(idx) || idx < 0 || idx >= selectedRoster().length) return;
+    const entry = selectedRoster()[idx];
+    selectedRoster().splice(idx, 1);
+    pushToStandby(entry.type, entry.sources);
     renderRosterUI();
   });
   elements.rosterAuto?.addEventListener("click", () => {
@@ -1822,10 +1493,7 @@ export function wireBattleUI() {
   elements.battleCanvas.addEventListener("mousemove", (e) => {
     const canvas = elements.battleCanvas;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const gx = Math.floor(((e.clientX - rect.left) * scaleX) / (canvas.width / battleState.size));
-    const gy = Math.floor(((e.clientY - rect.top) * scaleY) / (canvas.height / battleState.size));
+    const { x: gx, y: gy } = battleCellAt(e.clientX, e.clientY, rect, battleState.size);
     const unit = findUnitAt(gx, gy);
     battleState.hoveredId = unit?.id || null;
     updateBattleInfo();
@@ -1840,13 +1508,10 @@ export function wireBattleUI() {
     if (battleState.editing) {
       const canvas = elements.battleCanvas;
       const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const gx = Math.floor(((e.clientX - rect.left) * scaleX) / (canvas.width / battleState.size));
-      const gy = Math.floor(((e.clientY - rect.top) * scaleY) / (canvas.height / battleState.size));
+      const { x: gx, y: gy } = battleCellAt(e.clientX, e.clientY, rect, battleState.size);
       const slots = buildDeploySlots("ally", battleState.size);
       const slotIdx = slots.findIndex((s) => s.x === gx && s.y === gy);
-      const allies = battleState.units.filter((u) => u.side === "ally");
+      const allies = battleState.units.filter((u) => u.side === "ally" && u.status !== "reserve");
       const unitAt = allies.find((u) => u.x === gx && u.y === gy);
       // 選択していない状態で味方をクリックすると選択
       if (!battleState.selectedUnitId) {
@@ -1903,10 +1568,7 @@ export function wireBattleUI() {
     }
     const canvas = elements.battleCanvas;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const gx = Math.floor(((e.clientX - rect.left) * scaleX) / (canvas.width / battleState.size));
-    const gy = Math.floor(((e.clientY - rect.top) * scaleY) / (canvas.height / battleState.size));
+    const { x: gx, y: gy } = battleCellAt(e.clientX, e.clientY, rect, battleState.size);
     const unit = findUnitAt(gx, gy);
     const sel = getUnitById(unit?.id);
     battleState.selectedId = sel?.hp > 0 ? sel.id : null;

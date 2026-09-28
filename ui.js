@@ -1,5 +1,6 @@
+import { settleBattlePersonnel, wasBattleDeployed } from "./battlePersonnel.js";
 import { renderTideControl } from "./tideAllianceUI.js";
-import { activateAfterglow, rescueFaithLosses } from "./faith.js";
+import { activateAfterglow } from "./faith.js";
 import { wireFaithDetails, renderFaithDetails } from "./faithUI.js";
 import { modalDeadlineText } from "./questDeadlines.js";
 import {
@@ -97,9 +98,7 @@ import {
 } from "./supplies.js";
 import {
   addTroops,
-  applyTroopLosses,
   formatTroopDisplay,
-  levelUpTroopsRandom,
   renderTroopModal,
   totalTroops,
   TROOP_STATS,
@@ -639,7 +638,7 @@ function calcLosses(meta) {
  */
 function calcCaptures(meta, eventTag = null) {
   const units = meta?.units || [];
-  const enemies = units.filter((u) => u.side === "enemy" && u.hp <= 0);
+  const enemies = units.filter((u) => u.side === "enemy" && wasBattleDeployed(u) && u.hp <= 0);
   const bonusRolls = BONUS_CAPTURE_EVENT_TAGS.has(eventTag) ? 3 : 0;
   const captured = {};
   enemies.forEach((u) => {
@@ -665,7 +664,7 @@ function calcCaptures(meta, eventTag = null) {
 function killedEnemyCount(meta) {
   const units = meta?.units || [];
   return units
-    .filter((u) => u.side === "enemy" && u.hp <= 0)
+    .filter((u) => u.side === "enemy" && wasBattleDeployed(u) && u.hp <= 0)
     .reduce((s, u) => s + Math.max(0, Math.round(u.count || 0)), 0);
 }
 
@@ -678,7 +677,9 @@ function killedEnemyCount(meta) {
 function processBattleOutcome(resultCode, meta) {
   const pending = state.pendingEncounter || {};
   if (pending.bountyId != null && !state.bounties?.active.some(s => s.id === pending.bountyId)) { clearBattlePrep(true); syncUI(); return; }
-  const enemyTotal = pending.enemyTotal || enemyTotalEstimate(meta);
+  const enemyTotal = Array.isArray(meta?.units)
+    ? meta.units.filter(u => u.side === "enemy" && wasBattleDeployed(u)).reduce((sum, u) => sum + u.count, 0)
+    : pending.enemyTotal || enemyTotalEstimate(meta);
   const fameDelta = Math.floor(enemyTotal / 4);
   const isStrong = meta?.enemyFormation?.some((e) => (e.level || 1) > 1) || pending.strength === "elite";
   const enemyFactionId = meta?.enemyFactionId || pending.enemyFactionId || "pirates";
@@ -687,10 +688,18 @@ function processBattleOutcome(resultCode, meta) {
   const eventContext = meta?.eventContext || pending.eventContext || null;
   const resultLabel = BATTLE_RESULT_LABEL[resultCode] || resultCode;
   const isWin = resultCode === BATTLE_RESULT.WIN;
+  const isDraw = resultCode === BATTLE_RESULT.DRAW;
   const questId = pending.questId;
   const questType = pending.questType;
   const questFightIdx = pending.questFightIdx ?? null;
   const summary = [];
+  const reasonLabel = { rout: "敗走による継戦不能", elimination: "戦闘可能な部隊の全滅", blockade: "増援入口の封鎖による継戦不能", timeout: "時間切れ" }[meta?.resultReason];
+  if (reasonLabel) summary.push(`決着: ${reasonLabel}`);
+  const personnel = settleBattlePersonnel(state.troops, meta?.units || [], {
+    lossProb: calcLosses(meta).lossProb, rescue: meta?.faithRescue || 0,
+    won: isWin, upgrades: killedEnemyCount(meta),
+  });
+
   /**
    * 行商人関連の追加戦利品を付与する。資金は敵規模に±10%の乱数補正を掛ける。
    * 襲撃時は原料3回・加工品2回を重複ありで抽選し、表示用IDとログ本文を別に返す。
@@ -775,7 +784,7 @@ function processBattleOutcome(resultCode, meta) {
           })
           .join(" / ") || "なし";
       summary.push({ text: `物資: ${matText}`, label: "物資", resources: Object.entries(pickedMap).map(([id, qty]) => ({ id, label: SUPPLY_ITEMS.find(item => item.id === id)?.name || id, value: `+${qty}` })) });
-    } else {
+    } else if (!isDraw) {
       state.fame = Math.max(0, state.fame - fameDelta);
       const lossRate = 0.45 + Math.random() * 0.1; // 45-55%
       const fundsLost = Math.round(state.funds * lossRate);
@@ -793,8 +802,8 @@ function processBattleOutcome(resultCode, meta) {
       if (foodLost) summary.push({ text: `食料 -${foodLost}`, icon: "food" });
     }
 
-    const losses = rescueFaithLosses(calcLosses(meta).losses, meta?.faithRescue || 0, isWin);
-    applyTroopLosses(losses);
+    state.troops = personnel.troops;
+    const losses = personnel.losses;
     const lossEntries = Object.entries(losses || {}).map(([t, n]) => `${t} -${n}`);
     const lossText = lossEntries
       .map((txt) => {
@@ -825,16 +834,14 @@ function processBattleOutcome(resultCode, meta) {
       summary.push({ text: `獲得船: ${awardShips(state)}`, icon: "ships" });
     }
 
-    const killed = killedEnemyCount(meta);
-    const promotions = [];
-    const leveled = levelUpTroopsRandom(killed, promotions);
+    const { promotions, leveled } = personnel;
     if (leveled > 0) {
       summary.push({ text: `練度上昇: 延べ${leveled}回（同じ兵の複数昇級を含む）`, icon: "troops" });
       promotions.forEach(({ type, from, to, count }) => {
         summary.push({ text: `${TROOP_STATS[type]?.name || type} Lv${from} → Lv${to}: ${count}人`, icon: type });
       });
     }
-    if (questId) {
+    if (questId && !isDraw) {
       if (questType === QUEST_TYPES.ORACLE_HUNT || questType === QUEST_TYPES.ORACLE_ELITE) {
         if (isWin) {
           const ok = completeOracleBattleQuest(questId);
@@ -871,67 +878,81 @@ function processBattleOutcome(resultCode, meta) {
         summary.push(isWin ? "前線行動: 戦闘達成" : "前線行動: 戦闘失敗");
       }
     }
-    if (eventTag === "merchant_attack") {
-      const fid = eventContext?.enemyFactionId || enemyFactionId;
-      const setId = eventContext?.settlementId;
-      const nobId = eventContext?.nobleId;
-      if (isWin) {
-        addWarScore(playerFactionId, fid, -4, absDay(state), 0, 0);
-        summary.push("行商人襲撃: 戦況悪化");
-        const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "raid");
-        if (extras.texts.length) summary.push({ text: `追加戦利品: ${extras.texts.join(" / ")}`, label: "追加戦利品", resources: extras.resources });
-      } else {
-        addWarScore(playerFactionId, fid, 3, absDay(state), 0, 0);
-        summary.push("行商人襲撃失敗: 戦況悪化");
-      }
-      if (setId && fid) adjustSupport(setId, fid, -1);
-      if (nobId) adjustNobleFavor(nobId, -1);
-    } else if (eventTag === "merchant_rescue_help") {
-      const fid = eventContext?.beneficiaryFactionId || eventContext?.enemyFactionId || enemyFactionId;
-      const setId = eventContext?.settlementId;
-      const nobId = eventContext?.nobleId;
-      if (isWin) {
-        addWarScore(playerFactionId, fid, 6, absDay(state), 0, 0);
-        if (setId && fid) adjustSupport(setId, fid, 3);
-        if (nobId) adjustNobleFavor(nobId, 4);
-        summary.push("救助成功: 支持/好感度が上昇");
-        const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "help");
-        if (extras.texts.length) summary.push({ text: `追加報酬: ${extras.texts.join(" / ")}`, label: "追加報酬", resources: extras.resources });
-      } else {
-        addWarScore(playerFactionId, fid, -4, absDay(state), 0, 0);
+    if (!isDraw) {
+      if (eventTag === "merchant_attack") {
+        const fid = eventContext?.enemyFactionId || enemyFactionId;
+        const setId = eventContext?.settlementId;
+        const nobId = eventContext?.nobleId;
+        if (isWin) {
+          addWarScore(playerFactionId, fid, -4, absDay(state), 0, 0);
+          summary.push("行商人襲撃: 戦況悪化");
+          const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "raid");
+          if (extras.texts.length) summary.push({ text: `追加戦利品: ${extras.texts.join(" / ")}`, label: "追加戦利品", resources: extras.resources });
+        } else {
+          addWarScore(playerFactionId, fid, 3, absDay(state), 0, 0);
+          summary.push("行商人襲撃失敗: 戦況悪化");
+        }
         if (setId && fid) adjustSupport(setId, fid, -1);
-        summary.push("救助失敗: 支持が低下");
-      }
-    } else if (eventTag === "merchant_rescue_raid") {
-      const fid = eventContext?.enemyFactionId || enemyFactionId;
-      const setId = eventContext?.settlementId;
-      const nobId = eventContext?.nobleId;
-      if (isWin) {
-        addWarScore(playerFactionId, fid, -6, absDay(state), 0, 0);
+        if (nobId) adjustNobleFavor(nobId, -1);
+      } else if (eventTag === "merchant_rescue_help") {
+        const fid = eventContext?.beneficiaryFactionId || eventContext?.enemyFactionId || enemyFactionId;
+        const setId = eventContext?.settlementId;
+        const nobId = eventContext?.nobleId;
+        if (isWin) {
+          addWarScore(playerFactionId, fid, 6, absDay(state), 0, 0);
+          if (setId && fid) adjustSupport(setId, fid, 3);
+          if (nobId) adjustNobleFavor(nobId, 4);
+          summary.push("救助成功: 支持/好感度が上昇");
+          const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "help");
+          if (extras.texts.length) summary.push({ text: `追加報酬: ${extras.texts.join(" / ")}`, label: "追加報酬", resources: extras.resources });
+        } else {
+          addWarScore(playerFactionId, fid, -4, absDay(state), 0, 0);
+          if (setId && fid) adjustSupport(setId, fid, -1);
+          summary.push("救助失敗: 支持が低下");
+        }
+      } else if (eventTag === "merchant_rescue_raid") {
+        const fid = eventContext?.enemyFactionId || enemyFactionId;
+        const setId = eventContext?.settlementId;
+        const nobId = eventContext?.nobleId;
+        if (isWin) {
+          addWarScore(playerFactionId, fid, -6, absDay(state), 0, 0);
+          summary.push("難民襲撃: 戦況悪化");
+          const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "raid");
+          if (extras.texts.length) summary.push({ text: `追加戦利品: ${extras.texts.join(" / ")}`, label: "追加戦利品", resources: extras.resources });
+        } else {
+          addWarScore(playerFactionId, fid, 4, absDay(state), 0, 0);
+          summary.push("難民襲撃失敗: 戦況悪化");
+        }
+        if (setId && fid) adjustSupport(setId, fid, -2);
+        if (nobId) adjustNobleFavor(nobId, -2);
+      } else if (eventTag === "smuggle_raid") {
+        addWarScore(playerFactionId, enemyFactionId, -3, absDay(state), 0, 0);
+        summary.push("密輸襲撃: 戦況悪化");
+      } else if (eventTag === "refugee_raid") {
+        addWarScore(playerFactionId, enemyFactionId, -4, absDay(state), 0, 0);
         summary.push("難民襲撃: 戦況悪化");
-        const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "raid");
-        if (extras.texts.length) summary.push({ text: `追加戦利品: ${extras.texts.join(" / ")}`, label: "追加戦利品", resources: extras.resources });
-      } else {
-        addWarScore(playerFactionId, fid, 4, absDay(state), 0, 0);
-        summary.push("難民襲撃失敗: 戦況悪化");
+      } else if (eventTag === "checkpoint_force") {
+        addWarScore(playerFactionId, enemyFactionId, -2, absDay(state), 0, 0);
+        summary.push("検問突破: 戦況に影響");
+      } else if (eventTag === "omen_attack") {
+        addWarScore(playerFactionId, enemyFactionId, -1, absDay(state), 0, 0);
+        summary.push("災いの襲撃を退けました");
+      } else if (eventTag === "wreck_attack") {
+        addWarScore(playerFactionId, enemyFactionId, -1, absDay(state), 0, 0);
+        summary.push("廃船の罠: 戦況に影響");
       }
-      if (setId && fid) adjustSupport(setId, fid, -2);
-      if (nobId) adjustNobleFavor(nobId, -2);
-    } else if (eventTag === "smuggle_raid") {
-      addWarScore(playerFactionId, enemyFactionId, -3, absDay(state), 0, 0);
-      summary.push("密輸襲撃: 戦況悪化");
-    } else if (eventTag === "refugee_raid") {
-      addWarScore(playerFactionId, enemyFactionId, -4, absDay(state), 0, 0);
-      summary.push("難民襲撃: 戦況悪化");
-    } else if (eventTag === "checkpoint_force") {
-      addWarScore(playerFactionId, enemyFactionId, -2, absDay(state), 0, 0);
-      summary.push("検問突破: 戦況に影響");
-    } else if (eventTag === "omen_attack") {
-      addWarScore(playerFactionId, enemyFactionId, -1, absDay(state), 0, 0);
-      summary.push("災いの襲撃を退けました");
-    } else if (eventTag === "wreck_attack") {
-      addWarScore(playerFactionId, enemyFactionId, -1, absDay(state), 0, 0);
-      summary.push("廃船の罠: 戦況に影響");
+    }
+    // 引き分けでは依頼と固定敵を維持し、イベントの勝敗補正も与えない。
+    if (isDraw) {
+      summary.push("引き分け: 勝利報酬・敗北による資金や物資の喪失はありません。");
+      if (questId) {
+        const quest = state.quests?.active?.find(quest => quest.id === questId);
+        if (quest) {
+          quest.fixedEnemyByFight ||= {};
+          quest.fixedEnemyByFight[questFightIdx ?? 0] = { formation: pending.enemyFormation,
+            total: (pending.enemyFormation || []).reduce((sum, unit) => sum + unit.count, 0), strength: pending.strength };
+        }
+      }
     }
     // 依頼以外の海賊遭遇に勝利したら、近傍拠点の貴族好感度をわずかに上げる
     if (pending.bountyId == null && !questId && enemyFactionId === "pirates" && isWin) {
@@ -1011,11 +1032,13 @@ function startOracleBattle() {
   const quest = meta.quest;
   const force = meta.strength === "elite" ? "elite" : "normal";
   const enemyFactionId = meta.enemyFactionId || quest.enemyFactionId || "pirates";
-  const { formation, total, strength } = quest.fixedEnemy || buildEnemyFormation(force, enemyFactionId);
+  const { formation, total, strength } = quest.fixedEnemyByFight?.[meta.fightIdx ?? 0] || quest.fixedEnemy || buildEnemyFormation(force, enemyFactionId);
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
   state.pendingEncounter = {
     active: true,
     enemyFormation: formation,
+    battleKind: quest.battleKind || "normal",
+    enemyReserve: quest.enemyReserve || [],
     enemyTotal: total,
     strength,
     terrain,
@@ -1161,6 +1184,7 @@ function updateModeControls(loc) {
       elements.warDefendRaidBtn,
       elements.warAttackRaidBtn,
       elements.warSkirmishBtn,
+      elements.warGrandBtn,
       elements.warSupplyFoodBtn,
       elements.warEscortBtn,
       elements.warBlockBtn,
@@ -1188,6 +1212,7 @@ function updateModeControls(loc) {
       elements.warBlockBtn.hidden = !isAttacking;
       elements.warBlockBtn.disabled = elements.warBlockBtn.disabled || !isAttacking || usedKinds.has("blockade");
     }
+    if (elements.warGrandBtn) elements.warGrandBtn.disabled = elements.warGrandBtn.disabled || !war || usedKinds.has("grand");
     if (elements.warSkirmishBtn) {
       elements.warSkirmishBtn.disabled = elements.warSkirmishBtn.disabled || !war || usedKinds.has("skirmish");
     }
@@ -1660,6 +1685,7 @@ function bindAudienceControls() {
 function bindWarControls() {
   elements.warDefendRaidBtn?.addEventListener("click", () => triggerWarAction("defendRaid"));
   elements.warAttackRaidBtn?.addEventListener("click", () => triggerWarAction("attackRaid"));
+  elements.warGrandBtn?.addEventListener("click", () => triggerWarAction("grand"));
   elements.warSkirmishBtn?.addEventListener("click", () => triggerWarAction("skirmish"));
   elements.warSupplyFoodBtn?.addEventListener("click", () => triggerWarAction("supplyFood"));
   elements.warEscortBtn?.addEventListener("click", () => triggerWarAction("escort"));

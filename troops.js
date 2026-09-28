@@ -9,15 +9,15 @@ import { fleetEffects } from "./fleet.js";
 /** @type {number} 基本の部隊上限 */
 export const BASE_TROOP_CAP = 30;
 
-/** @type {object} 兵種の定義 */
+/** @type {object} 兵種の能力と役割。traitsの戦闘補正は後続段階で適用する。 */
 export const TROOP_STATS = {
-  pirate_shield: { name: "海賊盾兵", hire: 150, upkeep: 3, basePower: 120, hp: 130, atk: 32, def: 30, spd: 3, range: 1, move: 1, terrain: { plain: 110, deck: 110, forest: 100, mountain: 100, shoal: 110, sea: 120 }, level: 1 },
-  pirate_spear: { name: "海賊槍兵", hire: 170, upkeep: 3, basePower: 130, hp: 100, atk: 40, def: 14, spd: 3, range: 2, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
-  pirate_archer: { name: "海賊弓兵", hire: 150, upkeep: 3, basePower: 120, hp: 80, atk: 35, def: 6, spd: 3, range: 4, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
-  raider_cavalry: { name: "略奪騎兵", hire: 250, upkeep: 5, basePower: 150, hp: 150, atk: 32, def: 25, spd: 3, range: 1, move: 2, terrain: { plain: 130, deck: 130, forest: 100, mountain: 100, shoal: 100, sea: 110 }, level: 1 },
-  pirate_axe: { name: "海賊斧兵", hire: 150, upkeep: 3, basePower: 120, hp: 120, atk: 50, def: 12, spd: 3, range: 1, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
-  pirate_assault: { name: "海賊突撃兵", hire: 200, upkeep: 4, basePower: 130, hp: 120, atk: 40, def: 12, spd: 2, range: 1, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
-  infantry: {
+  pirate_shield: { role: "melee", traits: ["steadfast"], name: "海賊盾兵", hire: 150, upkeep: 3, basePower: 120, hp: 130, atk: 32, def: 30, spd: 3, range: 1, move: 1, terrain: { plain: 110, deck: 110, forest: 100, mountain: 100, shoal: 110, sea: 120 }, level: 1 },
+  pirate_spear: { role: "melee", traits: ["antiCavalry"], name: "海賊槍兵", hire: 170, upkeep: 3, basePower: 130, hp: 100, atk: 40, def: 14, spd: 3, range: 2, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
+  pirate_archer: { role: "ranged", traits: [], name: "海賊弓兵", hire: 150, upkeep: 3, basePower: 120, hp: 80, atk: 35, def: 6, spd: 3, range: 4, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
+  raider_cavalry: { role: "melee", traits: ["mounted"], name: "略奪騎兵", hire: 250, upkeep: 5, basePower: 150, hp: 150, atk: 32, def: 25, spd: 3, range: 1, move: 2, terrain: { plain: 130, deck: 130, forest: 100, mountain: 100, shoal: 100, sea: 110 }, level: 1 },
+  pirate_axe: { role: "melee", traits: [], name: "海賊斧兵", hire: 150, upkeep: 3, basePower: 120, hp: 120, atk: 50, def: 12, spd: 3, range: 1, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
+  pirate_assault: { role: "melee", traits: [], name: "海賊突撃兵", hire: 200, upkeep: 4, basePower: 130, hp: 120, atk: 40, def: 12, spd: 2, range: 1, move: 1, terrain: { plain: 120, deck: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 }, level: 1 },
+  infantry: { role: "melee", traits: [],
     name: "歩兵",
     hire: 100,
     upkeep: 2,
@@ -31,7 +31,7 @@ export const TROOP_STATS = {
     terrain: { plain: 110, forest: 120, mountain: 120, shoal: 100, sea: 100 },
     level: 1,
   },
-  halberd: {
+  halberd: { role: "melee", traits: ["antiCavalry"],
     name: "鉾槍兵",
     hire: 170,
     upkeep: 3,
@@ -45,7 +45,7 @@ export const TROOP_STATS = {
     terrain: { plain: 110, forest: 120, mountain: 120, shoal: 100, sea: 100 },
     level: 1,
   },
-  medic: {
+  medic: { role: "support", traits: [],
     name: "衛生兵",
     hire: 200,
     upkeep: 4,
@@ -59,7 +59,7 @@ export const TROOP_STATS = {
     terrain: { plain: 100, forest: 100, mountain: 100, shoal: 100, sea: 100 },
     level: 1,
   },
-  marine: {
+  marine: { role: "melee", traits: [],
     name: "海兵",
     hire: 150,
     upkeep: 3,
@@ -73,7 +73,7 @@ export const TROOP_STATS = {
     terrain: { plain: 120, forest: 100, mountain: 100, shoal: 120, sea: 130 },
     level: 1,
   },
-  archer: {
+  archer: { role: "ranged", traits: [],
     name: "弓兵",
     hire: 150,
     upkeep: 3,
@@ -87,7 +87,7 @@ export const TROOP_STATS = {
     terrain: { plain: 100, forest: 120, mountain: 130, shoal: 100, sea: 100 },
     level: 1,
   },
-  scout: {
+  scout: { role: "support", traits: [],
     name: "斥候",
     hire: 100,
     upkeep: 2,
@@ -101,7 +101,7 @@ export const TROOP_STATS = {
     terrain: { plain: 100, forest: 100, mountain: 100, shoal: 100, sea: 100 },
     level: 1,
   },
-  cavalry: {
+  cavalry: { role: "melee", traits: ["mounted"],
     name: "騎兵",
     hire: 200,
     upkeep: 4,
@@ -115,7 +115,7 @@ export const TROOP_STATS = {
     terrain: { plain: 150, forest: 100, mountain: 120, shoal: 80, sea: 80 },
     level: 1,
   },
-  cavalier: {
+  cavalier: { role: "melee", traits: ["mounted"],
     name: "重騎兵",
     hire: 250,
     upkeep: 5,
@@ -129,7 +129,7 @@ export const TROOP_STATS = {
     terrain: { plain: 150, forest: 100, mountain: 120, shoal: 80, sea: 80 },
     level: 1,
   },
-  crossbow: {
+  crossbow: { role: "ranged", traits: [],
     name: "弩兵",
     hire: 180,
     upkeep: 3,
@@ -143,7 +143,7 @@ export const TROOP_STATS = {
     terrain: { plain: 110, forest: 120, mountain: 120, shoal: 100, sea: 100 },
     level: 1,
   },
-  shield: {
+  shield: { role: "melee", traits: ["steadfast"],
     name: "盾兵",
     hire: 150,
     upkeep: 3,
@@ -157,7 +157,7 @@ export const TROOP_STATS = {
     terrain: { plain: 110, forest: 130, mountain: 130, shoal: 90, sea: 90 },
     level: 1,
   },
-  seaArcher: {
+  seaArcher: { role: "ranged", traits: [],
     name: "海弓兵",
     hire: 170,
     upkeep: 3,

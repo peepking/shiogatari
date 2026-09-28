@@ -90,10 +90,11 @@ export function outfittingBattleLosses(units, medics) {
   return { losses, lossProb };
 }
 
-/** @param {number} base 補正前能力。 @param {number} range 射程。 @param {string} ability 能力。 @param {object} effects 設備効果。 @returns {number} 加算倍率を一度だけ適用した能力。 */
-export function outfittedStat(base, range, ability, effects) {
-  const key = `${range > 1 ? "ranged" : "melee"}${ability === "atk" ? "Atk" : "Def"}`;
-  return Math.max(1, Math.floor(base * (100 + effects[ability] + effects[key]) / 100));
+/** @param {number} base 補正前能力。 @param {string} role 近接・射撃・支援の役割。 @param {string} ability 能力。 @param {object} effects 設備効果。 @returns {number} 加算倍率を一度だけ適用した能力。 */
+export function outfittedStat(base, role, ability, effects) {
+  const key = `${role}${ability === "atk" ? "Atk" : "Def"}`;
+  const roleBonus = role === "melee" || role === "ranged" ? effects[key] || 0 : 0;
+  return Math.max(1, Math.floor(base * (100 + (effects[ability] || 0) + roleBonus) / 100));
 }
 
 /**

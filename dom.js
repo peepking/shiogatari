@@ -28,6 +28,7 @@ export const elements = {
   warDefendRaidBtn: $("warDefendRaidBtn"),
   warAttackRaidBtn: $("warAttackRaidBtn"),
   warSkirmishBtn: $("warSkirmishBtn"),
+  warGrandBtn: $("warGrandBtn"),
   warSupplyFoodBtn: $("warSupplyFoodBtn"),
   warEscortBtn: $("warEscortBtn"),
   warBlockBtn: $("warBlockBtn"),

@@ -51,19 +51,21 @@ function simpleHash(str) {
 
 /**
  * ゲーム状態をローカルストレージへ保存する。
- * 原則として戦闘準備・戦闘中は保存しない。固定賞金首・犯罪成立後だけ準備を保存し、再読込で同じ敵へ戻す。
- * @param {{battleComplete?:boolean}} [options] 戦後処理完了の指定
+ * 原則として戦闘準備・戦闘中は保存しない。固定賞金首・犯罪成立後・大会戦の反映済み準備は保存できる。
+ * @param {{battleComplete?:boolean,battlePreparation?:boolean}} [options] 戦後処理完了・大会戦準備の指定
  * @returns {boolean}
  */
-export function saveGameToStorage({ battleComplete = false } = {}) {
+export function saveGameToStorage({ battleComplete = false, battlePreparation = false } = {}) {
   const unsafe = state.modeLabel === MODE_LABEL.BATTLE || state.pendingEncounter?.active;
   const fixedPreparation = state.modeLabel === MODE_LABEL.PREP && state.pendingEncounter?.active && (state.pendingEncounter.bountyId != null || state.pendingEncounter.crimeRecorded === true);
-  if (!battleComplete && unsafe && !fixedPreparation) return false;
+  const grandPreparation = battlePreparation && state.pendingEncounter?.active && state.pendingEncounter.battleKind === "grand" && state.pendingEncounter.preparation;
+  if (!battleComplete && unsafe && !fixedPreparation && !grandPreparation) return false;
   try {
     const data = {
       state: {
         ...state,
         logs: normalizeLogs(state.logs),
+        ...(grandPreparation ? { modeLabel: MODE_LABEL.PREP } : {}),
         ...(battleComplete ? {
           modeLabel: MODE_LABEL.NORMAL,
           pendingEncounter: { ...state.pendingEncounter, active: false },

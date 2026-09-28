@@ -82,6 +82,7 @@
             <div class="hd">
               <div class="row flex-wrap">
                 <span class="pill">出撃編成</span>
+                <select id="rosterGroup" class="battle-select" aria-label="編成する部隊" hidden><option value="sortie">前衛</option><option value="reserve">予備隊（一覧順に投入）</option></select>
                 <span class="pill">出撃: <b id="rosterCount">0/20</b></span>
                 <div class="row roster-actions gap-6">
                   <button class="btn" id="rosterAuto">自動配備</button>
@@ -251,9 +252,12 @@
               <div class="battle-block mb-12" id="battleBlock" hidden>
                 <div class="battle-header">
                   <span class="tiny">戦闘シミュレーション</span>
+                  <button class="btn ghost" id="battleZoomBtn" aria-pressed="false">拡大表示</button>
                   <button class="btn ghost" id="battleBackBtn">地図に戻る</button>
                 </div>
-                <canvas id="battleCanvas" width="640" height="640" aria-label="戦闘マップ"></canvas>
+                <div class="battle-viewport" id="battleViewport" tabindex="0" aria-label="戦場。拡大時はスクロールできます">
+                  <canvas id="battleCanvas" width="640" height="640" aria-label="戦闘マップ"></canvas>
+                </div>
                 <div class="tiny" id="battleOutfitting"></div>
                 <div class="battle-panel">
                   <div class="row flex-wrap">
@@ -356,6 +360,7 @@
                 <button class="btn" id="warDefendRaidBtn">補給路迎撃</button>
                 <button class="btn" id="warAttackRaidBtn">補給路襲撃</button>
                 <button class="btn" id="warSkirmishBtn">小規模戦闘</button>
+                <button class="btn" id="warGrandBtn">大会戦</button>
                 <button class="btn" id="warSupplyFoodBtn">食糧搬入</button>
                 <button class="btn" id="warEscortBtn">輸送護衛</button>
                 <button class="btn" id="warBlockBtn">補給封鎖</button>

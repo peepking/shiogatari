@@ -248,6 +248,15 @@ async function main() {
   state.modeLabel = "prep"; state.pendingEncounter = { active: true, crimeRecorded: true, enemyTotal: 40 };
   assert.equal(saveGameToStorage(), true);
   resetState(); assert.equal(loadGameFromStorage(), true); assert.equal(state.pendingEncounter.crimeRecorded, true);
+  state.modeLabel = "battle";
+  state.pendingEncounter = { active: true, battleKind: "grand", enemyReserve: [{ type: "infantry", count: 10, level: 3 }],
+    preparation: { version: 1, seed: 123, grid: [["plain"]], roster: { sortie: [], reserve: [] } } };
+  assert.equal(saveGameToStorage(), false, "大会戦も戦闘中の通常保存は禁止");
+  assert.equal(saveGameToStorage({ battlePreparation: true }), true);
+  resetState(); assert.equal(loadGameFromStorage(), true);
+  assert.equal(state.modeLabel, "prep");
+  assert.equal(state.pendingEncounter.preparation.seed, 123);
+  assert.equal(state.pendingEncounter.enemyReserve[0].level, 3);
   state.modeLabel = "normal"; state.pendingEncounter = { active: false };
   saved = validSave;
   failWrite = true;

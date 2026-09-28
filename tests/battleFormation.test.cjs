@@ -38,6 +38,10 @@ async function main() {
   assert.equal(width("defense"), 7);
   const biased = units.slice(0, 3).concat(units.slice(5));
   assert.notDeepEqual(plan(biased, "balance", 10).map(p => p.y), plan(biased, "assault", 10).map(p => p.y));
+  const roles = plan([{ id: "medic", role: "support", range: 1 }, { id: "halberd", role: "melee", range: 2 },
+    { id: "archer", role: "ranged", range: 4 }], "balance", 10);
+  assert.equal(roles.find(p => p.unit.id === "medic").x, 0);
+  assert.equal(roles.find(p => p.unit.id === "halberd").x, 1);
   console.log("フォーメーションの射程・配置幅・全人数構成: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

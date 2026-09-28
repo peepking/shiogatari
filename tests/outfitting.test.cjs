@@ -78,8 +78,9 @@ async function main() {
     assert.equal(fireOutfitting(interval*2,finishing,area,()=>0,noRandom).length,0);
   }
   const effects = { atk: 5, def: 5, meleeAtk: 10, meleeDef: 10, rangedAtk: 0, rangedDef: 0 };
-  assert.equal(outfittedStat(40, 1, "atk", effects), 46); assert.equal(outfittedStat(46, 1, "def", effects), 52);
-  assert.equal(outfittedStat(40, 4, "atk", effects), 42);
+  assert.equal(outfittedStat(40, "melee", "atk", effects), 46); assert.equal(outfittedStat(46, "melee", "def", effects), 52);
+  assert.equal(outfittedStat(40, "ranged", "atk", effects), 42);
+  assert.equal(outfittedStat(40, "support", "atk", effects), 42, "支援兵は全兵種効果のみ受ける");
   const lostUnits = [{ side: "ally", type: "infantry", count: 10, hp: 0 }];
   s.troops.medic = 5;
   assert.equal(outfittingBattleLosses(lostUnits, snapshotOutfitting(s).medics).losses.infantry, 4);

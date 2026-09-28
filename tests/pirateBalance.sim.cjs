@@ -19,11 +19,17 @@ function createSimulation() {
     clamp: (n,min,max) => Math.max(min,Math.min(max,n)),
     outfittedStat: n => n,
     fireOutfitting: () => [],
+    OUTFITTING_ITEMS: {},
   });
   vm.runInContext(`const TROOP_STATS = ${troops[1]};`, context);
   const damage = read("outfitting.js").match(/export function defendedDamage\([^\n]+/);
   assert.ok(damage, "本体のダメージ式を読み込めること");
   vm.runInContext(damage[0].replace("export ", ""), context);
+  vm.runInContext(read("battleGeometry.js").replace(/^export /gm, ""), context);
+  vm.runInContext(read("battleMorale.js").replace(/^export /gm, ""), context);
+  vm.runInContext(read("battleMovement.js").replace(/^export /gm, ""), context);
+  vm.runInContext(read("battleReinforcements.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
+  vm.runInContext(read("battleCore.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(read("battle.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(`
     /** @returns {void} 戦後のUIと報酬処理を省略する。 */
@@ -37,7 +43,7 @@ function createSimulation() {
 
 /**
  * 同人数・同レベル、均一地形で実戦の最大60tickまで進める。
- * 左右を入れ替えて先行処理と味方AIの偏りを平均化する。乱数の反復ではない。
+ * 左右を入れ替えて配置・移動競合の偏りを平均化する。乱数の反復ではない。
  * @param {object} context 実行環境。 @param {string[]} a 比較側兵種。 @param {string[]} b 相手兵種。
  * @param {string} terrain 地形。 @param {number} level レベル。 @param {number} squads 部隊数。
  * @param {boolean} reverse 陣営を逆にするか。 @returns {object} 勝敗と残HP率。
@@ -45,7 +51,7 @@ function createSimulation() {
 function simulate(context, a, b, terrain, level, squads, reverse) {
   Object.assign(context, { a,b,terrain,level,squads,reverse });
   return vm.runInContext(`(() => {
-    battleState.tick = 0; battleState.elapsedMs = 0;
+    battleState.tick = 0; battleState.elapsedMs = 0; battleState.moraleShocks = []; battleState.resultReason = null;
     battleState.attackFx = []; battleState.moveFx = []; battleState.logLines = [];
     battleState.grid = Array.from({length:10}, () => Array(10).fill(terrain));
     const entries = types => Array.from({length:squads}, (_,i) => ({type:types[i % types.length],count:10,level}));
@@ -53,12 +59,13 @@ function simulate(context, a, b, terrain, level, squads, reverse) {
     const enemies = createUnits(entries(reverse ? a : b), 'enemy', 10);
     battleState.units = [...allies, ...enemies];
     const original = battleState.units.reduce((n,u) => n + u.hp, 0);
-    while (battleState.tick < MAX_TICKS && !advanceBattleTick()) {}
+    while (battleState.tick < BATTLE_RULES.maxTicks && !advanceBattleTick()) {}
     const own = reverse ? enemies : allies;
     const other = reverse ? allies : enemies;
     const hp = units => units.reduce((n,u) => n + u.hp, 0);
     const remaining = hp(own), opposing = hp(other);
-    return {win: remaining > opposing ? 1 : remaining < opposing ? 0 : 0.5,
+    const result = battleResult(battleState.units, battleState.resultReason === "timeout");
+    return {win: result === "draw" ? 0.5 : result === (reverse ? "lose" : "win") ? 1 : 0,
       hp: remaining / own.reduce((n,u) => n + u.maxHp, 0), tick:battleState.tick,
       original, final: remaining + opposing};
   })()`, context);
@@ -94,4 +101,5 @@ function main() {
     }
 }
 
-main();
+if (require.main === module) main();
+module.exports = { createSimulation };
