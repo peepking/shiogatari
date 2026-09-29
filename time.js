@@ -1,4 +1,5 @@
 import { settleTideSeason } from "./tideAlliance.js";
+import { fishingRewards, grantFishingSeason } from "./fishingRewards.js";
 import { updateBountyWorld } from "./bountyWorld.js";
 import { grantFaithSeason } from "./faith.js";
 import { calcSupplyCap } from "./supplies.js";
@@ -21,6 +22,7 @@ import { SHIP_TYPES } from "./shipConfig.js";
  * @param {number} [days=1]
  */
 export function advanceDayWithEvents(days = 1) {
+  fishingRewards(state);
   for (let i = 0; i < days; i++) {
     baseAdvanceDay(1);
     const d = state.day;
@@ -36,6 +38,11 @@ export function advanceDayWithEvents(days = 1) {
     }
     if (d === 1) {
       const tide = settleTideSeason(state);
+      const fishingFaith = grantFishingSeason(state);
+      if (fishingFaith) {
+        pushToast("海を知る者", `潮語りへの敬意が届きました。信仰＋${fishingFaith}`, "good");
+        pushLog("海を知る者", `信仰＋${fishingFaith}`, "-");
+      }
       if (tide?.count) {
         pushToast("潮盟の支え", `潮盟の${tide.count}拠点から支えが届きました。信仰＋${tide.gain} / 今季の神託報酬＋${tide.bonus}%`, "good");
         pushLog("潮盟の支え", `信仰＋${tide.gain} / 神託＋${tide.bonus}%`, "-");

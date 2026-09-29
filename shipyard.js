@@ -1,6 +1,17 @@
 import { SHIP_TYPES, SHIP_SELL_RATE, SHIP_STOCK_TIERS } from "./shipConfig.js";
 import { normalizeFleet, shipCount } from "./fleet.js";
 import { VARIANT_SHIPS, normalizeVariants } from "./variantShips.js";
+import { fishingRewards } from "./fishingRewards.js";
+
+/** 解放済みの漁船だけ別枠で季節補充する。 @param {object} state 状態。 @param {object} settlement 街。 @returns {object|null} 造船所。 */
+export function fishingShipyard(state, settlement) {
+  const season = shipyardSeason(state), yard = refreshShipyard(settlement, season);
+  if (yard && fishingRewards(state).unlocked[1] && yard.fishingSeason !== season) {
+    yard.stock.fishing_boat = Math.max(yard.stock.fishing_boat || 0, 1);
+    yard.fishingSeason = season;
+  }
+  return yard;
+}
 
 /** @param {object} state 日付状態。 @returns {number} 年をまたぐ季節番号。 */
 export function shipyardSeason(state) { return state.year * 4 + state.season; }
@@ -48,6 +59,7 @@ export function shipTradePrice(type, mode) { return Math.floor(SHIP_TYPES[type].
 export function quoteShipTrade(state, settlement, type, mode, quantity) {
   if (settlement?.kind !== "town" || !settlement.shipyard) return { error: "街の造船所で取引してください。" };
   if (typeof type === "string" && type.startsWith("variant:")) return quoteVariantTrade(state, settlement, Number(type.slice(8)), mode, quantity);
+  if (type === "fishing_boat" && mode === "buy" && !fishingRewards(state).unlocked[1]) return { error: "魚図鑑50%で漁船の購入が解放されます。" };
   if (!Object.hasOwn(SHIP_TYPES, type) || !["buy", "sell"].includes(mode) || !Number.isSafeInteger(quantity) || quantity <= 0)
     return { error: "取引数は1以上の整数を入力してください。" };
   const fleet = normalizeFleet(state.fleet);

@@ -1596,6 +1596,8 @@ input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) 
 .codex-progress strong { color: #c6ece4; font-size: 19px; font-variant-numeric: tabular-nums; }
 .codex-progress small { color: #a2b7c3; font-size: 12px; font-weight: 400; }
 .codex-progress progress { display: block; width: 100%; height: 5px; margin-top: 12px; accent-color: #69cfca; }
+.fishing-rewards { margin-top: 12px; max-height: 160px; overflow: auto; }
+.fishing-rewards summary { cursor: pointer; color: #c6ece4; }
 .codex-tools { display: grid; gap: 10px; }
 .codex-tools[hidden] { display: none; }
 .codex-tools input { width: 100%; box-sizing: border-box; }

@@ -7,7 +7,8 @@ import { advanceDayWithEvents } from "./time.js";
 import { saveGameToStorage } from "./storage.js";
 import { SEASONS, escapeHtml } from "./util.js";
 import { FISHING_CONFIG, FISH_REGIONS, FISH_CATEGORIES, BAIT_DEFS, ROD_DEFS, FISH_SPECIES, DEPTH_NAMES } from "./fishingConfig.js";
-import { fishingRegionAt, rollCatch, windowFor, rollSize, recordCatch, dressCatch, speciesById, categoryTone, atariMessage, catchRecordFacts, consumeBait, processToBait, checkRodUpgrade, sessionDayRule, matchesCodexFilters, codexCompletion, codexRevealState, codexDetailReveal } from "./fishing.js";
+import { fishingRegionAt, rollCatch, windowFor, rollSize, recordCatch, dressCatch, speciesById, categoryTone, atariMessage, catchRecordFacts, consumeBait, processToBait, checkRodUpgrade, sessionDayRule, matchesCodexFilters, codexCompletion, codexRevealState, codexDetailReveal, fishSalePrice } from "./fishing.js";
+import { fishingRewards } from "./fishingRewards.js";
 
 /** 釣りパネルを開いた際に渡される表示同期。 bite/キャスト後に使う。 */
 let panelSync = null;
@@ -637,7 +638,7 @@ function inventoryHtml() {
       const feedInfo = s.feedType ? ` / 餌:${BAIT_DEFS[s.feedType]?.name || s.feedType}+${s.dressFood}` : "";
       return `<div class="fishing-row">
         <span class="pill">${escapeHtml(s.name)} x${qty}</span>
-        <span class="tiny">売値${s.sellPrice} / 捌いて食料+${s.dressFood}${feedInfo}</span>
+        <span class="tiny">売値${fishSalePrice(state, s)} / 捌いて食料+${s.dressFood}${feedInfo}</span>
         <button class="btn" data-dress="${id}" ${busy ? "disabled" : ""}>全部捌く</button>
         <button class="btn" data-process="${id}" ${busy ? "disabled" : ""}>餌に加工</button>
       </div>`;
@@ -726,6 +727,11 @@ function renderCodexModal() {
   const completion = codexCompletion(state.expansion.fishing.codex);
   const progress = document.getElementById("codexProgress");
   if (progress) progress.innerHTML = `<div><span>航海で出会った魚たち</span><strong>発見 ${completion.caught}<small> / ${completion.total}種</small></strong></div><progress max="${completion.total}" value="${completion.caught}" aria-label="図鑑の発見数"></progress>`;
+  if (progress) {
+    const rewards = fishingRewards(state);
+    const labels = ["釣り仲間の伝手：海兵系の雇用枠", "漁師の伝手：漁船の購入", "鮮度を保つ知恵：魚売値＋20%", "海を知る者：毎季節信仰＋5"];
+    progress.innerHTML += `<details class="fishing-rewards"><summary>図鑑の達成報酬</summary>${labels.map((label, i) => `<p class="tiny">${(i + 1) * 25}%・${rewards.unlocked[i] ? "解放済み" : "未解放"}：${label}</p>`).join("")}</details>`;
+  }
   const filterCount = document.getElementById("codexFilterCount");
   const count = codexCats.size + codexRegions.size + codexSeasons.size;
   if (filterCount) filterCount.textContent = count ? `（${count}件選択中）` : "";
@@ -1126,7 +1132,7 @@ function openFishSale() {
     .map(([id, qty]) => {
       const s = speciesById(id);
       if (!s) return null;
-      return { id, name: s.name, price: s.sellPrice, stock: qty, have: qty, direction: "sell" };
+      return { id, name: s.name, price: fishSalePrice(state, s), stock: qty, have: qty, direction: "sell" };
     })
     .filter(Boolean);
   if (!deals.length) return;

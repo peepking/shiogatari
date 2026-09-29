@@ -3,6 +3,7 @@ import { normalizeBounties } from "./bounty.js";
 import { normalizeWanted } from "./playerWanted.js";
 import { normalizePiracy } from "./pirateConfig.js";
 import { normalizeFaith } from "./faith.js";
+import { fishingRewards } from "./fishingRewards.js";
 import { MODE_LABEL } from "./constants.js";
 import { restoreWorld, snapshotWorld } from "./map.js";
 import { reconcileWarFronts } from "./warFronts.js";
@@ -124,6 +125,7 @@ export function loadGameFromStorage() {
     state.nationalPower = normalizeNationalPower(snapshot.state.nationalPower, nationalPowerDay(state));
     state.logs = normalizeLogs(state.logs);
     state.expansion = normalizeExpansionState(state.expansion);
+    fishingRewards(state);
     reconcileCharts(state.expansion.charts, state.quests?.active || []);
     reconcileWarFronts(state, snapshotWorld().settlements || []);
     const powerSettlements = snapshotWorld().settlements || [];

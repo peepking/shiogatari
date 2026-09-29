@@ -12,6 +12,7 @@ export const SHIP_TYPES = Object.freeze({
   galleass: { name: "ガレアス", price: 12000, supplies: 55, troops: 35, limit: 2, effects: { supportPower: 10 } },
   galleon: { name: "ガレオン", price: 15000, supplies: 80, troops: 35, limit: 2, effects: { def: 5 } },
   fluyt: { name: "フリュート", price: 7500, supplies: 60, troops: 10, limit: 4, effects: { shipUpkeepReduction: 2.5 } },
+  fishing_boat: { name: "漁船", price: 5500, supplies: 60, troops: 10, limit: 5, rewardExcluded: true, effects: { baitSaving: 5 } },
 });
 for (const ship of Object.values(SHIP_TYPES)) { Object.freeze(ship.effects); Object.freeze(ship); }
 export const SHIP_STOCK_TIERS = Object.freeze([

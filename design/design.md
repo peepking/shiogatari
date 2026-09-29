@@ -280,6 +280,8 @@
 - `npm test` に海賊の境界条件・検問・復元テストを含める。`tests/pirateIntegration.html` はブラウザで実モジュール間の連携を検証し、保存データを検証後に戻す。`npm run simulate:pirates` は本体の能力値と戦闘処理で6地形・Lv1/5・1/5/10/20部隊の比較を行う。
 ## 6. 釣りシステム
 
+釣り図鑑の追加報酬は `fishing-rewards.md` を参照。`fishingRewards.js` が永続解放・釣り仲間の雇用在庫・季節信仰を管理し、釣果登録と旧セーブ読込で解放を補完する。魚売値は `fishSalePrice`、漁船販売は `fishingShipyard` に集約する。
+
 釣りシステムは、海上で餌を使って魚を釣るミニゲームです。詳細仕様は `design/fishing-design.md` を参照してください。
 
 ### 6.1 概要

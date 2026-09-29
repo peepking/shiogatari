@@ -24,10 +24,12 @@ async function main() {
   const config = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../fishingConfig.js"), "utf8"));
   const mod = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../fishing.js"), "utf8"));
   await config.link(() => {});
+  const rewards = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../fishingRewards.js"), "utf8"));
+  await rewards.link(() => config);
   await mod.link((name) =>
     name === "./fishingConfig.js"
       ? config
-      : (() => {
+      : name === "./fishingRewards.js" ? rewards : (() => {
           throw new Error(`予期しない依存: ${name}`);
         })()
   );
@@ -140,7 +142,7 @@ async function main() {
 
   // 補完: 欠損・不正値は既定値へ、壊れたセッションは破棄
   const fresh = fishing.normalizeFishing();
-  assert.deepEqual(fresh, { rodId: null, counts: {}, codex: {}, bait: { insect: 0, shell: 0, cut: 0, small: 0 }, pending: null });
+  assert.deepEqual(fresh, fishing.createFishingState());
   const dirty = fishing.normalizeFishing({
     rodId: "unknown",
     counts: { aji: 3, nope: 1, madai: -1 },

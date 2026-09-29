@@ -1,4 +1,5 @@
 import { FISH_SPECIES, BAIT_DEFS, ROD_DEFS, FISHING_CONFIG, ROD_UPGRADE_THRESHOLDS } from "./fishingConfig.js";
+import { fishingRewards, normalizeFishingRewards, FISHING_REWARDS } from "./fishingRewards.js";
 
 /**
  * game時間から絶対日を算出する。questUtils.absDayと同じ式なので、独立して維持する。
@@ -34,7 +35,7 @@ function isPosition(value) {
  * @returns {object} 共有参照を持たない初期状態。
  */
 export function createFishingState() {
-  return { rodId: null, counts: {}, codex: {}, bait: { insect: 0, shell: 0, cut: 0, small: 0 }, pending: null };
+  return { rodId: null, counts: {}, codex: {}, bait: { insect: 0, shell: 0, cut: 0, small: 0 }, pending: null, rewards: normalizeFishingRewards(null, {}) };
 }
 
 /**
@@ -296,6 +297,7 @@ export function recordCatch(state, { species, size }) {
     entry.maxSizeAbs = absDay(state);
     entry.maxSizePos = { x: state.position.x, y: state.position.y };
   }
+  fishingRewards(state);
 }
 
 /**
@@ -361,19 +363,27 @@ export function sellCatch(state, speciesId, qty = 1) {
   if (!n) return 0;
   data.counts[speciesId] -= n;
   if (data.counts[speciesId] <= 0) delete data.counts[speciesId];
-  return n * s.sellPrice;
+  return n * fishSalePrice(state, s);
+}
+
+/** 表示と取引で共有する魚の売却単価。 @param {object} state 状態。 @param {object} species 魚種。 @returns {number} 単価。 */
+export function fishSalePrice(state, species) {
+  return Math.floor(species.sellPrice * (fishingRewards(state).unlocked[2] ? FISHING_REWARDS.sale : 1));
 }
 
 /**
- * 指定した餌を1個消費する。所持数が足りない場合は false を返す。
+ * 有効なキャストで1回だけ漁船の節約を抽選し、外れたら指定餌を1個消費する。餌ゼロでは抽選しない。
  * @param {object} state ゲーム状態。
  * @param {string} baitId 餌ID。
+ * @param {Function} random 0以上1未満の乱数。
  * @returns {boolean} 消費できたか。
  */
-export function consumeBait(state, baitId) {
+export function consumeBait(state, baitId, random = Math.random) {
   const data = state.expansion.fishing;
   const current = data.bait?.[baitId] || 0;
   if (current <= 0) return false;
+  const ships = Math.max(0, Math.min(FISHING_REWARDS.shipLimit, Number(state.fleet?.counts?.fishing_boat) || 0));
+  if (ships > 0 && random() < ships * FISHING_REWARDS.baitPerShip) return true;
   data.bait[baitId] = current - 1;
   return true;
 }
@@ -505,6 +515,6 @@ export function normalizeFishing(value) {
     codex,
     bait,
     pending: validPending(source.pending),
+    rewards: normalizeFishingRewards(source.rewards, codex),
   };
 }
-

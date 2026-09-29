@@ -17,6 +17,7 @@ async function main() {
   const { SHIP_TYPES } = modules.get("./shipConfig.js").namespace;
   assert.deepEqual(Object.values(SHIP_TYPES).map(s => [s.price, s.supplies, s.troops]), [
     [4000,35,10], [4500,45,10], [5000,30,15], [5500,75,10], [6000,25,25], [10000,90,30], [12000,55,35], [15000,80,35], [7500,60,10],
+    [5500,60,10],
   ]);
   const old = { ships: 3, troops: { infantry: 100 } };
   migrateFleet(old); migrateFleet(old);
@@ -27,7 +28,7 @@ async function main() {
   const effects = fleetEffects(fleet);
   assert.equal(effects.upkeepReduction, 10); assert.equal(effects.supplyCap, 10); assert.equal(effects.troopCap, 10);
   assert.equal(effects.atk, 10); assert.equal(effects.def, 10); assert.equal(effects.supportPower, 20);
-  assert.equal(effects.supplies, 4950); assert.equal(effects.troops, 1800);
+  assert.equal(effects.supplies, 5550); assert.equal(effects.troops, 1900);
   assert.equal(effects.shipUpkeepReduction, 10);
   assert.equal(fleetEffects(normalizeFleet({ counts: { galley: 1 } })).troopCap, 2.5);
   const outfittingModule = await load("./outfitting.js"); await outfittingModule.evaluate();
@@ -60,13 +61,13 @@ async function main() {
   const cargo = { slots: 1, owned: ["cargo_tent"], equipped: ["cargo_tent"] };
   const cargoEffects = getOutfittingEffects(cargo, fleet);
   assert.equal(cargoEffects.supplyCap, 30);
-  assert.equal(applyCapacityBonus(60 + effects.supplies, cargoEffects.supplyCap), 6513);
+  assert.equal(applyCapacityBonus(60 + effects.supplies, cargoEffects.supplyCap), 7293);
   const upkeepModule = await load("./upkeep.js"); await upkeepModule.evaluate();
   const cost = upkeepModule.namespace.getUpkeepForecast({ fleet, troops: { infantry: 23 }, day: 29,
     expansion: { outfitting: { slots: 1, owned: ["storm_cover"], equipped: ["storm_cover"] } } }, { infantry: { upkeep: 2 } });
   assert.equal(cost.troopFunds, 36);
-  assert.equal(cost.shipFunds, 12510);
-  assert.equal(cost.funds, 12546);
+  assert.equal(cost.shipFunds, 13500);
+  assert.equal(cost.funds, 13536);
   const yardModule = await load("./shipyard.js"); await yardModule.evaluate();
   const { refreshShipyard, quoteShipTrade, tradeShip, shipyardSeason } = yardModule.namespace;
   assert.equal(shipyardSeason({year:1001,season:0}) - shipyardSeason({year:1000,season:3}), 1);
@@ -100,7 +101,7 @@ async function main() {
   const { addVariantShip, fleetCounts, shipListText } = fleetModule.namespace;
   const { VARIANT_SHIPS } = modules.get("./variantShips.js").namespace;
   assert.equal(Object.keys(VARIANT_SHIPS).length, 27);
-  for (const id of Object.keys(SHIP_TYPES)) assert.equal(Object.values(VARIANT_SHIPS).filter(v => v.base === id).length, 3);
+  for (const id of Object.keys(SHIP_TYPES).filter(id => !SHIP_TYPES[id].rewardExcluded)) assert.equal(Object.values(VARIANT_SHIPS).filter(v => v.base === id).length, 3);
   const named = { funds: 100000, fleet: normalizeFleet({ counts: { longship: 4 } }) };
   const first = addVariantShip(named, "crown", "灰冠の船長", 120001);
   const second = addVariantShip(named, "crown", "灰冠の別の船長", 120031);

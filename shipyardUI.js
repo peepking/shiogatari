@@ -3,7 +3,7 @@ import { getCurrentSettlement } from "./actions.js";
 import { SHIP_TYPES, SHIP_UPKEEP_RATE } from "./shipConfig.js";
 import { normalizeFleet, fleetCounts } from "./fleet.js";
 import { VARIANT_SHIPS } from "./variantShips.js";
-import { refreshShipyard, shipyardSeason, shipTradePrice, quoteShipTrade, tradeShip } from "./shipyard.js";
+import { fishingShipyard, shipTradePrice, quoteShipTrade, tradeShip } from "./shipyard.js";
 import { shipIcon, shipEffectText, fleetMetrics, variantShipDetails } from "./fleetUI.js";
 import { totalSupplies } from "./supplies.js";
 import { totalTroops } from "./troops.js";
@@ -76,19 +76,20 @@ function requestTrade(settlement, canChange, syncUI) {
 export function renderShipTrade(body, canChange, syncUI) {
   const settlement = getCurrentSettlement();
   if (!canChange()) { body.innerHTML = '<p>船取引は街の造船所で行えます。</p>'; return; }
-  const yard = refreshShipyard(settlement, shipyardSeason(state));
+  const yard = fishingShipyard(state, settlement);
   const counts = normalizeFleet(state.fleet).counts;
   const owned = normalizeFleet(state.fleet).variants;
   const stock = { ...yard.stock };
   for (const v of owned) counts[`variant:${v.id}`] = 1;
   for (const v of yard.variants) stock[`variant:${v.id}`] = 1;
   const list = Object.keys(SHIP_TYPES).filter(id => mode === "buy"
-    ? yard.regular.some(r => r.type === id) || yard.stock[id] > 0 : counts[id] > 0);
+    ? yard.regular.some(r => r.type === id) || yard.stock[id] > 0 || (id === "fishing_boat" && yard.fishingSeason != null) : counts[id] > 0);
   list.push(...(mode === "buy" ? yard.variants : owned).map(v => `variant:${v.id}`));
   if (!list.includes(selected)) { selected = list[0] || null; quantity = 1; }
   body.innerHTML = `<div class="ship-trade-bar"><div class="row"><button class="btn ${mode === "buy" ? "primary" : "ghost"}" data-ship-mode="buy" aria-pressed="${mode === "buy"}">購入</button><button class="btn ${mode === "sell" ? "primary" : "ghost"}" data-ship-mode="sell" aria-pressed="${mode === "sell"}">売却</button></div><span>所持資金 ${state.funds.toLocaleString()}</span></div><p class="tiny">定番4種は毎季節1日に補充。買取在庫は売り切れるまで販売します。</p><div class="outfitting-layout ship-trade-layout"><div class="outfitting-catalog">${list.map(id => {
     const ship = tradeSelection(id, yard);
-    return `<button class="btn outfitting-item ship-choice ${selected === id ? "primary" : ""}" data-ship="${id}" aria-pressed="${selected === id}">${shipIcon(ship.base)}<b>${ship.name}${ship.record ? ` #${ship.record.id}` : ""}</b><span>${shipTradePrice(ship.base, mode).toLocaleString()}資金 / 隻</span><span>在庫 ${stock[id] || 0} / 所持 ${counts[id] || 0}</span><span>物資＋${ship.supplies} / 兵員＋${ship.troops}</span>${ship.record ? '<span>固有船</span>' : mode === "buy" ? `<span>${yard.regular.some(r => r.type === id) ? yard.stock[id] ? "定番" : "売り切れ" : "買取在庫"}</span>` : ""}</button>`;
+    const fishingLabel = id === "fishing_boat" ? `<span>漁師の伝手・${yard.stock[id] ? "季節補充枠" : "売り切れ"}</span>` : "";
+    return `<button class="btn outfitting-item ship-choice ${selected === id ? "primary" : ""}" data-ship="${id}" aria-pressed="${selected === id}">${shipIcon(ship.base)}<b>${ship.name}${ship.record ? ` #${ship.record.id}` : ""}</b><span>${shipTradePrice(ship.base, mode).toLocaleString()}資金 / 隻</span><span>在庫 ${stock[id] || 0} / 所持 ${counts[id] || 0}</span><span>物資＋${ship.supplies} / 兵員＋${ship.troops}</span>${fishingLabel || (ship.record ? '<span>固有船</span>' : mode === "buy" ? `<span>${yard.regular.some(r => r.type === id) ? yard.stock[id] ? "定番" : "売り切れ" : "買取在庫"}</span>` : "")}</button>`;
   }).join("") || '<p class="tiny">売却できる船はありません。</p>'}</div><div class="outfitting-comparison" id="shipTradeDetail"></div></div>`;
   body.querySelectorAll("[data-ship-mode]").forEach(button => { button.onclick = () => { mode = button.dataset.shipMode; quantity = 1; renderShipTrade(body, canChange, syncUI); }; });
   body.querySelectorAll("[data-ship]").forEach(button => { button.onclick = () => { selected = button.dataset.ship; quantity = 1; renderShipTrade(body, canChange, syncUI); }; });

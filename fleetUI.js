@@ -10,7 +10,7 @@ import { faithEffects } from "./faith.js";
 
 /** @param {string} id 船種。 @returns {string} 既存の線画に合わせた船種別の帆装アイコン。 */
 export function shipIcon(id) {
-  const index = Object.keys(SHIP_TYPES).indexOf(id);
+  const index = id === "fishing_boat" ? 0 : Object.keys(SHIP_TYPES).indexOf(id);
   const masts = index >= 5 ? [21, 35, 47] : index === 2 ? [31] : [26, 42];
   const sails = masts.map((x, i) => `<path d="M${x} ${12 + i * 4}v31"/><path d="M${x - 2} ${14 + i * 4}l-10 20h10Z" fill="currentColor" fill-opacity=".2"/>${index !== 0 && index !== 4 ? `<path d="M${x + 2} ${15 + i * 4}q12 7 10 18h-10Z" fill="currentColor" fill-opacity=".12"/>` : ""}`).join("");
   const oars = [2, 4, 6].includes(index) ? '<path d="m20 45-6 9m14-9-6 9m14-9-6 9m14-9-6 9m14-9-6 9"/>' : "";
@@ -20,6 +20,7 @@ export function shipIcon(id) {
 /** @param {string} id 船種。 @returns {string} 船種設定から作る固有効果の説明。 */
 export function shipEffectText(id) {
   const ship = SHIP_TYPES[id];
+  if (id === "fishing_boat") return `餌を消費しない確率＋${ship.effects.baitSaving}%/隻（${ship.limit}隻で${ship.effects.baitSaving * ship.limit}%）・漁師の伝手`;
   const names = { upkeepReduction: "部隊維持費", shipUpkeepReduction: "船維持費", supplyCap: "物資上限", troopCap: "部隊上限", atk: "部隊ATK", def: "部隊DEF", supportPower: "支援射撃威力" };
   const effects = Object.entries(ship.effects).map(([key, n]) => `${names[key]} ${key.endsWith("Reduction") ? "−" : "+"}${n}%/隻`);
   return effects.length ? `${effects.join(" / ")}（${ship.limit}隻で上限）` : "固有バフなし・容量重視の船";

@@ -1,5 +1,6 @@
 import { troopImage } from "./pirateConfig.js";
 import { faithRecruitSlot } from "./faith.js";
+import { fishingRecruitSlot } from "./fishingRewards.js";
 import { getCurrentSettlement } from "./actions.js";
 import { MODE_LABEL } from "./constants.js";
 import { elements, pushLog, setInlineMessage, setOutput } from "./dom.js";
@@ -12,6 +13,8 @@ function hireSlots(settlement) {
   const slots = (settlement?.recruitSlots || []).map((slot, index) => ({ id: `normal-${index}`, slot, level: 1, faith: false }));
   const extra = faithRecruitSlot(state, settlement);
   if (extra) slots.push({ id: 'faith', slot: extra, level: extra.level, faith: true });
+  const fishing = fishingRecruitSlot(state, settlement);
+  if (fishing) slots.push({ id: "fishing", slot: fishing, level: 1, fishing: true });
   return slots;
 }
 
@@ -70,7 +73,7 @@ export function renderHireModal(settlement) {
     return;
   }
   const rows = slots
-    .map(({ id, slot, level, faith }) => {
+    .map(({ id, slot, level, faith, fishing }) => {
       const stat = TROOP_STATS[slot.type];
       const name = stat?.name || slot.type;
       const hire = stat?.hire ?? 0;
@@ -80,7 +83,7 @@ export function renderHireModal(settlement) {
       return `
         <tr>
           <td class="ta-center"><img src="${imgSrc}" alt="${name}" class="hire-icon"></td>
-          <td>${name}${faith ? `<br><span class="pill">潮盟の便り・Lv${level}</span>` : ""}</td>
+          <td>${name}${faith ? `<br><span class="pill">潮盟の便り・Lv${level}</span>` : fishing ? '<br><span class="pill">釣り仲間の伝手・Lv1</span>' : ""}</td>
           <td class="ta-center">${hire}</td>
           <td class="ta-center">${remaining}</td>
           <td class="ta-center">
