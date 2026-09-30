@@ -86,6 +86,15 @@ main .grid > * { min-width: 0; }
 #questOpenBtn { --action-icon: url('./image/ui/action-quest.svg'); }
 #bountyOpenBtn, #bountyVisitBtn, #oracleBattleBtn { --action-icon: url('./image/ui/arms.svg'); }
 #audienceBtn { --action-icon: url('./image/ui/fame.svg'); }
+#identityOpenBtn { --action-icon: url('./image/ui/fame.svg'); }
+#locationOfficeBtn { --action-icon: url('./image/ui/action-quest.svg'); }
+#locationCrimeBtn { --action-icon: url('./image/ui/arms.svg'); }
+.location-actions #oracleBattleBtn, .location-actions #bountyVisitBtn {
+  background: #385582; border-color: #7aa7ff; color: #fff;
+}
+.location-actions #oracleBattleBtn:hover:not(:disabled), .location-actions #bountyVisitBtn:hover:not(:disabled) {
+  background: #486b9d; border-color: #a8c5ff;
+}
 #tideOpen, #oracleBtn, #modePrayBtn { --action-icon: url('./image/ui/faith.svg'); }
 #modeWaitBtn { --action-icon: url('./image/ui/action-wait.svg'); }
 .command-actions { padding-top: 15px; border-top: 1px solid var(--line); gap: 9px; }

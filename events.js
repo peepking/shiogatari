@@ -4,6 +4,7 @@ import { addHonorFaction, addWarScore, adjustNobleFavor, adjustSupport, getPlaye
 import { state } from "./state.js";
 import { scheduleGameSave } from "./storage.js";
 import { resourceList } from "./resourceUI.js";
+import { crimeRestriction } from "./wantedPolicy.js";
 
 /**
  * イベントキューにイベントを追加し、未表示なら即座に表示する。
@@ -171,6 +172,7 @@ function handleAction(action) {
  * @returns {void}
  */
 export function showNextEvent() {
+  if (state.wanted?.detention) return;
   const modal = elements.eventModal;
   if (!modal) return;
   if (state.expansion?.exploration.pending || state.expansion?.charts.pending || (elements.battleBlock && !elements.battleBlock.hidden) || (elements.battleResultModal && !elements.battleResultModal.hidden)) {
@@ -199,8 +201,15 @@ export function showNextEvent() {
       btn.textContent = act.label || "閉じる";
       btn.dataset.actionId = act.id;
       btn.disabled = isBattleEventActionBlocked(act);
-      if (btn.disabled) btn.title = "部隊員がいないため選択できません。";
+      const crimeReason = crimeRestriction(state, act);
+      if (btn.disabled) btn.title = crimeReason || "部隊員がいないため選択できません。";
       elements.eventModalActions.append(btn);
+      if (crimeReason) {
+        const reason = document.createElement("p");
+        reason.className = "tiny";
+        reason.textContent = crimeReason;
+        elements.eventModalActions.append(reason);
+      }
     });
   }
   modal.hidden = false;

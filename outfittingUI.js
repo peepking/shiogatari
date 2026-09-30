@@ -1,4 +1,6 @@
 import { state } from "./state.js";
+import { wantedEntryReason } from "./wantedPolicy.js";
+import { absDay } from "./calendar.js";
 import { MODE_LABEL } from "./constants.js";
 import { OUTFITTING_CONFIG, OUTFITTING_ITEMS } from "./expansionConfig.js";
 import { getCurrentSettlement } from "./actions.js";
@@ -21,6 +23,7 @@ let showTrade = false;
 
 /** @returns {boolean} 街で艤装を変更できるか。 */
 function canChange() {
+  if (wantedEntryReason(state, getCurrentSettlement(), absDay(state))) return false;
   return state.modeLabel === MODE_LABEL.IN_TOWN && getCurrentSettlement()?.kind === "town" &&
     !state.pendingEncounter?.active && !state.expansion.exploration.pending && !state.expansion.charts.pending;
 }

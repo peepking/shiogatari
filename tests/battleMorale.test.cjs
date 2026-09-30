@@ -87,7 +87,7 @@ async function main() {
     if (eventTag === "bounty") { state.pendingEncounter.bountyId = 3; state.bounties = { active: [{ id: 3 }] }; }
     if (eventTag === "exploration") state.pendingEncounter.explorationId = 2;
     let explored = false;
-    const context = vm.createContext({ state, BATTLE_RESULT: { WIN: "win", LOSE: "lose", DRAW: "draw" }, BATTLE_RESULT_LABEL: {}, NONE_LABEL: "なし",
+    const context = vm.createContext({ state, absDay: () => 0, finishPursuit: () => false, BATTLE_RESULT: { WIN: "win", LOSE: "lose", DRAW: "draw" }, BATTLE_RESULT_LABEL: {}, NONE_LABEL: "なし",
       getPlayerFactionId: () => "west", settleBattlePersonnel: () => ({ troops: {}, losses: {}, promotions: [], leveled: 0 }),
       calcLosses: () => ({ lossProb: 0.6 }), killedEnemyCount: () => 0, calcCaptures: () => ({}),
       wasBattleDeployed: () => true, TROOP_STATS: {}, BONUS_CAPTURE_EVENT_TAGS: new Set(),

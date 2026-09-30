@@ -1,4 +1,4 @@
-const SINGLE_SUPPLY_TYPES = ["supply", "delivery"];
+const SINGLE_SUPPLY_TYPES = ["supply", "delivery", "amnesty"];
 const MULTI_SUPPLY_TYPES = ["oracle_supply", "noble_supply", "noble_logistics", "war_supply"];
 const BATTLE_TYPES = ["oracle_hunt", "oracle_elite", "pirate_hunt", "bounty_hunt", "noble_hunt", "noble_security", "war_defend_raid", "war_attack_raid", "war_skirmish", "war_blockade"];
 

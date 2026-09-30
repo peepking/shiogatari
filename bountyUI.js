@@ -13,6 +13,11 @@ import { SHIP_TYPES } from "./shipConfig.js";
 import { variantBonusText } from "./variantShips.js";
 import { saveGameToStorage } from "./storage.js";
 import { pushToast } from "./dom.js";
+import { totalWanted, WANTED_FACTIONS, expireWanted } from "./playerWanted.js";
+import { absDay } from "./questUtils.js";
+import { BOUNTY_CONFIG } from "./bountyConfig.js";
+import { wantedSettlement } from "./wantedUI.js";
+
 
 /** @param {object} site 個体。 @returns {string} 討伐不可理由。 */
 export function bountyRestriction(site) {
@@ -48,7 +53,8 @@ function wantedCrimesHtml(wanted) {
     const year = Math.floor(index / DAY_PER_YEAR);
     const season = Math.floor((index % DAY_PER_YEAR) / DAY_PER_SEASON);
     const day = index % DAY_PER_SEASON + 1;
-    return `<li><span class="tiny">神歴${year}年 ${SEASONS[season]} ${day}日</span><span>${escapeHtml(CRIME_LABELS[row.kind] || "不明な罪状")}</span></li>`;
+    const faction = row.factionId ? factionLabel(row.factionId) : "旧記録・対象勢力不明";
+    return `<li><span class="tiny">神歴${year}年 ${SEASONS[season]} ${day}日</span><span>${escapeHtml(CRIME_LABELS[row.kind] || "不明な罪状")}</span><span>${faction}${row.amount ? ` / ＋${row.amount.toLocaleString()}` : ""}</span></li>`;
   }).join("");
   return `<details class="bounty-crimes"><summary>主な罪状${history.length ? `（${history.length}件）` : ""}</summary>
     ${history.length ? `<p class="tiny">過去の記録を含む直近${CRIME_HISTORY_LIMIT}件を表示しています。</p><div class="bounty-crime-scroll" tabindex="0" role="region" aria-label="過去の犯罪歴"><ul>${rows}</ul></div>` : '<p class="tiny">詳細な罪状の記録は残っていません。</p>'}</details>`;
@@ -64,7 +70,11 @@ function openBounties(sync, site = null) {
   modal.onclick = e => { if (e.target === modal) close(); };
   modal.onkeydown = e => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
   const list = site ? [site] : state.bounties?.active || [];
-  body.innerHTML = `${!site && state.wanted?.amount ? `<article class="bounty-card"><h3>あなた</h3><strong>${resourceIcon("funds")}${state.wanted.amount.toLocaleString()}</strong><p>最後の犯罪から5年間、新たな犯罪がなければ手配が解除されます。</p>${wantedCrimesHtml(state.wanted)}</article>` : ""}
+  expireWanted(state.wanted, absDay(state));
+  body.innerHTML = `${!site ? `<article class="bounty-card"><h3>あなた</h3><strong>${resourceIcon("funds")}合計賞金 ${totalWanted(state.wanted).toLocaleString()}</strong>${WANTED_FACTIONS.map(id => {
+    const record = state.wanted?.byFaction?.[id];
+    return `<p>${factionLabel(id)}：${(record?.amount || 0).toLocaleString()}${record?.amount ? ` / 自然解除まであと${Math.max(0, record.lastCrimeAbs + BOUNTY_CONFIG.lifetime - absDay(state))}日` : " / 手配なし"}</p>`;
+  }).join("")}<p class="tiny">各勢力への最後の犯罪から600日で、その勢力の手配だけが解除されます。</p>${wantedCrimesHtml(state.wanted || {})}</article>` : ""}
     <div class="bounty-list">${list.map(bountyCard).join("") || '<p>現在、活動中の賞金首はいません。</p>'}</div>
     ${!site && state.bounties?.history.length ? `<details><summary>討伐の記録（直近100件）</summary>${state.bounties.history.map(s => `<p>${escapeHtml(bountyName(s))} / 賞金 ${s.reward.toLocaleString()}${s.flagship ? ` / ${escapeHtml(s.flagship)}` : ""}</p>`).join("")}</details>` : ""}`;
   body.querySelectorAll("[data-bounty-map]").forEach(button => { button.onclick = () => {
@@ -92,7 +102,8 @@ export function renderBountyControls(sync) {
   const list = document.getElementById("bountyOpenBtn"), visit = document.getElementById("bountyVisitBtn");
   if (!list || !visit) return;
   const locked = state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE;
-  list.hidden = locked || ![MODE_LABEL.IN_TOWN, MODE_LABEL.IN_VILLAGE].includes(state.modeLabel);
+  list.hidden = locked || !wantedSettlement();
+  list.textContent = "賞金首";
   list.onclick = () => openBounties(sync);
   const site = bountyAt(state.position);
   visit.hidden = locked || !site || state.modeLabel !== MODE_LABEL.NORMAL;

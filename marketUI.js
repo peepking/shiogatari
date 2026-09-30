@@ -1,4 +1,5 @@
 import { quantityControl, wireQuantityControls, refreshQuantity } from "./quantityUI.js";
+import { wantedFacilityReason, wantedEntryReason } from "./wantedPolicy.js";
 import { getCurrentSettlement } from "./actions.js";
 import { elements, pushLog, pushToast, setInlineMessage } from "./dom.js";
 import { adjustSupport } from "./faction.js";
@@ -34,6 +35,13 @@ function setEventTradeError(msg) {
 export function renderTradeSelects() {
   const settlement = getCurrentSettlement();
   if (!settlement || !elements.tradeTableBody) return;
+  const restriction = wantedFacilityReason(state, settlement, "trade", absDay(state));
+  if (restriction) {
+    elements.tradeTableBody.innerHTML = "";
+    setTradeError(restriction);
+    if (elements.tradeConfirm) elements.tradeConfirm.disabled = true;
+    return;
+  }
   const demand = settlement.demand || {};
   const stock = settlement.stock || {};
   const rows = SUPPLY_ITEMS.map((i) => {
@@ -128,7 +136,7 @@ function collectTrade(eventTrade = false) {
   const shortages = [];
   if (state.funds + fundsDelta < 0) shortages.push(`資金が${-(state.funds + fundsDelta)}不足しています。`);
   if (!isBaitTrade && after > cap) shortages.push(`物資上限を${after - cap}個超えています。`);
-  error ||= shortages.join(" ");
+  error = (!eventTrade && wantedFacilityReason(state, settlement, "trade", absDay(state))) || error || shortages.join(" ");
   return { buys, sells, fundsDelta, after, cap, error, empty: !Object.keys(buys).length && !Object.keys(sells).length, isBaitTrade, baitDelta };
 }
 
@@ -234,6 +242,10 @@ export function renderEventTradeModal(trade) {
  * @param {Function} syncUI
  */
 function confirmEventTrade(closeModal, syncUI) {
+  if (["fishing", "bait"].includes(getEventTradeSource())) {
+    const restriction = wantedEntryReason(state, getCurrentSettlement(), absDay(state));
+    if (restriction) { setEventTradeError(restriction); return; }
+  }
   if (!currentEventTrade?.deals?.length) {
     closeModal?.(elements.eventTradeModal);
     state.eventTrade = null;

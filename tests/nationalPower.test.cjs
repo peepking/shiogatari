@@ -120,6 +120,7 @@ async function main() {
   assert.equal(rules.completeBattlePower(game,encounter,true).length,0);
   const factionSource = await fs.readFile(path.join(__dirname,"../faction.js"),"utf8");
   const context = vm.createContext({ state:game, settlements:places, FACTIONS:[], NATIONAL_POWER_CONFIG:config,
+    wantedFacilityReason:()=>"",
     applyNationalPowerPlan:rules.applyNationalPowerPlan, nationalPowerResources:()=>[], getPlayerFactionId:()=>null,
     pushToast(){}, pushLog(){}, enqueueEvent(){} });
   const start = factionSource.indexOf("function resolveFront(");
@@ -193,6 +194,8 @@ async function testDonationUI(base,config,rules) {
     return elements.get(id);
   }, querySelectorAll:()=>[] };
   const mocked={
+    "./wantedPolicy.js":{honorSuspensionReason:()=>state.suspended ? "停止中" : ""},
+    "./questUtils.js":{absDay:()=>120001},
     "./state.js":{state}, "./lore.js":{FACTIONS:[{id:"north",name:"北海連合",nobles:[{id:"n1"},{id:"n2"}]}]},
     "./map.js":{settlements:[]}, "./faction.js":{isHonorFaction:()=>honor}, "./constants.js":{MODE_LABEL:{AUDIENCE:"audience"}},
     "./nationalPowerWorld.js":{nationalPowerAtWar:()=>false,nationalPowerResources:()=>[]},
@@ -222,7 +225,9 @@ async function testDonationUI(base,config,rules) {
     assert.equal(state.funds,9000); assert.equal(base.namespace.getNationalPower(state.nationalPower,"north"),601);
     saveOK=true; submit.onclick(); honor=false; submit.onclick();
     assert.equal(state.funds,9000);
-    honor=true; submit.onclick(); nobleId="n2"; submit.onclick();
+    honor=true; submit.onclick(); state.suspended=true; submit.onclick();
+    assert.equal(state.funds,9000);
+    state.suspended=false; submit.onclick(); nobleId="n2"; submit.onclick();
     assert.equal(state.funds,9000);
     state.nationalPower.values.north=999999; input.value="2"; input.oninput(); assert.equal(submit.disabled,true);
     input.value="1"; input.oninput(); submit.onclick(); submit.onclick();

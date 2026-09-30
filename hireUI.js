@@ -1,4 +1,6 @@
 import { troopImage } from "./pirateConfig.js";
+import { wantedFacilityReason } from "./wantedPolicy.js";
+import { absDay } from "./questUtils.js";
 import { faithRecruitSlot } from "./faith.js";
 import { fishingRecruitSlot } from "./fishingRewards.js";
 import { getCurrentSettlement } from "./actions.js";
@@ -64,6 +66,13 @@ export function renderHireModal(settlement) {
     if (elements.hireFunds) elements.hireFunds.textContent = String(state.funds);
     return;
   }
+  const restriction = wantedFacilityReason(state, settlement, "hire", absDay(state));
+  if (restriction) {
+    body.innerHTML = "";
+    setHireError(restriction);
+    if (elements.hireDelta) elements.hireDelta.hidden = true;
+    return;
+  }
   const slots = hireSlots(settlement);
   if (!slots.length) {
     body.innerHTML = `<tr><td colspan="5" class="ta-center pad-10">雇用枠がありません。</td></tr>`;
@@ -120,6 +129,8 @@ export function wireHireModal({ openModal, bindModal, syncUI }) {
   });
   elements.hireConfirm?.addEventListener("click", () => {
     const settlement = getCurrentSettlement();
+    const restriction = wantedFacilityReason(state, settlement, "hire", absDay(state));
+    if (restriction) { setHireError(restriction); return; }
     if (!settlement) {
       setHireError("街・村の中でのみ雇用できます。");
       return;

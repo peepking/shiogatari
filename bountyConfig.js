@@ -1,11 +1,11 @@
 /** 賞金首・犯罪の調整値。増援戦の設定とは独立させる。 */
 export const BOUNTY_CONFIG = Object.freeze({ count: 10, lifetime: 600, historyLimit: 100, perTroop: 100, base: 100, multiplier: 1.5, ownFavor: -3, otherFavor: 1 });
 /** 犯罪は選択成立時、海賊依頼だけは達成時に加算する。 */
-export const CRIME_REWARDS = Object.freeze({ merchant_attack: 1000, merchant_rescue_raid: 1000, refugee_raid: 1500, checkpoint_force: 2000, pirate_checkpoint: 2000, pirate_quest: 500 });
+export const CRIME_REWARDS = Object.freeze({ merchant_attack: 1000, merchant_rescue_raid: 1000, refugee_raid: 1500, checkpoint_force: 2000, pirate_checkpoint: 2000, pirate_quest: 500, theft_market: 500, theft_granary: 1000, theft_armory: 1500, settlement_raid: 5000, judicial_deal: 1000 });
 /** 犯罪歴は直近50件を保存し、手配解除後も過去の記録として保持する。 */
 export const CRIME_HISTORY_LIMIT = 50;
 /** 犯罪の表示名。判定には内部IDを使用する。 */
-export const CRIME_LABELS = Object.freeze({ merchant_attack: "商人襲撃", merchant_rescue_raid: "商人襲撃", refugee_raid: "難民襲撃", checkpoint_force: "検問強行突破", pirate_checkpoint: "検問強行突破", pirate_quest: "海賊依頼への加担" });
+export const CRIME_LABELS = Object.freeze({ merchant_attack: "商人襲撃", merchant_rescue_raid: "商人襲撃", refugee_raid: "難民襲撃", checkpoint_force: "検問強行突破", pirate_checkpoint: "検問強行突破", pirate_quest: "海賊依頼への加担", theft_market: "市場での窃盗", theft_granary: "兵糧庫での窃盗", theft_armory: "武器庫での窃盗", settlement_raid: "拠点襲撃", judicial_deal: "海賊情報の提供・司法取引" });
 /** 修飾詞・所属・編成の固定テンプレート。行の人数は10人部隊の数。 */
 export const BOUNTY_TEMPLATES = [
   { id: "red_sail", epithet: "赤帆の", factionId: "pirates", level: 2, troops: { pirate_spear: 3, pirate_archer: 2 }, description: "小船団を率いる沿岸の略奪者。" },

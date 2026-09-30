@@ -22,11 +22,11 @@ export function nearestLawfulSettlement() {
     .sort((a,b)=>a.d-b.d || a.s.id.localeCompare(b.s.id))[0]?.s || null;
 }
 
-/** @returns {string|null} 手配中は近隣国家が追跡する。自分の所属勢力と期限切れは除外する。 */
+/** @returns {string|null} 近隣国家が自勢力への犯罪だけを追跡する。期限切れは除外し、所属による免除はしない。 */
 export function wantedFaction() {
   expireWanted(state.wanted, absDay(state));
   const set=nearestLawfulSettlement();
-  return set && state.wanted?.amount > 0 && !(state.honorFactions || []).includes(set.factionId) ? set.factionId : null;
+  return set && state.wanted?.byFaction?.[set.factionId]?.amount > 0 ? set.factionId : null;
 }
 
 /**

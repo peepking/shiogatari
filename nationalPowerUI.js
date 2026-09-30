@@ -1,4 +1,6 @@
 import { state } from "./state.js";
+import { honorSuspensionReason } from "./wantedPolicy.js";
+import { absDay } from "./questUtils.js";
 import { FACTIONS } from "./lore.js";
 import { settlements } from "./map.js";
 import { isHonorFaction } from "./faction.js";
@@ -41,7 +43,7 @@ function donationFaction(getContext) {
   if (state.modeLabel !== MODE_LABEL.AUDIENCE || state.pendingEncounter?.active || state.expansion?.exploration.pending || state.expansion?.charts.pending) return null;
   const ctx = getContext();
   const faction = FACTIONS.find(f => f.nobles?.some(n => n.id === ctx.nobleId));
-  return faction && isNationalPowerFaction(faction.id) && isHonorFaction(faction.id) ? faction.id : null;
+  return faction && isNationalPowerFaction(faction.id) && isHonorFaction(faction.id) && !honorSuspensionReason(state, faction.id, absDay(state)) ? faction.id : null;
 }
 
 /** @param {Function} getContext 謁見相手。 @returns {void} 提供ボタンと開いている勢力シートを更新する。 */

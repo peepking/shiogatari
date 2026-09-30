@@ -241,7 +241,7 @@ async function main() {
   assert.equal(saveGameToStorage(), true);
   resetState(); assert.equal(loadGameFromStorage(), true);
   assert.equal(state.modeLabel, "prep"); assert.equal(state.pendingEncounter.bountyId, 5);
-  assert.equal(state.pendingEncounter.enemyName, "赤帆の保存名"); assert.equal(state.wanted.amount, 1000);
+  assert.equal(state.pendingEncounter.enemyName, "赤帆の保存名"); assert.equal(state.wanted.byFaction.north.amount, 0);
   state.modeLabel = "battle";
   const preparationSave = saved;
   assert.equal(saveGameToStorage(), false); assert.equal(saved, preparationSave);

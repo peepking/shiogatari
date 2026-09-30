@@ -693,8 +693,33 @@ option {
   padding: 14px;
 }
 
+.location-office-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.location-office-body > details {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.location-office-body > details > .btn,
+.location-office-body > details > select {
+  margin-top: 10px;
+  width: 100%;
+}
+
 #confirmModal {
   z-index: 60;
+}
+
+.bounty-card [data-bounty-fight] {
+  background: #385582;
+  border-color: #7aa7ff;
+  color: #fff;
+  font-weight: 700;
 }
 
 #eventTradeModal {
@@ -1751,3 +1776,6 @@ input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) 
 @media (max-width: 600px) { .bounty-list { grid-template-columns: minmax(0, 1fr); } }
 .variant-ship-history { max-height: 18rem; overflow-y: auto; overscroll-behavior: contain; }
 .variant-ship-record { padding: 0.75rem 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+/* 投獄の保存再試行中は背景操作を止める。 */
+.detention-dialog { max-width: min(32rem, 85vw); background: #15263a; color: #e7edf5; border: 1px solid #52677c; border-radius: 12px; padding: 24px; }
+.detention-dialog::backdrop { background: #080f20cc; }

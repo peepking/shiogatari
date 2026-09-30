@@ -1,4 +1,6 @@
 import { tideOracleReward } from "./tideAlliance.js";
+import { pirateRewardLabel } from "./pirateEconomy.js";
+import { wantedFacilityReason } from "./wantedPolicy.js";
 import { getCurrentSettlement } from "./actions.js";
 import { elements, pushToast } from "./dom.js";
 import { getSettlementById, focusMapPosition } from "./map.js";
@@ -54,16 +56,19 @@ export function renderQuestConditions(q) {
  * @returns {string}
  */
 export function renderQuestRewards(q) {
+  if (q.type === "amnesty") return `対象勢力の賞金を最大${q.reduction}減額（資金報酬なし）`;
   const resources = [];
   if (q.rewardFragment) resources.push({ id: "chart", label: `${chartLabel(q.rewardFragment)}の断片`, value: "+1（資金の代わり）" });
   else if (q.reward) resources.push({ id: "funds", label: "資金", value: `+${q.reward}` });
   if (q.rewardFaith) resources.push({ id: "faith", label: q.type?.startsWith("oracle_") ? `信仰（基本${q.rewardFaith}・今季の報告見込み）` : "信仰", value: `+${tideOracleReward(state, q)}` });
   if (q.rewardFame) resources.push({ id: "fame", label: "名声", value: `+${q.rewardFame}` });
   const power = questPowerRewardHtml(q);
-  return (resources.length ? resourceList(resources) : power ? "" : "報酬は依頼内容を参照") + power + (q.type?.startsWith("oracle_") ? '<div class="tiny">信仰の報告見込みは季節が変わると変動する場合があります。</div>' : '');
+  const pirateLabel = pirateRewardLabel(q);
+  return (resources.length ? resourceList(resources) : power ? "" : "報酬は依頼内容を参照") + power + (pirateLabel ? `<div class="tiny">${escapeHtml(pirateLabel)}</div>` : "") + (q.type?.startsWith("oracle_") ? '<div class="tiny">信仰の報告見込みは季節が変わると変動する場合があります。</div>' : '');
 }
 
 const TYPE_LABEL = {
+  amnesty: "恩赦",
   [QUEST_TYPES.SUPPLY]: "調達",
   [QUEST_TYPES.DELIVERY]: "配達",
   [QUEST_TYPES.REFUGEE_ESCORT]: "護送",
@@ -301,6 +306,11 @@ export function renderQuestModal(settlement, syncUI) {
   if (!body) return;
   if (!settlement) {
     body.innerHTML = `<tr><td colspan="4" class="ta-center pad-10">街・村の中でのみ受注できます。</td></tr>`;
+    return;
+  }
+  const restriction = wantedFacilityReason(state, settlement, "quest", absDay(state));
+  if (restriction) {
+    body.innerHTML = `<tr><td colspan="4">${escapeHtml(restriction)}</td></tr>`;
     return;
   }
   const available = getAvailableQuestsForSettlement(settlement.id);

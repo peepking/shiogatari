@@ -8,7 +8,7 @@ export const PIRATE_CONFIG = {
   bribeMin: 0.2, bribeMax: 0.8, bribeFailureFavor: -3, recordPenalty: -3,
   minScale: 0.5, maxScale: 1.5, raidScale: 1.25, raidRewardScale: 1.5,
   minimum: { normal: 3, elite: 30, bounty: 20, regular: 40 },
-  contrabandStock: 12, demandLow: [1,3], demandHigh: [8,10],
+  contrabandStock: [10,15], demandLow: [1,3], demandHigh: [8,10],
   relationHostile: -30, relationNeutral: 0, lawfulRadius: 8,
 };
 

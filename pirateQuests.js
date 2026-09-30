@@ -7,6 +7,7 @@ import { enqueueEvent } from "./events.js";
 import { pushLog } from "./dom.js";
 import { absDay, manhattan, randomHuntTarget } from "./questUtils.js";
 import { FACTIONS } from "./lore.js";
+import { bindPirateReward } from "./pirateEconomy.js";
 
 /**
  * 依頼の基準地点から最寄りの通常拠点を固定する。同距離はID順。
@@ -56,6 +57,7 @@ export function makePirateQuests(origin, factories) {
       q.title=kind === "raid" ? "隊商襲撃" : "商船団襲撃";
       q.desc=`(${q.target.x+1}, ${q.target.y+1})で${q.title}。推定${q.estimatedTotal}人・${q.fixedEnemy.strength === "elite" ? "強編成" : "通常編成"}。`;
     } else q.title=`海賊の物資納品：${q.title}`;
+    bindPirateReward(q, getNobleFavor(PIRATE_CONFIG.nobleId));
     bindVictim(q,origin);
     return q;
   }).filter(Boolean);
@@ -71,7 +73,7 @@ export function resolvePirateRelations(q) {
   const hunt=["pirate_hunt","bounty_hunt"].includes(q.type);
   if (!q.pirateKind && !hunt) return;
   q.pirateRelationsApplied=true;
-  if (q.pirateKind) recordCrime(state, "pirate_quest", q, absDay(state));
+  if (q.pirateKind) recordCrime(state, "pirate_quest", q, absDay(state), q.pirateVictim?.factionId);
   const delta=q.pirateKind ? PIRATE_CONFIG.favorDelta : -PIRATE_CONFIG.favorDelta;
   const before=getNobleFavor(PIRATE_CONFIG.nobleId);
   adjustNobleFavor(PIRATE_CONFIG.nobleId,delta);

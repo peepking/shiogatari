@@ -78,7 +78,8 @@ async function main() {
     const altar = rollChartReward({ kind: "altar", size }, goods, () => 0.999999);
     assert.equal(altar.faith, size === 3 ? 110 : 220);
     assert.equal(altar.fame, size === 3 ? 11 : 22);
-    assert.equal(rollChartReward({ kind: "treasure", size }, goods).funds, size === 3 ? 25000 : 50000);
+    assert.equal(rollChartReward({ kind: "treasure", size }, goods, () => 0).funds, size === 3 ? 23750 : 47500);
+    assert.equal(rollChartReward({ kind: "treasure", size }, goods, () => 0.999999).funds, size === 3 ? 26250 : 52500);
   }
   data.pending = { chartId: c.id, kind: "destination", dayApplied: true, reward: rollChartReward(c, goods) };
   const restored = normalizeExpansionState(JSON.parse(JSON.stringify(state.expansion)));

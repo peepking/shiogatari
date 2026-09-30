@@ -56,11 +56,11 @@ export function advanceDayWithEvents(days = 1) {
     updateBountyWorld();
     tickDailyWar(today);
     tickRelationDrift(today);
-    maybeQueueHonorInvite(today);
+    if (!state.wanted?.detention) maybeQueueHonorInvite(today);
     if (state.day % 7 === 0) {
       applySupportDrift();
     }
-    processScheduledOmens(today);
+    if (!state.wanted?.detention) processScheduledOmens(today);
   }
   // 日付進行に合わせて依頼の期限/季節更新を処理する。
   questTickDay(days);

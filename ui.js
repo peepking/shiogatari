@@ -1,4 +1,8 @@
 import { settleBattlePersonnel, wasBattleDeployed } from "./battlePersonnel.js";
+import { resumeDetention } from "./detentionUI.js";
+import { finishPursuit } from "./pursuit.js";
+import { finishTheftBattle } from "./settlementCrime.js";
+import { honorSuspensionReason, wantedFacilityReason, wantedEntryReason } from "./wantedPolicy.js";
 import { renderTideControl } from "./tideAllianceUI.js";
 import { activateAfterglow } from "./faith.js";
 import { wireFaithDetails, renderFaithDetails } from "./faithUI.js";
@@ -28,6 +32,8 @@ import { renderLocationHeader } from "./locationHeader.js";
 import { updateExplorationWorld, renderExplorationControl, resumeExploration, finishExploration } from "./explorationUI.js";
 import { updateBountyWorld, finishBounty } from "./bountyWorld.js";
 import { renderBountyControls, bountyRestriction } from "./bountyUI.js";
+import { renderOfficeControls } from "./locationOfficeUI.js";
+import { confirmAction } from "./dom.js";
 import { processScheduledOmens } from "./time.js";
 import { snapshotOutfitting, outfittingBattleLosses } from "./outfitting.js";
 import { renderOutfittingControl } from "./outfittingUI.js";
@@ -168,6 +174,7 @@ function isAudienceMode() {
  * @returns {boolean}
  */
 function canHonorHere(ctx) {
+  if (wantedFacilityReason(state, ctx?.settlement, "audience", absDay(state))) return false;
   if (!ctx?.settlement || !ctx.nobleId || ctx.settlement.pirateHaven) return false;
   if (honorFactions().length > 0) return false;
   if (isHonorFaction(ctx.settlement.factionId)) return false;
@@ -323,6 +330,8 @@ function setTradeError(msg) {
  */
 function enterAudience() {
   const ctx = getAudienceContext();
+  const restriction = wantedFacilityReason(state, ctx.settlement, "audience", absDay(state));
+  if (restriction) { pushToast("謁見不可", restriction, "warn"); return; }
   if (!ctx.nobleId) {
     pushToast("謁見不可", "ここで謁見できる貴族がいません。", "warn");
     return;
@@ -353,6 +362,8 @@ function exitAudience() {
  */
 function submitBribe() {
   const ctx = getAudienceContext();
+  const restriction = wantedFacilityReason(state, ctx.settlement, "audience", absDay(state));
+  if (restriction) { setInlineMessage(elements.bribeError, restriction); return; }
   if (!ctx.nobleId) {
     closeModal(elements.bribeModal);
     return;
@@ -609,6 +620,7 @@ function startAutoMove(target) {
  * @returns {void}
  */
 function escapeBattleSuccess(reason) {
+  finishPursuit(state, state.pendingEncounter, absDay(state));
   if (state.pendingEncounter?.explorationId != null) finishExploration(false);
   const text = reason || "敵との接触を回避しました。";
   clearBattlePrep();
@@ -676,6 +688,7 @@ function killedEnemyCount(meta) {
  */
 function processBattleOutcome(resultCode, meta) {
   const pending = state.pendingEncounter || {};
+  finishPursuit(state, pending, absDay(state));
   if (pending.bountyId != null && !state.bounties?.active.some(s => s.id === pending.bountyId)) { clearBattlePrep(true); syncUI(); return; }
   const enemyTotal = Array.isArray(meta?.units)
     ? meta.units.filter(u => u.side === "enemy" && wasBattleDeployed(u)).reduce((sum, u) => sum + u.count, 0)
@@ -955,7 +968,7 @@ function processBattleOutcome(resultCode, meta) {
       }
     }
     // 依頼以外の海賊遭遇に勝利したら、近傍拠点の貴族好感度をわずかに上げる
-    if (pending.bountyId == null && !questId && enemyFactionId === "pirates" && isWin) {
+    if (!pending.theftKind && pending.bountyId == null && !questId && enemyFactionId === "pirates" && isWin) {
       const nearest = settlements
         .filter(s => !s.pirateHaven)
         .map((s) => ({ s, d: manhattan(s.coords, state.position) }))
@@ -970,19 +983,23 @@ function processBattleOutcome(resultCode, meta) {
     }
     // 戦況スコア反映（敵勢力ID必須化）
     let delta = isWin ? 8 : resultCode === BATTLE_RESULT.LOSE ? -6 : 0;
-    if (pending.bountyId == null && !questId && !questType && enemyFactionId !== "pirates") {
+    if (!pending.theftKind && pending.bountyId == null && !questId && !questType && enemyFactionId !== "pirates") {
       delta = isWin ? 3 : resultCode === BATTLE_RESULT.LOSE ? -2 : 0;
       if (delta > 0) summary.push("戦況がわずかに有利に傾いた");
       if (delta < 0) summary.push("戦況がわずかに不利に傾いた");
     }
-    if (pending.bountyId == null && delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
+    if (!pending.theftKind && pending.bountyId == null && delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
 
     if (pending.explorationId != null) {
       const resources = finishExploration(isWin);
       summary.push(resources.length ? { label: "探索報酬", text: `探索報酬: ${resources.map(r => `${r.label} ${r.value}`).join(" / ")}`, resources } : "探索失敗: 探索地点は消滅しました。");
     }
     if (pending.bountyId != null && isWin) summary.push(...finishBounty(pending.bountyId));
-    const powerResources = pending.bountyId != null ? [] : nationalPowerResources(completeBattlePower(state, pending, isWin));
+    if (pending.theftKind) {
+      const resources = finishTheftBattle(state, pending, isWin);
+      summary.push(resources.length ? { label: "犯罪戦闘の戦利品", text: resources.map(r => `${r.label}＋${r.value}`).join(" / "), resources } : "犯罪戦闘からの追加報酬はありません。");
+    }
+    const powerResources = pending.theftKind || pending.bountyId != null ? [] : nationalPowerResources(completeBattlePower(state, pending, isWin));
     if (powerResources.length) summary.push({ label: "国力への貢献", text: powerResources.map(r => `${r.label} ${r.value}`).join(" / "), resources: powerResources });
     renderBattleSummary(summary, resultLabel, pending, enemyTotal, isWin);
   } finally {
@@ -1129,7 +1146,11 @@ function updateModeControls(loc) {
     ? isHonorFaction(audienceCtx.settlement.factionId)
     : false;
   if (elements.tradeBtn) elements.tradeBtn.hidden = !visible || inAudience;
-  if (elements.questOpenBtn) elements.questOpenBtn.hidden = !visible || inAudience;
+  const portRestriction = wantedEntryReason(state, hereSettlement, absDay(state));
+  const pirateWindow = !!portRestriction && hereSettlement?.pirateHaven && state.modeLabel === MODE_LABEL.NORMAL;
+  const portNote = document.getElementById("wantedPortNote");
+  if (portNote) { portNote.hidden = !portRestriction || lockActions; portNote.textContent = portRestriction; }
+  if (elements.questOpenBtn) elements.questOpenBtn.hidden = (!visible && !pirateWindow) || inAudience;
   if (elements.hireBtn) elements.hireBtn.hidden = !visible || inAudience;
   if (elements.oracleBtn) {
     elements.oracleBtn.hidden = lockActions || inAudience;
@@ -1219,6 +1240,12 @@ function updateModeControls(loc) {
     if (elements.warSupplyFoodBtn) {
       elements.warSupplyFoodBtn.disabled = elements.warSupplyFoodBtn.disabled || !war || usedKinds.has("supplyFood");
     }
+    const suspension = honorSuspensionReason(state, pf, absDay(state));
+    btns.forEach(button => {
+      if (!button) return;
+      button.disabled = button.disabled || !!suspension;
+      button.title = suspension;
+    });
     // 両陣営で使えるものは隠さない
   }
   if (elements.oracleBattleBtn) {
@@ -1298,7 +1325,9 @@ function updateModeControls(loc) {
   if (elements.audienceRequestBtn) {
     const showReq = inAudience && honorHere;
     elements.audienceRequestBtn.hidden = !showReq;
-    elements.audienceRequestBtn.disabled = !showReq;
+    const reason = honorSuspensionReason(state, audienceCtx.settlement?.factionId, absDay(state));
+    elements.audienceRequestBtn.disabled = !showReq || !!reason;
+    elements.audienceRequestBtn.title = reason;
   }
   if (elements.audienceResignBtn) {
     const showResign = inAudience && honorHere;
@@ -1315,6 +1344,9 @@ function updateModeControls(loc) {
  * 画面全体の状態表示を同期する。
  */
 function syncUI() {
+  if (!state.pendingEncounter?.active && [MODE_LABEL.IN_TOWN, MODE_LABEL.IN_VILLAGE, MODE_LABEL.AUDIENCE].includes(state.modeLabel) && wantedEntryReason(state, getCurrentSettlement(), absDay(state))) {
+    state.modeLabel = MODE_LABEL.NORMAL;
+  }
   renderFaithDetails();
   updateExplorationWorld();
   updateBountyWorld();
@@ -1361,6 +1393,7 @@ function syncUI() {
   renderNationalPowerControls(getAudienceContext);
 renderExplorationControl(syncUI);
   renderBountyControls(syncUI);
+  renderOfficeControls(syncUI);
   renderChartControl(syncUI);
   renderFishingControl(syncUI);
   renderOutfittingControl(syncUI);
@@ -1470,6 +1503,11 @@ function renderNobleQuestModal(noble, settlement, syncUI) {
   if (!body) return;
   if (!noble || !settlement) {
     body.innerHTML = `<tr><td colspan="4" class="ta-center pad-10">謁見中のみ受注できます。</td></tr>`;
+    return;
+  }
+  const suspension = wantedFacilityReason(state, settlement, "nobleQuest", absDay(state)) || honorSuspensionReason(state, settlement.factionId, absDay(state));
+  if (suspension) {
+    body.innerHTML = `<tr><td colspan="4">${escapeHtml(suspension)}</td></tr>`;
     return;
   }
   ensureNobleQuests(noble, settlement);
@@ -1648,7 +1686,7 @@ function bindModeControls() {
     waitOneDay(elements, clearActionMessage, syncUI);
   });
   elements.modePrayBtn?.addEventListener("click", () => {
-    performPrayer();
+    confirmAction({ title: "海に祈る", body: `信仰を${Math.floor(state.faith * 0.1)}消費して祈ります。この季節は再び祈れなくなります。`, onConfirm: () => { if (canPray()) performPrayer(); } });
   });
   elements.enterVillageBtn?.addEventListener("click", () => {
     attemptEnter("village", clearActionMessage, syncUI);
@@ -1858,7 +1896,10 @@ function bindExportButtons() {
 function bindBattlePrepButtons() {
   elements.battlePrepFightBtn?.addEventListener("click", startPrepBattle);
   elements.battlePrepRunBtn?.addEventListener("click", tryRunFromEncounter);
-  elements.battlePrepPrayBtn?.addEventListener("click", tryPrayEscape);
+  elements.battlePrepPrayBtn?.addEventListener("click", () => {
+    const encounter = state.pendingEncounter;
+    confirmAction({ title: "海に祈る", body: `信仰を${Math.floor(state.faith * 0.1)}消費して戦闘から離脱します。この季節は再び祈れなくなります。`, onConfirm: () => { if (encounter?.active && state.pendingEncounter === encounter && canPray()) tryPrayEscape(); } });
+  });
   elements.battlePrepSurrenderBtn?.addEventListener("click", surrenderBattle);
   elements.battleResultBack?.addEventListener("click", () => {
     closeModal(elements.battleResultModal);
@@ -1902,6 +1943,7 @@ if (state.expansion.exploration.pending) resumeExploration(syncUI);
     { text: "-", kind: "" },
   ]);
   if (!restored) pushLog("起動", "潮語り航海録を開始。");
+  resumeDetention(syncUI);
 }
 import { awardShips, totalShips, normalizeFleet } from "./fleet.js";
 import { snapshotBattlePower, completeBattlePower } from "./nationalPowerRules.js";

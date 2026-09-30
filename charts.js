@@ -91,7 +91,7 @@ export function reconcileCharts(data, quests) {
 }
 
 /**
- * 完成報酬を固定幅で抽選する。高級品は全種類へ1個ずつ配り、残りを均等抽選する。
+ * 完成報酬を固定幅で抽選する。資金は基準額±5%の整数を一様抽選する。高級品は全種類へ1個ずつ配り、残りを均等抽選する。
  * @param {object} chart 海図。 @param {string[]} goods 高級品ID。 @param {Function} [random] 乱数源。
  * @returns {object} 固定報酬。
  */
@@ -99,7 +99,7 @@ export function rollChartReward(chart, goods, random = Math.random) {
   const settings = CONFIG.rewards[chart.kind][chart.size];
   /** @param {number[]} range 範囲。 @returns {number} 範囲内の整数を均等抽選する。 */
   const integer = range => range[0] + Math.floor(random() * (range[1] - range[0] + 1));
-  const reward = { funds: settings.funds || 0, ships: settings.ships || 0,
+  const reward = { funds: settings.funds ? integer([Math.floor(settings.funds * 0.95), Math.ceil(settings.funds * 1.05)]) : 0, ships: settings.ships || 0,
     faith: settings.faith ? integer(settings.faith) : 0, fame: integer(CONFIG.fame[chart.size]), supplies: {} };
   if (settings.goods && goods.length) {
     for (const id of goods) reward.supplies[id] = 1;

@@ -34,6 +34,23 @@ async function main() {
   }
   const config=await load("pirateConfig.js");await config.evaluate();
   const c=config.namespace;
+  const economy=await load("pirateEconomy.js");await economy.evaluate();
+  for (const [favor,rate] of [[-100,.8],[-30,.8],[-29,.9],[-1,.9],[0,1],[29,1],[30,1.2],[100,1.2]]) {
+    const quest={pirateKind:"supply",reward:103,rewardFame:5};
+    economy.namespace.bindPirateReward(quest,favor);
+    assert.equal(quest.reward,Math.floor(103*rate));
+    assert.equal(quest.rewardFame,5);
+    assert.ok(economy.namespace.pirateRewardLabel(quest).includes(`${Math.round(rate*100)}%`));
+    const restored=JSON.parse(JSON.stringify(quest));
+    economy.namespace.bindPirateReward(restored,-favor);
+    assert.deepEqual(restored,quest,"保存復元後や好感度変動後も生成時の報酬を維持する");
+  }
+  for (const quest of [{reward:100},{pirateKind:"raid",reward:0,rewardFragment:{chartId:"chart"}}]) {
+    const before=JSON.stringify(quest);
+    economy.namespace.bindPirateReward(quest,100);
+    assert.equal(JSON.stringify(quest),before);
+    assert.equal(economy.namespace.pirateRewardLabel(quest),"");
+  }
   for(const [kind,min] of Object.entries(c.PIRATE_CONFIG.minimum)) {
     assert.equal(c.pirateEnemyCount({min:0,max:0},kind,1,()=>0),min);
     assert.equal(c.pirateEnemyCount({min:10000,max:10000},kind,1,()=>1),200);
@@ -75,6 +92,7 @@ async function main() {
   let relation="peace", builtFaction=null, rescued=null;
   const encounterMath=Object.create(Math);encounterMath.random=()=>0.99;
   const encounterContext=vm.createContext({state:encounterState,Math:encounterMath,wantedFaction:()=>null,
+    canRollPursuit:()=>false,hunterTier:()=>null,absDay:()=>120001,
     settlements:[{id:"enemyTown",factionId:"north",coords:{x:1,y:0}}],
     FACTIONS:[{id:"north",name:"North"},{id:"pirates",name:"Pirates"}],
     FRONT_ENCOUNTER_RADIUS:3,getPlayerFactionId:()=>"citadel",getRelation:()=>relation,
@@ -98,16 +116,32 @@ async function main() {
   vm.runInContext('handleMerchantAction({type:"merchant_rescue_help",payload:{enemyFactionId:"north",nobleId:"n"}})',encounterContext);
   assert.equal(rescued.enemyFactionId,"pirates");
   assert.equal(rescued.eventContext.nobleId,"n");
+  encounterContext.canRollPursuit = () => true;
+  encounterContext.hunterTier = () => ({ chance: 1, min: 110, max: 160 });
+  encounterContext.wantedFaction = () => "north";
+  encounterMath.random = () => 0;
+  vm.runInContext("triggerEncounter()", encounterContext);
+  assert.equal(encounterState.pendingEncounter.pursuitKind, "regular");
+  encounterContext.wantedFaction = () => null;
+  let pursuitOptions;
+  encounterContext.buildEnemyFormation = (_strength, faction, options) => {
+    pursuitOptions = options;
+    return { formation: [], total: 110, strength: "elite", kind: "bounty" };
+  };
+  vm.runInContext("triggerEncounter()", encounterContext);
+  assert.equal(encounterState.pendingEncounter.pursuitKind, "hunter");
+  assert.equal(pursuitOptions.totalRange.max, 160);
+  assert.equal(encounterState.pendingEncounter.frontId, null);
   const enc=await load("pirateEncounters.js");await enc.evaluate();
   const e=enc.namespace;
   Object.assign(modules.get("rosterOptions.js").namespace.rosterOptions,options);
   state.position={x:2,y:2};
   assert.equal(e.wantedFaction(),null);
-  state.wanted={amount:1000,lastCrimeAbs:120001};
+  state.wanted={version:2,byFaction:{north:{amount:1000,lastCrimeAbs:120001}}};
   assert.equal(e.wantedFaction(),"north");
-  state.honorFactions=["north"];assert.equal(e.wantedFaction(),null);state.honorFactions=[];
-  state.wanted.lastCrimeAbs=119401;assert.equal(e.wantedFaction(),null);
-  state.wanted={amount:1000,lastCrimeAbs:120001};
+  state.honorFactions=["north"];assert.equal(e.wantedFaction(),"north");state.honorFactions=[];
+  state.wanted.byFaction.north.lastCrimeAbs=119401;assert.equal(e.wantedFaction(),null);
+  state.wanted={version:2,byFaction:{north:{amount:1000,lastCrimeAbs:120001}}};
   state.position={x:20,y:20};assert.equal(e.wantedFaction(),null);state.position={x:2,y:2};
   state.supplies.illegal_drug=5;math.random=()=>0;
   assert.equal(e.enqueuePirateCheckpoint(),true);

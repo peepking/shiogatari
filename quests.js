@@ -1,4 +1,7 @@
 import { makePirateQuests, resolvePirateRelations } from "./pirateQuests.js";
+import { canCompleteAmnesty, completeAmnesty } from "./amnesty.js";
+import { saveGameToStorage } from "./storage.js";
+import { honorSuspensionReason, wantedFacilityReason } from "./wantedPolicy.js";
 import { tideOracleReward } from "./tideAlliance.js";
 import { pushLog, pushToast } from "./dom.js";
 import { enqueueEvent } from "./events.js";
@@ -406,6 +409,7 @@ export function addRefugeeEscortQuest(targetSet) {
 export function acceptQuest(id, settlement) {
   ensureState();
   if (!settlement) return null;
+  if (wantedFacilityReason(state, settlement, "quest", absDay(state))) return null;
   const list = state.quests.availableBySettlement[settlement.id] || [];
   const idx = list.findIndex((q) => q.id === id);
   if (idx === -1) return null;
@@ -453,6 +457,8 @@ export function acceptQuest(id, settlement) {
 export function acceptNobleQuest(id, noble, settlement) {
   ensureState();
   if (!noble || !settlement) return null;
+  if (wantedFacilityReason(state, settlement, "nobleQuest", absDay(state))) return null;
+  if (honorSuspensionReason(state, settlement.factionId, absDay(state))) return null;
   const list = state.nobleQuests.availableByNoble[noble.id] || [];
   const idx = list.findIndex((q) => q.id === id);
   if (idx === -1) return null;
@@ -1122,6 +1128,15 @@ export function completeQuest(id) {
   if (idx === -1) return false;
   const q = state.quests.active[idx];
   const here = getSettlementAtPosition(state.position.x, state.position.y);
+  if (q.type === "amnesty") {
+    const previous = structuredClone({ wanted: state.wanted, supplies: state.supplies, quests: state.quests });
+    const reduction = completeAmnesty(state, q, here);
+    if (!reduction) return false;
+    if (!saveGameToStorage()) { Object.assign(state, previous); pushToast("保存できません", "納品と賞金減額を取り消しました。", "warn"); return false; }
+    pushLog("恩赦", `${q.title} / 賞金−${reduction}`, "-");
+    pushToast("恩赦", `対象勢力の賞金を${reduction}減らしました。`, "good");
+    return true;
+  }
   let fameReward = 0;
   if (q.type === QUEST_TYPES.SUPPLY) {
     if (!here || here.id !== q.originId) return false;
@@ -1286,6 +1301,7 @@ export function completeQuest(id) {
  */
 export function canCompleteQuest(q) {
   const here = getSettlementAtPosition(state.position.x, state.position.y);
+  if (q.type === "amnesty") return canCompleteAmnesty(state, q, here);
   if (q.type === QUEST_TYPES.SUPPLY) {
     if (!here || here.id !== q.originId) return false;
     if ((state.supplies?.[q.itemId] ?? 0) < q.qty) return false;

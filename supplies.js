@@ -401,7 +401,7 @@ export function refreshSettlementStock(settlement) {
   if (settlement.pirateHaven) {
     add("food", rollDice(10, 10));
     pickTopByDemand(settlement, SUPPLY_TYPES.raw, 3).forEach(id => add(id, rollDice(5, 5)));
-    CONTRABAND.forEach(item => add(item.id, PIRATE_CONFIG.contrabandStock));
+    CONTRABAND.forEach(item => add(item.id, PIRATE_CONFIG.contrabandStock[0] + Math.floor(Math.random() * (PIRATE_CONFIG.contrabandStock[1] - PIRATE_CONFIG.contrabandStock[0] + 1))));
     return;
   }
 

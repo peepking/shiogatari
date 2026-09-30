@@ -1,7 +1,9 @@
 import { buildGrandReserve } from "./grandBattle.js";
+import { canRollPursuit, hunterTier } from "./pursuit.js";
+import { crimeRestriction, honorSuspensionReason, wantedEntryReason } from "./wantedPolicy.js";
 import { PIRATE_CONFIG, PIRATE_IMAGES, pirateEnemyCount } from "./pirateConfig.js";
 import { enqueuePirateCheckpoint, enqueueSettlementCheckpoint, handlePirateCheckpoint, wantedFaction } from "./pirateEncounters.js";
-import { recordCrime } from "./playerWanted.js";
+import { recordCrime, totalWanted, WANTED_FACTIONS } from "./playerWanted.js";
 import { visitTideSite } from "./tideAlliance.js";
 import { activateAfterglow, rollFaithRecruitment } from "./faith.js";
 import { MODE_LABEL, PLACE } from "./constants.js";
@@ -115,7 +117,7 @@ function notifyAutoMoveStop() {
  * 最大20部隊・各10人とし、人数上限200人まで全員を配分する。兵種・レベルの抽選は従来どおり。
  * @param {"normal"|"elite"|null} forceStrength 強敵プール強制指定
  * @param {string|null} enemyFactionId 敵勢力ID（正規軍プール判定用）
- * @param {{kind?:string,scale?:number,regularPool?:boolean}} options 賞金稼ぎ、襲撃規模、商船護衛の兵種指定。
+ * @param {{kind?:string,scale?:number,regularPool?:boolean,totalRange?:{min:number,max:number}}} options 賞金稼ぎ、襲撃規模、商船護衛の兵種指定。追跡の人数範囲を指定した場合は範囲内の整数を均等抽選し、最大200人・20部隊へ配分する。
  * @returns {{formation:Array, total:number, strength:string, terrain?:string}} 生成結果
  */
 export function buildEnemyFormation(forceStrength, enemyFactionId = null, options = {}) {
@@ -132,7 +134,7 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null, option
   const maxSquads = 20;
   const maxUnitCount = 10;
   const kind = options.kind || (useRegular ? "regular" : useStrong ? "elite" : "normal");
-  const total = pirateEnemyCount(range, kind, options.scale || 1);
+  const total = options.totalRange ? Math.max(1, Math.min(200, randInt(options.totalRange.min, options.totalRange.max))) : pirateEnemyCount(range, kind, options.scale || 1);
   const basePool = options.kind === "bounty" ? Object.keys(PIRATE_IMAGES) : enemyTroopPool(useRegular || options.regularPool, useStrong);
   const pool = basePool.slice().sort(() => Math.random() - 0.5).slice(0, Math.min(6, basePool.length));
   if (!pool.length) pool.push("infantry");
@@ -157,8 +159,6 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null, option
  * @returns {string} 勢力ID
  */
 function pickEncounterFaction(pos, terrain) {
-  const pursuit = wantedFaction();
-  if (pursuit && Math.random() < PIRATE_CONFIG.wantedChance) return pursuit;
   const regionWeight = new Map();
   settlements.forEach((s) => {
     if (!s?.factionId) return;
@@ -210,12 +210,16 @@ function pickEncounterFaction(pos, terrain) {
  */
 function triggerEncounter() {
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
-  const frontHint = pickFrontEncounter(state.position);
+  const pursuitCandidate = canRollPursuit(state, absDay(state)) ? wantedFaction() : null;
+  const pursuit = pursuitCandidate && Math.random() < PIRATE_CONFIG.wantedChance ? pursuitCandidate : null;
+  const tier = !pursuit && canRollPursuit(state, absDay(state)) ? hunterTier(state, absDay(state)) : null;
+  const hunter = tier && Math.random() < tier.chance ? tier : null;
+  const frontHint = pursuit || hunter ? null : pickFrontEncounter(state.position);
   const strongRange = pickAnchorRange(state.fame || 0, STRONG_ANCHORS);
   const basis = (strongRange.min + strongRange.max) / 2;
-  const enemyFactionId = frontHint?.enemyFactionId || pickEncounterFaction(state.position, terrain);
+  const enemyFactionId = pursuit || (hunter ? "pirates" : frontHint?.enemyFactionId || pickEncounterFaction(state.position, terrain));
   const bounty = enemyFactionId === "pirates" && basis >= PIRATE_CONFIG.minimum.bounty && Math.random() < PIRATE_CONFIG.bountyChance;
-  const { formation, total, strength, kind } = buildEnemyFormation(bounty ? "elite" : null, enemyFactionId, bounty ? {kind:"bounty"} : {});
+  const { formation, total, strength, kind } = buildEnemyFormation(hunter || bounty ? "elite" : null, enemyFactionId, hunter ? { kind: "bounty", totalRange: hunter } : bounty ? {kind:"bounty"} : {});
   state.pendingEncounter = {
     active: true,
     enemyFormation: formation,
@@ -225,6 +229,7 @@ function triggerEncounter() {
     enemyFactionId,
     frontId: frontHint?.frontId || null,
     encounterKind: kind,
+    pursuitKind: pursuit ? "regular" : hunter ? "hunter" : null,
   };
   state.modeLabel = MODE_LABEL.PREP;
   resetEncounterMeter();
@@ -237,7 +242,7 @@ function triggerEncounter() {
       : "通常編成";
   return {
     title: "敵襲",
-    message: `${enemyName} と遭遇しました（推定${total}人 / ${strengthLabel}）。行動を選んでください。`,
+    message: `${enemyName} と遭遇しました（推定${total}人 / ${strengthLabel}）。${pursuit || hunter ? "あなたの手配を受けた追跡部隊です。" : ""}行動を選んでください。`,
     log: `${enemyName} と遭遇（推定${total}人 / ${strengthLabel}）。`,
     detail: { enemyName, total, strengthLabel, enemyFactionId, frontId: frontHint?.frontId || null },
   };
@@ -372,6 +377,12 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
     return false;
   }
   const hereSettlement = getSettlementAtPosition(state.position.x, state.position.y);
+  const entryRestriction = wantedEntryReason(state, hereSettlement, absDay(state));
+  if (entryRestriction) {
+    pushToast("入場拒否", entryRestriction, "warn");
+    syncUI?.();
+    return false;
+  }
   if (hereSettlement && isSettlementUnderSiege(hereSettlement.id)) {
     setOutput("入場できません", "防衛中の拠点には入れません。戦闘の行方を見守りましょう。", [
       { text: "防衛中", kind: "warn" },
@@ -559,6 +570,8 @@ export function rollTravelEvents() {
  * @returns {boolean}
  */
 export function triggerWarAction(kind) {
+  const suspension = honorSuspensionReason(state, getPlayerFactionId(), absDay(state));
+  if (suspension) { pushToast("家臣機能停止中", suspension, "warn"); return false; }
   const here = getSettlementAtPosition(state.position.x, state.position.y);
   const pf = getPlayerFactionId();
   if (!here || !here.factionId || !pf || pf === "player") {
@@ -841,7 +854,7 @@ function handleRefugeeAction(action) {
       return true;
     }
     case "refugee_attack": {
-      const info = nearestSettlementInfo();
+      const info = action.payload;
       if (info?.settlementId && info?.factionId) adjustSupport(info.settlementId, info.factionId, -3);
       if (info?.nobleId) adjustNobleFavor(info.nobleId, -4);
       startTravelEncounter({
@@ -1032,7 +1045,7 @@ function handleTraitorAction(action) {
 
 /** 部隊員がいない場合、選択によって直ちに戦闘へ進む行動を禁止する。 */
 export function isBattleEventActionBlocked(action) {
-  return ["merchant_attack", "merchant_rescue_help", "merchant_rescue_attack", "smuggle_attack", "refugee_attack", "checkpoint_force", "pirate_force"].includes(action?.type) && totalTroops() <= 0;
+  return Boolean(crimeRestriction(state, action)) || (["merchant_attack", "merchant_rescue_help", "merchant_rescue_attack", "smuggle_attack", "refugee_attack", "checkpoint_force", "pirate_force"].includes(action?.type) && totalTroops() <= 0);
 }
 
 /**
@@ -1044,6 +1057,10 @@ export function handleTravelEventAction(action) {
   if (state.pendingEncounter?.active && action?.crimeRecorded) return true;
   if (isBattleEventActionBlocked(action)) return false;
   if (!action?.type) return false;
+  const kinds = { merchant_attack: "merchant_attack", merchant_rescue_attack: "merchant_attack", refugee_attack: "refugee_raid", checkpoint_force: "checkpoint_force", pirate_force: "pirate_checkpoint" };
+  if (["refugee_attack", "checkpoint_force"].includes(action.type) && !action.payload?.factionId) action.payload = nearestSettlementInfo();
+  const crimeFaction = action.type === "pirate_force" ? state.piracy?.checkpoint?.factionId : action.payload?.enemyFactionId || action.payload?.factionId;
+  if (kinds[action.type] && !WANTED_FACTIONS.includes(crimeFaction)) return false;
   const handlers = [
     handlePirateCheckpoint,
     handleChartPurchase,
@@ -1060,12 +1077,11 @@ export function handleTravelEventAction(action) {
     const before = state.pendingEncounter;
     if (h(action)) {
       if (state.pendingEncounter?.active && state.pendingEncounter !== before) {
-        const kinds = { merchant_attack: "merchant_attack", merchant_rescue_attack: "merchant_attack", refugee_attack: "refugee_raid", checkpoint_force: "checkpoint_force", pirate_force: "pirate_checkpoint" };
-        const amount = recordCrime(state, kinds[action.type], action, absDay(state));
+        const amount = recordCrime(state, kinds[action.type], action, absDay(state), crimeFaction);
         if (amount) {
           state.pendingEncounter.crimeRecorded = true;
-          pushLog("指名手配", `賞金 +${amount}（現在 ${state.wanted.amount}）`, "-");
-          pushToast("指名手配", `あなたへの賞金が${state.wanted.amount}資金になりました。`, "warn");
+          pushLog("指名手配", `賞金 +${amount}（合計 ${totalWanted(state.wanted)}）`, "-");
+          pushToast("指名手配", `あなたへの合計賞金が${totalWanted(state.wanted)}資金になりました。`, "warn");
         }
       }
       return true;

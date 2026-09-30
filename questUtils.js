@@ -10,11 +10,11 @@ function explorationPositions() {
 }
 
 /** @type {number} 1季節あたりの日数 */
-export const DAY_PER_SEASON = 30;
+export { DAY_PER_SEASON } from "./calendar.js";
 /** @type {number} 1年あたりの季節数 */
-export const SEASONS_PER_YEAR = 4;
+export { SEASONS_PER_YEAR } from "./calendar.js";
 /** @type {number} 1年あたりの日数 */
-export const DAY_PER_YEAR = DAY_PER_SEASON * SEASONS_PER_YEAR;
+export { DAY_PER_YEAR } from "./calendar.js";
 
 /** 敵人数計算用アンカー（通常） */
 export const NORMAL_ANCHORS = [
@@ -53,7 +53,7 @@ export const rollDice = (sides, count) =>
  * @param {{year:number,season:number,day:number}} param0
  * @returns {number}
  */
-export const absDay = ({ year, season, day }) => year * DAY_PER_YEAR + season * DAY_PER_SEASON + day;
+export { absDay } from "./calendar.js";
 /**
  * マンハッタン距離を計算する。
  * @param {{x:number,y:number}} a

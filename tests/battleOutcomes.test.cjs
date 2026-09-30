@@ -13,21 +13,37 @@ async function main() {
   const body = raw.slice(start, raw.indexOf("\n}", start) + 2);
   const personnel = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../battlePersonnel.js"), "utf8"));
   await personnel.link(() => {}); await personnel.evaluate();
+  const pursuit = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../pursuit.js"), "utf8"));
+  const pursuitDependencies = new Map();
+  /** @param {string} name 相対名。 @returns {Promise<vm.Module>} 追跡の実依存モジュール。 */
+  async function loadPursuitDependency(name) {
+    if (pursuitDependencies.has(name)) return pursuitDependencies.get(name);
+    const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"));
+    pursuitDependencies.set(name, module);
+    await module.link(loadPursuitDependency);
+    return module;
+  }
+  await pursuit.link(loadPursuitDependency); await pursuit.evaluate();
+  const theft = await loadPursuitDependency("./settlementCrime.js"); await theft.evaluate();
   const QUEST_TYPES = Object.fromEntries(["ORACLE_HUNT", "ORACLE_ELITE", "PIRATE_HUNT", "BOUNTY_HUNT",
     "NOBLE_SECURITY", "NOBLE_HUNT", "WAR_DEFEND_RAID", "WAR_ATTACK_RAID", "WAR_SKIRMISH", "WAR_BLOCKADE"].map(id => [id,id]));
-  const routes = ["normal", "exploration", "bounty", ...Object.keys(QUEST_TYPES)];
+  const routes = ["normal", "armory", "raid", "pursuit", "hunter", "exploration", "bounty", ...Object.keys(QUEST_TYPES)];
   for (const route of routes) for (const outcome of ["win", "lose", "draw"]) {
     const quest = { id: 1 };
     const pending = { enemyFactionId: "north", enemyFormation: [{type:"infantry",count:20}], enemyTotal:120 };
     if (QUEST_TYPES[route]) Object.assign(pending,{questId:1,questType:route,questFightIdx:1});
     if (route === "bounty") pending.bountyId = 1;
     if (route === "exploration") pending.explorationId = 1;
+    if (route === "pursuit") pending.pursuitKind = "regular";
+    if (route === "hunter") pending.pursuitKind = "hunter";
+    if (route === "armory") Object.assign(pending, { theftKind: "theft_armory", theftReward: { arms: 8, iron: 10 } });
+    if (route === "raid") Object.assign(pending, { theftKind: "settlement_raid", theftReward: { food: 50, wood: 10 }, theftFunds: 5000 });
     const state = { funds:1000,fame:100,supplies:{food:50},troops:{},quests:{active:[quest]},
-      pendingEncounter:pending,bounties:{active:[{id:1}]} };
+      pendingEncounter:pending,bounties:{active:[{id:1}]},wanted:{} };
     const calls = [];
     /** @param {string} name 呼出名。 @returns {Function} 呼出記録。 */
     const record = name => (...args) => { calls.push({name,args}); return []; };
-    const context = vm.createContext({ state, QUEST_TYPES, ...personnel.namespace,
+    const context = vm.createContext({ state, QUEST_TYPES, ...personnel.namespace, ...pursuit.namespace, finishTheftBattle: theft.namespace.finishTheftBattle,
       Math:Object.assign(Object.create(Math),{random:()=>0.5}),
       BATTLE_RESULT:{WIN:"win",LOSE:"lose",DRAW:"draw"},BATTLE_RESULT_LABEL:{},NONE_LABEL:"なし",
       SUPPLY_ITEMS:[{id:"food",name:"食料"}],TROOP_STATS:{},BONUS_CAPTURE_EVENT_TAGS:new Set(),
@@ -45,9 +61,15 @@ async function main() {
       {side:"enemy",count:100,hp:100,status:"reserve",deployedAt:null},
     ]};
     vm.runInContext(`processBattleOutcome(${JSON.stringify(outcome)},meta)`,context);
+    assert.equal(state.wanted.pursuitUntil, ["pursuit", "hunter"].includes(route) ? 3 : undefined);
+    if (route === "armory") {
+      assert.equal(state.supplies.arms || 0, outcome === "win" ? 8 : 0);
+      assert.equal(calls.filter(c => c.name === "war").length, 0);
+    }
     assert.equal(calls.filter(c=>c.name==="clear").length,1);
     assert.equal(calls.find(c=>c.name==="summary").args[3],20,"未投入の敵を報酬基準へ含めない");
-    assert.equal(state.funds,outcome==="win"?1400:outcome==="lose"?500:1000);
+    assert.equal(state.funds,outcome==="win"?(route==="raid"?6400:1400):outcome==="lose"?500:1000);
+    if (route === "raid") assert.equal(calls.filter(c => c.name === "war").length, 0);
     assert.equal(state.fame,outcome==="win"?105:outcome==="lose"?95:100);
     const completion = calls.filter(c=>["oracleWin","oracleLose","hunt","noble","front"].includes(c.name));
     assert.equal(completion.length,QUEST_TYPES[route] && outcome!=="draw"?1:0);

@@ -303,6 +303,7 @@
               </div>
             </div>
             <div class="bd">
+              <p class="tiny" id="wantedPortNote" hidden></p>
               <div class="location-actions" id="locationActions">
                 <section class="location-action-group" aria-labelledby="facilityActionsTitle">
                 <h3 id="facilityActionsTitle">施設<span>旅の支度</span></h3>
@@ -318,6 +319,8 @@
                 <div class="location-action-grid">
                 <button class="btn good" id="questOpenBtn" hidden>依頼受注</button>
                 <button class="btn" id="bountyOpenBtn" hidden>賞金首</button>
+                <button class="btn" id="locationOfficeBtn" hidden>窓口で交渉</button>
+                <button class="btn" id="locationCrimeBtn" hidden>裏の行動</button>
                 <button class="btn good" id="audienceBtn" hidden>謁見する</button>
                 <button class="btn good" id="tideOpen" hidden>潮盟の拠点</button>
                 </div>
@@ -325,6 +328,7 @@
                 <section class="location-action-group journey-action-group" aria-labelledby="journeyActionsTitle">
                 <h3 id="journeyActionsTitle">旅の行動<span>潮と向き合う</span></h3>
                 <div class="location-action-grid">
+                <button class="btn" id="identityOpenBtn">所属・身分</button>
                 <button class="btn" id="fishBtn" hidden>釣り</button>
                 <button class="btn warn" id="bountyVisitBtn" hidden>賞金首を確認</button>
                 <button class="btn primary" id="oracleBtn">神託を授かる</button>
@@ -434,6 +438,12 @@
 
   <div id="toastContainer" aria-live="polite"></div>
 
+  <div class="modal-backdrop" id="locationOfficeModal" hidden>
+    <div class="modal bounty-modal" role="dialog" aria-modal="true" aria-labelledby="locationOfficeTitle">
+      <div class="modal-hd"><h2 id="locationOfficeTitle">窓口で交渉</h2><button class="btn" id="locationOfficeClose">閉じる</button></div>
+      <div class="modal-bd location-office-body" id="locationOfficeBody"></div>
+    </div>
+  </div>
   <div class="modal-backdrop" id="bountyModal" hidden>
     <div class="modal bounty-modal" role="dialog" aria-modal="true" aria-labelledby="bountyTitle">
       <div class="modal-hd"><h2 id="bountyTitle">賞金首</h2><button class="btn" id="bountyCloseBtn">閉じる</button></div>

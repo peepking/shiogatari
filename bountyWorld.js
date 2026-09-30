@@ -22,7 +22,7 @@ function occupiedPositions() {
 
 /** 日次は期限を処理し、初回と季節変更時だけ到達候補を計算して補充する。 @returns {void} */
 export function updateBountyWorld() {
-  if (expireWanted(state.wanted, absDay(state))) pushLog("手配解除", "5年間新たな犯罪がなく、あなたへの手配が解除されました。", "-");
+  if (expireWanted(state.wanted, absDay(state))) pushLog("手配解除", "最後の犯罪から600日が経過した勢力の手配が解除されました。他勢力の手配は継続します。", "-");
   if (!mapData.length) return;
   state.bounties ||= normalizeBounties();
   const data = state.bounties, season = state.year * 4 + state.season;
