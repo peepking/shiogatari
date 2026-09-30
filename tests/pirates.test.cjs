@@ -1,3 +1,4 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -27,7 +28,7 @@ async function main() {
     const exports=stubs[name];
     const mod=exports ? new vm.SyntheticModule(Object.keys(exports),function(){
       for(const [key,value] of Object.entries(exports)) this.setExport(key,value);
-    },{context}) : new vm.SourceTextModule(await fs.readFile(path.join(__dirname,"..",name),"utf8"),{context});
+    },{context}) : new vm.SourceTextModule(await readSource(name),{context});
     modules.set(name,mod);
     await mod.link(load);
     return mod;
@@ -71,7 +72,7 @@ async function main() {
   const originalPorts=JSON.stringify(sets);
   world.namespace.buildPirateHavens(grid,sets,homes,()=>assert.fail("既設港を再初期化しない"));
   assert.equal(JSON.stringify(sets),originalPorts);
-  const mapSource=await fs.readFile(path.join(__dirname,"..","map.js"),"utf8");
+  const mapSource=await readSource("map.js");
   const seasonalSource=mapSource.match(/function refreshSettlementDemandIfNeeded\(\) \{[\s\S]*?\n\}/)?.[0];
   assert.ok(seasonalSource);
   const refreshed={demand:0,stock:0,recruit:0};
@@ -87,7 +88,7 @@ async function main() {
     assert.equal(JSON.stringify(sets),originalPorts);
   }
   assert.deepEqual(refreshed,{demand:80,stock:80,recruit:80});
-  const actionSource=await fs.readFile(path.join(__dirname,"..","actions.js"),"utf8");
+  const actionSource=await readSource("actions.js");
   const encounterState={position:{x:0,y:0},fame:0,warLedger:{entries:[]}};
   let relation="peace", builtFaction=null, rescued=null;
   const encounterMath=Object.create(Math);encounterMath.random=()=>0.99;

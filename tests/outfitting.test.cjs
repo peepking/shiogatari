@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /** @returns {Promise<void>} 艤装購入・射撃境界・補助兵・消費を検証する。 */
@@ -9,7 +8,7 @@ async function main() {
   /** @param {string} name モジュール名。 @returns {Promise<vm.Module>} 実モジュール。 */
   async function load(name) {
     if (modules.has(name)) return modules.get(name);
-    const m = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"));
+    const m = new vm.SourceTextModule(await readSource(name));
     modules.set(name, m); await m.link(load); return m;
   }
   await load("./fleet.js");

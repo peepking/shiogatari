@@ -1,7 +1,6 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require('node:assert/strict');
-const fs = require('node:fs/promises');
 const vm = require('node:vm');
-const path = require('node:path');
 
 /** 相場の上下限・補正範囲・売却端数・分割時の一致を検証する。 */
 async function main() {
@@ -14,10 +13,10 @@ async function main() {
     './upkeep.js': {renderUpkeepForecast() {}}, './outfitting.js': {getOutfittingEffects() {}, applyCapacityBonus() {}},
     './troops.js': {TROOP_STATS: {}}, './fleet.js': {fleetEffects() {}},
   };
-  const mod = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, '../supplies.js'), 'utf8'));
-  const faith = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, '../faith.js'), 'utf8'));
+  const mod = new vm.SourceTextModule(await readSource('supplies.js'));
+  const faith = new vm.SourceTextModule(await readSource('faith.js'));
   await faith.link(() => {});
-  const pirate = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, '../pirateConfig.js'), 'utf8'));
+  const pirate = new vm.SourceTextModule(await readSource('pirateConfig.js'));
   await pirate.link(() => {});
   await mod.link(name => name === './pirateConfig.js' ? pirate : name === './faith.js' ? faith : new vm.SyntheticModule(Object.keys(dependencies[name]), function () {
     for (const [key, value] of Object.entries(dependencies[name])) this.setExport(key, value);

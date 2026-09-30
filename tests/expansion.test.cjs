@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /**
@@ -16,7 +15,7 @@ async function main() {
    */
   async function load(name) {
     if (modules.has(name)) return modules.get(name);
-    const source = await fs.readFile(path.join(__dirname, "..", name), "utf8");
+    const source = await readSource(name);
     const module = new vm.SourceTextModule(source, { identifier: name });
     modules.set(name, module);
     await module.link(load);

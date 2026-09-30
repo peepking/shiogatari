@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /**
@@ -18,7 +17,7 @@ async function main() {
       addEventListener(name, handler) { change = handler; },
     },
   };
-  const source = await fs.readFile(path.join(__dirname, "../rosterOptions.js"), "utf8");
+  const source = await readSource("rosterOptions.js");
   /** @returns {Promise<object>} 独立した画面起動を再現する。 */
   async function boot() {
     const context = vm.createContext({

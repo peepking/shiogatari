@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /**
@@ -8,7 +7,7 @@ const vm = require("node:vm");
  * @returns {Promise<void>}
  */
 async function main() {
-  const source = await fs.readFile(path.join(__dirname, "../questDeadlines.js"), "utf8");
+  const source = await readSource("questDeadlines.js");
   for (const days of [60, 75]) {
     const module = new vm.SourceTextModule(source.replace("delivery: 60", `delivery: ${days}`));
     /** @returns {void} 外部依存を禁止する。 */

@@ -12,7 +12,7 @@
 - 15世紀頃の世界観に合わせ、自然由来の餌を使う。
 - 一般魚・大物・超大物は大きさ・価値・釣り応えの分類。魚・イカ・タコ・エビ・カニなどの生物分類とは別に扱う。
 - 上位竿は操作の猶予を広げる装備であり、魚種の解禁条件にはしない。大物ほど基本猶予は短いが、極端に厳しい反射操作を要求しない。
-- 初期の200種案は現行の286種へ拡張済み。魚種の値は `fishingConfig.js` の `FISH_SPECIES`、由来・候補名簿は [釣り対象マスター候補一覧](shiogatari_fishing_species_master.md) を参照する。
+- 初期の200種案は現行の286種へ拡張済み。魚種の値は `src/fishing/fishingConfig.js` の `FISH_SPECIES`、由来・候補名簿は [釣り対象マスター候補一覧](shiogatari_fishing_species_master.md) を参照する。
 - 竿以外の完成率報酬・漁船は [釣り図鑑の追加報酬](fishing-rewards.md) に集約する。
 
 ### 生息条件と釣果の利用
@@ -289,7 +289,7 @@
 - 発見済みカードには分類共通のシルエット・魚名・最大サイズ・生息域・季節を表示する。未発見カードには正体を伏せたアイコンと、従来の公開条件で確認できる手がかりだけを表示する。
 - 詳細では魚名・説明・最大記録・生態情報をまとめる。未発見魚の情報公開条件と検索対象は変更しない。
 - 詳細から一覧へ戻ると、検索条件・絞り込み・スクロール位置・選択カードへのフォーカスを復元する。
-- 分類シルエットは `fishingCodexArt.js` に分離し、SVGで描画する。
+- 分類シルエットは `src/fishing/fishingCodexArt.js` に分離し、SVGで描画する。
 
 ### 8.4 図鑑データ構造
 
@@ -364,18 +364,18 @@ codex[speciesId] = {
 
 | 機能 | モジュール | 主な関数 |
 |------|-----------|----------|
-| セッション管理 | `fishingUI.js` | `beginFishing`, `doCast`, `resolveWait`, `resolveBite`, `openFishingPanel` |
-| 餌消費・加工・購入 | `fishing.js` | `consumeBait`, `processToBait`, `purchaseBait` |
-| 抽選・窓計算 | `fishing.js` | `rollCatch`, `windowFor`, `rollSize`, `getCurrentRod`, `checkRodUpgrade` |
-| 図鑑・記録 | `fishing.js` | `recordCatch`, `codexCompletion`, `speciesById` |
-| UI描画 | `fishingUI.js` | `sessionHtml`, `resultAnnouncementHtml`, `inventoryHtml`, `wireSessionButtons` |
-| 報酬モーダル | `fishingUI.js` | `showRodRewardModal` |
-| 状態保存・復元 | `fishing.js` | `createFishingState`, `normalizeFishing`, `sessionDayRule` |
-| 図鑑完成率 | `fishing.js` | `codexCompletion`, `codexRevealState` |
+| セッション管理 | `src/fishing/fishingUI.js` | `beginFishing`, `doCast`, `resolveWait`, `resolveBite`, `openFishingPanel` |
+| 餌消費・加工・購入 | `src/fishing/fishing.js` | `consumeBait`, `processToBait`, `purchaseBait` |
+| 抽選・窓計算 | `src/fishing/fishing.js` | `rollCatch`, `windowFor`, `rollSize`, `getCurrentRod`, `checkRodUpgrade` |
+| 図鑑・記録 | `src/fishing/fishing.js` | `recordCatch`, `codexCompletion`, `speciesById` |
+| UI描画 | `src/fishing/fishingUI.js` | `sessionHtml`, `resultAnnouncementHtml`, `inventoryHtml`, `wireSessionButtons` |
+| 報酬モーダル | `src/fishing/fishingUI.js` | `showRodRewardModal` |
+| 状態保存・復元 | `src/fishing/fishing.js` | `createFishingState`, `normalizeFishing`, `sessionDayRule` |
+| 図鑑完成率 | `src/fishing/fishing.js` | `codexCompletion`, `codexRevealState` |
 
 ---
 
-## 11. 設定定数 (`fishingConfig.js`)
+## 11. 設定定数 (`src/fishing/fishingConfig.js`)
 
 ```javascript
 FISHING_CONFIG = {
@@ -417,9 +417,9 @@ BAIT_DEFS = {
 
 | ファイル | 役割 |
 |---------|------|
-| `fishing.js` | 核心ロジック（抽選、窓計算、記録、餌操作、竿判定） |
-| `fishingUI.js` | UI描画・イベントハンドリング・モーダル表示 |
-| `fishingConfig.js` | 定数定義（竿・餌・閾値・窓設定） |
+| `src/fishing/fishing.js` | 核心ロジック（抽選、窓計算、記録、餌操作、竿判定） |
+| `src/fishing/fishingUI.js` | UI描画・イベントハンドリング・モーダル表示 |
+| `src/fishing/fishingConfig.js` | 定数定義（竿・餌・閾値・窓設定） |
 | `index.html` | 中央の釣りパネル・図鑑と竿報酬のモーダル構造 |
 | `styles.css` | スタイル（釣りの水面・浮き、固定操作欄、釣果強調、竿色分け） |
 

@@ -1,14 +1,13 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
 const vm = require("node:vm");
-const path = require("node:path");
 
 /** @param {unknown} value 比較値。 @returns {unknown} 通常のオブジェクト。 */
 function plain(value) { return JSON.parse(JSON.stringify(value)); }
 
 /** @returns {Promise<void>} 迂回・移動競合・同時攻撃・役割分類の結合を検証する。 */
 async function main() {
-  const movement = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../battleMovement.js"), "utf8"));
+  const movement = new vm.SourceTextModule(await readSource("battleMovement.js"));
   await movement.link(() => {}); await movement.evaluate();
   const { findAttackPath: find, findTacticalPath: tactical, resolveBattleMovement: resolve, isHostileZone: zone } = movement.namespace;
   const start = { id: "a", x: 1, y: 1, range: 1 };
@@ -70,10 +69,10 @@ async function main() {
   const flank = tactical(mounted, distant, 8, new Set(["1,3", "5,3"]), 0, [mounted, distant]);
   assert.notEqual(flank.at(-1).y, distant.y, "騎乗兵は2歩までの迂回なら側方の攻撃位置を選べる");
 
-  const core = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../battleCore.js"), "utf8"));
-  const morale = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../battleMorale.js"), "utf8"));
+  const core = new vm.SourceTextModule(await readSource("battleCore.js"));
+  const morale = new vm.SourceTextModule(await readSource("battleMorale.js"));
   await morale.link(() => {});
-  const reinforcements = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../battleReinforcements.js"), "utf8"));
+  const reinforcements = new vm.SourceTextModule(await readSource("battleReinforcements.js"));
   await core.link(name => ({ "./battleMovement.js": movement, "./battleMorale.js": morale, "./battleReinforcements.js": reinforcements })[name]); await core.evaluate();
   const { stepBattle: step, battleResult } = core.namespace;
   /** @param {string} side 陣営。 @param {number} x 座標。 @returns {object} 部隊。 */

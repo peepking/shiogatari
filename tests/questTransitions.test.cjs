@@ -1,9 +1,8 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const vm = require("node:vm");
 /** @param {string} file ファイル名。 @returns {string} 検証対象のソース。 */
-function read(file) { return fs.readFileSync(path.join(__dirname, "..", file), "utf8"); }
+function read(file) { return readSource(file); }
 const quests = read("quests.js");
 const state = { quests: { active: [] }, fame: 0 };
 const context = vm.createContext({

@@ -1,7 +1,7 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
 const vm = require("node:vm");
-const source = fs.readFileSync(require("node:path").join(__dirname, "../battle.js"), "utf8");
+const source = readSource("battle.js");
 const context = vm.createContext({
   MORALE_RULES: { initial: 100 },
   deploymentDepth: size => Math.max(2, Math.ceil(20 / size)),
@@ -41,7 +41,7 @@ const terrainSelection = "createUnits([...Array(20).fill({type:'basic',count:10}
 assert.equal(vm.runInContext(terrainSelection, context), false);
 vm.runInContext("battleState.grid.forEach(row => row.fill('forest'))", context);
 assert.equal(vm.runInContext(terrainSelection, context), true);
-const actionsSource = fs.readFileSync(require("node:path").join(__dirname, "../actions.js"), "utf8");
+const actionsSource = readSource("actions.js");
 const formationStart = actionsSource.indexOf("function buildEnemyFormation(");
 context.state = { fame: 5611 };
 context.pirateEnemyCount = range => range.min;

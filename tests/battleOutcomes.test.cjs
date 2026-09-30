@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /** 実際の戦後処理へ勝敗を渡し、経路別通知・予備隊除外・再戦維持を検証する。
@@ -8,17 +7,17 @@ const vm = require("node:vm");
  * @returns {Promise<void>} 検証完了。
  */
 async function main() {
-  const raw = await fs.readFile(path.join(__dirname, "../ui.js"), "utf8");
+  const raw = await readSource("ui.js");
   const start = raw.indexOf("function processBattleOutcome(");
   const body = raw.slice(start, raw.indexOf("\n}", start) + 2);
-  const personnel = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../battlePersonnel.js"), "utf8"));
+  const personnel = new vm.SourceTextModule(await readSource("battlePersonnel.js"));
   await personnel.link(() => {}); await personnel.evaluate();
-  const pursuit = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../pursuit.js"), "utf8"));
+  const pursuit = new vm.SourceTextModule(await readSource("pursuit.js"));
   const pursuitDependencies = new Map();
   /** @param {string} name 相対名。 @returns {Promise<vm.Module>} 追跡の実依存モジュール。 */
   async function loadPursuitDependency(name) {
     if (pursuitDependencies.has(name)) return pursuitDependencies.get(name);
-    const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"));
+    const module = new vm.SourceTextModule(await readSource(name));
     pursuitDependencies.set(name, module);
     await module.link(loadPursuitDependency);
     return module;

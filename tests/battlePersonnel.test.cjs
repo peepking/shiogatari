@@ -1,14 +1,13 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
 const vm = require("node:vm");
-const path = require("node:path");
 
 /** @param {unknown} value 値。 @returns {unknown} 比較用の通常オブジェクト。 */
 function plain(value) { return JSON.parse(JSON.stringify(value)); }
 
 /** @returns {Promise<void>} 混成レベル・待機兵・予備隊・救護・昇級を検証する。 */
 async function main() {
-  const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../battlePersonnel.js"), "utf8"));
+  const module = new vm.SourceTextModule(await readSource("battlePersonnel.js"));
   await module.link(() => { throw new Error("兵員台帳は外部状態に依存しない"); });
   await module.evaluate();
   const { takeBattlePersonnel: take, returnBattlePersonnel: back, settleBattlePersonnel: settle } = module.namespace;
@@ -56,7 +55,7 @@ async function main() {
     const survivors = settle(troops, [routed], { lossProb: 1, upgrades: 0 });
     assert.deepEqual(plain(survivors.troops), troops, "敗走・退出だけでは恒久損耗を生まない");
   }
-  const battleSource = await fs.readFile(path.join(__dirname, "../battle.js"), "utf8");
+  const battleSource = await readSource("battle.js");
   const context = vm.createContext({ takeBattlePersonnel: take, returnBattlePersonnel: back,
     MORALE_RULES: { initial: 100 },
     battleRoster: { standby: { infantry: [{ level: 5, count: 3 }, { level: 1, count: 7 }] } },

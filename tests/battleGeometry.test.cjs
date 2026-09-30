@@ -1,16 +1,15 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
 const vm = require("node:vm");
-const path = require("node:path");
 /** @returns {Promise<void>} 全サイズの配置と、拡大・スクロール時の選択位置を検証する。 */
 async function main() {
-  const geometry = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../battleGeometry.js"), "utf8"));
-  const formation = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../battleFormation.js"), "utf8"));
+  const geometry = new vm.SourceTextModule(await readSource("battleGeometry.js"));
+  const formation = new vm.SourceTextModule(await readSource("battleFormation.js"));
   await geometry.link(() => {}); await geometry.evaluate(); await formation.link(() => {}); await formation.evaluate();
   const { selectBattleSize, deploymentDepth, battleCellAt } = geometry.namespace;
   const modules = {};
   for (const name of ["battleCore", "battleMorale", "battleMovement", "battleReinforcements"])
-    modules[`./${name}.js`] = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, `../${name}.js`), "utf8"));
+    modules[`./${name}.js`] = new vm.SourceTextModule(await readSource(`${name}.js`));
   await modules["./battleCore.js"].link(name => modules[name]); await modules["./battleCore.js"].evaluate();
   assert.deepEqual([0, 5, 6, 10, 11, 15, 16, 20].map(selectBattleSize), [8, 8, 10, 10, 12, 12, 15, 15]);
   for (const size of [8, 10, 12, 15]) {

@@ -198,21 +198,21 @@ ATK・DEFは、既存の人数・レベル補正後に、船種と艤装の共�
 
 | 担当案 | 責務 |
 | --- | --- |
-| shipConfig.js | 9船種、バフ上限、売却率、品揃え価格帯、補充数、抽選設定 |
-| fleet.js | 船団の正規化、総数、船種バフ、獲得・最安順喪失、報酬船種抽選 |
-| shipyard.js | 街の品揃え初期化、季節補充、売買検証・一括更新 |
-| shipyardUI.js | 船取引の一覧、数量指定、詳細と変化予告 |
-| outfitting.js等の共通効果層 | 船と艤装の合算、容量・維持費・戦闘スナップショット |
+| src/fleet/shipConfig.js | 9船種、バフ上限、売却率、品揃え価格帯、補充数、抽選設定 |
+| src/fleet/fleet.js | 船団の正規化、総数、船種バフ、獲得・最安順喪失、報酬船種抽選 |
+| src/fleet/shipyard.js | 街の品揃え初期化、季節補充、売買検証・一括更新 |
+| src/fleet/shipyardUI.js | 船取引の一覧、数量指定、詳細と変化予告 |
+| src/fleet/outfitting.js等の共通効果層 | 船と艤装の合算、容量・維持費・戦闘スナップショット |
 
 現行コードの接続確認箇所：
 
-- state.js、storage.js、map.js：初期船団、旧セーブ移行、街在庫の世界保存。
-- supplies.js、troops.js：現在の隻数×固定容量を船種別容量へ変更。
-- upkeep.js、outfitting.js、outfittingUI.js、battle.js：予告・実消費・実戦能力を同じ効果へ接続。
-- marketUI.js、index.html、dom.js、styles.css：旧船取引の撤去・造船所への統合。
-- actions.js、ui.js、quests.js：イベント報酬・戦利品・依頼報酬のstate.ships直接加算を共通獲得処理へ変更。
-- exploration.js、explorationUI.js、charts.js、chartUI.js等：船報酬の抽選時点・保存・付与と表示を揃える。
-- panelUI.js、ui.js：ヘッダ合計とデバッグのコグ数。
+- src/core/state.js、src/core/storage.js、src/world/map.js：初期船団、旧セーブ移行、街在庫の世界保存。
+- src/resources/supplies.js、src/resources/troops.js：現在の隻数×固定容量を船種別容量へ変更。
+- src/resources/upkeep.js、src/fleet/outfitting.js、src/fleet/outfittingUI.js、src/battle/battle.js：予告・実消費・実戦能力を同じ効果へ接続。
+- src/resources/marketUI.js、index.html、src/ui/dom.js、styles.css：旧船取引の撤去・造船所への統合。
+- src/app/actions.js、src/app/ui.js、src/quests/quests.js：イベント報酬・戦利品・依頼報酬のstate.ships直接加算を共通獲得処理へ変更。
+- src/exploration/exploration.js、src/exploration/explorationUI.js、src/exploration/charts.js、src/exploration/chartUI.js等：船報酬の抽選時点・保存・付与と表示を揃える。
+- src/ui/panelUI.js、src/app/ui.js：ヘッダ合計とデバッグのコグ数。
 - 日付進行処理：季節境界の在庫補充。既存の物資・雇用更新を変更しない。
 
 全ファイルのships参照・代入と、報酬内のshipsフィールドを実装時に再検索する。上記の一覧だけで網羅済みと判断しない。

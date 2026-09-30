@@ -1,10 +1,9 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /** @param {string} file ファイル。 @returns {Promise<string>} ソース。 */
-function read(file) { return fs.readFile(path.join(__dirname, "..", file), "utf8"); }
+function read(file) { return readSource(file); }
 
 /** @param {string} side 陣営。 @param {number} x 位置。 @returns {object} 検証用部隊。 */
 function unit(side, x) {

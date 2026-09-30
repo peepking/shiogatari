@@ -1,7 +1,7 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
 const vm = require("node:vm");
-const source = fs.readFileSync(require("node:path").join(__dirname, "../map.js"), "utf8");
+const source = readSource("map.js");
 const state = { selectedPosition: { x: 0, y: 0 }, warLedger: { entries: [{ activeFronts: [{ settlementId: "town", attacker: "archipelago", defender: "north", endAbs: 60 }] }] } };
 /** 情報欄のテキストと子要素を保持し、再描画時には内容を消去する。 */
 function createElement() {

@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 const { createSimulation } = require("./pirateBalance.sim.cjs");
 
@@ -13,14 +12,14 @@ async function main() {
   /** @param {string} name 名前。 @returns {Promise<vm.Module>} 実モジュール。 */
   async function load(name) {
     if (modules.has(name)) return modules.get(name);
-    const m = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"));
+    const m = new vm.SourceTextModule(await readSource(name));
     modules.set(name, m); await m.link(load); return m;
   }
   await load("./fleet.js");
   const equipment = await load("./outfitting.js"); await equipment.evaluate();
   const context = createSimulation();
   Object.assign(context, { assert, ...equipment.namespace });
-  vm.runInContext((await fs.readFile(path.join(__dirname, "../battleFormation.js"), "utf8")).replace(/^export /gm, ""), context);
+  vm.runInContext((await readSource("battleFormation.js")).replace(/^export /gm, ""), context);
   const items = modules.get("./expansionConfig.js").namespace.OUTFITTING_ITEMS;
   const attacks = Object.keys(items).filter(id => items[id].attack);
   const profiles = [[], ...attacks.map(id => [id]), attacks.slice(0, 5),

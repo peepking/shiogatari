@@ -1,10 +1,9 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
 const vm = require("node:vm");
-const path = require("node:path");
 /** @returns {Promise<void>} 射程順・配置重複・範囲・各配置の幅・少数から満員までの兵員保持を検証する。 */
 async function main() {
-  const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../battleFormation.js"), "utf8"));
+  const module = new vm.SourceTextModule(await readSource("battleFormation.js"));
   await module.link(() => {}); await module.evaluate();
   const plan = module.namespace.planBattleFormation;
   for (const kind of ["balance", "assault", "defense"]) {

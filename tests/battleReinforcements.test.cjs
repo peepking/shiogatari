@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /** @param {string} id 識別子。 @param {string} side 陣営。 @param {object} extra 上書き。 @returns {object} 部隊。 */
@@ -19,7 +18,7 @@ function field(units) { return { battleKind: "grand", units, size: 10, tick: 0, 
 async function main() {
   const modules = {};
   for (const name of ["battleCore", "battleMorale", "battleMovement", "battleReinforcements", "battlePersonnel"])
-    modules[`./${name}.js`] = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, `../${name}.js`), "utf8"));
+    modules[`./${name}.js`] = new vm.SourceTextModule(await readSource(`${name}.js`));
   const core = modules["./battleCore.js"];
   await core.link(name => modules[name]); await core.evaluate();
   const personnel = modules["./battlePersonnel.js"];

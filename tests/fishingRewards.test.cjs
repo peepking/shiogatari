@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 /** @returns {Promise<void>} 解放維持・在庫・売値・抽選境界・季節重複を検証する。 */
 async function main() {
@@ -8,7 +7,7 @@ async function main() {
   /** @param {string} name ファイル名。 @returns {Promise<vm.Module>} 実モジュール。 */
   async function load(name) {
     if (modules.has(name)) return modules.get(name);
-    const m = new vm.SourceTextModule(await fs.readFile(path.join(__dirname,"..",name),"utf8"));
+    const m = new vm.SourceTextModule(await readSource(name));
     modules.set(name,m); await m.link(load); return m;
   }
   const fleet = await load("./fleet.js"); await fleet.evaluate();

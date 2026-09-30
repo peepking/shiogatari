@@ -2,6 +2,8 @@
 
 プレイヤー向けの操作説明は [ゲームのREADME](../README.md)、開発時の構成把握は [全体設計](design.md) を参照する。全体設計は概要と接続先を示し、数値・条件・保存規則の詳細は下記の担当文書へ集約する。
 
+JavaScriptは `src/` の機能別フォルダへ配置する。各フォルダの責務とテストの読み込み方法は [JavaScriptの配置](../src/README.md) を参照する。
+
 ## 仕様の参照先
 
 | 対象 | 担当文書 |
@@ -20,7 +22,7 @@
 | 竿以外の図鑑報酬・漁船 | [釣り図鑑の追加報酬](fishing-rewards.md) |
 | 魚種の原典・追加候補の名簿 | [釣り対象マスター候補一覧](shiogatari_fishing_species_master.md) |
 
-魚種の実装値は `fishingConfig.js` の `FISH_SPECIES` を参照する。候補名簿は実装済みの全魚種を網羅する仕様表ではない。
+魚種の実装値は `src/fishing/fishingConfig.js` の `FISH_SPECIES` を参照する。候補名簿は実装済みの全魚種を網羅する仕様表ではない。
 
 ## 更新方針
 

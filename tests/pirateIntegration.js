@@ -1,12 +1,12 @@
-import { state } from "../state.js";
-import { buildWorld, settlements, mapData, nobleHome, snapshotWorld, restoreWorld } from "../map.js";
-import { seedInitialQuests, acceptQuest, completeQuest, completeHuntBattleQuest } from "../quests.js";
-import { buildEnemyFormation } from "../actions.js";
-import { enemyTroopPool, TROOP_STATS } from "../troops.js";
-import { CONTRABAND, PIRATE_CONFIG, PIRATE_IMAGES, pirateEnemyCount } from "../pirateConfig.js";
-import { bribeTerms, enqueuePirateCheckpoint, handlePirateCheckpoint, piracyState } from "../pirateEncounters.js";
-import { getNobleFavor } from "../faction.js";
-import { MODE_LABEL } from "../constants.js";
+import { state } from "../src/core/state.js";
+import { buildWorld, settlements, mapData, nobleHome, snapshotWorld, restoreWorld } from "../src/world/map.js";
+import { seedInitialQuests, acceptQuest, completeQuest, completeHuntBattleQuest } from "../src/quests/quests.js";
+import { buildEnemyFormation } from "../src/app/actions.js";
+import { enemyTroopPool, TROOP_STATS } from "../src/resources/troops.js";
+import { CONTRABAND, PIRATE_CONFIG, PIRATE_IMAGES, pirateEnemyCount } from "../src/pirates/pirateConfig.js";
+import { bribeTerms, enqueuePirateCheckpoint, handlePirateCheckpoint, piracyState } from "../src/pirates/pirateEncounters.js";
+import { getNobleFavor } from "../src/factions/faction.js";
+import { MODE_LABEL } from "../src/core/constants.js";
 
 const output=document.getElementById("result");
 const notes=[];
@@ -24,7 +24,7 @@ function run() {
   check(ports.every(s=>s.recruitSlots.length===5 && s.recruitSlots.every(r=>PIRATE_IMAGES[r.type])),"海賊兵の雇用枠");
   check(normal.every(s=>s.recruitSlots.every(r=>!PIRATE_IMAGES[r.type])),"通常雇用枠の分離");
   check(normal.every(s=>CONTRABAND.every(i=>!s.stock[i.id])),"通常拠点へ禁制品を補充しない");
-  check(ports.every(s=>CONTRABAND.every(i=>s.stock[i.id]===PIRATE_CONFIG.contrabandStock && s.demand[i.id]<=3)),"無法港の禁制品在庫と需要");
+  check(ports.every(s=>CONTRABAND.every(i=>Number.isInteger(s.stock[i.id]) && s.stock[i.id]>=PIRATE_CONFIG.contrabandStock[0] && s.stock[i.id]<=PIRATE_CONFIG.contrabandStock[1] && s.demand[i.id]>=PIRATE_CONFIG.demandLow[0] && s.demand[i.id]<=PIRATE_CONFIG.demandLow[1])),"無法港の禁制品在庫と需要");
   check(enemyTroopPool(true,false).every(id=>!PIRATE_IMAGES[id]),"正規軍に海賊兵を混ぜない");
   check(Object.keys(PIRATE_IMAGES).every(id=>TROOP_STATS[id]),"全6兵種が実際の定義に存在");
   check(pirateEnemyCount({min:70,max:80},"normal",1,()=>0)===38,"人数下限50%");

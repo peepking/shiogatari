@@ -1,9 +1,8 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 /** @param {string} name ファイル。 @returns {Promise<string>} ソース。 */
-function read(name) { return fs.readFile(path.join(__dirname, "..", name), "utf8"); }
+function read(name) { return readSource(name); }
 /** @param {string} source ソース。 @param {string} name 関数名。 @returns {string} 関数本体。 */
 function extract(source, name) { const start = source.indexOf(`function ${name}(`); assert.ok(start >= 0); return source.slice(start, source.indexOf("\n}", start) + 2); }
 /** @returns {Promise<void>} 大会戦の生成・編成・復元・盤上除外を検証する。 */

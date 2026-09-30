@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /** @returns {Promise<void>} 海図の予約・報酬・入場抽選・保存を検証する。 */
@@ -24,7 +23,7 @@ async function main() {
   /** @param {string} name ファイル。 @returns {Promise<vm.Module>} 実モジュール。 */
   async function load(name) {
     if (modules.has(name)) return modules.get(name);
-    const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"), { context });
+    const module = new vm.SourceTextModule(await readSource(name), { context });
     modules.set(name, module); await module.link(load); return module;
   }
   await load("./fleet.js");

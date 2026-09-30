@@ -166,4 +166,4 @@
 - 再描画で会話が変わらず、支援・発展後に適切な描写になる。対象外も同等に情景を楽しめる。
 - スマホで情景と操作が収まり、支援条件・離脱確認が読める。
 
-README.mdへプレイヤー向け説明、design.mdへ主要な構成と連携を反映済み。実装は `tideAlliance.js`（設定・計算）、`tideAllianceUI.js`（閲覧・支援）、`tideScene.js`（情景）に分割した。
+README.mdへプレイヤー向け説明、design.mdへ主要な構成と連携を反映済み。実装は `src/faith/tideAlliance.js`（設定・計算）、`src/faith/tideAllianceUI.js`（閲覧・支援）、`src/faith/tideScene.js`（情景）に分割した。

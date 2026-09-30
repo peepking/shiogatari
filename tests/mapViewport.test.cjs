@@ -1,11 +1,10 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /** @returns {Promise<void>} 循環順・地図端の表示範囲・描画幅を検証する。 */
 async function main() {
-  const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../mapViewport.js"), "utf8"));
+  const module = new vm.SourceTextModule(await readSource("mapViewport.js"));
   await module.link(() => {}); await module.evaluate();
   const { nextMapMode, mapViewport } = module.namespace;
   assert.equal(nextMapMode("full"), "nearby");

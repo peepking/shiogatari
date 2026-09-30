@@ -1,3 +1,4 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const path = require("node:path");
@@ -12,7 +13,7 @@ async function main() {
   /** @param {string} name @returns {Promise<vm.Module>} 表示モジュールを読み込む。 */
   async function load(name) {
     if (!modules[name]) {
-      modules[name] = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"));
+      modules[name] = new vm.SourceTextModule(await readSource(name));
       await modules[name].link(load);
     }
     return modules[name];

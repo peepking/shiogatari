@@ -1,0 +1,1137 @@
+import { buildPirateHavens } from "../pirates/pirateWorld.js";
+import { bountyName } from "../bounty/bounty.js";
+import { drawBountySite } from "../bounty/bountyMapArt.js";
+import { elements } from "../ui/dom.js";
+import { mapViewport } from "./mapViewport.js";
+import { drawMapTile, drawMapPlayer, drawExplorationSite, drawChartSite } from "./mapArt.js";
+import { visibleChartSites } from "../exploration/charts.js";
+import { CHART_CONFIG } from "../core/expansionConfig.js";
+import { EXPLORATION_NAMES, describeDanger } from "../exploration/exploration.js";
+import { FACTIONS } from "./lore.js";
+import { FRONT_DURATION_DAYS } from "../core/constants.js";
+import { QUEST_TYPES } from "../quests/quests.js";
+import { absDay } from "../quests/questUtils.js";
+import { state } from "../core/state.js";
+import {
+  randomSupplyIdByType,
+  refreshSettlementDemand,
+  refreshSettlementStock,
+  SUPPLY_TYPES,
+} from "../resources/supplies.js";
+import { initSettlementRecruitment, refreshSettlementRecruitment } from "../resources/troops.js";
+import { displaySupportLabel, displayWarLabel, supportLabel } from "../core/util.js";
+
+/** @type {number} マップの一辺サイズ */
+export const MAP_SIZE = 50;
+/** @type {number} ズーム表示の一辺サイズ */
+export const MAP_ZOOM = 9;
+/** @type {number} セル1つのピクセル幅 */
+export const MAP_CELL = 14;
+/** @type {number} 描画パディング */
+export const MAP_PAD = 4;
+
+const PIN_STYLES = {
+  hunt: { shape: "star", color: "#ff9b3a", priority: 1 },
+  bounty: { shape: "star", color: "#ff4d4d", priority: 1 },
+  move: { shape: "triangle", color: "#ff66b3", priority: 2 },
+  supply: { shape: "dot", color: "#6b3dff", priority: 0, mergeKey: "supply" },
+};
+
+/** @type {Object<string,string>} 勢力紋章と共通の防衛ピン配色。 */
+const WAR_PIN_COLORS = { north: "#b6d9f7", archipelago: "#a6d9c0", citadel: "#dcc591", pirates: "#e3a39a" };
+
+let pinCache = { list: [], byPos: new Map() };
+
+/**
+ * 地形
+ */
+const terrainKinds = [
+  { key: "sea", name: "海", color: "#0f4c81" },
+  { key: "forest", name: "森", color: "#16603a" },
+  { key: "plain", name: "平原", color: "#3a6b35" },
+  { key: "mountain", name: "山岳", color: "#4b4b4b" },
+  { key: "shoal", name: "浅瀬", color: "#227f91" },
+];
+
+/**
+ * 拠点のランダムネーム定義
+ */
+const settlementNames = {
+  prefix: ["北", "南", "東", "西", "潮", "波", "風", "岩", "砂", "霧", "蒼", "紅"],
+  middle: [
+    "落ち葉", "潮待ち", "弦月", "月影", "星降り", "潮騒", "朝凪", "夕凪", "朝霧", "夕霧",
+    "潮風", "波間", "白波", "渚", "灯火", "寄せ波", "深緑", "藍", "群青", "茜",
+    "翠", "灰雲", "霧雨", "霜降り", "雪解け", "小雨", "大潮", "満潮", "干潮", "霧笛",
+    "霜月", "花霞", "若葉", "初穂", "渡り鳥", "浜辺", "山裾", "岬先", "沖目", "沖鳴り",
+    "鯨骨", "帆影", "帆先", "水面", "水脈", "潮目", "潮路", "潮灯", "舟出", "避難",
+  ],
+};
+
+const goodsPool = ["食料", "木材", "石材", "鉄", "繊維", "塩", "織物", "酒", "武具", "香辛料", "なめし革"];
+const DEFAULT_WORLD_SEED = 2025;
+
+/** @type {Array} 生成済み拠点の一覧 */
+export const settlements = [];
+/** @type {Map<string,string>} 貴族ID -> 拠点ID */
+export const nobleHome = new Map(); // 貴族ID -> 拠点ID
+
+/**
+ * 拠点名をランダム生成する。
+ * @param {Set<string>} used
+ * @param {"village"|"town"} [kind="village"]
+ * @returns {string}
+ */
+function nextName(used, kind = "village") {
+  for (let i = 0; i < 200; i++) {
+    const p =
+      settlementNames.prefix[Math.floor(Math.random() * settlementNames.prefix.length)];
+    const m =
+      settlementNames.middle[Math.floor(Math.random() * settlementNames.middle.length)];
+    const suffix = kind === "town" ? "街" : "村";
+    const name = `${p}${m}${suffix}`;
+    if (!used.has(name)) {
+      used.add(name);
+      return name;
+    }
+  }
+  const fallback = kind === "town" ? `街${used.size + 1}` : `村${used.size + 1}`;
+  used.add(fallback);
+  return fallback;
+}
+
+/**
+ * 地形・建物を含むマップを生成する。
+ * @param {number} [seed=1]
+ * @returns {Array}
+ */
+function generateMap(seed = 1) {
+  const grid = [];
+  let s = seed;
+  /**
+   * 乱数を生成する（簡易シード方式）。
+   * @returns {number}
+   */
+  const rnd = () => {
+    s = (s * 1664525 + 1013904223) % 0xffffffff;
+    return s / 0xffffffff;
+  };
+
+  const bigIslands = [
+    { x: Math.floor(MAP_SIZE * 0.22), y: Math.floor(MAP_SIZE * 0.22) },
+    { x: Math.floor(MAP_SIZE * 0.78), y: Math.floor(MAP_SIZE * 0.22) },
+    { x: Math.floor(MAP_SIZE * 0.5), y: Math.floor(MAP_SIZE * 0.7) },
+  ].map((c, i) => {
+    const base = (i === 0 ? 14 : i === 2 ? 12 : 10) + Math.floor(rnd() * 6);
+    const rx = i === 2 ? Math.floor(base * 1.5) : base;
+    const ry = i === 2 ? Math.floor(base * 0.9) : base;
+    return { ...c, rx, ry };
+  });
+
+  const smallIsles = Array.from({ length: 2 }, () => ({
+    x: Math.floor(rnd() * MAP_SIZE),
+    y: Math.floor(rnd() * MAP_SIZE),
+    r: 3 + Math.floor(rnd() * 4),
+  }));
+
+  const maxDist = Math.hypot(MAP_SIZE / 2, MAP_SIZE / 2);
+
+  for (let y = 0; y < MAP_SIZE; y++) {
+    const row = [];
+    for (let x = 0; x < MAP_SIZE; x++) {
+      const distCenter = Math.hypot(x - MAP_SIZE / 2, y - MAP_SIZE / 2);
+      const falloff = 1 - distCenter / maxDist;
+
+      let influenceBig = 0;
+      bigIslands.forEach((c) => {
+        const dx = (x - c.x) / c.rx;
+        const dy = (y - c.y) / c.ry;
+        const d = Math.hypot(dx, dy);
+        influenceBig += Math.max(0, 1 - d);
+      });
+      let influenceSmall = 0;
+      smallIsles.forEach((c) => {
+        const d = Math.hypot(x - c.x, y - c.y);
+        influenceSmall += Math.max(0, (c.r - d) / c.r);
+      });
+
+      const noise = rnd() * 0.5 - 0.25;
+      const height =
+        falloff * 0.4 + influenceBig * 0.8 + influenceSmall * 0.4 + noise - 0.2;
+
+      let terrain = "sea";
+      if (height > 0.8) terrain = "mountain";
+      else if (height > 0.6) terrain = rnd() > 0.4 ? "forest" : "plain";
+      else if (height > 0.48) terrain = "plain";
+      else if (height > 0.34) terrain = "shoal";
+
+      row.push({ terrain, building: "none" });
+    }
+    grid.push(row);
+  }
+
+  // 陸地から離れた浅瀬は海に戻す。
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      const cell = grid[y][x];
+      if (cell.terrain !== "shoal") continue;
+      let nearLand = false;
+      for (let dy = -2; dy <= 2 && !nearLand; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const ny = y + dy;
+          const nx = x + dx;
+          if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+          const t = grid[ny][nx].terrain;
+          if (t !== "sea" && t !== "shoal") {
+            nearLand = true;
+            break;
+          }
+        }
+      }
+      if (!nearLand) cell.terrain = "sea";
+    }
+  }
+
+  // 建物配置（陸のみ、海沿い優先、浅瀬は除外）。
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      const cell = grid[y][x];
+      if (cell.terrain === "sea" || cell.terrain === "shoal") continue;
+
+      let coast = false;
+      for (let dy = -2; dy <= 2 && !coast; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+          const ny = y + dy;
+          const nx = x + dx;
+          if (nx < 0 || ny < 0 || nx >= MAP_SIZE || ny >= MAP_SIZE) continue;
+          if (grid[ny][nx].terrain === "sea") {
+            coast = true;
+            break;
+          }
+        }
+      }
+
+      const r = rnd();
+      let building = "none";
+
+      // 生成比は「街1 : 村2」くらいになるように閾値を調整（城は生成しない）。
+      if (coast) {
+        if (r > 0.9567) building = "town";
+        else if (r > 0.88) building = "village";
+      } else {
+        if (r > 0.9833) building = "town";
+        else if (r > 0.96) building = "village";
+      }
+
+      cell.building = building;
+    }
+  }
+
+  return grid;
+}
+
+/** @type {Array} マップの地形/建物データ */
+export let mapData = [];
+let lastDemandSeason = { year: state.year, season: state.season };
+
+/**
+ * マップと拠点を再生成する。
+ * @param {number} [seed=DEFAULT_WORLD_SEED]
+ */
+export function buildWorld(seed = DEFAULT_WORLD_SEED) {
+  mapData = generateMap(seed);
+  settlements.length = 0;
+  nobleHome.clear();
+  const usedNames = new Set();
+  const noblesByFaction = new Map();
+  FACTIONS.forEach((f) => noblesByFaction.set(f.id, (f.nobles || []).map((n) => ({ ...n, factionId: f.id }))));
+  const factionCursor = new Map();
+  const fallbackList = Array.from(noblesByFaction.values()).flat().filter(n => n.factionId !== "pirates");
+  let fallbackCursor = 0;
+  // 拠点の所属は島ごとの勢力偏りを持たせる（左上/右上/下の島）。
+  const preferredFactionForCell = (x, y) => {
+    const xRatio = x / MAP_SIZE;
+    const yRatio = y / MAP_SIZE;
+    if (yRatio < 0.45) {
+      if (xRatio < 0.45) return "north";
+      if (xRatio > 0.55) return "archipelago";
+    }
+    if (yRatio > 0.55) return "citadel";
+    return null;
+  };
+
+  for (let y = 0; y < MAP_SIZE; y++) {
+    for (let x = 0; x < MAP_SIZE; x++) {
+      const cell = mapData[y][x];
+      if (cell.building !== "town" && cell.building !== "village") continue;
+
+      const tooClose = settlements.some((s) => {
+        if (s.kind !== "town" && s.kind !== "village") return false;
+        const dx = Math.abs(s.coords.x - x);
+        const dy = Math.abs(s.coords.y - y);
+        // 周囲2マス以内には村/街を配置しない。
+        return dx <= 2 && dy <= 2;
+      });
+      if (tooClose) {
+        cell.building = "none";
+        continue;
+      }
+
+      const preferred = preferredFactionForCell(x, y);
+      let owner = null;
+      const list = (preferred && noblesByFaction.get(preferred)) || null;
+      if (list && list.length) {
+        const cur = factionCursor.get(preferred) || 0;
+        owner = list[cur % list.length];
+        factionCursor.set(preferred, cur + 1);
+      }
+      if (!owner && fallbackList.length) {
+        owner = fallbackList[fallbackCursor % fallbackList.length];
+        fallbackCursor += 1;
+      }
+      const id = `set-${settlements.length + 1}`;
+      const goods = [
+        goodsPool[Math.floor(Math.random() * goodsPool.length)],
+        goodsPool[Math.floor(Math.random() * goodsPool.length)],
+      ];
+      const specialty =
+        cell.building === "village"
+          ? randomSupplyIdByType(SUPPLY_TYPES.raw)
+          : cell.building === "town"
+            ? randomSupplyIdByType(SUPPLY_TYPES.processed)
+            : null;
+
+      const settlement = {
+        id,
+        name: nextName(usedNames, cell.building),
+        kind: cell.building,
+        factionId: owner.factionId,
+        nobleId: owner.id,
+        goods,
+        coords: { x, y },
+        specialty,
+        controllerId: owner.id,
+        support: Object.fromEntries(FACTIONS.map((f) => [f.id, 0])),
+        warState: { contested: false, frontline: false },
+      };
+      initSettlementRecruitment(settlement);
+      refreshSettlementDemand(settlement);
+      refreshSettlementStock(settlement);
+      settlements.push(settlement);
+      cell.settlement = settlement;
+      cell.factionId = settlement.factionId;
+      if (!nobleHome.has(owner.id)) nobleHome.set(owner.id, id);
+      const nobleObj = FACTIONS.find((f) => f.id === owner.factionId)?.nobles?.find((n) => n.id === owner.id);
+      if (nobleObj && !nobleObj.homeSettlementId) nobleObj.homeSettlementId = id;
+    }
+  }
+
+  // 街を優先して貴族を再割当（街が不足する場合のみ村へ）。
+  const townsByFaction = new Map();
+  const villagesByFaction = new Map();
+  settlements.forEach((s) => {
+    if (s.kind === "town") {
+      if (!townsByFaction.has(s.factionId)) townsByFaction.set(s.factionId, []);
+      townsByFaction.get(s.factionId).push(s);
+    } else if (s.kind === "village") {
+      if (!villagesByFaction.has(s.factionId)) villagesByFaction.set(s.factionId, []);
+      villagesByFaction.get(s.factionId).push(s);
+    }
+  });
+  const assignedNobles = new Set();
+  FACTIONS.filter((f) => f.id !== "pirates").forEach((f) => {
+    const nobles = f.nobles || [];
+    const towns = townsByFaction.get(f.id) || [];
+    const villages = villagesByFaction.get(f.id) || [];
+    if (towns.length) {
+      nobles.forEach((n, idx) => {
+        const t = towns[idx % towns.length];
+        const prev = t.nobleId;
+        if (prev && prev !== n.id) nobleHome.delete(prev);
+        t.nobleId = n.id;
+        t.controllerId = n.id;
+        nobleHome.set(n.id, t.id);
+        assignedNobles.add(n.id);
+      });
+    }
+    nobles.forEach((n, idx) => {
+      if (assignedNobles.has(n.id)) return;
+      const fallback = villages[idx % (villages.length || 1)];
+      if (!fallback) return;
+      const prev = fallback.nobleId;
+      if (prev && prev !== n.id) nobleHome.delete(prev);
+      fallback.nobleId = n.id;
+      fallback.controllerId = n.id;
+      nobleHome.set(n.id, fallback.id);
+      assignedNobles.add(n.id);
+    });
+  });
+  buildPirateHavens(mapData, settlements, nobleHome, port => {
+    initSettlementRecruitment(port); refreshSettlementDemand(port); refreshSettlementStock(port);
+  });
+  lastDemandSeason = { year: state.year, season: state.season };
+}
+
+// 初期ワールド生成
+buildWorld();
+
+/**
+ * 勢力内で均等に貴族を拠点へ割り振る（拠点数 < 貴族数の場合は再利用）。
+ */
+export function ensureNobleHomes() {
+  if (nobleHome.size > 0) return;
+  const fallbackSet = settlements[0] || null;
+  const shuffle = (arr) => {
+    const copy = [...arr];
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  };
+  FACTIONS.forEach((f) => {
+    const towns = settlements.filter((s) => s.factionId === f.id && s.kind === "town");
+    const villages = settlements.filter((s) => s.factionId === f.id && s.kind === "village");
+    const sets = [...shuffle(towns), ...shuffle(villages)];
+    const nobles = f.nobles || [];
+    if (!sets.length || !nobles.length) return;
+    sets.forEach((s, idx) => {
+      const n = nobles[idx % nobles.length];
+      s.nobleId = n.id;
+      s.controllerId = n.id;
+      if (!nobleHome.has(n.id)) {
+        nobleHome.set(n.id, s.id);
+        n.homeSettlementId = n.homeSettlementId || s.id;
+      }
+    });
+  });
+  // 勢力に拠点が無い貴族がいる場合のフォールバック
+  FACTIONS.forEach((f) => {
+    if (f.id === "pirates") return;
+    (f.nobles || []).forEach((n) => {
+      if (nobleHome.has(n.id)) return;
+      if (fallbackSet) {
+        nobleHome.set(n.id, fallbackSet.id);
+        n.homeSettlementId = n.homeSettlementId || fallbackSet.id;
+      }
+    });
+  });
+}
+ensureNobleHomes();
+
+/**
+ * 拠点の可変状態を初期値にリセットする（支持度・戦況など）。
+ * マップ生成は再実行せず、既存のsettlement配列を初期状態に戻す。
+ */
+export function resetSettlementSupport() {
+  settlements.forEach((s) => {
+    s.support = Object.fromEntries(FACTIONS.map((f) => [f.id, 0]));
+    s.warState = { contested: false, frontline: false, label: null };
+  });
+}
+
+/**
+ * 指定の貴族が保有する拠点を返す。
+ * @param {string} nobleId
+ * @returns {Array}
+ */
+export function getSettlementsByNoble(nobleId) {
+  return settlements.filter((s) => s.nobleId === nobleId);
+}
+
+/**
+ * 勢力IDから名称を取得する。
+ * @param {string} id
+ * @returns {string}
+ */
+function factionName(id) {
+  return FACTIONS.find((f) => f.id === id)?.name || id;
+}
+
+/**
+ * 貴族IDから表示名を取得する。
+ * @param {string} nobleId 貴族ID
+ * @returns {string} 貴族名（見つからない場合はIDをそのまま返す）
+ */
+function nobleName(nobleId) {
+  const nob = FACTIONS.flatMap((f) => f.nobles || []).find((n) => n.id === nobleId);
+  return nob?.name || nobleId;
+}
+
+/**
+ * 依頼オブジェクトからマップピン情報を生成する。
+ * @param {object} q 依頼データ
+ * @param {number} nowAbs 現在日（絶対日）
+ * @returns {Array<object>} ピン情報の配列
+ */
+function questToPin(q, nowAbs) {
+  const title = q.title || "依頼";
+  // 期限未設定の依頼も安全側に30日を表示する
+  const remainDays = typeof q.deadlineAbs === "number" ? Math.max(0, q.deadlineAbs - nowAbs) : 30;
+  const deadlineText = `期限あと${remainDays}日`;
+  const common = {
+    labels: [title],
+    deadlines: [deadlineText],
+  };
+  const style = (kind) => ({ ...common, ...PIN_STYLES[kind] });
+  // 座標取得
+  const fromTarget = (t, styleKey) => {
+    if (!t || typeof t.x !== "number" || typeof t.y !== "number") return null;
+    return { ...style(styleKey), x: t.x, y: t.y };
+  };
+  const fromSettlementId = (sid, styleKey, mergeKey) => {
+    const s = getSettlementById(sid);
+    if (!s) return null;
+    return { ...style(styleKey), x: s.coords.x, y: s.coords.y, mergeKey: mergeKey || style(styleKey).mergeKey };
+  };
+
+  switch (q.type) {
+    case QUEST_TYPES.PIRATE_HUNT:
+    case QUEST_TYPES.ORACLE_HUNT:
+      return [fromTarget(q.target, "hunt")].filter(Boolean);
+    case QUEST_TYPES.BOUNTY_HUNT:
+    case QUEST_TYPES.ORACLE_ELITE:
+      return [fromTarget(q.target, "bounty")].filter(Boolean);
+    case QUEST_TYPES.ORACLE_MOVE:
+      return [fromTarget(q.target, "move")].filter(Boolean);
+    case QUEST_TYPES.SUPPLY:
+    case QUEST_TYPES.DELIVERY:
+    case QUEST_TYPES.REFUGEE_ESCORT:
+      return [fromSettlementId(q.targetId || q.originId, "supply", "supply")].filter(Boolean);
+    case QUEST_TYPES.NOBLE_SUPPLY:
+    case QUEST_TYPES.NOBLE_LOGISTICS:
+      return [fromSettlementId(q.originId, "supply", "supply")].filter(Boolean);
+    case QUEST_TYPES.NOBLE_SCOUT:
+      return [fromTarget(q.target, "move")].filter(Boolean);
+    case QUEST_TYPES.NOBLE_REFUGEE:
+    case QUEST_TYPES.WAR_ESCORT:
+      return [q.picked
+        ? fromSettlementId(q.originId, "supply", "supply")
+        : fromTarget(q.target, "move")].filter(Boolean);
+    case QUEST_TYPES.NOBLE_SECURITY: {
+      const pins = [];
+      (q.fights || []).forEach((f, idx) => {
+        if (f?.done) return; // クリア済みの戦闘はピンを出さない
+        const styleKey = idx === 0 ? "hunt" : "bounty";
+        const p = fromTarget(f?.target, styleKey);
+        if (p) pins.push(p);
+      });
+      return pins;
+    }
+    case QUEST_TYPES.NOBLE_HUNT:
+      return [fromTarget(q.target, "bounty")].filter(Boolean);
+    case QUEST_TYPES.WAR_DEFEND_RAID:
+      return [fromTarget(q.target, "hunt")].filter(Boolean);
+    case QUEST_TYPES.WAR_ATTACK_RAID:
+    case QUEST_TYPES.WAR_SKIRMISH:
+      return [fromTarget(q.target, "bounty")].filter(Boolean);
+    case QUEST_TYPES.WAR_SUPPLY:
+      return [fromSettlementId(q.originId, "supply", "supply")].filter(Boolean);
+    case QUEST_TYPES.WAR_TRUCE:
+      return [fromSettlementId(q.originId, "supply", "supply")].filter(Boolean);
+    case QUEST_TYPES.WAR_BLOCKADE: {
+      const pins = [];
+      (q.fights || []).forEach((f) => {
+        if (f?.done) return;
+        const p = fromTarget(f?.target, "bounty");
+        if (p) pins.push(p);
+      });
+      return pins;
+    }
+    default:
+      return [];
+  }
+}
+
+/**
+ * ピン配列をマージ・優先度ソートし、座標インデックス付きのキャッシュを作る。
+ * @param {Array} pins ピン配列
+ * @returns {{list:Array,byPos:Map<string,Array>}} キャッシュ情報
+ */
+function buildPinCache(pins) {
+  const merged = [];
+  const mergeMap = new Map();
+  pins.forEach((p) => {
+    if (p.mergeKey) {
+      const key = `${p.mergeKey}:${p.x},${p.y}`;
+      const existing = mergeMap.get(key);
+      if (existing) {
+        existing.labels.push(...(p.labels || []));
+        existing.deadlines.push(...(p.deadlines || []));
+      } else {
+        mergeMap.set(key, { ...p, labels: [...(p.labels || [])], deadlines: [...(p.deadlines || [])] });
+      }
+    } else {
+      merged.push(p);
+    }
+  });
+  merged.push(...mergeMap.values());
+  merged.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+  const byPos = new Map();
+  merged.forEach((p) => {
+    const infoParts = (p.labels || []).map((lbl, idx) => `${lbl}（${p.deadlines?.[idx] || "期限あと30日"}）`);
+    const entry = { ...p, info: [...infoParts, p.info].filter(Boolean).join(", ") };
+    const key = `${p.x},${p.y}`;
+    if (!byPos.has(key)) byPos.set(key, []);
+    byPos.get(key).push(entry);
+  });
+  return { list: merged, byPos };
+}
+
+/**
+ * 防衛ピンと依頼ピンを統合してキャッシュを再構築する。
+ * @returns {void}
+ */
+function refreshPinCache() {
+  pinCache = { list: [], byPos: new Map() };
+  if (state.mapPinsVisible === false) return;
+  const nowAbs = absDay(state);
+  const active = state.quests?.active || [];
+  const pins = [];
+  // 防衛中ピン
+  if (state.warLedger?.entries) {
+    state.warLedger.entries.forEach((e) => {
+      (e.activeFronts || []).forEach((f) => {
+        const set = settlements.find((s) => s.id === f.settlementId);
+        if (!set) return;
+        const endAbs = typeof f.endAbs === "number" ? f.endAbs : nowAbs + FRONT_DURATION_DAYS;
+        const remain = Math.max(0, endAbs - nowAbs);
+        pins.push({
+          x: set.coords.x,
+          y: set.coords.y,
+          color: WAR_PIN_COLORS[f.attacker] || "#c2c8d2",
+          defenderColor: WAR_PIN_COLORS[f.defender] || "#c2c8d2",
+          shape: "shield",
+          labels: ["防衛中"],
+          deadlines: [`期限あと${remain}日`],
+          info: `攻: ${factionName(f.attacker)} → 防: ${factionName(f.defender)}`,
+          priority: 1,
+        });
+      });
+    });
+  }
+  active.forEach((q) => {
+    const res = questToPin(q, nowAbs);
+    if (Array.isArray(res)) {
+      res.forEach((p) => {
+        if (p && typeof p.x === "number" && typeof p.y === "number") pins.push(p);
+      });
+    } else if (res && typeof res.x === "number" && typeof res.y === "number") {
+      pins.push(res);
+    }
+  });
+  pinCache = buildPinCache(pins);
+}
+
+/**
+ * 指定座標に存在するピン一覧を取得する。
+ * @param {number} x X座標
+ * @param {number} y Y座標
+ * @returns {Array} ピン配列
+ */
+function pinsAt(x, y) {
+  return pinCache.byPos.get(`${x},${y}`) || [];
+}
+
+/**
+ * ピンをキャンバスに描画する。防衛盾は左を攻撃色、右を防衛色で塗り分け、マス内に収める。
+ * @param {CanvasRenderingContext2D} ctx 描画コンテキスト
+ * @param {object} pin ピン情報
+ * @param {number} pad キャンバスパディング
+ * @param {number} cellSize セルサイズ
+ * @param {number} startX 描画開始X座標
+ * @param {number} startY 描画開始Y座標
+ */
+function drawPin(ctx, pin, pad, cellSize, startX, startY) {
+  const detailed = cellSize > MAP_CELL;
+  const cx = pad + (pin.x - startX) * cellSize + cellSize * (detailed ? 0.81 : 0.5);
+  const cy = pad + (pin.y - startY) * cellSize + cellSize * (detailed ? 0.2 : 0.5);
+  const r = Math.max(3, cellSize * (detailed ? 0.1 : 0.24));
+  ctx.save();
+  ctx.fillStyle = pin.color;
+  ctx.strokeStyle = "#ffffffaa";
+  ctx.lineWidth = 1.4;
+  if (pin.shape === "dot") {
+    const size = Math.max(1.0, r * (detailed ? 0.65 : 0.30));
+    ctx.beginPath();
+    ctx.arc(cx, cy, size, 0, Math.PI * 2);
+    ctx.fill();
+    // ドットは枠線なし
+  } else if (pin.shape === "triangle") {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - r);
+    ctx.lineTo(cx - r, cy + r);
+    ctx.lineTo(cx + r, cy + r);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (pin.shape === "shield") {
+    const w = Math.max(r * 1.2, 5);
+    const h = Math.max(r * 1.6, 7);
+    ctx.beginPath();
+    ctx.moveTo(cx - w * 0.6, cy - h * 0.4);
+    ctx.lineTo(cx + w * 0.6, cy - h * 0.4);
+    ctx.lineTo(cx + w * 0.6, cy + h * 0.1);
+    ctx.lineTo(cx, cy + h * 0.6);
+    ctx.lineTo(cx - w * 0.6, cy + h * 0.1);
+    ctx.closePath();
+    ctx.fill();
+    if (pin.defenderColor) {
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = pin.defenderColor;
+      ctx.fillRect(cx, cy - h * 0.4, w * 0.6, h);
+      ctx.restore();
+    }
+    ctx.strokeStyle = "#10192c";
+    ctx.stroke();
+  } else if (pin.shape === "star") {
+    ctx.beginPath();
+    const spikes = 5;
+    const outer = Math.max(r * 1.15, 4);
+    const inner = outer * 0.45;
+    for (let i = 0; i < spikes * 2; i++) {
+      const rad = (Math.PI * i) / spikes;
+      const rr = i % 2 === 0 ? outer : inner;
+      ctx.lineTo(cx + Math.cos(rad - Math.PI / 2) * rr, cy + Math.sin(rad - Math.PI / 2) * rr);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+/**
+ * マップ座標の表示用テキストを生成する。
+ * @param {number} gx
+ * @param {number} gy
+ * @returns {string}
+ */
+function formatCellInfo(gx, gy) {
+  const cell = mapData[gy]?.[gx];
+  if (!cell) return "";
+  const t = terrainKinds.find((t) => t.key === cell.terrain);
+  const terr = t ? t.name : cell.terrain;
+  const bounty = state.bounties?.active.find(s => s.position.x === gx && s.position.y === gy);
+  if (bounty) return `(${gx + 1}, ${gy + 1}) ${terr} / ${bountyName(bounty)}（${FACTIONS.find(f => f.id === bounty.factionId)?.name || bounty.factionId}） / ${bounty.total}人 / 賞金 ${bounty.reward}`;
+  const site = (state.expansion?.exploration.sites || []).find(s => s.position.x === gx && s.position.y === gy);
+  if (site) return `(${gx + 1}, ${gy + 1}) ${terr} / ${EXPLORATION_NAMES[site.kind]} / ${describeDanger(site.danger)} / 消滅まであと${Math.max(0, site.expiresAbs - absDay(state))}日`;
+  const chartSite = visibleChartSites(state.expansion?.charts).find(s => s.position.x === gx && s.position.y === gy);
+  if (chartSite) return `(${gx + 1}, ${gy + 1}) ${terr} / ${chartSite.kind === "rumor" ? "海図の断片の噂" : CHART_CONFIG.rewards[chartSite.kind].name} / 探索1日・期限なし`;
+  if (!cell.settlement) return `(${gx + 1}, ${gy + 1}) ${terr}`;
+  const s = cell.settlement;
+  const ctrl = nobleName(s.nobleId);
+  const support = displaySupportLabel(supportLabel(s.support?.[s.factionId] ?? 0));
+  const fronts = (state.warLedger?.entries || []).flatMap(e => e.activeFronts || [])
+    .filter(f => f.settlementId === s.id);
+  const underAttack = fronts.length > 0;
+  const war =
+    s.warState?.label
+      ? displayWarLabel(s.warState.label)
+      : underAttack
+        ? "防衛中"
+        : s.warState?.frontline || s.warState?.contested
+          ? "前線"
+          : "平常";
+  return `(${gx + 1}, ${gy + 1}) ${terr} / ${s.name}（${factionName(s.factionId)}） / 支配: ${ctrl} / 支持: ${support} / 戦況: ${war}`;
+}
+
+/**
+ * 現在地の場所/勢力表示に使う情報を返す。
+ * @returns {{place: string, faction: (string|null)}}
+ */
+export function getLocationStatus() {
+  const { x, y } = state.position;
+  const cell = mapData[y]?.[x];
+  let place = "フィールド";
+  if (cell?.building === "town") place = "街";
+  else if (cell?.building === "village") place = "村";
+
+  let faction = null;
+  const near = settlements.find(
+    (s) => Math.abs(s.coords.x - x) <= 1 && Math.abs(s.coords.y - y) <= 1
+  );
+  if (near) {
+    faction = factionName(near.factionId);
+  }
+
+  return { place, faction };
+}
+
+/**
+ * 季節の切り替わりに拠点データを更新する。
+ */
+function refreshSettlementDemandIfNeeded() {
+  if (state.day !== 1) return;
+  if (lastDemandSeason.year === state.year && lastDemandSeason.season === state.season) return;
+  // 需要・在庫・雇用枠は季節の1日にまとめて更新する。
+  settlements.forEach((s) => {
+    refreshSettlementDemand(s);
+    refreshSettlementStock(s);
+    refreshSettlementRecruitment(s);
+  });
+  lastDemandSeason = { year: state.year, season: state.season };
+}
+
+/**
+ * 現在のマップ表示を描画する。
+ */
+export function renderMap() {
+  refreshSettlementDemandIfNeeded();
+  refreshPinCache();
+  const { mapCanvas, mapPosLabel } = elements;
+  if (!mapCanvas) return;
+  const { detailed: isZoom, cells, cellSize, startX, startY, label } = mapViewport(state.mapMode, state.position);
+  if (elements.mapToggle) elements.mapToggle.textContent = `地図切替：${label}`;
+  const pad = MAP_PAD;
+  mapCanvas.width = cells * cellSize + pad * 2;
+  mapCanvas.height = cells * cellSize + pad * 2;
+  const ctx = mapCanvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, mapCanvas.width, mapCanvas.height);
+  ctx.fillStyle = "#0b1020";
+  ctx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+
+
+  for (let y = 0; y < cells; y++) {
+    for (let x = 0; x < cells; x++) {
+      const gx = startX + x;
+      const gy = startY + y;
+      const cell = mapData[gy][gx];
+      const factionId = cell.settlement?.factionId || cell.factionId;
+      const factionColor = FACTIONS.find(faction => faction.id === factionId)?.color;
+      drawMapTile(ctx, cell, pad + x * cellSize, pad + y * cellSize, cellSize - 1, isZoom, factionColor, (gx + gy) % 2);
+    }
+  }
+
+  // 移動可能範囲の強調表示（上下左右）。
+  // 選択マスの強調表示
+  for (const site of state.expansion?.exploration.sites || []) {
+    const { x, y } = site.position;
+    if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
+    drawExplorationSite(ctx, site.kind, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1, isZoom);
+  }
+  const chartSites = visibleChartSites(state.expansion?.charts);
+  for (const site of state.bounties?.active || []) {
+    const { x, y } = site.position;
+    if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
+    drawBountySite(ctx, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1);
+  }
+  for (const site of chartSites) {
+    const { x, y } = site.position;
+    if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
+    drawChartSite(ctx, site.kind, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1, isZoom);
+  }
+  if (state.selectedPosition) {
+    const sel = state.selectedPosition;
+    if (
+      sel.x >= startX &&
+      sel.x < startX + cells &&
+      sel.y >= startY &&
+      sel.y < startY + cells
+    ) {
+      ctx.strokeStyle = "#ffd27a";
+      ctx.lineWidth = 2;
+      ctx.strokeRect(
+        pad + (sel.x - startX) * cellSize + 1,
+        pad + (sel.y - startY) * cellSize + 1,
+        cellSize - 3,
+        cellSize - 3
+      );
+    }
+  }
+
+  // 現在地の地形に合わせて帆船または人物を描き、枠を最後に重ねる。
+  if (isZoom) {
+    drawMapPlayer(ctx, { ...mapData[state.position.y][state.position.x], exploration: [...(state.expansion?.exploration.sites || []), ...(state.bounties?.active || []), ...chartSites].some(s => s.position.x === state.position.x && s.position.y === state.position.y) },
+      pad + (state.position.x - startX) * cellSize,
+      pad + (state.position.y - startY) * cellSize, cellSize - 1);
+  }
+  ctx.strokeStyle = "#e8efff";
+  ctx.lineWidth = 2;
+  ctx.strokeRect(
+    pad + (state.position.x - startX) * cellSize,
+    pad + (state.position.y - startY) * cellSize,
+    cellSize - 1,
+    cellSize - 1
+  );
+
+  // ピン描画
+  if (state.mapPinsVisible !== false) {
+    pinCache.list.forEach((pin) => {
+      if (
+        pin.x < startX ||
+        pin.x >= startX + cells ||
+        pin.y < startY ||
+        pin.y >= startY + cells
+      )
+        return;
+      drawPin(ctx, pin, pad, cellSize, startX, startY);
+    });
+  }
+
+  if (mapPosLabel) {
+    mapPosLabel.textContent = `(${state.position.x + 1}, ${state.position.y + 1})`;
+  }
+  refreshMapInfo();
+}
+
+/**
+ * 指定座標にある拠点を返す。
+ * @param {number} x
+ * @param {number} y
+ * @returns {object|null}
+ */
+export function getSettlementAtPosition(x, y) {
+  const cell = mapData[y]?.[x];
+  return cell?.settlement || null;
+}
+
+/**
+ * 指定座標の地形キーを返す。
+ * @param {number} x
+ * @param {number} y
+ * @returns {string}
+ */
+export function getTerrainAt(x, y) {
+  return mapData[y]?.[x]?.terrain || "plain";
+}
+
+/**
+ * 現在のマップ/拠点情報をスナップショットとして返す。
+ * @returns {{cells:Array,settlements:Array,nobleHome:Array}}
+ */
+export function snapshotWorld() {
+  const cells = mapData.map((row) =>
+    row.map((cell) => ({
+      terrain: cell.terrain,
+      building: cell.building,
+      factionId: cell.factionId ?? null,
+      settlementId: cell.settlement?.id || null,
+    }))
+  );
+  const settlementsSnap = settlements.map((s) => ({ ...s, coords: { ...s.coords } }));
+  const nobleHomeSnap = Array.from(nobleHome.entries());
+  return { cells, settlements: settlementsSnap, nobleHome: nobleHomeSnap };
+}
+
+/**
+ * スナップショットからマップ/拠点を復元する。
+ * @param {{cells:Array,settlements:Array,nobleHome:Array}|null} snapshot
+ * @returns {boolean} 復元成功時 true
+ */
+export function restoreWorld(snapshot) {
+  try {
+    if (!snapshot?.cells || !snapshot?.settlements) return false;
+    if (
+      !Array.isArray(snapshot.cells) ||
+      snapshot.cells.length !== MAP_SIZE ||
+      snapshot.cells[0]?.length !== MAP_SIZE
+    )
+      return false;
+    // mapDataはconstなので中身を上書きする
+    for (let y = 0; y < MAP_SIZE; y++) {
+      for (let x = 0; x < MAP_SIZE; x++) {
+        const src = snapshot.cells[y][x];
+        const cell = mapData[y][x];
+        cell.terrain = src.terrain;
+        cell.building = src.building;
+        cell.factionId = src.factionId ?? null;
+        cell.settlement = null;
+      }
+    }
+    // 拠点を再構築
+    settlements.length = 0;
+    snapshot.settlements.forEach((s) => settlements.push({ ...s }));
+    // nobleHomeを再構築
+    nobleHome.clear();
+    (snapshot.nobleHome || []).forEach(([k, v]) => nobleHome.set(k, v));
+    const settlementById = new Map(settlements.map((s) => [s.id, s]));
+    // mapDataにsettlement参照を差し戻す
+    snapshot.cells.forEach((row, y) => {
+      row.forEach((src, x) => {
+        if (src.settlementId) {
+          const s = settlementById.get(src.settlementId);
+          if (s) {
+            mapData[y][x].settlement = s;
+            mapData[y][x].building = s.kind;
+            mapData[y][x].factionId = s.factionId;
+          }
+        }
+      });
+    });
+    return true;
+  } catch (e) {
+    console.error("restoreWorld failed", e);
+    return false;
+  }
+}
+
+/**
+ * ワールドを初期スナップショットへリセットする。
+ * @returns {boolean} リセット成功ならtrue
+ */
+export function resetWorld(seed = DEFAULT_WORLD_SEED) {
+  buildWorld(seed);
+  return true;
+}
+
+/**
+ * IDから拠点を取得する。
+ * @param {string} id
+ * @returns {object|null}
+ */
+export function getSettlementById(id) {
+  return settlements.find((s) => s.id === id) || null;
+}
+
+/**
+ * マップ情報表示を更新する。
+ * 左列: ホバー情報, 右列: 選択情報。それぞれ独立に依頼ピン詳細を表示する。
+ * @param {string} [hoverText]
+ * @param {{x:number,y:number}|null} [hoverPos]
+ * @param {boolean} [suppressHoverPins=false] ホバーを消すときにピン行も消したい場合に true
+ */
+function updateMapInfo(hoverText = "", hoverPos = null, suppressHoverPins = false) {
+  const { mapInfo } = elements;
+  if (!mapInfo) return;
+
+  const selectedText = state.selectedPosition
+    ? `選択中: ${formatCellInfo(state.selectedPosition.x, state.selectedPosition.y)}`
+    : "選択中: なし";
+
+  const pinLineText = (pos, suppress) => {
+    if (!pos || state.mapPinsVisible === false || suppress) return "";
+    const pins = pinsAt(pos.x, pos.y);
+    const parts = pins.map((p) => p.info).filter(Boolean);
+    return parts.length ? parts.join(" / ") : "";
+  };
+
+  const hoverPins = pinLineText(hoverPos, suppressHoverPins);
+  const selectedPins = pinLineText(state.selectedPosition, false);
+
+  mapInfo.innerHTML = "";
+
+  const leftCol = document.createElement("div");
+  leftCol.className = "map-info-col left";
+  if (hoverText) {
+    const line = document.createElement("div");
+    line.className = "map-info-line";
+    line.textContent = hoverText;
+    leftCol.append(line);
+  }
+  if (hoverPins) {
+    const line = document.createElement("div");
+    line.className = "map-info-line pin-line";
+    line.textContent = hoverPins;
+    leftCol.append(line);
+  }
+
+  const rightCol = document.createElement("div");
+  rightCol.className = "map-info-col right";
+  const selLine = document.createElement("div");
+  selLine.className = "map-info-line";
+  selLine.textContent = selectedText;
+  rightCol.append(selLine);
+  if (selectedPins) {
+    const line = document.createElement("div");
+    line.className = "map-info-line pin-line";
+    line.textContent = selectedPins;
+    rightCol.append(line);
+  }
+
+  mapInfo.append(leftCol, rightCol);
+}
+
+/**
+ * 選択中のマスに合わせてマップ情報を再計算する。
+ */
+export function refreshMapInfo() {
+  const pos = state.selectedPosition ? { ...state.selectedPosition } : null;
+  updateMapInfo("", pos);
+}
+
+/**
+ * 配達先・海図の地点を共通の選択枠で強調し、全体地図へ移す。
+ * @param {{x:number,y:number}} position 対象座標。 @returns {void}
+ */
+export function focusMapPosition(position) {
+  state.selectedPosition = { ...position };
+  state.mapMode = "full";
+  state.mapPinsVisible = true;
+  renderMap();
+  refreshMapInfo();
+  elements.mapCanvas?.scrollIntoView({ block: "center", behavior: "smooth" });
+}
+
+/**
+ * マップのホバー表示を設定する。
+ */
+export function wireMapHover() {
+  const { mapCanvas } = elements;
+  if (!mapCanvas) return;
+  const isTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+  if (!isTouch) {
+    mapCanvas.addEventListener("mousemove", (e) => {
+      const rect = mapCanvas.getBoundingClientRect();
+      const { cells, startX, startY } = mapViewport(state.mapMode, state.position);
+      const scaleX = rect.width / mapCanvas.width;
+      const pad = MAP_PAD * scaleX;
+      const cell = (rect.width - pad * 2) / cells;
+      const localX = Math.floor((e.clientX - rect.left - pad) / cell);
+      const localY = Math.floor((e.clientY - rect.top - pad) / cell);
+      if (localX < 0 || localY < 0 || localX >= cells || localY >= cells) {
+        const sel = state.selectedPosition ? { ...state.selectedPosition } : null;
+        updateMapInfo("", sel, true);
+        return;
+      }
+      const gx = startX + localX;
+      const gy = startY + localY;
+      updateMapInfo(formatCellInfo(gx, gy), { x: gx, y: gy });
+    });
+
+    mapCanvas.addEventListener("mouseleave", () => {
+      const sel = state.selectedPosition ? { ...state.selectedPosition } : null;
+      updateMapInfo("", sel, true);
+    });
+  }
+
+  mapCanvas.addEventListener("click", (e) => {
+    // クリックで自動移動を強制停止
+    document.dispatchEvent(new CustomEvent("auto-move-stop"));
+    const rect = mapCanvas.getBoundingClientRect();
+    const { cells, startX, startY } = mapViewport(state.mapMode, state.position);
+    const scaleX = rect.width / mapCanvas.width;
+    const pad = MAP_PAD * scaleX;
+    const cell = (rect.width - pad * 2) / cells;
+    const localX = Math.floor((e.clientX - rect.left - pad) / cell);
+    const localY = Math.floor((e.clientY - rect.top - pad) / cell);
+    if (localX < 0 || localY < 0 || localX >= cells || localY >= cells) return;
+    const gx = startX + localX;
+    const gy = startY + localY;
+    const sameSelection =
+      state.selectedPosition &&
+      state.selectedPosition.x === gx &&
+      state.selectedPosition.y === gy;
+    const isCurrent = state.position.x === gx && state.position.y === gy;
+    state.selectedPosition = { x: gx, y: gy };
+    renderMap();
+    updateMapInfo(formatCellInfo(gx, gy), { x: gx, y: gy });
+    if (sameSelection) {
+      if (isCurrent) {
+        return;
+      } else {
+        const dx = Math.abs(state.position.x - gx);
+        const dy = Math.abs(state.position.y - gy);
+        if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
+          document.dispatchEvent(new CustomEvent("map-move-request"));
+        } else {
+          document.dispatchEvent(
+            new CustomEvent("map-auto-move-request", {
+              detail: { target: { x: gx, y: gy } },
+            })
+          );
+        }
+      }
+    }
+  });
+}

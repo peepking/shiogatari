@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /** @returns {Promise<void>} 国力のデータ・精度・境界・変更を伴わない予告を検証する。 */
@@ -9,7 +8,7 @@ async function main() {
   /** @param {string} name 相対パス。 @returns {Promise<vm.Module>} 実モジュール。 */
   async function load(name) {
     if (modules.has(name)) return modules.get(name);
-    const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"));
+    const module = new vm.SourceTextModule(await readSource(name));
     modules.set(name, module); await module.link(load); return module;
   }
   const module = await load("./nationalPower.js"); await module.evaluate();
@@ -118,7 +117,7 @@ async function main() {
   assert.equal(battleChanges[0].factionId,"north");
   assert.equal(battleChanges[0].delta,2); assert.equal(battleChanges[1].delta,0);
   assert.equal(rules.completeBattlePower(game,encounter,true).length,0);
-  const factionSource = await fs.readFile(path.join(__dirname,"../faction.js"),"utf8");
+  const factionSource = await readSource("faction.js");
   const context = vm.createContext({ state:game, settlements:places, FACTIONS:[], NATIONAL_POWER_CONFIG:config,
     wantedFacilityReason:()=>"",
     applyNationalPowerPlan:rules.applyNationalPowerPlan, nationalPowerResources:()=>[], getPlayerFactionId:()=>null,
@@ -134,7 +133,7 @@ async function main() {
   assert.equal(places[0].factionId,"north"); assert.equal(getNationalPower(game.nationalPower,"citadel"),520);
   vm.runInContext("resolveFront({},front,true)",context);
   assert.equal(getNationalPower(game.nationalPower,"citadel"),520);
-  const questSource=await fs.readFile(path.join(__dirname,"../quests.js"),"utf8");
+  const questSource=await readSource("quests.js");
   Object.assign(context,{ensureState(){},addFrontScore(){},absDay:()=>nationalPowerDay(game),
     awardQuestNationalPower:q=>rules.completeQuestPower(game,q,[],places,atWar),
     payQuestFunds:()=>0,adjustNobleFavor(){},enqueueQuestResult(){},resolvePirateRelations(){}});
@@ -202,7 +201,7 @@ async function testDonationUI(base,config,rules) {
     "./storage.js":{saveGameToStorage:()=>{saves++;return saveOK;}}, "./dom.js":{pushToast(){},pushLog(){}},
     "./util.js":{escapeHtml:v=>v}, "./resourceUI.js":{resourceList:()=>""},
   };
-  const ui=new vm.SourceTextModule(await fs.readFile(path.join(__dirname,"../nationalPowerUI.js"),"utf8"));
+  const ui=new vm.SourceTextModule(await readSource("nationalPowerUI.js"));
   await ui.link(name=> {
     if (name==="./nationalPower.js") return base;
     if (name==="./nationalPowerConfig.js") return config;

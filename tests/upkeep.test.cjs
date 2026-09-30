@@ -1,7 +1,6 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
 const vm = require("node:vm");
-const path = require("node:path");
 
 /**
  * 食料消費日・季節境界と旧形式を含む兵員の維持費、昇級内訳を検証する。
@@ -23,7 +22,7 @@ async function main() {
       const module = new vm.SyntheticModule(["state"], function () { this.setExport("state", state); });
       modules.set(name, module);
       return module;
-    } else source = await fs.readFile(path.join(__dirname, "..", name), "utf8");
+    } else source = await readSource(name);
     const module = new vm.SourceTextModule(source);
     modules.set(name, module);
     await module.link(load);
@@ -69,7 +68,7 @@ async function main() {
   const bulk=payShipUpkeep(ships);
   assert.deepEqual(bulk.sold.map(row=>[row.id,row.count]),[["caravel",1],["cog",2]]);
   assert.equal(ships.funds,620);
-  const timeSource=await fs.readFile(path.join(__dirname,"../time.js"),"utf8");
+  const timeSource=await readSource("time.js");
   const fixture={day:30,season:3,year:1000,funds:5,troops:{infantry:10},supplies:{food:900},fleet:normalizeFleet({counts:{cog:1}})};
   const notices=[];
   const toasts=[];

@@ -1,3 +1,4 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const vm = require("node:vm");
@@ -16,8 +17,8 @@ async function main() {
     "./outfitting.js": { getOutfittingEffects() {}, applyCapacityBonus() {} },
     "./fleet.js": { fleetEffects() {} },
   };
-  const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../troops.js"), "utf8"), { context });
-  const pirates = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../pirateConfig.js"), "utf8"), {context});
+  const module = new vm.SourceTextModule(await readSource("troops.js"), { context });
+  const pirates = new vm.SourceTextModule(await readSource("pirateConfig.js"), {context});
   await pirates.link(() => {});
   await module.link(name => name === "./pirateConfig.js" ? pirates : new vm.SyntheticModule(Object.keys(dependencies[name]), function () {
     for (const [key, value] of Object.entries(dependencies[name])) this.setExport(key, value);

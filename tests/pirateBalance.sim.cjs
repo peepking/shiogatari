@@ -1,10 +1,9 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /** @param {string} file ファイル名。 @returns {string} 本体のソース。 */
-function read(file) { return fs.readFileSync(path.join(__dirname, "..", file), "utf8"); }
+function read(file) { return readSource(file); }
 
 /**
  * 描画・終了後の報酬処理だけを差し替え、実際の戦闘処理を読み込む。

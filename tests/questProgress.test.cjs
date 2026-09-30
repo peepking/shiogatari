@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /**
@@ -8,7 +7,7 @@ const vm = require("node:vm");
  * @returns {Promise<void>}
  */
 async function main() {
-  const source = await fs.readFile(path.join(__dirname, "../questProgress.js"), "utf8");
+  const source = await readSource("questProgress.js");
   const module = new vm.SourceTextModule(source);
   /** @returns {void} 外部依存を禁止する。 */
   function link() { throw Error("予期しない依存"); }

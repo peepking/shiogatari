@@ -1,10 +1,9 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 /** @returns {Promise<void>} 重複・占領後の前線・依頼・要請の整理と、新規重複攻撃の防止を検証する。 */
 async function main() {
-  const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../warFronts.js"), "utf8"));
+  const module = new vm.SourceTextModule(await readSource("warFronts.js"));
   await module.link(() => {}); await module.evaluate();
   const reconcile = module.namespace.reconcileWarFronts;
   const settlements = [{ id: "town", factionId: "archipelago" }];
@@ -26,7 +25,7 @@ async function main() {
   const after = JSON.stringify(state);
   reconcile(state, settlements);
   assert.equal(JSON.stringify(state), after);
-  const source = await fs.readFile(path.join(__dirname, "../faction.js"), "utf8");
+  const source = await readSource("faction.js");
   const context = vm.createContext({ state, settlements, Math: { random: () => 0 }, FACTIONS: [] });
   for (const name of ["isSettlementUnderSiege", "maybeStartFront", "resolveFront"]) {
     const start = source.indexOf(`function ${name}(`);

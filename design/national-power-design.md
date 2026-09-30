@@ -17,7 +17,7 @@
 
 ## 2. 共通設定と暫定値
 
-`nationalPowerConfig.js` の `NATIONAL_POWER_CONFIG` に集約する。UI・保存補完・増減計算・日次処理で別々に数値を持たない。
+`src/factions/nationalPowerConfig.js` の `NATIONAL_POWER_CONFIG` に集約する。UI・保存補完・増減計算・日次処理で別々に数値を持たない。
 
 | 設定項目 | 暫定値 | 意味 |
 | --- | ---: | --- |
@@ -180,18 +180,18 @@
 
 | ファイル案／既存ファイル | 責務 |
 | --- | --- |
-| nationalPowerConfig.js | 調整値・対象国家・定義の検証 |
-| nationalPower.js | 初期化・正規化、精度変換、増減、回復・消耗・補正の純粋計算、提供の検証 |
-| nationalPowerRules.js | 日次順序、前線集計、依頼の支援先固定、活動報酬の重複防止、戦闘開始条件の固定 |
-| nationalPowerWorld.js | 実世界の交戦判定、依頼完了時の接続、実増減の結果・ログ表示 |
-| nationalPowerUI.js | 勢力シートの内訳、提供画面、結果表示 |
-| state.js / storage.js | 初期状態、保存、旧セーブ補完 |
-| time.js / faction.js / warFronts.js | 季節・日次処理、交戦確認、前線整合性、決着と拠点喪失 |
-| quests.js / questUI.js | 支援勢力の固定、種類別完了処理、予定報酬 |
-| ui.js | 戦闘開始時の所属・敵・交戦状態の固定、通常戦闘結果、謁見導線 |
-| panelUI.js / index.html / styles.css | 勢力シート・既存画面への組み込み |
+| src/factions/nationalPowerConfig.js | 調整値・対象国家・定義の検証 |
+| src/factions/nationalPower.js | 初期化・正規化、精度変換、増減、回復・消耗・補正の純粋計算、提供の検証 |
+| src/factions/nationalPowerRules.js | 日次順序、前線集計、依頼の支援先固定、活動報酬の重複防止、戦闘開始条件の固定 |
+| src/factions/nationalPowerWorld.js | 実世界の交戦判定、依頼完了時の接続、実増減の結果・ログ表示 |
+| src/factions/nationalPowerUI.js | 勢力シートの内訳、提供画面、結果表示 |
+| src/core/state.js / src/core/storage.js | 初期状態、保存、旧セーブ補完 |
+| src/app/time.js / src/factions/faction.js / src/factions/warFronts.js | 季節・日次処理、交戦確認、前線整合性、決着と拠点喪失 |
+| src/quests/quests.js / src/quests/questUI.js | 支援勢力の固定、種類別完了処理、予定報酬 |
+| src/app/ui.js | 戦闘開始時の所属・敵・交戦状態の固定、通常戦闘結果、謁見導線 |
+| src/ui/panelUI.js / index.html / styles.css | 勢力シート・既存画面への組み込み |
 
-勢力や世界を参照する接続処理と純粋計算を分け、既に大きい `faction.js`・`ui.js` に国力ロジックを集中させない。ゲーム状態の変更を表示関数から行わない。
+勢力や世界を参照する接続処理と純粋計算を分け、既に大きい `src/factions/faction.js`・`src/app/ui.js` に国力ロジックを集中させない。ゲーム状態の変更を表示関数から行わない。
 
 ### 完了経路の対応
 

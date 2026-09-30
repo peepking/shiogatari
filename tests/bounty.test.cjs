@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /** 名前抽選・固定敵・期限・補充・報酬の一度だけの適用と犯罪期限を実モジュールで検証する。 @returns {Promise<void>} */
@@ -24,7 +23,7 @@ async function main() {
     const exports = stubs[name];
     const mod = exports ? new vm.SyntheticModule(Object.keys(exports), function () {
       for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
-    }, { context }) : new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"), { context });
+    }, { context }) : new vm.SourceTextModule(await readSource(name), { context });
     modules.set(name, mod); await mod.link(load); return mod;
   }
   const core = await load("bounty.js"); await core.evaluate();
@@ -353,7 +352,7 @@ async function main() {
   for (const f of factions) for (const n of f.nobles) assert.equal(favors[n.id], f.id === shark.factionId ? -3 : 1);
   assert.equal(world.namespace.finishBounty(shark.id).length, 0); assert.equal(state.fleet.variants.length, 1); assert.equal(state.funds, shark.reward);
   // 公開UIの制限とイベント成立経路も、実際の関数を抽出して検証する。
-  const uiSource = await fs.readFile(path.join(__dirname, "..", "bountyUI.js"), "utf8");
+  const uiSource = await readSource("bountyUI.js");
   const checks = vm.createContext({ state, totalTroops: () => 10 });
   Object.assign(checks, { CRIME_LABELS: modules.get("bountyConfig.js").namespace.CRIME_LABELS, CRIME_HISTORY_LIMIT: 50, DAY_PER_YEAR: 120, DAY_PER_SEASON: 30, SEASONS: ["春", "夏", "秋", "冬"], escapeHtml: s => s });
   vm.runInContext(uiSource.match(/function wantedCrimesHtml\([^\n]*\) \{[\s\S]*?\n\}/)[0], checks);
@@ -369,10 +368,10 @@ async function main() {
   assert.ok(vm.runInContext("bountyRestriction(site)", checks));
   state.honorFactions = []; assert.equal(vm.runInContext("bountyRestriction(site)", checks), "");
   checks.totalTroops = () => 0; assert.ok(vm.runInContext("bountyRestriction(site)", checks));
-  const source = await fs.readFile(path.join(__dirname, "..", "actions.js"), "utf8");
+  const source = await readSource("actions.js");
   const escapeContext = vm.createContext({ state: { wanted: {}, pendingEncounter: { pursuitKind: "regular" } }, finishPursuit: pursuitRules.finishPursuit, absDay: () => 20,
     clearBattlePrep() {}, setOutput() {}, pushLog() {}, pushToast() {}, syncUI() {} });
-  const fullUI = await fs.readFile(path.join(__dirname, "..", "ui.js"), "utf8");
+  const fullUI = await readSource("ui.js");
   vm.runInContext(fullUI.match(/function escapeBattleSuccess\([^\n]*\) \{[\s\S]*?\n\}/)[0], escapeContext);
   vm.runInContext('escapeBattleSuccess("祈りによる回避")', escapeContext);
   assert.equal(escapeContext.state.wanted.pursuitUntil, 23);

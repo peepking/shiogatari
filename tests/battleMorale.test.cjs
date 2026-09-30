@@ -1,10 +1,9 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
 const vm = require("node:vm");
-const path = require("node:path");
 
 /** @param {string} file ファイル。 @returns {Promise<string>} ソース。 */
-function read(file) { return fs.readFile(path.join(__dirname, "..", file), "utf8"); }
+function read(file) { return readSource(file); }
 /** @param {string} id ID。 @param {number} x 横。 @param {number} y 縦。 @param {object} extra 上書き。 @returns {object} 部隊。 */
 function unit(id, x, y, extra = {}) {
   return { id, name: id, side: "ally", x, y, count: 10, hp: 100, maxHp: 100, morale: 100,

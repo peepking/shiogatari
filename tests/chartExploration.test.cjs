@@ -1,6 +1,5 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
-const path = require("node:path");
 const vm = require("node:vm");
 
 /** @returns {Promise<void>} 海図探索の保存中断・日数・報酬の一度だけの適用を検証する。 */
@@ -28,7 +27,7 @@ async function main() {
   /** @param {string} name ファイル。 @returns {Promise<vm.Module>} 読み込んだモジュール。 */
   async function load(name) {
     if (modules.has(name)) return modules.get(name);
-    const m = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "..", name), "utf8"), { context });
+    const m = new vm.SourceTextModule(await readSource(name), { context });
     modules.set(name, m); await m.link(load); return m;
   }
   const fleet = await load("./fleet.js"); await fleet.evaluate();

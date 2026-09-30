@@ -1,7 +1,6 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
 const vm = require("node:vm");
-const path = require("node:path");
 
 /** 釣りモジュールの名前空間（読み込み後に設定）。 */
 let fishing = null;
@@ -21,10 +20,10 @@ function makeState() {
 
 /** 海域判定・抽選・猶予・登録・捌き・売却・補完・図鑑フィルタ・ヒント公開を検証する。 */
 async function main() {
-  const config = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../fishingConfig.js"), "utf8"));
-  const mod = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../fishing.js"), "utf8"));
+  const config = new vm.SourceTextModule(await readSource("fishingConfig.js"));
+  const mod = new vm.SourceTextModule(await readSource("fishing.js"));
   await config.link(() => {});
-  const rewards = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../fishingRewards.js"), "utf8"));
+  const rewards = new vm.SourceTextModule(await readSource("fishingRewards.js"));
   await rewards.link(() => config);
   await mod.link((name) =>
     name === "./fishingConfig.js"
@@ -662,7 +661,7 @@ const noRod2 = fishing.normalizeFishing({ counts: {}, codex: {}, bait: {}, pendi
 assert.equal(noRod2.rodId, null);
 
 // 画面を開いたまま釣りを再開しても、日数適用後にキャスト待ちへ描画し直す。
-const uiSource = await fs.readFile(path.join(__dirname, "../fishingUI.js"), "utf8");
+const uiSource = await readSource("fishingUI.js");
 const restartState = makeState();
 restartState.modeLabel = "normal";
 restartState.expansion.fishing.rodId = "rod_basic";

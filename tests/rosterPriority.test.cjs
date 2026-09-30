@@ -1,10 +1,9 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
-const fs = require("node:fs/promises");
 const vm = require("node:vm");
-const path = require("node:path");
 /** @returns {Promise<void>} 指定順・候補切れ・評価優先・20枠での公平性・再実行の一致を検証する。 */
 async function main() {
-  const module = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, "../rosterPriority.js"), "utf8"));
+  const module = new vm.SourceTextModule(await readSource("rosterPriority.js"));
   await module.link(() => {}); await module.evaluate();
   const order = module.namespace.orderRosterCandidates;
   for (const types of [["crossbow", "halberd", "seaArcher"], ["shield", "archer", "marine"], ["scout", "medic"]]) {

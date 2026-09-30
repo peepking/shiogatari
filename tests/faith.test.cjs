@@ -1,11 +1,10 @@
+const { readSource } = require("./helpers/source.cjs");
 const assert = require('node:assert/strict');
-const fs = require('node:fs/promises');
 const vm = require('node:vm');
-const path = require('node:path');
 
 /** 恩恵の境界・期限・配布・抽選回数・救済を固定乱数で検証する。 */
 async function main() {
-  const mod = new vm.SourceTextModule(await fs.readFile(path.join(__dirname, '../faith.js'), 'utf8'));
+  const mod = new vm.SourceTextModule(await readSource('faith.js'));
   await mod.link(() => {}); await mod.evaluate();
   const { faithEffects, activateAfterglow, grantFaithSeason, rollFaithRecruitment, faithRecruitSlot, rescueFaithLosses, normalizeFaith } = mod.namespace;
   const state = { year:1000, season:3, day:30, faith:0, supplies:{food:5} };
