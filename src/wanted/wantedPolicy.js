@@ -24,7 +24,7 @@ export function wantedFacilityReason(state, settlement, service, now) {
   const record = state.wanted?.byFaction?.[settlement?.factionId];
   const trade = ["trade", "shipBuy"].includes(service);
   if (!record || record.amount < (trade ? WANTED_POLICY.tradeRestriction : WANTED_POLICY.facilityRestriction) || !Number.isSafeInteger(record.lastCrimeAbs) || now - record.lastCrimeAbs >= BOUNTY_CONFIG.lifetime) return "";
-  if (trade) return "この勢力から重罪人として手配されているため、通常取引・船の購入は利用できません。最低限の食料は賞金首一覧から購入できます。";
+  if (trade) return "この勢力から重罪人として手配されているため、通常取引・船の購入は利用できません。最低限の食料は窓口で交渉から購入できます。";
   return "この勢力から指名手配されているため、雇用・貴族面会・新規の通常依頼は利用できません。受注済み依頼は依頼カードから報告できます。";
 }
 
