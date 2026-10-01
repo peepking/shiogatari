@@ -5,7 +5,7 @@ const vm = require("node:vm");
 /** @param {string} id 識別子。 @param {string} side 陣営。 @param {object} extra 上書き。 @returns {object} 部隊。 */
 function unit(id, side, extra = {}) {
   return { id, side, name: id, type: "infantry", x: side === "ally" ? 2 : 7, y: 4,
-    status: "active", deployedAt: 0, count: 10, sources: { 1: 10 }, hp: 100, maxHp: 100,
+    status: "active", deployedAt: 0, count: 10, sources: { 1: 10 }, hp: 100, maxHp: 100, formationOrder: "line",
     atk: 0, def: 0, spd: 2, range: 1, move: 1, cooldown: 0, role: "melee", morale: 100, ...extra };
 }
 /** @param {number} count 部隊数。 @param {string} side 陣営。 @returns {Array} 待機順の予備隊。 */
@@ -17,7 +17,7 @@ function field(units) { return { battleKind: "grand", units, size: 10, tick: 0, 
 /** @returns {Promise<void>} 同時上限・後端投入・登場制限・継戦・封鎖・精算を検証する。 */
 async function main() {
   const modules = {};
-  for (const name of ["battleCore", "battleMorale", "battleMovement", "battleReinforcements", "battlePersonnel"])
+  for (const name of ["battleGeometry", "battleUnitFormation", "battleTarget", "battleCore", "battleMorale", "battleMovement", "battleReinforcements", "battlePersonnel"])
     modules[`./${name}.js`] = new vm.SourceTextModule(await readSource(`${name}.js`));
   const core = modules["./battleCore.js"];
   await core.link(name => modules[name]); await core.evaluate();
@@ -45,6 +45,20 @@ async function main() {
   assert.equal(new Set(simultaneous.units.filter(onBoard).map(u => `${u.x},${u.y}`)).size, 4);
   const routingFull = field([...Array.from({ length: 20 }, (_, i) => unit(`r-${i}`, "ally", { x: 2 + Math.floor(i / 10), y: i % 10, status: "routing" })), ...reserves(2, "ally")]);
   assert.equal(deploy(routingFull).length, 0, "敗走中も盤上20部隊の枠を使用する");
+  for (const size of [8, 10, 12, 15]) for (const status of ["active", "routing"]) {
+    const limit = modules["./battleGeometry.js"].namespace.battleDeploymentLimit(size);
+    for (const count of [limit - 2, limit - 1, limit]) {
+      const front = ["ally", "enemy"].flatMap(side => Array.from({ length: count }, (_, i) =>
+        unit(`${side}-${i}`, side, { x: side === "ally" ? 2 + Math.floor(i / size) : size - 3 - Math.floor(i / size), y: i % size, status })));
+      const state = field([...front, ...reserves(4, "ally"), ...reserves(4, "enemy")]);
+      state.size = size;
+      const arrived = deploy(state);
+      for (const side of ["ally", "enemy"]) {
+        assert.equal(arrived.filter(u => u.side === side).length, limit - count);
+        assert.equal(state.units.filter(u => u.side === side && onBoard(u)).length, limit);
+      }
+    }
+  }
   const longQueue = field([...reserves(50, "ally"), ...reserves(50, "enemy")]);
   const ids = new Set();
   for (let tick = 1; tick <= 50; tick++) {

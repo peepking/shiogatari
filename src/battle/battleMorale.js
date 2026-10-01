@@ -1,3 +1,5 @@
+import { unitFormation } from "./battleUnitFormation.js";
+
 /** 士気の初期調整値。堅固はtick低下上限を適用した後に軽減する。 */
 export const MORALE_RULES = Object.freeze({ initial: 100, damage: 60, pressure: 3, shock: 6,
   shockCap: 12, lossCap: 20, recoverAfter: 3, recovery: 2, shaken: 35, rally: 45, rout: 15, attackRate: 0.9, steadfast: 0.8 });
@@ -30,6 +32,7 @@ export function localPressure(unit, units) {
 /**
  * 士気を同じ盤面から一括計算する。撃破衝撃は当tick、敗走衝撃は次tickに1回だけ配る。
  * 敗走後の撃破では再度衝撃を発生させず、敗走部隊の士気を回復させない。
+ * 被害・圧力・衝撃の順に加算し、横陣では従来の浮動小数点計算順も維持する。
  * @param {object} state 戦場。 @param {Array} before tick開始時HP記録。 @returns {Array} 新たな敗走部隊。
  */
 export function updateBattleMorale(state, before) {
@@ -47,7 +50,9 @@ export function updateBattleMorale(state, before) {
       .reduce((sum, event) => sum + MORALE_RULES.shock * weight(event), 0));
     const adjacentEnemy = state.units.some(enemy => isBattleOnBoard(enemy) && enemy.side !== unit.side && distance(unit, enemy) === 1);
     const safe = !damage && !adjacentEnemy ? (unit.safeTicks || 0) + 1 : 0;
-    const loss = Math.min(MORALE_RULES.lossCap, damage / Math.max(1, unit.maxHp) * MORALE_RULES.damage + pressure * MORALE_RULES.pressure + shock)
+    const formationMorale = unitFormation(unit).morale / 100;
+    const loss = Math.min(MORALE_RULES.lossCap, damage / Math.max(1, unit.maxHp) * MORALE_RULES.damage
+      + pressure * MORALE_RULES.pressure * formationMorale + shock * formationMorale)
       * (unit.traits?.includes("steadfast") ? MORALE_RULES.steadfast : 1);
     const morale = Math.max(0, Math.min(100, (unit.morale ?? MORALE_RULES.initial) - loss
       + (safe >= MORALE_RULES.recoverAfter && !loss ? MORALE_RULES.recovery : 0)));
@@ -59,6 +64,7 @@ export function updateBattleMorale(state, before) {
     unit.morale = morale; unit.safeTicks = safe; unit.pressure = pressure; unit.moraleLoss = loss;
     unit.shaken = morale <= MORALE_RULES.shaken || (unit.shaken && morale < MORALE_RULES.rally);
     if (morale <= MORALE_RULES.rout) {
+      unit.pendingFormationOrder = null;
       unit.status = "routing"; unit.moraleShockSent = true; routed.push(unit);
       state.moraleShocks.push({ x: unit.x, y: unit.y, side: unit.side, count: unit.count });
     }

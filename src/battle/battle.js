@@ -1,6 +1,6 @@
 import { REINFORCEMENT_RULES } from "./battleReinforcements.js";
 import { restoreGrandRoster } from "./grandBattle.js";
-import { selectBattleSize, deploymentDepth, battleCellAt, BATTLE_SIZE_RULES } from "./battleGeometry.js";
+import { selectBattleSize, deploymentDepth, battleDeploymentLimit, battleCellAt, BATTLE_SIZE_RULES } from "./battleGeometry.js";
 import { takeBattlePersonnel, returnBattlePersonnel } from "./battlePersonnel.js";
 import { stepBattle, battleResult, createBattleRandom, BATTLE_RULES, battleAttackRate, COMBAT_TRAIT_RULES } from "./battleCore.js";
 import { isBattleActive, isBattleOnBoard, MORALE_RULES } from "./battleMorale.js";
@@ -20,6 +20,9 @@ import { snapshotOutfitting, outfittedStat, fireOutfitting, defendedDamage } fro
 import { OUTFITTING_ITEMS } from "../core/expansionConfig.js";
 import { planBattleFormation } from "./battleFormation.js";
 import { orderRosterCandidates } from "../ui/rosterPriority.js";
+import { initializeUnitFormation, normalizeFormationOrder, normalizeFormationRoster, queueUnitFormation, unitFormation, DEFAULT_FORMATION_ORDER } from "./battleUnitFormation.js";
+import { formationInfoMarkup, formationOptions, syncUnitFormationPanel, wireUnitFormationPanel, syncBulkFormationPanel, wireBulkFormationPanel } from "./battleUnitFormationUI.js";
+import { formationOrderRecipients, selectFormationOrderRecipients, applyFormationOrders } from "./battleUnitFormationOrders.js";
 
 const BASE_TICK_MS = BATTLE_RULES.tickMs;
 const MOVE_FX_TTL = BATTLE_RULES.moveFxTtl;
@@ -162,20 +165,101 @@ const battleRoster = {
   reserve: [],
 };
 
+let rosterUnitSequence = 0;
+
+/** 指示の編集を人数・編成の未反映判定から分離する。 @returns {string} 編成の比較用文字列。 */
+function rosterSignature() {
+  return JSON.stringify([battleRoster.sortie, battleRoster.reserve].map(list => list.map(entry => {
+    const copy = { ...entry };
+    delete copy.formationOrder;
+    return copy;
+  })));
+}
+
+/** @returns {void} 旧編成を補完し、新規部隊IDの再利用を防ぐ。 */
+function normalizeRosterFormations() {
+  const entries = [...battleRoster.sortie, ...battleRoster.reserve];
+  normalizeFormationRoster(entries);
+  for (const entry of entries) rosterUnitSequence = Math.max(rosterUnitSequence, Number(entry.rosterUnitId.slice(7)));
+}
+
+/** @param {object} entry 新規編成。 @returns {object} 新しい識別子とおまかせの初期指示を持つ編成。 */
+function createRosterEntry(entry) {
+  return { ...entry, rosterUnitId: `roster-${++rosterUnitSequence}`, formationOrder: DEFAULT_FORMATION_ORDER };
+}
+
+/**
+ * 準備中は編成と反映済み部隊を更新し、戦闘中は停止して実行時の予約だけを受け付ける。
+ * @param {string} order 指示。 @param {string|null} rosterId 準備欄から指定した部隊。 @returns {void}
+ */
+function changeFormationOrder(order, rosterId = null) {
+  if (battleState.result) return;
+  const unit = rosterId ? battleState.units.find(item => item.rosterUnitId === rosterId) : focusedUnit();
+  if (battleState.started) {
+    if (unit?.side !== "ally") return;
+    if (battleState.running) pauseBattle();
+    queueUnitFormation(unit, order);
+  } else {
+    const entry = [...battleRoster.sortie, ...battleRoster.reserve].find(item => item.rosterUnitId === (rosterId || unit?.rosterUnitId));
+    if (!entry) return;
+    entry.formationOrder = normalizeFormationOrder(order);
+    if (unit) initializeUnitFormation(unit, entry.formationOrder);
+    saveGrandPreparation();
+  }
+  renderRosterUI();
+  updateBattleInfo();
+  renderBattle();
+}
+
+/** @returns {void} 準備と戦闘の一括指示を同期し、前衛・予備隊を合わせた対象数を示す。 */
+function syncBulkFormationOrders() {
+  const started = battleState.started;
+  const preparation = document.getElementById("rosterFormationBulkEditor");
+  const runtime = document.getElementById("battleFormationBulkEditor");
+  if (preparation) preparation.hidden = started;
+  if (runtime) runtime.hidden = !started;
+  const nameForType = type => TROOP_STATS[type]?.name || type;
+  syncBulkFormationPanel("rosterFormationBulk", [...battleRoster.sortie, ...battleRoster.reserve], {
+    started: false, disabled: started || !!battleState.result, nameForType, reserveItems: battleRoster.reserve,
+  });
+  syncBulkFormationPanel("battleFormationBulk", battleState.units, {
+    started, disabled: !started || !!battleState.result, nameForType,
+  });
+}
+
+/**
+ * 一括指示の対象を操作時点で抽出し、準備中は保存へ、戦闘中は停止して各部隊の予約へ接続する。
+ * @param {string} target 対象ID。 @param {string} order 指示。 @returns {number} 受付部隊数。
+ */
+function changeBulkFormationOrder(target, order) {
+  if (battleState.result || !order) return 0;
+  const started = battleState.started;
+  const items = started ? battleState.units : [...battleRoster.sortie, ...battleRoster.reserve];
+  const selected = selectFormationOrderRecipients(formationOrderRecipients(items, started), target);
+  if (!selected.length) return 0;
+  if (battleState.running) pauseBattle();
+  const count = applyFormationOrders(selected, order, { started, units: battleState.units });
+  if (!started) saveGrandPreparation();
+  renderRosterUI();
+  updateBattleInfo();
+  renderBattle();
+  return count;
+}
+
 /** @returns {Array} 現在編集する編成。 */
 function selectedRoster() {
   return battleState.battleKind === "grand" && document.getElementById("rosterGroup")?.value === "reserve" ? battleRoster.reserve : battleRoster.sortie;
 }
 
 /** @returns {number} 現在編集する編成の上限。 */
-function selectedRosterLimit() { return selectedRoster() === battleRoster.reserve ? REINFORCEMENT_RULES.reserveLimit : MAX_SQUADS; }
+function selectedRosterLimit() { return selectedRoster() === battleRoster.reserve ? REINFORCEMENT_RULES.reserveLimit : battleDeploymentLimit(battleState.size); }
 
 /** 大会戦の反映済み編成と盤面だけを保存する。戦闘途中の保存はしない。 */
 function saveGrandPreparation() {
   if (battleState.battleKind !== "grand" || battleState.started || !state.pendingEncounter?.active) return;
-  if (appliedRosterSignature !== JSON.stringify([battleRoster.sortie, battleRoster.reserve])) return;
+  if (appliedRosterSignature !== rosterSignature()) return;
   state.pendingEncounter.preparation = JSON.parse(JSON.stringify({
-    version: 2, size: battleState.size, seed: battleState.randomSeed, grid: battleState.grid,
+    version: 3, size: battleState.size, seed: battleState.randomSeed, grid: battleState.grid,
     roster: { sortie: battleRoster.sortie, reserve: battleRoster.reserve },
     formation: battleState.allyFormation, strategy: battleStrategy,
     customCoordinates: Object.fromEntries(Object.entries(battleState.customSlots).map(([id, index]) => [id, buildDeploySlots("ally", battleState.size)[index]])),
@@ -195,6 +279,7 @@ const battleStrategy = {
  * 部隊編成をUIドラフトから確定させる。
  */
 function applyRoster() {
+  if (battleState.started || battleState.result) return;
   if (!battleRoster.sortie.length) {
     pushToast("編成エラー", "出撃部隊がありません。1部隊以上を出撃にしてください。", "warn");
     return;
@@ -335,6 +420,22 @@ function pushToStandby(type, sources) {
 }
 
 /**
+ * 旧保存の上限超過部隊を編成順の後ろから待機へ戻し、元レベルの人数を保つ。
+ * 小マップの旧3列目の甲板だけを基準の水域へ戻し、他の地形は維持する。
+ * @returns {number} 待機へ戻した部隊数。
+ */
+function normalizeBattleDeployment() {
+  const overflow = battleRoster.sortie.splice(battleDeploymentLimit(battleState.size));
+  overflow.forEach(entry => pushToStandby(entry.type, entry.sources));
+  if (battleState.size === 8 && ["sea", "shoal"].includes(battleState.battleTerrain)) {
+    for (const row of battleState.grid) for (const x of [2, battleState.size - 3]) {
+      if (row[x] === DECK_KEY) row[x] = battleState.battleTerrain;
+    }
+  }
+  return overflow.length;
+}
+
+/**
  * 出撃部隊一覧を返す（最大20件）。
  * @returns {Array<{type:string,count:number}>}
  */
@@ -357,8 +458,9 @@ function autoWeight(type) {
  * 人数・兵種性能・平均Lvによる重みが大きい順に最大20部隊を選ぶ。
  * 同じ重みは指定の兵種順で交互に選び、同兵種内では高Lvの兵から取り出す。
  * 対象外の兵種・端数・上限超過の兵は待機に残す。
+ * @param {number} frontLimit 前衛上限。新しい戦場の初期候補だけは最大20部隊で選ぶ。
  */
-function autoDeployRoster() {
+function autoDeployRoster(frontLimit = battleDeploymentLimit(battleState.size)) {
   resetRoster();
   const totals = standbyTotals();
   const chunks = Object.entries(totals)
@@ -374,10 +476,10 @@ function autoDeployRoster() {
   battleRoster.sortie = [];
   battleRoster.reserve = [];
   for (const chunk of orderRosterCandidates(chunks)) {
-    if (battleRoster.sortie.length + battleRoster.reserve.length >= MAX_SQUADS + (battleState.battleKind === "grand" ? REINFORCEMENT_RULES.reserveLimit : 0)) break;
+    if (battleRoster.sortie.length + battleRoster.reserve.length >= frontLimit + (battleState.battleKind === "grand" ? REINFORCEMENT_RULES.reserveLimit : 0)) break;
     const pulled = takeFromStandby(chunk.type, chunk.size);
     if (pulled.count <= 0) continue;
-    (battleRoster.sortie.length < MAX_SQUADS ? battleRoster.sortie : battleRoster.reserve).push({ type: chunk.type, count: pulled.count, level: pulled.level, sources: pulled.sources });
+    (battleRoster.sortie.length < frontLimit ? battleRoster.sortie : battleRoster.reserve).push(createRosterEntry({ type: chunk.type, count: pulled.count, level: pulled.level, sources: pulled.sources }));
   }
 }
 
@@ -393,6 +495,8 @@ function clearRoster() {
  * @returns {void}
  */
 function renderRosterUI() {
+  normalizeRosterFormations();
+  syncBulkFormationOrders();
   const standbyEl = elements.rosterStandby;
   const sortieEl = elements.rosterSortie;
   const countEl = elements.rosterCount;
@@ -402,6 +506,8 @@ function renderRosterUI() {
   if (group) { group.hidden = battleState.battleKind !== "grand"; group.disabled = disableAll; }
   const list = selectedRoster();
   const limit = selectedRosterLimit();
+  const heading = document.getElementById("rosterSortieHeading");
+  if (heading) heading.textContent = `${list === battleRoster.reserve ? "予備隊" : "出撃"}（最大${limit}部隊）`;
   const sortieCount = list.length;
   if (countEl) countEl.textContent = `${sortieCount}/${limit}`;
   const sortieFull = sortieCount >= limit;
@@ -449,7 +555,12 @@ function renderRosterUI() {
               <div><b>${name}</b></div>
               <div class="tiny">${list === battleRoster.reserve ? `予備 ${idx + 1}番` : "前衛"} ${s.count}人</div>
             </div>
-            <button class="btn ghost" data-action="to-standby" ${disableAll ? "disabled" : ""}>待機</button>
+            <div class="roster-right">
+              <label class="tiny" for="formation-${s.rosterUnitId}">部隊陣形</label>
+              <select id="formation-${s.rosterUnitId}" class="roster-formation-select" data-roster-unit="${s.rosterUnitId}" ${disableAll ? "disabled" : ""}>${formationOptions(s.formationOrder)}</select>
+              ${battleState.battleKind === "grand" ? `<button class="btn ghost" data-action="move-group" ${disableAll || (list === battleRoster.reserve ? battleRoster.sortie.length >= battleDeploymentLimit(battleState.size) : battleRoster.reserve.length >= REINFORCEMENT_RULES.reserveLimit) ? "disabled" : ""}>${list === battleRoster.reserve ? "前衛へ" : "予備隊へ"}</button>` : ""}
+              <button class="btn ghost" data-action="to-standby" ${disableAll ? "disabled" : ""}>待機</button>
+            </div>
           </div>
         `;
       })
@@ -497,7 +608,7 @@ function applyStrategyFromUI() {
 }
 
 /**
- * 20部隊を収容できる自軍側2〜3列の配置可能座標を作成する。
+ * 自軍側2列の配置可能座標を作成する。
  * @param {"ally"|"enemy"} side
  * @param {number} size
  * @returns {{x:number,y:number}[]}
@@ -562,7 +673,7 @@ function createUnit(type, side, index, pos, count, level = 1) {
 }
 
 /**
- * 側ごとのユニット配列を最大20部隊・配置枠数まで生成する。
+ * 側ごとのユニット配列を戦場の盤上上限・配置枠数まで生成する。
  * 敵候補が上限を超える場合、全配置マスで平均した既存の戦力判定値
  * （地形補正後の攻撃力÷攻撃間隔×HP×防御補正）が高い順に選抜する。
  * 人数・レベルも生成時の能力値に反映する。同点は元の順を優先し、選抜後も元の配置順を保つ。
@@ -574,7 +685,7 @@ function createUnit(type, side, index, pos, count, level = 1) {
  */
 function createUnits(entries, side, size, slots) {
   const positions = slots && slots.length ? slots : buildDeploySlots(side, size);
-  const limit = Math.min(MAX_SQUADS, positions.length);
+  const limit = Math.min(battleDeploymentLimit(size), positions.length);
   let selected = entries;
   if (side === "enemy" && entries.length > limit) {
     const ranked = entries.map((entry, index) => {
@@ -594,6 +705,8 @@ function createUnits(entries, side, size, slots) {
     const level = typeof entry === "string" ? 1 : entry?.level ?? 1;
     const pos = positions[i];
     const unit = createUnit(type, side, i, pos, count, level);
+    unit.rosterUnitId = entry?.rosterUnitId ?? null;
+    initializeUnitFormation(unit, side === "enemy" ? "auto" : entry?.formationOrder);
     unit.sources = side === "ally" ? { ...entry.sources } : { [Math.round(unit.level)]: unit.count };
     unit.status = "active";
     unit.deployedAt = 0;
@@ -884,7 +997,7 @@ function focusedUnit() {
     if (draftSel && draftSel.hp > 0) return draftSel;
   }
   const selected = getUnitById(battleState.selectedId, true);
-  if (selected && selected.hp > 0) return selected;
+  if (selected) return selected;
   const hovered = getUnitById(battleState.hoveredId);
   if (hovered) return hovered;
   return null;
@@ -894,10 +1007,12 @@ function focusedUnit() {
  * 戦闘詳細パネルを更新する。地形倍率は攻撃・防御計算と共通の処理で取得する。
  */
 function updateBattleInfo() {
+  syncBulkFormationOrders();
   const infoEl = elements.battleInfo;
   if (!infoEl) return;
   const fmt = (n) => Math.round(n);
   const unit = focusedUnit();
+  syncUnitFormationPanel(battleState, unit);
   if (!unit) {
     infoEl.textContent = "部隊にカーソルを合わせるかクリックすると詳細を表示します。";
     return;
@@ -916,12 +1031,13 @@ function updateBattleInfo() {
   const side = unit.side === "ally" ? "味方" : "敵";
   const status =
     unit.hp <= 0 ? "撃破" : `HP ${hpText} / ATK ${effAtk} / DEF ${effDef} / SPD ${unit.spd}`;
-  const coords = `(${unit.x + 1}, ${unit.y + 1})`;
+  const coords = unit.status === "reserve" ? "未投入" : `(${unit.x + 1}, ${unit.y + 1})`;
   infoEl.innerHTML = `
     <div><b>${side}</b> ${unit.name} x${unit.count ?? MAX_UNIT_COUNT} / Lv${(unit.level ?? 1).toFixed(1)}</div>
     <div>${status}</div>
-    <div>士気 ${Math.round(unit.morale ?? 100)} / ${unit.status === "routing" ? "敗走中" : unit.status === "escaped" ? "退出済み" : unit.shaken ? "動揺" : "平静"}・圧力 ${(unit.pressure || 0).toFixed(1)}</div>
+    <div>士気 ${Math.round(unit.morale ?? 100)} / ${unit.status === "reserve" ? "未投入" : unit.status === "routing" ? "敗走中" : unit.status === "escaped" ? "退出済み" : unit.shaken ? "動揺" : "平静"}・圧力 ${(unit.pressure || 0).toFixed(1)}</div>
     <div>射程 ${unit.range} / 移動 ${unit.move}</div>
+    ${formationInfoMarkup(unit, battleState)}
     ${traits.length ? `<div>特性 ${traits.join("・")}</div>` : ""}
     <div>座標 ${coords}</div>
     <div>地形 ${terrName} (補正 x${Math.round(terrRate * 100) / 100})</div>
@@ -946,7 +1062,7 @@ function updateSpeedUI() {
  */
 function updateBattleButtons() {
   const hasSortie = battleRoster.sortie.length > 0;
-  const applied = appliedRosterSignature === JSON.stringify([battleRoster.sortie, battleRoster.reserve]);
+  const applied = appliedRosterSignature === rosterSignature();
   if (elements.battleStartBtn)
     elements.battleStartBtn.disabled = battleState.running || !!battleState.result || battleState.editing || !hasSortie || !applied;
   if (elements.battlePauseBtn) elements.battlePauseBtn.disabled = !battleState.running;
@@ -1045,6 +1161,9 @@ function renderBattle() {
     }
 
     const hpRatio = unit.hp / Math.max(1, unit.maxHp);
+    ctx.fillStyle = "#e8efff";
+    ctx.font = `bold ${Math.max(9, Math.round(cell * 0.19))}px sans-serif`;
+    ctx.fillText(unitFormation(unit).mark, unit.x * cell + 2, unit.y * cell + Math.max(10, cell * 0.2));
     const barW = cell * 0.5;
     const barH = 4;
     ctx.fillStyle = "rgba(0,0,0,0.5)";
@@ -1139,7 +1258,8 @@ function findUnitAt(x, y) {
  * @returns {void}
  */
 function startBattle() {
-  if (battleState.running || !battleState.ready || elements.battleStartBtn?.disabled) return;
+  if (battleState.running || battleState.result || !battleState.ready || elements.battleStartBtn?.disabled) return;
+  const resuming = battleState.started;
   if (!battleState.started) {
     battleState.outfitting = snapshotOutfitting(state);
     battleState.faithRescue = faithEffects(state).rescue;
@@ -1156,7 +1276,8 @@ function startBattle() {
   updateBattleStatus();
   renderRosterUI();
   scheduleBattleTimer();
-  addBattleLog("戦闘開始。");
+  addBattleLog(resuming ? "戦闘再開。" : "戦闘開始。");
+  updateBattleInfo();
 }
 
 /**
@@ -1180,6 +1301,8 @@ function pauseBattle() {
  * @param {boolean} preserveField 既存の地形・敵配置を保持するか
  */
 function resetBattle(useDraft = false, preserveField = true) {
+  if (battleState.started) return;
+  normalizeRosterFormations();
   pauseBattle();
   if (!preserveField || battleState.randomSeed == null) {
     battleState.randomSeed = Math.floor(Math.random() * 4294967296);
@@ -1203,16 +1326,17 @@ function resetBattle(useDraft = false, preserveField = true) {
   battleState.moveFx = [];
   battleState.moveFx = [];
   const allyEntries = getSortieEntries();
-  const allies = allyEntries.length ? allyEntries : [];
   const enemiesFormation = battleState.enemyFormation && battleState.enemyFormation.length
     ? battleState.enemyFormation
     : DEFAULT_ENEMY_FORMATION;
-  const maxUnits = Math.max(allies.length, enemiesFormation.length);
+  const maxUnits = Math.max(allyEntries.length, enemiesFormation.length);
   if (!preserveField || !battleState.grid?.length) battleState.size = calcBattleSize(maxUnits);
   if (!preserveField || !battleState.grid || !battleState.grid.length) {
     battleState.grid = buildBattleGrid(battleState.size, battleState.battleTerrain || "plain");
     battleState.enemySlotOrder = null;
   }
+  const returnedSquads = normalizeBattleDeployment();
+  const allies = getSortieEntries();
   const allySlots = buildDeploySlots("ally", battleState.size);
   const enemySlotsBase = buildDeploySlots("enemy", battleState.size);
   if (!battleState.enemySlotOrder || battleState.enemySlotOrder.length !== enemySlotsBase.length) {
@@ -1234,6 +1358,8 @@ function resetBattle(useDraft = false, preserveField = true) {
     for (const [side, entries] of [["ally", battleRoster.reserve], ["enemy", state.pendingEncounter?.enemyReserve || []]]) {
       entries.slice(0, REINFORCEMENT_RULES.reserveLimit).forEach((entry, index) => {
         const unit = createUnit(entry.type, side, index, { x: -1, y: -1 }, entry.count, entry.level);
+        unit.rosterUnitId = entry.rosterUnitId ?? null;
+        initializeUnitFormation(unit, side === "enemy" ? "auto" : entry.formationOrder);
         unit.id = `${side}-reserve-${index}`; unit.status = "reserve"; unit.deployedAt = null;
         unit.sources = side === "ally" ? { ...entry.sources } : { [Math.round(unit.level)]: unit.count };
         battleState.units.push(unit);
@@ -1242,12 +1368,14 @@ function resetBattle(useDraft = false, preserveField = true) {
   }
   battleState.logLines = [];
   battleState.ready = true;
-  appliedRosterSignature = JSON.stringify([battleRoster.sortie, battleRoster.reserve]);
+  appliedRosterSignature = rosterSignature();
   syncFormationUI();
   updateSpeedUI();
   updateBattleStatus();
   updateBattleButtons();
   addBattleLog("配置を初期化しました。");
+  if (returnedSquads) addBattleLog(`戦場の上限に合わせ、${returnedSquads}部隊を待機へ戻しました。`);
+  renderRosterUI();
   renderBattle();
   updateBattleInfo();
   saveGrandPreparation();
@@ -1299,8 +1427,7 @@ function scheduleBattleTimer() {
   if (!battleState.running) return;
   const interval = Math.max(50, Math.floor(BASE_TICK_MS / Math.max(1, battleState.speed)));
   battleState.timer = setInterval(() => {
-    const scaledMs = interval * Math.max(1, battleState.speed);
-    const ended = advanceBattleTick(scaledMs);
+    const ended = advanceBattleTick(BASE_TICK_MS);
     renderBattle();
     updateBattleStatus();
     updateBattleInfo();
@@ -1339,7 +1466,7 @@ function openBattleView() {
   resetRoster();
   const restored = saved ? restoreGrandRoster(battleRoster.standby, saved.roster) : null;
   if (restored) Object.assign(battleRoster, restored);
-  else autoDeployRoster();
+  else autoDeployRoster(MAX_SQUADS);
   const validField = saved && Number.isInteger(saved.seed) && Array.isArray(saved.grid)
     && BATTLE_SIZE_RULES.some(rule => rule.size === saved.grid.length)
     && saved.grid.every(row => Array.isArray(row) && row.length === saved.grid.length);
@@ -1401,6 +1528,22 @@ export function wireBattleUI() {
   elements.battleBackBtn?.addEventListener("click", closeBattleView);
   elements.battleStartBtn?.addEventListener("click", startBattle);
   elements.battlePauseBtn?.addEventListener("click", pauseBattle);
+  wireUnitFormationPanel({
+    pause: () => { if (battleState.running) pauseBattle(); },
+    select: id => { battleState.selectedId = id || null; updateBattleInfo(); renderBattle(); },
+    change: changeFormationOrder,
+  });
+  for (const prefix of ["rosterFormationBulk", "battleFormationBulk"]) {
+    wireBulkFormationPanel(prefix, {
+      pause: () => { if (battleState.running) pauseBattle(); },
+      sync: syncBulkFormationOrders,
+      change: changeBulkFormationOrder,
+    });
+  }
+  elements.rosterSortie?.addEventListener("change", e => {
+    const select = e.target.closest("[data-roster-unit]");
+    if (select && !battleState.started) changeFormationOrder(select.value, select.dataset.rosterUnit);
+  });
   document.querySelectorAll(".battle-speed").forEach((btn) => {
     btn.addEventListener("click", () => {
       const speed = Number(btn.getAttribute("data-battle-speed") || 1);
@@ -1430,6 +1573,7 @@ export function wireBattleUI() {
     // 出撃側の数値変更UIは無し
   });
   elements.rosterStandby?.addEventListener("click", (e) => {
+    if (battleState.started || battleState.result) return;
     const btn = e.target.closest("[data-action='to-sortie']");
     if (!btn) return;
     const row = btn.closest(".roster-row");
@@ -1451,11 +1595,24 @@ export function wireBattleUI() {
     if (val <= 0) return;
     const pulled = takeFromStandby(type, val);
     if (pulled.count > 0) {
-      selectedRoster().push({ type, count: pulled.count, level: pulled.level, sources: pulled.sources });
+      selectedRoster().push(createRosterEntry({ type, count: pulled.count, level: pulled.level, sources: pulled.sources }));
     }
     renderRosterUI();
   });
   elements.rosterSortie?.addEventListener("click", (e) => {
+    if (battleState.started || battleState.result) return;
+    const move = e.target.closest("[data-action='move-group']");
+    if (move) {
+      const list = selectedRoster();
+      const destination = list === battleRoster.reserve ? battleRoster.sortie : battleRoster.reserve;
+      const limit = destination === battleRoster.sortie ? battleDeploymentLimit(battleState.size) : REINFORCEMENT_RULES.reserveLimit;
+      const index = Number(move.closest(".roster-row")?.dataset.idx);
+      if (battleState.battleKind === "grand" && destination.length < limit && Number.isInteger(index) && list[index]) {
+        destination.push(list.splice(index, 1)[0]);
+        renderRosterUI();
+      }
+      return;
+    }
     const btn = e.target.closest("[data-action='to-standby']");
     if (!btn) return;
     const row = btn.closest(".roster-row");
@@ -1468,10 +1625,12 @@ export function wireBattleUI() {
     renderRosterUI();
   });
   elements.rosterAuto?.addEventListener("click", () => {
+    if (battleState.started || battleState.result) return;
     autoDeployRoster();
     renderRosterUI();
   });
   elements.rosterClear?.addEventListener("click", () => {
+    if (battleState.started || battleState.result) return;
     clearRoster();
     renderRosterUI();
   });

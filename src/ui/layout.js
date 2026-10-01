@@ -116,8 +116,8 @@ export function updateBattleLayout({ active, count, applied, editing, running, s
   if (!guide) return;
   document.getElementById("battleHeading").textContent = result ? `戦闘終了：${result}` : started ? "戦闘中" : "戦闘準備";
   guide.textContent = result ? "戦果を確認して地図に戻れます。"
-    : running ? "戦闘中です。速度変更・一時停止ができます。"
-    : started ? "一時停止中です。再開ボタンで戦闘を続けます。"
+    : running ? "戦闘中です。部隊陣形の指示欄を開くと一時停止します。"
+    : started ? "一時停止中です。まとめて、または部隊ごとに陣形を指示して再開できます。"
     : !count ? "① おまかせ編成、または待機中の兵を出撃させてください。"
     : !applied ? "① 編成が変更されています。「編成を反映」を押してください。"
     : editing ? "② 配置を調整し、右の「保存」で確定してください。"

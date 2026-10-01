@@ -1665,6 +1665,31 @@ input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) 
   .codex-detail .codex-ecology { grid-template-columns: 1fr; gap: 0; }
   .codex-filter-disclosure .codex-filters { max-height: 130px; }
 }
+
+.battle-unit-orders {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.battle-unit-orders select,
+.roster-formation-select {
+  width: 100%;
+  min-width: 0;
+}
+
+fieldset.battle-unit-orders {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.battle-unit-orders summary,
+#battleFormationBulkEditor > summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
 .fishing-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .fishing-row .tiny { flex: 1 1 180px; }
 .fishing-session { display: grid; height: 145px; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; background: rgba(255, 255, 255, 0.04); line-height: 1.6; }

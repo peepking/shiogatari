@@ -22,7 +22,7 @@ function initial() {
 /** @returns {Promise<void>} 計算の独立性・再現性・画面接続を検証する。 */
 async function main() {
   const modules = {};
-  for (const name of ["battleCore", "battleMovement", "battleMorale", "battleReinforcements"])
+  for (const name of ["battleGeometry", "battleUnitFormation", "battleTarget", "battleCore", "battleMovement", "battleMorale", "battleReinforcements"])
     modules[`./${name}.js`] = new vm.SourceTextModule(await read(`${name}.js`));
   const core = modules["./battleCore.js"];
   await core.link(name => modules[name]);

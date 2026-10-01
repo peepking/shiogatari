@@ -20,6 +20,7 @@ function formationRows(count, width, size) {
  * 前後の振り分け後は各列を元の編成順に戻し、優先順位の高い部隊から中央へ配置する。
  * バランスは人数の多い列の幅に揃え、突撃は両列を中央へ密集させる。
  * 防御は前列を後列より2マス広げることを目指すが、前列の空き間隔は最大1マスに抑える。
+ * 2列の収容数を超える入力は編成順の先頭から収容し、3列目は作らない。
  * @param {object[]} units 味方部隊。
  * @param {string} kind 配置種別。
  * @param {number} size 盤面サイズ。
@@ -27,14 +28,8 @@ function formationRows(count, width, size) {
  */
 export function planBattleFormation(units, kind, size) {
   const isFront = unit => unit.role ? unit.role === "melee" : (unit.range ?? 1) <= 2;
-  const sorted = units.map((unit, index) => ({ unit, index }))
+  const sorted = units.slice(0, size * 2).map((unit, index) => ({ unit, index }))
     .sort((a, b) => Number(isFront(b.unit)) - Number(isFront(a.unit)) || (a.unit.range ?? 1) - (b.unit.range ?? 1) || a.index - b.index);
-  // 小さい盤面で準備開始後に増員しても、3列目を使って重複なく配置する。
-  if (units.length > size * 2) {
-    const rows = formationRows(size, size, size);
-    return sorted.slice(0, size).map(({ unit }, row) => ({ unit, x: 2, y: rows[row] }))
-      .concat(planBattleFormation(sorted.slice(size).map(item => item.unit), kind, size));
-  }
   const preferred = sorted.filter(({ unit }) => isFront(unit)).length;
   const frontCount = Math.max(sorted.length - size, Math.min(size, preferred));
   const front = sorted.slice(0, frontCount);

@@ -25,9 +25,13 @@ function createSimulation() {
   assert.ok(damage, "本体のダメージ式を読み込めること");
   vm.runInContext(damage[0].replace("export ", ""), context);
   vm.runInContext(read("battleGeometry.js").replace(/^export /gm, ""), context);
-  vm.runInContext(read("battleMorale.js").replace(/^export /gm, ""), context);
+  vm.runInContext(read("battleUnitFormation.js").replace(/^export /gm, ""), context);
+  vm.runInContext(read("battleUnitFormationOrders.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
+  vm.runInContext(read("battleUnitFormationUI.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
+  vm.runInContext(read("battleMorale.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(read("battleMovement.js").replace(/^export /gm, ""), context);
   vm.runInContext(read("battleReinforcements.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
+  vm.runInContext(read("battleTarget.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(read("battleCore.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(read("battle.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(`

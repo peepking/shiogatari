@@ -4,7 +4,6 @@ const vm = require("node:vm");
 const source = readSource("battle.js");
 const context = vm.createContext({
   MORALE_RULES: { initial: 100 },
-  deploymentDepth: size => Math.max(2, Math.ceil(20 / size)),
   MAX_SQUADS: 20, MAX_UNIT_COUNT: 10, DECK_KEY: "deck",
   TROOP_STATS: {
     basic: { hp: 100, atk: 30, def: 20, spd: 3, terrain: { plain: 100, forest: 100 } },
@@ -13,6 +12,8 @@ const context = vm.createContext({
   battleState: { grid: Array.from({ length: 10 }, () => Array(10).fill("plain")) },
   clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
 });
+vm.runInContext(readSource("battleUnitFormation.js").replace(/^export /gm, ""), context);
+vm.runInContext(readSource("battleGeometry.js").replace(/^export /gm, ""), context);
 vm.runInContext(source.match(/const BATTLE_HP_MULTIPLIER = \d+;/)[0], context);
 for (const name of ["buildDeploySlots", "createUnit", "createUnits", "terrainRate", "effectiveAtk", "effectiveDef", "calcStrength"]) {
   const start = source.indexOf(`function ${name}(`);
@@ -37,6 +38,11 @@ assert.equal(vm.runInContext("new Set(result.map(u => u.x + ',' + u.y)).size", c
 assert.equal(vm.runInContext("JSON.stringify(entries) === before", context), true);
 assert.equal(vm.runInContext("createUnits(entries.slice(0, 4), 'enemy', 10).length", context), 4);
 assert.equal(vm.runInContext("createUnits(entries, 'enemy', 10, [{x:9,y:0}])[0].level", context), 5);
+const small = vm.runInContext("createUnits(entries, 'enemy', 8)", context);
+assert.equal(small.length, 16);
+assert.equal(small.filter(u => u.level === 5).length, 6, "小マップでも戦力の高い敵を優先する");
+assert.equal(new Set(small.map(u => `${u.x},${u.y}`)).size, 16);
+assert.ok(small.every(u => u.x >= 6 && u.x <= 7));
 const terrainSelection = "createUnits([...Array(20).fill({type:'basic',count:10}), {type:'forest',count:10}], 'enemy', 10).some(u => u.type === 'forest')";
 assert.equal(vm.runInContext(terrainSelection, context), false);
 vm.runInContext("battleState.grid.forEach(row => row.fill('forest'))", context);

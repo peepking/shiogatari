@@ -1,5 +1,7 @@
 import { findTacticalPath, findRoutPath, resolveBattleMovement, movementPriority } from "./battleMovement.js";
-import { MORALE_RULES, isBattleActive, isBattleOnBoard, updateBattleMorale } from "./battleMorale.js";
+import { MORALE_RULES, isBattleActive, isBattleOnBoard, updateBattleMorale, localPressure } from "./battleMorale.js";
+import { selectBattleTarget } from "./battleTarget.js";
+import { chooseUnitFormation, formationDamage, initializeUnitFormation, resolveUnitFormation, unitFormation, UNIT_FORMATION_RULES } from "./battleUnitFormation.js";
 import { REINFORCEMENT_RULES, deployReinforcements, canSideContinue } from "./battleReinforcements.js";
 
 /** 現行ルールの時間・表示寿命。描画と計算で共有する。 */
@@ -39,26 +41,9 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
   function finishBattle(draw = false) { forceDraw = draw; }
   const BASE_TICK_MS = BATTLE_RULES.tickMs;
   const MAX_TICKS = battleState.battleKind === "grand" ? REINFORCEMENT_RULES.maxTicks : BATTLE_RULES.maxTicks;
-  const SEARCH_RANGE = 4;
-  const MELEE_SEARCH_RANGE = 3;
-  const TARGET_SWITCH_RATIO = 1.5;
   const ATTACK_FX_TTL = BATTLE_RULES.attackFxTtl;
   const MOVE_FX_TTL = BATTLE_RULES.moveFxTtl;
   const DECK_KEY = "deck";
-  const UNIT_TARGET_MODE = {
-    pirate_shield: "hp", pirate_spear: "hp", pirate_archer: "rear", raider_cavalry: "hp", pirate_axe: "hp", pirate_assault: "hp",
-    infantry: "hp",
-    marine: "hp",
-    shield: "hp",
-    cavalry: "hp",
-    cavalier: "hp",
-    halberd: "hp",
-    medic: "hp",
-    scout: "hp",
-    archer: "rear",
-    crossbow: "rear",
-    seaArcher: "rear",
-  };
   /**
    * マンハッタン距離を返す。
    * @param {object} a
@@ -126,86 +111,39 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
     return dps * ehp;
   }
 
-  /**
-   * 目標優先モードを取得する。
-   * @param {object} unit
-   * @returns {"hp"|"rear"|"strong"}
-   */
-  function targetMode(unit) {
-    if (unit.side === "ally") {
-      const mode = battleStrategy.targetMode;
-      if (mode && mode !== "type") return mode;
-    }
-    return UNIT_TARGET_MODE[unit.type] || "strong";
-  }
-
-  /**
-   * モードに応じたターゲットを選ぶ。
-   * @param {"hp"|"rear"|"strong"} mode
-   * @param {object} unit
-   * @param {object[]} enemies
-   * @returns {object|null}
-   */
-  function pickTargetByMode(mode, unit, enemies) {
-    if (!enemies.length) return null;
-    if (mode === "rear") {
-      const ranged = enemies.filter((e) => e.role === "ranged");
-      if (ranged.length) {
-        return ranged.reduce((best, cur) => (cur.hp < (best?.hp ?? Infinity) ? cur : best), null);
-      }
-      // 遠隔がいない場合はHP優先にフォールバック
-      mode = "hp";
-    }
-    if (mode === "close") {
-      return enemies.reduce((best, cur) => {
-        if (!best) return cur;
-        return manhattan(unit, cur) < manhattan(unit, best) ? cur : best;
-      }, null);
-    }
-    if (mode === "hp") {
-      return enemies.reduce((best, cur) => (cur.hp < (best?.hp ?? Infinity) ? cur : best), null);
-    }
-    // strong
-    return enemies.reduce((best, cur) => {
-      if (!best) return cur;
-      return calcStrength(cur) > calcStrength(best) ? cur : best;
-    }, null);
-  }
-
-  /**
-   * ターゲットを選択する。
-   * @param {object} unit
-   * @param {object[]} enemies
-   * @returns {object|null}
-   */
+  /** @param {object} unit 部隊。 @param {Array} enemies 候補。 @returns {object|null} 標的。 */
   function selectTarget(unit, enemies) {
-    const fighters = enemies.filter(isBattleActive);
-    const alive = (fighters.length ? fighters : enemies.filter(isBattleOnBoard)).sort((a, b) => movementPriority(a.id, battleState.randomSeed || 0, battleState.tick) - movementPriority(b.id, battleState.randomSeed || 0, battleState.tick));
-    if (!alive.length) return null;
-    const isMelee = unit.role !== "ranged";
-    const searchRange = isMelee ? MELEE_SEARCH_RANGE : SEARCH_RANGE;
-    const current = alive.find((e) => e.id === unit.targetId);
-    const candidates = alive.filter((e) => manhattan(unit, e) <= searchRange);
-    const mode = targetMode(unit);
-    const modePick = pickTargetByMode(mode, unit, candidates);
-    const strongPick = pickTargetByMode("strong", unit, candidates);
-    const bestCandidate = modePick || strongPick;
-    if (current && manhattan(unit, current) <= searchRange) {
-      if (!bestCandidate) return current;
-      const currentStrength = calcStrength(current);
-      const nextStrength = calcStrength(bestCandidate);
-      // HP優先時はHPがより低いなら切替を許容
-      if (mode === "hp" && bestCandidate.hp < current.hp * 0.8) return bestCandidate;
-      // 後衛狙いでは射撃兵へ切り替える。
-      if (mode === "rear" && bestCandidate.role === "ranged" && current.role !== "ranged") return bestCandidate;
-      if (nextStrength < currentStrength * TARGET_SWITCH_RATIO) return current;
+    return selectBattleTarget(unit, enemies, { strategy: battleStrategy, seed: battleState.randomSeed || 0,
+      tick: battleState.tick, strength: calcStrength });
+  }
+
+  /** 開始時の共通盤面から脅威・圧力・攻撃可能性を評価する。
+   * @param {object} unit 部隊。 @returns {object} 自動陣形と理由。
+   */
+  function decideFormation(unit) {
+    const enemies = battleState.units.filter(enemy => enemy.side !== unit.side);
+    const target = selectTarget(unit, enemies.filter(enemy => manhattan(unit, enemy) <= unit.range));
+    return chooseUnitFormation(unit, {
+      pressure: localPressure(unit, battleState.units),
+      shock: (battleState.moraleShocks || []).some(event => event.side === unit.side
+        && event.count > 0 && manhattan(unit, event) <= UNIT_FORMATION_RULES.shockRange),
+      adjacentMelee: enemies.some(enemy => isBattleActive(enemy) && !enemy.arriving
+        && enemy.role === "melee" && manhattan(unit, enemy) === 1),
+      rangedThreat: enemies.some(enemy => isBattleActive(enemy) && !enemy.arriving
+        && enemy.role === "ranged" && manhattan(unit, enemy) <= enemy.range),
+      target, canAttack: !unit.arriving && isBattleActive(unit) && Math.max(0, (unit.cooldown || 0) - 1) === 0 && !!target,
+    });
+  }
+
+  /** 共通盤面の判断を一括確定し、実際の切り替えだけを記録する。
+   * @param {Array} units 対象部隊。 @returns {void}
+   */
+  function resolveFormations(units) {
+    const decisions = new Map(units.filter(unit => isBattleActive(unit)).map(unit => [unit.id, decideFormation(unit)]));
+    for (const unit of units) {
+      if (resolveUnitFormation(unit, battleState.tick, () => decisions.get(unit.id)))
+        addBattleLog(`${unit.side === "ally" ? "味方" : "敵"}の${unit.name}が${unitFormation(unit).name}に変更した。`);
     }
-    if (bestCandidate) return bestCandidate;
-    if (current) return current;
-    return alive.reduce((best, cur) => {
-      if (!best) return cur;
-      return manhattan(unit, cur) < manhattan(unit, best) ? cur : best;
-    }, null);
   }
 
 
@@ -302,8 +240,15 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
   function advanceBattleTick(dtMs = BASE_TICK_MS) {
     battleState.elapsedMs += dtMs;
     battleState.tick += 1;
-    for (const unit of deployReinforcements(battleState))
+    for (const unit of battleState.units) if (unit.arriving) unit.arriving = false;
+    resolveFormations(battleState.units.filter(unit => unit.status !== "reserve"));
+    const arrivals = deployReinforcements(battleState);
+    for (const unit of arrivals) {
+      initializeUnitFormation(unit, unit.formationOrder, battleState.tick + 1);
       addBattleLog(`${unit.side === "ally" ? "味方" : "敵"}の増援: ${unit.name} ${unit.count}人が到着した。`);
+      if (unit.formationOrder === "auto") unit.formationChangeAt = battleState.tick;
+    }
+    resolveFormations(arrivals);
     const alive = battleState.units.filter(isBattleOnBoard);
     const allies = alive.filter((u) => u.side === "ally");
     const enemies = alive.filter((u) => u.side === "enemy");
@@ -377,8 +322,8 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
       unit.targetId = target.id;
       const atk = effectiveAtk(unit);
       const antiCavalry = unit.traits?.includes("antiCavalry") && target.traits?.includes("mounted");
-      const damage = Math.floor(defendedDamage(atk, effectiveDef(target))
-        * (antiCavalry ? COMBAT_TRAIT_RULES.antiCavalry : 1));
+      const damage = formationDamage(Math.floor(defendedDamage(atk, effectiveDef(target))
+        * (antiCavalry ? COMBAT_TRAIT_RULES.antiCavalry : 1)), unit, target);
       attacks.push({ unit, target, damage, atk });
       unit.cooldown = unit.spd;
     }
@@ -390,7 +335,8 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
     for (const target of alive.filter(unit => unit.hp <= 0))
       addBattleLog(`${target.side === "ally" ? "味方" : "敵"}の${target.name}が撃破された。`);
 
-    for (const shot of fireOutfitting(battleState.tick, alive.filter(isBattleActive), battleState.outfitting.effects.attacks, effectiveDef, random)) {
+    for (const shot of fireOutfitting(battleState.tick, alive.filter(isBattleActive), battleState.outfitting.effects.attacks,
+      effectiveDef, random, (damage, target) => formationDamage(damage, null, target, "ranged"))) {
       battleState.attackFx.push({ support: true, equipmentId: shot.id, to: shot.target.id, ttl: ATTACK_FX_TTL, impact: true });
       addBattleLog(`${equipmentNames[shot.id] || shot.id}: 敵の${shot.target.name}に${shot.damage}ダメージ${shot.target.hp <= 0 ? "・撃破" : ""}。`);
     }

@@ -71,9 +71,13 @@ async function main() {
 
   const core = new vm.SourceTextModule(await readSource("battleCore.js"));
   const morale = new vm.SourceTextModule(await readSource("battleMorale.js"));
-  await morale.link(() => {});
+  const formation = new vm.SourceTextModule(await readSource("battleUnitFormation.js"));
+  const target = new vm.SourceTextModule(await readSource("battleTarget.js"));
+  await morale.link(() => formation);
   const reinforcements = new vm.SourceTextModule(await readSource("battleReinforcements.js"));
-  await core.link(name => ({ "./battleMovement.js": movement, "./battleMorale.js": morale, "./battleReinforcements.js": reinforcements })[name]); await core.evaluate();
+  const geometry = new vm.SourceTextModule(await readSource("battleGeometry.js"));
+  await core.link(name => ({ "./battleMovement.js": movement, "./battleMorale.js": morale, "./battleReinforcements.js": reinforcements,
+    "./battleUnitFormation.js": formation, "./battleTarget.js": target, "./battleGeometry.js": geometry })[name]); await core.evaluate();
   const { stepBattle: step, battleResult } = core.namespace;
   /** @param {string} side 陣営。 @param {number} x 座標。 @returns {object} 部隊。 */
   function unit(side, x) {

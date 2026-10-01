@@ -1,5 +1,6 @@
 import { isBattleActive, isBattleOnBoard } from "./battleMorale.js";
 import { isHostileZone } from "./battleMovement.js";
+import { battleDeploymentLimit } from "./battleGeometry.js";
 
 /** 通常戦には適用せず、大会戦の投入数・上限・制限時間をここで調整する。 */
 export const REINFORCEMENT_RULES = Object.freeze({ onBoardLimit: 20, reserveLimit: 10,
@@ -16,6 +17,7 @@ export function canSideContinue(state, side) {
  * 各tick開始時に後端中央寄りの空きマスへ、編成順に最大2部隊を投入する。
  * 両軍とも投入前のZoCで評価し、登場tickは被攻撃対象になるが行動・拘束・支援しない。
  * 戦闘可能部隊がなく全入口が敵に封鎖された場合だけ連続失敗を数える。味方の渋滞は数えない。
+ * 敗走中も盤上枠を使い、8×8では16部隊、それ以外では20部隊までとする。
  * @param {object} state 戦場。 @returns {Array} 今回投入した部隊。
  */
 export function deployReinforcements(state) {
@@ -27,7 +29,7 @@ export function deployReinforcements(state) {
   const arrivals = [];
   for (const side of ["ally", "enemy"]) {
     const queue = state.units.filter(unit => unit.side === side && unit.status === "reserve" && unit.hp > 0);
-    const room = REINFORCEMENT_RULES.onBoardLimit - board.filter(unit => unit.side === side).length;
+    const room = Math.min(REINFORCEMENT_RULES.onBoardLimit, battleDeploymentLimit(state.size)) - board.filter(unit => unit.side === side).length;
     const entrances = Array.from({ length: state.size }, (_, y) => ({ x: side === "ally" ? 0 : state.size - 1, y }))
       .sort((a, b) => Math.abs(a.y - (state.size - 1) / 2) - Math.abs(b.y - (state.size - 1) / 2) || a.y - b.y);
     const probe = { side };

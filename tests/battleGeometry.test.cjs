@@ -6,19 +6,41 @@ async function main() {
   const geometry = new vm.SourceTextModule(await readSource("battleGeometry.js"));
   const formation = new vm.SourceTextModule(await readSource("battleFormation.js"));
   await geometry.link(() => {}); await geometry.evaluate(); await formation.link(() => {}); await formation.evaluate();
-  const { selectBattleSize, deploymentDepth, battleCellAt } = geometry.namespace;
-  const modules = {};
-  for (const name of ["battleCore", "battleMorale", "battleMovement", "battleReinforcements"])
+  const { selectBattleSize, deploymentDepth, battleDeploymentLimit, battleCellAt } = geometry.namespace;
+  const modules = { "./battleGeometry.js": geometry };
+  for (const name of ["battleUnitFormation", "battleTarget", "battleCore", "battleMorale", "battleMovement", "battleReinforcements"])
     modules[`./${name}.js`] = new vm.SourceTextModule(await readSource(`${name}.js`));
   await modules["./battleCore.js"].link(name => modules[name]); await modules["./battleCore.js"].evaluate();
+  const battle = await readSource("battle.js");
+  const context = vm.createContext({ ...geometry.namespace, DECK_KEY: "deck", battleState: { fieldRandom: () => 0.5 } });
+  vm.runInContext(battle.match(/const TERRAIN_WEIGHTS_BY_BASE = \{[\s\S]*?\n\};/)[0], context);
+  for (const name of ["buildBattleGrid", "buildDeploySlots"]) {
+    const start = battle.indexOf(`function ${name}(`);
+    vm.runInContext(battle.slice(start, battle.indexOf("\n}", start) + 2), context);
+  }
   assert.deepEqual([0, 5, 6, 10, 11, 15, 16, 20].map(selectBattleSize), [8, 8, 10, 10, 12, 12, 15, 15]);
   for (const size of [8, 10, 12, 15]) {
-    assert.ok(deploymentDepth(size) * size >= 20);
+    const limit = size === 8 ? 16 : 20;
+    assert.equal(deploymentDepth(size), 2);
+    assert.equal(battleDeploymentLimit(size), limit);
+    context.size = size;
+    for (const side of ["ally", "enemy"]) {
+      context.side = side;
+      const slots = vm.runInContext("buildDeploySlots(side, size)", context);
+      assert.equal(slots.length, size * 2);
+      assert.equal(new Set(slots.map(p => p.x)).size, 2);
+    }
+    for (const terrain of ["sea", "shoal"]) {
+      context.terrain = terrain;
+      const grid = vm.runInContext("buildBattleGrid(size, terrain)", context);
+      assert.ok(grid.every(row => row.every((cell, x) => (cell === "deck") === (x < 2 || x >= size - 2))), "海戦の甲板は全サイズで両端2列");
+    }
     for (const kind of ["balance", "assault", "defense"]) for (let total = 1; total <= 20; total++) for (let melee = 0; melee <= total; melee++) {
       const units = Array.from({ length: total }, (_, id) => ({ id, role: id < melee ? "melee" : "ranged", range: id < melee ? 1 : 4 }));
       const positions = formation.namespace.planBattleFormation(units, kind, size);
-      assert.equal(positions.length, total);
-      assert.equal(new Set(positions.map(p => `${p.x},${p.y}`)).size, total);
+      assert.equal(positions.length, Math.min(total, limit));
+      assert.equal(new Set(positions.map(p => `${p.x},${p.y}`)).size, Math.min(total, limit));
+      assert.ok(positions.every(p => p.unit.id < limit), "上限超過は編成順の後ろから除外する");
       assert.ok(positions.every(p => p.x >= 0 && p.x < deploymentDepth(size) && p.y >= 0 && p.y < size));
       assert.ok(positions.every(p => size - 1 - p.x >= deploymentDepth(size)), "両陣営の初期配置領域が重ならない");
     }
@@ -30,7 +52,7 @@ async function main() {
       }
     }
     const units = ["ally", "enemy"].flatMap(side => {
-      const army = Array.from({ length: 20 }, (_, index) => ({ id: `${side}-${index}`, name: "兵", side,
+      const army = Array.from({ length: limit }, (_, index) => ({ id: `${side}-${index}`, name: "兵", side,
         role: index < 12 ? "melee" : "ranged", range: index < 12 ? 1 : 4, count: 10,
         hp: 150, maxHp: 150, atk: 20, def: 10, spd: 2, move: 1, cooldown: 0, status: "active" }));
       return formation.namespace.planBattleFormation(army, "balance", size).map(p => ({ ...p.unit, x: side === "ally" ? p.x : size - 1 - p.x, y: p.y }));
@@ -43,8 +65,8 @@ async function main() {
       assert.equal(new Set(board.map(u => `${u.x},${u.y}`)).size, board.length);
       assert.ok(board.every(u => u.x >= 0 && u.x < size && u.y >= 0 && u.y < size));
     } while (!result.ended && state.tick < 60);
-    assert.equal(result.ended, true, `${size}マスの混成20対20が制限時間内に決着する`);
+    assert.equal(result.ended, true, `${size}マスの混成${limit}対${limit}が制限時間内に決着する`);
   }
-  console.log("可変戦場: サイズ境界・全編成の重複なし・3列配置・拡大/スクロール時のマス選択: 全項目成功");
+  console.log("可変戦場: サイズ境界・全編成の重複なし・2列配置と盤上上限・拡大/スクロール時のマス選択: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

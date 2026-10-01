@@ -15,7 +15,7 @@ function field(units) { return { units, size: 6, tick: 0, elapsedMs: 0, grid: Ar
 /** @returns {Promise<void>} 士気・敗走・交換・新勝敗と引き分けの外部処理を検証する。 */
 async function main() {
   const modules = {};
-  for (const name of ["battleMorale", "battleMovement", "battleReinforcements", "battleCore"])
+  for (const name of ["battleGeometry", "battleUnitFormation", "battleTarget", "battleMorale", "battleMovement", "battleReinforcements", "battleCore"])
     modules[`./${name}.js`] = new vm.SourceTextModule(await read(`${name}.js`));
   await modules["./battleCore.js"].link(name => modules[name]);
   await modules["./battleCore.js"].evaluate();

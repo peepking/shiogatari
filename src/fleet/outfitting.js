@@ -102,8 +102,9 @@ export function outfittedStat(base, role, ability, effects) {
  * DEF軽減は対象ごとに計算する。通常行動で決着済みなら発射しない。
  * @param {number} tick ティック。 @param {Array} units 戦闘部隊。 @param {Array} attacks 設備。
  * @param {Function} defense 有効DEF計算。 @param {Function} [random] 乱数源。 @returns {Array} 発射結果。
+ * @param {Function|null} [damageForTarget] 対象の射撃陣形補正。省略時は従来ダメージ。
  */
-export function fireOutfitting(tick, units, attacks, defense, random = Math.random) {
+export function fireOutfitting(tick, units, attacks, defense, random = Math.random, damageForTarget = null) {
   const shots = [];
   if (!units.some(u => u.side === "ally" && u.hp > 0)) return shots;
   for (const attack of attacks) {
@@ -112,7 +113,8 @@ export function fireOutfitting(tick, units, attacks, defense, random = Math.rand
     if (!enemies.length) break;
     const targets = attack.allEnemies ? enemies : [enemies[Math.floor(random() * enemies.length)]];
     for (const target of targets) {
-      const damage = defendedDamage(attack.power, defense(target));
+      const baseDamage = defendedDamage(attack.power, defense(target));
+      const damage = damageForTarget ? damageForTarget(baseDamage, target) : baseDamage;
       target.hp = Math.max(0, target.hp - damage);
       shots.push({ id: attack.id, target, damage });
     }

@@ -75,6 +75,28 @@
           <section class="card" aria-label="battle-info" id="battleInfoCard" hidden>
             <div class="bd">
               <div id="battleInfo" class="battle-info"></div>
+              <details id="battleFormationBulkEditor" class="mt-10" hidden>
+                <summary>まとめて陣形を指示</summary>
+                <div class="battle-unit-orders mt-6">
+                  <label for="battleFormationBulkTarget">指示する対象</label>
+                  <select id="battleFormationBulkTarget"></select>
+                  <label for="battleFormationBulkOrder">陣形指示</label>
+                  <select id="battleFormationBulkOrder"></select>
+                  <button class="btn primary" id="battleFormationBulkApply" disabled>0部隊に指示</button>
+                  <p class="tiny" id="battleFormationBulkNote"></p>
+                  <p class="tiny" id="battleFormationBulkFeedback" role="status"></p>
+                </div>
+              </details>
+              <div class="battle-unit-orders mt-10">
+                <label for="battleUnitSelect">味方部隊一覧</label>
+                <select id="battleUnitSelect" aria-label="詳細を確認する味方部隊"></select>
+                <details id="battleUnitFormationEditor" hidden>
+                  <summary>部隊陣形を指示</summary>
+                  <label for="battleUnitFormationOrder">陣形指示</label>
+                  <select id="battleUnitFormationOrder"></select>
+                  <p class="tiny" id="battleUnitFormationNote"></p>
+                </details>
+              </div>
               <div class="battle-log mt-10" id="battleLog"></div>
             </div>
           </section>
@@ -113,7 +135,17 @@
                   <div id="rosterStandby" class="roster-list"></div>
                 </div>
                 <div class="roster-col">
-                  <div class="tiny mb-4">出撃（最大20部隊）</div>
+                  <div id="rosterSortieHeading" class="tiny mb-4">出撃（最大20部隊）</div>
+                  <fieldset id="rosterFormationBulkEditor" class="battle-unit-orders mb-12">
+                    <legend>まとめて陣形を指示</legend>
+                    <label for="rosterFormationBulkTarget">指示する対象</label>
+                    <select id="rosterFormationBulkTarget"></select>
+                    <label for="rosterFormationBulkOrder">陣形指示</label>
+                    <select id="rosterFormationBulkOrder"></select>
+                    <button class="btn primary" id="rosterFormationBulkApply" disabled>0部隊に指示</button>
+                    <p class="tiny" id="rosterFormationBulkNote"></p>
+                    <p class="tiny" id="rosterFormationBulkFeedback" role="status"></p>
+                  </fieldset>
                   <div id="rosterSortie" class="roster-list"></div>
                 </div>
               </div>
@@ -261,7 +293,7 @@
                 <div class="tiny" id="battleOutfitting"></div>
                 <div class="battle-panel">
                   <div class="row flex-wrap">
-                    <button class="btn good" id="battleStartBtn">開始</button>
+                    <button class="btn good" id="battleStartBtn">戦闘開始</button>
                     <button class="btn" id="battlePauseBtn" disabled>一時停止</button>
                     <span class="pill">速度: <b id="battleSpeedLabel">x1</b></span>
                   </div>
@@ -274,7 +306,7 @@
                   <span class="pill battle-count">残存: <b id="battleCount">-</b></span>
                 </div>
                 <div class="battle-formation row flex-wrap mt-6">
-                  <label class="tiny mb-0" for="battleFormationSelect">味方フォーメーション</label>
+                  <label class="tiny mb-0" for="battleFormationSelect">味方の初期配置</label>
                   <select id="battleFormationSelect" class="battle-select">
                     <option value="balance">バランス</option>
                     <option value="assault">突撃</option>
