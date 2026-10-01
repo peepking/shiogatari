@@ -57,6 +57,12 @@ main .grid > * { min-width: 0; }
 .battle-viewport.is-zoomed { max-height: 70dvh; overscroll-behavior: contain; }
 #battleViewport.is-zoomed #battleCanvas { width: 720px; min-width: 720px; max-width: none; display: block; }
 .map-header { flex-wrap: wrap; }
+/* PCでは地点情報の増減で画面が揺れないように高さとスクロールバーの幅を確保する。 */
+@media (min-width: 851px) {
+  html { scrollbar-gutter: stable; }
+  #mapInfo { height: 96px; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; line-height: 1.6; overflow-wrap: anywhere; }
+}
+#mapInfo:focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
 .workspace-actions .mode-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .workspace-actions .mode-actions .btn { flex: 1 1 110px; }
 

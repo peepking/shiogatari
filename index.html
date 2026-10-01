@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
   <link rel="stylesheet" href="styles.css?v=20260915-number-inputs-center" />
-  <link rel="stylesheet" href="layout.css?v=20260912-audience" />
+  <link rel="stylesheet" href="layout.css?v=20261002-map-info" />
 </head>
 
 <body>
@@ -274,7 +274,7 @@
                   <button class="btn ghost" id="mapToggle">地図切替：全体</button>
                 </div>
                 <canvas id="mapCanvas" width="640" height="640" aria-label="航路マップ"></canvas>
-                <div id="mapInfo"></div>
+                <div id="mapInfo" tabindex="0" aria-label="マップの地点情報"></div>
               </div>
               <section class="outfitting-panel" id="outfittingPanel" aria-labelledby="outfittingTitle" hidden>
                 <div class="outfitting-heading"><h2 id="outfittingTitle" tabindex="-1">造船所</h2><div class="outfitting-heading-actions"><button class="btn ghost" id="outfittingEdit" aria-pressed="true">艤装変更</button><button class="btn ghost" id="outfittingTrade" aria-pressed="false">船取引</button><button class="btn ghost" id="outfittingDetails" aria-pressed="false">詳細確認</button><button class="btn ghost" id="outfittingClose">地図に戻る</button></div></div>
