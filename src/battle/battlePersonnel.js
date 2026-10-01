@@ -50,7 +50,7 @@ function pickPersonnel(rows, random) {
 
 /**
  * 戦後兵員をコピー上で精算する。損耗は撃破部隊の元レベル内で人数加重抽選し、
- * 救済後の生還兵のみを昇級候補にする。未投入兵と後から得る捕虜には触れない。
+ * 損耗・救済後の全保有兵から人数加重で昇級候補を抽選する。待機兵・未投入予備隊も含め、後から得る捕虜は含めない。
  * 同じ兵の複数昇級を許可し、Lv5を上限とする。入力不足・二重割当は反映前に拒否する。
  * @param {object} troops 保有兵。
  * @param {Array} units 戦闘部隊。
@@ -77,7 +77,7 @@ export function settleBattlePersonnel(troops, units, { lossProb, rescue = 0, won
     }
     if (wasBattleDeployed(unit)) participants.push({ unit, sources });
   }
-  const survivors = {}, losses = {}, promotions = [];
+  const losses = {}, promotions = [];
   for (const { unit, sources } of participants) {
     let lost = unit.hp <= 0 ? Math.round(unit.count * lossProb) : 0;
     if (won && rescue > 0) {
@@ -91,19 +91,16 @@ export function settleBattlePersonnel(troops, units, { lossProb, rescue = 0, won
       sources[row.level]--; next[unit.type][row.level]--;
       losses[unit.type] = (losses[unit.type] || 0) + 1;
     }
-    const pool = survivors[unit.type] ||= {};
-    for (const [level, count] of Object.entries(sources)) pool[level] = (pool[level] || 0) + count;
   }
   let leveled = 0;
   for (let i = 0; i < upgrades; i++) {
-    const rows = Object.entries(survivors).flatMap(([type, levels]) => Object.entries(levels)
+    const rows = Object.entries(next).flatMap(([type, levels]) => Object.entries(levels)
       .filter(([level, count]) => Number(level) < 5 && count > 0)
       .map(([level, count]) => ({ type, level: Number(level), count })));
     const selected = pickPersonnel(rows, random);
     if (!selected) break;
     const { type, level } = selected;
-    survivors[type][level]--; next[type][level]--;
-    survivors[type][level + 1] = (survivors[type][level + 1] || 0) + 1;
+    next[type][level]--;
     next[type][level + 1] = (next[type][level + 1] || 0) + 1;
     const promotion = promotions.find(p => p.type === type && p.from === level);
     if (promotion) promotion.count++;

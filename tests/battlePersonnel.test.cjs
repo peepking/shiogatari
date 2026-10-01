@@ -27,8 +27,8 @@ async function main() {
     status: "reserve", deployedAt: null, sources: { 1: 10 } };
   const before = JSON.stringify({ troops, destroyed, reserve });
   const result = settle(troops, [destroyed, reserve], { lossProb: 0.6, upgrades: 100 }, () => 0);
-  assert.deepEqual(plain(result.troops), { infantry: { 1: 100, 5: 4 }, archer: { 1: 20 } });
-  assert.equal(result.leveled, 0, "待機と未投入の低レベル兵は昇級しない");
+  assert.deepEqual(plain(result.troops), { infantry: { 2: 100, 5: 4 }, archer: { 1: 20 } });
+  assert.equal(result.leveled, 100, "投入兵がLv5だけでも待機兵が昇級する");
   assert.deepEqual(plain(result.losses), { infantry: 6 });
   assert.equal(JSON.stringify({ troops, destroyed, reserve }), before, "入力は変更しない");
 
@@ -38,16 +38,23 @@ async function main() {
   assert.equal(defeat.losses.infantry, 6);
 
   const active = { ...destroyed, hp: 50, status: "active", sources: { 1: 10 } };
-  const leveled = settle(troops, [active, reserve], { lossProb: 0.6, upgrades: 100 }, () => 0);
-  assert.deepEqual(plain(leveled.troops), { infantry: { 1: 90, 5: 20 }, archer: { 1: 20 } });
-  assert.equal(leveled.leveled, 40, "投入兵だけが複数回昇級しLv5で止まる");
+  const leveled = settle(troops, [active, reserve], { lossProb: 0.6, upgrades: 1000 }, () => 0);
+  assert.deepEqual(plain(leveled.troops), { infantry: { 5: 110 }, archer: { 5: 20 } });
+  assert.equal(leveled.leveled, 480, "待機兵・未投入予備隊も複数回昇級しLv5で止まる");
+  const reserveUpgrade = settle(troops, [active, reserve], { lossProb: 0.6, upgrades: 1 }, () => 0.999);
+  assert.deepEqual(plain(reserveUpgrade.troops.archer), { 1: 19, 2: 1 }, "未投入予備隊の兵種も抽選対象になる");
+  const weighted = settle({ infantry: { 1: 3 }, archer: { 1: 1 } }, [], { lossProb: 0, upgrades: 1 }, () => 0.74);
+  assert.deepEqual(plain(weighted.promotions), [{ type: "infantry", from: 1, to: 2, count: 1 }], "兵種数ではなく人数比で抽選する");
+  const lost = settle({ infantry: { 1: 10 }, archer: { 1: 1 } }, [{ ...destroyed, sources: { 1: 10 } }],
+    { lossProb: 1, upgrades: 1 }, () => 0);
+  assert.deepEqual(plain(lost.troops), { archer: { 2: 1 } }, "損耗した兵は抽選対象から除く");
   const mixed = { ...destroyed, sources: { 1: 7, 5: 3 } };
   const mixedResult = settle({ infantry: { 1: 7, 5: 30 } }, [mixed], { lossProb: 0.6 }, () => 0.999);
   assert.deepEqual(plain(mixedResult.troops), { infantry: { 1: 4, 5: 27 } });
   assert.throws(() => settle(troops, [destroyed, destroyed], { lossProb: 0.6 }), /重複/);
   assert.throws(() => settle(troops, [destroyed, { ...destroyed, id: "other" }], { lossProb: 0.6 }), /重複/);
   assert.throws(() => settle(troops, [{ ...destroyed, sources: {} }], { lossProb: 0.6 }), /内訳/);
-  const empty = settle(troops, [], { lossProb: 0.6, upgrades: 100 });
+  const empty = settle(troops, [], { lossProb: 0.6, upgrades: 0 });
   assert.deepEqual(plain(empty.troops), troops);
   assert.equal(empty.leveled, 0);
   for (const status of ["routing", "escaped"]) {
