@@ -180,10 +180,20 @@ main .grid > * { min-width: 0; }
 .quest-offer-table .quest-accept { min-width: 64px; }
 .modal .trade-table .btn, .modal-close { white-space: nowrap; }
 .quest-offer-table .resource-list { gap: 6px 10px; }
-.workspace-drawers { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+/* 補助カードは個別の高さで並べ、見出しの矢印・操作名・背景で開閉状態を示す。 */
+.workspace-drawers { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; margin-top: 14px; }
 .workspace-drawer { flex: 1 1 260px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #10192c; }
-.workspace-drawer > summary { font-size: 13px; color: var(--muted); }
-.workspace-drawer > .card { box-shadow: none; border: 0; }
+.workspace-drawer > summary { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 12px 14px; border-radius: 9px; list-style: none; font-size: 13px; font-weight: 600; color: #b6c9dd; }
+.workspace-drawer > summary::-webkit-details-marker { display: none; }
+.workspace-drawer > summary::before { content: ""; width: 7px; height: 7px; flex: 0 0 7px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); }
+.workspace-drawer > summary::after { content: "開く"; margin-left: auto; flex-shrink: 0; font-size: 11px; font-weight: 400; color: var(--muted); }
+.workspace-drawer > summary:hover { background: #ffffff08; }
+.workspace-drawer > summary:focus-visible { outline-offset: -3px; }
+.workspace-drawer[open] { border-color: #698dc166; }
+.workspace-drawer[open] > summary { border-bottom: 1px solid var(--line); border-radius: 9px 9px 0 0; background: #16243b; color: #e8efff; }
+.workspace-drawer[open] > summary::before { transform: rotate(45deg); }
+.workspace-drawer[open] > summary::after { content: "閉じる"; }
+.workspace-drawer > .card { box-shadow: none; border: 0; border-radius: 0 0 9px 9px; }
 .workspace-drawer .row { flex-wrap: wrap; }
 .workspace-drawer .sep:first-child { display: none; }
 .battle-heading, .battle-command, .battle-side { display: none; }

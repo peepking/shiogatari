@@ -1,11 +1,9 @@
-const { readSource } = require("./helpers/source.cjs");
 const assert = require('node:assert/strict');
-const vm = require('node:vm');
+const { loadTestModule } = require("./helpers/module.cjs");
 
 /** 支援の両条件・人員の厳密な離脱・季節固定・報酬の境界を検証する。 */
 async function main() {
-  const module = new vm.SourceTextModule(await readSource('tideAlliance.js'));
-  await module.link(() => { throw Error('不要な依存'); }); await module.evaluate();
+  const module = await loadTestModule("tideAlliance.js");
   const { tideStage, tideProgress, tideRanking, settleTideSeason, tideOracleReward, proposeTideSupport, visitTideSite, normalizeTide } = module.namespace;
   assert.equal(tideStage({funds:200000,people:4}),0);
   assert.equal(tideStage({funds:19999,people:50}),0);

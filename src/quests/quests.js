@@ -1,3 +1,4 @@
+import { receiveFaith, spendFunds, recordVoyage } from "../core/voyageStats.js";
 import { makePirateQuests, resolvePirateRelations } from "../pirates/pirateQuests.js";
 import { canCompleteAmnesty, completeAmnesty } from "../wanted/amnesty.js";
 import { saveGameToStorage } from "../core/storage.js";
@@ -386,6 +387,7 @@ export function addRefugeeEscortQuest(targetSet) {
   const q = {
     id: nextId(),
     type: QUEST_TYPES.REFUGEE_ESCORT,
+    refugeeCount: 30,
     title: `護送: (${targetSet.coords.x + 1}, ${targetSet.coords.y + 1})`,
     targetId: targetSet.id,
     acceptedAbs: absDay(state),
@@ -797,6 +799,7 @@ function genNobleRefugeeQuest(settlement, noble) {
   return {
     id: nextNobleId(),
     type: QUEST_TYPES.NOBLE_REFUGEE,
+    refugeeCount: 30,
     title: `難民受け入れ`,
     target,
     reward: dist * 200,
@@ -1182,7 +1185,7 @@ export function completeQuest(id) {
   if (q.type === QUEST_TYPES.WAR_TRUCE) {
     if (!here || here.id !== q.originId) return false;
     if (q.costFunds != null && (state.funds || 0) < q.costFunds) return false;
-    if (q.costFunds != null) state.funds = Math.max(0, (state.funds || 0) - q.costFunds);
+    if (q.costFunds != null) spendFunds(state, q.costFunds);
     applyWarFrontScore(q, true);
     if (q.frontId && q.extendDays) extendFrontDuration(q.frontId, q.extendDays);
     const set = getSettlementById(q.originId);
@@ -1208,12 +1211,12 @@ export function completeQuest(id) {
     q.items.forEach((it) => {
       state.supplies[it.id] = Math.max(0, (state.supplies[it.id] ?? 0) - it.qty);
     });
-    state.faith += tideOracleReward(state, q);
+    receiveFaith(state, tideOracleReward(state, q));
   }
   if (q.type === QUEST_TYPES.ORACLE_MOVE) {
     const herePos = state.position;
     if (!q.target || herePos.x !== q.target.x || herePos.y !== q.target.y) return false;
-    state.faith += tideOracleReward(state, q);
+    receiveFaith(state, tideOracleReward(state, q));
   }
   if (q.type === QUEST_TYPES.ORACLE_TROOP) {
     const levels = state.troops?.[q.troopType];
@@ -1228,7 +1231,7 @@ export function completeQuest(id) {
     if (next === 0) delete levels[lowest];
     else levels[lowest] = next;
     if (Object.keys(levels).length === 0) delete state.troops[q.troopType];
-    state.faith += tideOracleReward(state, q);
+    receiveFaith(state, tideOracleReward(state, q));
   }
   if (q.type === QUEST_TYPES.NOBLE_SUPPLY) {
     if (!here || here.id !== q.originId) return false;
@@ -1381,7 +1384,7 @@ export function completeOracleBattleQuest(id) {
   if (idx === -1) return false;
   const q = state.quests.active[idx];
   const rewardFaith = tideOracleReward(state, q);
-  state.faith += rewardFaith;
+  receiveFaith(state, rewardFaith);
   state.quests.active.splice(idx, 1);
   const rewardText = rewardFaith > 0 ? `信仰+${rewardFaith}` : "報酬なし";
   pushLog("神託達成", `${q.title} / ${rewardText}`, "-");
@@ -1774,6 +1777,7 @@ export function completeRefugeeEscortAt(settlement) {
   if (idx === -1) return false;
   const q = state.quests.active[idx];
   const factionId = settlement.factionId || "pirates";
+  recordVoyage(state, "refugeesRescued", q.refugeeCount);
   state.fame += 4;
   adjustSupport(settlement.id, factionId, 3);
   addWarScore(getPlayerFactionId(), factionId, 4, absDay(state), 0, 0);
@@ -1843,6 +1847,7 @@ export function completeNobleRefugeeAt(settlement) {
   const q = state.quests.active[idx];
   state.quests.active.splice(idx, 1);
   const fameReward = q.rewardFame || 0;
+  recordVoyage(state, "refugeesRescued", q.refugeeCount);
   if (!q.pirateKind) awardQuestNationalPower(q);
   resolvePirateRelations(q);
   payQuestFunds(q);

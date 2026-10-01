@@ -1,4 +1,5 @@
 import { CRIME_REWARDS, CRIME_HISTORY_LIMIT, BOUNTY_CONFIG } from "../bounty/bountyConfig.js";
+import { recordVoyage } from "../core/voyageStats.js";
 
 /** 手配の対象勢力。未知IDへ犯罪を振り替えない。 */
 export const WANTED_FACTIONS = Object.freeze(["north", "archipelago", "citadel", "pirates"]);
@@ -41,7 +42,9 @@ export function recordCrime(state, kind, action, now, factionId) {
   expireWanted(state.wanted, now);
   action.crimeRecorded = true;
   const target = state.wanted.byFaction[factionId];
+  const previous = target.amount;
   target.amount = Math.min(Number.MAX_SAFE_INTEGER, target.amount + amount);
+  recordVoyage(state, "wantedEarned", target.amount - previous);
   target.lastCrimeAbs = now;
   state.wanted.history = [{ kind, day: now, factionId, amount }, ...(state.wanted.history || [])].slice(0, CRIME_HISTORY_LIMIT);
   return amount;

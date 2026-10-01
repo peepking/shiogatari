@@ -1,3 +1,4 @@
+import { receiveFunds, recordVoyage } from "../core/voyageStats.js";
 import { state } from "../core/state.js";
 import { mapData } from "../world/map.js";
 import { absDay } from "../quests/questUtils.js";
@@ -37,7 +38,8 @@ export function bountyAt(position) { return state.bounties?.active.find(s => s.p
 export function finishBounty(id) {
   const site = claimBounty(state.bounties, id, absDay(state));
   if (!site) return [];
-  state.funds += site.reward;
+  receiveFunds(state, site.reward);
+  recordVoyage(state, "bountiesDefeated", 1);
   const summary = [{ text: `${bountyName(site)} 討伐賞金 +${site.reward}`, icon: "funds" }];
   const variant = VARIANT_SHIPS[site.templateId];
   if (variant) {

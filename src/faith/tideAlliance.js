@@ -1,3 +1,4 @@
+import { receiveFaith } from "../core/voyageStats.js";
 /** 潮盟拠点の発展条件。費用・人員は累計、信仰は十分の一単位。 */
 export const TIDE_STAGES = Object.freeze([
   { name: 'まだ名のない集い', funds: 0, people: 0, faith: 0, bonus: 0 },
@@ -50,7 +51,7 @@ export function settleTideSeason(state) {
   const tenths = data.remainder + data.targets.reduce((sum,row) => sum+row.faith,0);
   const gain = Math.floor(tenths/10);
   data.remainder = tenths%10;
-  state.faith = (state.faith || 0)+gain;
+  receiveFaith(state, gain);
   return { gain, bonus:data.bonus, count:data.targets.length };
 }
 

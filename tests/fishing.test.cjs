@@ -1,6 +1,7 @@
 const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
+const { loadTestModule } = require("./helpers/module.cjs");
 
 /** 釣りモジュールの名前空間（読み込み後に設定）。 */
 let fishing = null;
@@ -24,11 +25,12 @@ async function main() {
   const mod = new vm.SourceTextModule(await readSource("fishing.js"));
   await config.link(() => {});
   const rewards = new vm.SourceTextModule(await readSource("fishingRewards.js"));
-  await rewards.link(() => config);
+  const voyage = await loadTestModule("voyageStats.js");
+  await rewards.link(name => name === "./voyageStats.js" ? voyage : config);
   await mod.link((name) =>
     name === "./fishingConfig.js"
       ? config
-      : name === "./fishingRewards.js" ? rewards : (() => {
+      : name === "./voyageStats.js" ? voyage : name === "./fishingRewards.js" ? rewards : (() => {
           throw new Error(`予期しない依存: ${name}`);
         })()
   );

@@ -201,8 +201,11 @@ async function testDonationUI(base,config,rules) {
     "./storage.js":{saveGameToStorage:()=>{saves++;return saveOK;}}, "./dom.js":{pushToast(){},pushLog(){}},
     "./util.js":{escapeHtml:v=>v}, "./resourceUI.js":{resourceList:()=>""},
   };
+  const { loadTestModule } = require("./helpers/module.cjs");
+  const voyage = await loadTestModule("voyageStats.js");
   const ui=new vm.SourceTextModule(await readSource("nationalPowerUI.js"));
   await ui.link(name=> {
+    if (name === "./voyageStats.js") return voyage;
     if (name==="./nationalPower.js") return base;
     if (name==="./nationalPowerConfig.js") return config;
     if (name==="./nationalPowerRules.js") return rules;

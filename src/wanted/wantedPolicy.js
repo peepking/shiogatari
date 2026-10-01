@@ -1,3 +1,4 @@
+import { spendFunds } from "../core/voyageStats.js";
 import { WANTED_FACTIONS } from "./playerWanted.js";
 import { BOUNTY_CONFIG } from "../bounty/bountyConfig.js";
 
@@ -63,7 +64,7 @@ export function quoteWantedCompensation(state, factionId, now) {
 export function compensateWanted(state, factionId, now, amount) {
   const quote = quoteWantedCompensation(state, factionId, now);
   if (quote.error || !quote.affordable || quote.amount !== amount) return false;
-  state.funds -= quote.cost;
+  spendFunds(state, quote.cost);
   state.wanted.byFaction[factionId] = { amount: 0, lastCrimeAbs: null };
   return true;
 }

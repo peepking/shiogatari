@@ -1,3 +1,4 @@
+import { receiveFunds } from "../core/voyageStats.js";
 import { state } from "../core/state.js";
 import { MODE_LABEL } from "../core/constants.js";
 import { mapData, snapshotWorld, restoreWorld } from "../world/map.js";
@@ -63,7 +64,7 @@ export function finishExploration(success) {
   if (!reward) return [];
   if (reward.fragment === true) awardExplorationFragment();
   addShips(state, prepareShipReward(reward));
-  state.funds += reward.funds;
+  receiveFunds(state, reward.funds);
   const resources = [{ id: "funds", label: "探索資金", value: `+${reward.funds}` }];
   if (reward.ships) resources.push({ id: "ships", label: "発見した船", value: shipListText(reward.shipTypes) });
   for (const [id, qty] of Object.entries(reward.supplies)) {

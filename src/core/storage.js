@@ -11,6 +11,8 @@ import { migrateFleet } from "../fleet/fleet.js";
 import { resetState, state } from "./state.js";
 import { normalizeLogs } from "./logStore.js";
 import { normalizeExpansionState } from "./expansionState.js";
+import { normalizeVoyageStats, recordVisit } from "./voyageStats.js";
+import { normalizeFinalVoyage } from "../endings/endings.js";
 import { normalizeNationalPower, nationalPowerDay } from "../factions/nationalPower.js";
 import { bindQuestPower } from "../factions/nationalPowerRules.js";
 import { FACTIONS } from "../world/lore.js";
@@ -125,6 +127,11 @@ export function loadGameFromStorage() {
     state.nationalPower = normalizeNationalPower(snapshot.state.nationalPower, nationalPowerDay(state));
     state.logs = normalizeLogs(state.logs);
     state.expansion = normalizeExpansionState(state.expansion);
+    state.voyageStats = normalizeVoyageStats(snapshot.state.voyageStats, state);
+    state.finalVoyage = normalizeFinalVoyage(snapshot.state.finalVoyage);
+    if (!snapshot.state.voyageStats && [MODE_LABEL.IN_TOWN, MODE_LABEL.IN_VILLAGE, MODE_LABEL.AUDIENCE].includes(state.modeLabel)) {
+      recordVisit(state, snapshotWorld().settlements?.find(s => s.coords?.x === state.position?.x && s.coords?.y === state.position?.y));
+    }
     fishingRewards(state);
     reconcileCharts(state.expansion.charts, state.quests?.active || []);
     reconcileWarFronts(state, snapshotWorld().settlements || []);

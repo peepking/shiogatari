@@ -1,3 +1,4 @@
+import { receiveFunds, spendFunds, recordVoyage, recordTroopLoss } from "../core/voyageStats.js";
 import { settleBattlePersonnel, wasBattleDeployed } from "../battle/battlePersonnel.js";
 import { resumeDetention } from "../wanted/detentionUI.js";
 import { finishPursuit } from "../wanted/pursuit.js";
@@ -59,6 +60,7 @@ import {
 import { wireHireModal } from "../resources/hireUI.js";
 import { FACTIONS } from "../world/lore.js";
 import {
+  DEFAULT_WORLD_SEED,
   ensureNobleHomes,
   getLocationStatus,
   getTerrainAt,
@@ -112,13 +114,16 @@ import {
 } from "../resources/troops.js";
 import { clamp, nowStr, escapeHtml } from "../core/util.js";
 import { renderGameTime } from "../core/gameTime.js";
+import { wireWorldResetUI } from "../ui/worldResetUI.js";
+import { wireFinalVoyageUI, renderFinalVoyageControl } from "../endings/endingUI.js";
 
 /**
- * 
+ * 指定したマップシードで世界とゲーム状態を初期化し、初期依頼などを再生成する。
+ * @param {number} [seed=DEFAULT_WORLD_SEED] マップ生成用シード。
  * @returns {void}
  */
-function resetAndSeedAll() {
-  resetWorld();
+function resetAndSeedAll(seed = DEFAULT_WORLD_SEED) {
+  resetWorld(seed);
   resetState();
   settlements.forEach(s => refreshShipyard(s, shipyardSeason(state)));
   resetSettlementSupport();
@@ -389,7 +394,7 @@ function submitBribe() {
     setInlineMessage(elements.bribeError, "額が少なすぎます。");
     return;
   }
-  state.funds = (state.funds || 0) - amount;
+  spendFunds(state, amount);
   adjustNobleFavor(ctx.nobleId, favorGain);
   pushLog("賄賂", `${ctx.settlement?.name || "拠点"}で賄賂を渡した。好感度が上昇した。`);
   pushToast("賄賂", "好感度が上がった。", "info");
@@ -488,7 +493,7 @@ function performPrayer() {
   activateAfterglow(state);
   const fundsGain = consume * rollDice(50, 10);
   const foodGain = consume * 2;
-  state.funds += fundsGain;
+  receiveFunds(state, fundsGain);
   state.supplies.food = (state.supplies.food ?? 0) + foodGain;
   state.lastPrayerSeason = { year: state.year, season: state.season };
   const text = `信仰を${consume}捧げ、資金+${fundsGain} / 食料+${foodGain}を得ました。`;
@@ -688,6 +693,9 @@ function killedEnemyCount(meta) {
  */
 function processBattleOutcome(resultCode, meta) {
   const pending = state.pendingEncounter || {};
+  if (pending.outcomeApplied || meta?.outcomeApplied) return;
+  pending.outcomeApplied = true;
+  if (meta) meta.outcomeApplied = true;
   finishPursuit(state, pending, absDay(state));
   if (pending.bountyId != null && !state.bounties?.active.some(s => s.id === pending.bountyId)) { clearBattlePrep(true); syncUI(); return; }
   const enemyTotal = Array.isArray(meta?.units)
@@ -727,7 +735,7 @@ function processBattleOutcome(resultCode, meta) {
     state.supplies ||= {};
     const variance = 0.9 + Math.random() * 0.2;
     const fundsGain = Math.max(5, Math.round(scale * (kind === "help" ? 15 : 20) * variance * (elite ? 1.2 : 1)));
-    state.funds = (state.funds || 0) + fundsGain;
+    receiveFunds(state, fundsGain);
     texts.push(`資金 +${fundsGain}`);
     resources.push({ id: "funds", label: "資金", value: `+${fundsGain}` });
     if (kind === "help") return { texts, resources };
@@ -784,7 +792,7 @@ function processBattleOutcome(resultCode, meta) {
         state.supplies[key] = (state.supplies[key] ?? 0) + 1;
       }
       const fragment = awardBattleFragment(questId);
-      if (!fragment) state.funds += fundsGain;
+      if (!fragment) receiveFunds(state, fundsGain);
       state.supplies.food = (state.supplies.food ?? 0) + foodGain;
       summary.push({ text: `名声 +${fameDelta}`, icon: "fame" });
       summary.push(fragment ? { text: `戦闘報酬: ${chartLabel(fragment)}の断片 +1`, icon: "chart" } : { text: `資金 +${fundsGain}`, icon: "funds" });
@@ -801,7 +809,7 @@ function processBattleOutcome(resultCode, meta) {
       state.fame = Math.max(0, state.fame - fameDelta);
       const lossRate = 0.45 + Math.random() * 0.1; // 45-55%
       const fundsLost = Math.round(state.funds * lossRate);
-      state.funds = Math.max(0, state.funds - fundsLost);
+      spendFunds(state, fundsLost);
       summary.push({ text: `名声 -${fameDelta}`, icon: "fame" });
       summary.push({ text: `資金 -${fundsLost}`, icon: "funds" });
       const supplyLoss = {};
@@ -816,6 +824,11 @@ function processBattleOutcome(resultCode, meta) {
     }
 
     state.troops = personnel.troops;
+    if (state.voyageStats) {
+      recordVoyage(state, "enemyDefeated", killedEnemyCount(meta));
+      recordTroopLoss(state, Object.values(personnel.losses).reduce((sum, n) => sum + n, 0), "battle");
+      if (Object.hasOwn(state.voyageStats.battles, resultCode)) state.voyageStats.battles[resultCode]++;
+    }
     const losses = personnel.losses;
     const lossEntries = Object.entries(losses || {}).map(([t, n]) => `${t} -${n}`);
     const lossText = lossEntries
@@ -1401,6 +1414,7 @@ renderExplorationControl(syncUI);
   renderChartCards();
   showNextEvent();
   renderQuestUI(syncUI);
+  renderFinalVoyageControl();
 
   // 行動選択の有効/無効切替
   if (elements.ctxEl) {
@@ -1798,16 +1812,24 @@ function bindCoreUtilityButtons() {
     pushLog("魚図鑑全開放", `全 ${completion} 種を図鑑に登録しました。`);
   });
 
-  document.getElementById("resetBtn")?.addEventListener("click", () => {
-    if (!confirm("状態とログをリセットしますか？")) return;
-    resetAndSeedAll();
-    if (elements.logEl) elements.logEl.innerHTML = "";
-    setOutput("次の操作", "状況を選んで、1D6を振ってください", [
-      { text: "-", kind: "" },
-      { text: "-", kind: "" },
-    ]);
-    syncUI();
-    pushLog("起動", "潮語り航海録を開始。");
+  wireWorldResetUI({
+    defaultSeed: DEFAULT_WORLD_SEED,
+    openModal,
+    closeModal,
+    /** 指定シードで初期化し、表示と起動ログを更新する。 @param {number} seed マップ生成用シード。 */
+    onReset(seed) {
+      document.dispatchEvent(new CustomEvent("auto-move-stop"));
+      document.dispatchEvent(new CustomEvent("game-reset"));
+      document.querySelectorAll(".modal-backdrop").forEach(modal => { modal.hidden = true; });
+      resetAndSeedAll(seed);
+      if (elements.logEl) elements.logEl.innerHTML = "";
+      setOutput("次の操作", "状況を選んで、1D6を振ってください", [
+        { text: "-", kind: "" },
+        { text: "-", kind: "" },
+      ]);
+      syncUI();
+      pushLog("起動", `潮語り航海録を開始。（マップシード: ${seed}）`);
+    },
   });
 }
 
@@ -1925,6 +1947,7 @@ export function initUI() {
   }
   settlements.forEach(s => refreshShipyard(s, shipyardSeason(state)));
   wireButtons();
+  wireFinalVoyageUI();
   initNationalPowerUI(getAudienceContext, syncUI);
   wireBattleUI();
   wireTroopDismiss(elements.troopsDetail, syncUI);

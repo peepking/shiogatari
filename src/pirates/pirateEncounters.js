@@ -1,3 +1,4 @@
+import { spendFunds } from "../core/voyageStats.js";
 import { CONTRABAND, PIRATE_CONFIG, entryCheckpointChance } from "./pirateConfig.js";
 import { state } from "../core/state.js";
 import { settlements } from "../world/map.js";
@@ -101,7 +102,7 @@ export function handlePirateCheckpoint(action) {
   if (action.type === "pirate_bribe") {
     const terms=bribeTerms();
     if (check.bribeFailed || state.funds<terms.price) { showCheckpoint(); return true; }
-    state.funds-=terms.price;
+    spendFunds(state, terms.price);
     if (Math.random()<terms.chance) { data.checkpoint=null; pushLog("検問通過",`賄賂：資金−${terms.price}`,"-"); }
     else {check.bribeFailed=true; adjustNobleFavor(check.nobleId,PIRATE_CONFIG.bribeFailureFavor); pushLog("賄賂失敗",`資金−${terms.price} / 貴族好感度${PIRATE_CONFIG.bribeFailureFavor}`,"-");showCheckpoint();}
   } else if (action.type === "pirate_surrender") {

@@ -26,6 +26,7 @@ async function main() {
     }, { context }) : new vm.SourceTextModule(await readSource(name), { context });
     modules.set(name, mod); await mod.link(load); return mod;
   }
+  await load("voyageStats.js");
   const core = await load("bounty.js"); await core.evaluate();
   const policyModule = await load("wantedPolicy.js"); await policyModule.evaluate();
   const policy = policyModule.namespace;

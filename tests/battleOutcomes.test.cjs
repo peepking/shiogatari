@@ -1,12 +1,14 @@
 const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
+const { loadTestModule } = require("./helpers/module.cjs");
 
 /** 実際の戦後処理へ勝敗を渡し、経路別通知・予備隊除外・再戦維持を検証する。
  * 外部の依頼更新や画面描画は呼出記録へ置換し、報酬計算と兵員精算は実処理を使う。
  * @returns {Promise<void>} 検証完了。
  */
 async function main() {
+  const voyage = await loadTestModule("voyageStats.js");
   const raw = await readSource("ui.js");
   const start = raw.indexOf("function processBattleOutcome(");
   const body = raw.slice(start, raw.indexOf("\n}", start) + 2);
@@ -37,12 +39,13 @@ async function main() {
     if (route === "hunter") pending.pursuitKind = "hunter";
     if (route === "armory") Object.assign(pending, { theftKind: "theft_armory", theftReward: { arms: 8, iron: 10 } });
     if (route === "raid") Object.assign(pending, { theftKind: "settlement_raid", theftReward: { food: 50, wood: 10 }, theftFunds: 5000 });
-    const state = { funds:1000,fame:100,supplies:{food:50},troops:{},quests:{active:[quest]},
+    const state = { funds:1000,fame:100,supplies:{food:50},troops:{infantry:{1:10}},quests:{active:[quest]},
       pendingEncounter:pending,bounties:{active:[{id:1}]},wanted:{} };
+    state.voyageStats = voyage.namespace.createVoyageStats({ ...state, year: 1000, season: 0, day: 1 });
     const calls = [];
     /** @param {string} name 呼出名。 @returns {Function} 呼出記録。 */
     const record = name => (...args) => { calls.push({name,args}); return []; };
-    const context = vm.createContext({ state, QUEST_TYPES, ...personnel.namespace, ...pursuit.namespace, finishTheftBattle: theft.namespace.finishTheftBattle,
+    const context = vm.createContext({ state, QUEST_TYPES, ...voyage.namespace, ...personnel.namespace, ...pursuit.namespace, finishTheftBattle: theft.namespace.finishTheftBattle,
       Math:Object.assign(Object.create(Math),{random:()=>0.5}),
       BATTLE_RESULT:{WIN:"win",LOSE:"lose",DRAW:"draw"},BATTLE_RESULT_LABEL:{},NONE_LABEL:"なし",
       SUPPLY_ITEMS:[{id:"food",name:"食料"}],TROOP_STATS:{},BONUS_CAPTURE_EVENT_TAGS:new Set(),
@@ -54,7 +57,10 @@ async function main() {
       finishExploration:record("exploration"),finishBounty:record("bounty"),
       renderBattleSummary:record("summary"),clearBattlePrep:record("clear"),syncUI:record("sync") });
     vm.runInContext(body,context);
-    context.meta = {units:[
+    const killedStart = raw.indexOf("function killedEnemyCount(");
+    vm.runInContext(raw.slice(killedStart, raw.indexOf("\n}", killedStart) + 2), context);
+    context.meta = {faithRescue: 1, units:[
+      {id:"ally",side:"ally",type:"infantry",count:10,hp:0,status:"destroyed",deployedAt:0,sources:{1:10}},
       {side:"enemy",count:10,hp:0,status:"destroyed",deployedAt:0},
       {side:"enemy",count:10,hp:100,status:"escaped",deployedAt:3},
       {side:"enemy",count:100,hp:100,status:"reserve",deployedAt:null},
@@ -84,6 +90,14 @@ async function main() {
     assert.equal(calls.filter(c=>c.name==="exploration").length,route==="exploration"?1:0);
     if (route==="exploration") assert.equal(calls.find(c=>c.name==="exploration").args[0],outcome==="win");
     if (outcome==="draw" && QUEST_TYPES[route]) assert.equal(quest.fixedEnemyByFight[1].total,20);
+    assert.equal(state.voyageStats.enemyDefeated, 10, "敗走・未投入を撃破数へ含めない");
+    assert.equal(state.voyageStats.battles[outcome], 1);
+    assert.equal(state.voyageStats.losses.battle, outcome === "win" ? 0 : 6, "救護で生還した兵士は恒久損耗へ含めない");
+    assert.equal(state.voyageStats.income, outcome === "win" ? (route === "raid" ? 5400 : 400) : 0);
+    assert.equal(state.voyageStats.expenses.other, outcome === "lose" ? 500 : 0);
+    const beforeRepeated = JSON.stringify(state);
+    vm.runInContext(`processBattleOutcome(${JSON.stringify(outcome)},meta)`,context);
+    assert.equal(JSON.stringify(state), beforeRepeated, "結果の再処理で報酬・撃破・戦闘数を増やさない");
   }
   console.log("戦後接続: 通常遭遇・神託・討伐・貴族・前線・探索・賞金首の39経路、未投入報酬除外: 成功");
 }

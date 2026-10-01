@@ -2,6 +2,7 @@ import { faithEffects } from "../faith/faith.js";
 import { SHIP_TYPES, SHIP_UPKEEP_RATE, SHIP_SELL_RATE } from "./shipConfig.js";
 import { normalizeFleet, fleetCounts } from "./fleet.js";
 import { VARIANT_SHIPS } from "./variantShips.js";
+import { recordVoyage, recordExpense } from "../core/voyageStats.js";
 import { getOutfittingEffects, applyConsumptionReduction } from "./outfitting.js";
 
 /** @param {object} state 状態。 @returns {number} 定価総額の維持費に船専用軽減を適用し、最後に一度だけ切り捨てる。聖船は対象外。 */
@@ -42,5 +43,7 @@ export function payShipUpkeep(state, cost = shipUpkeepCost(state)) {
   const paid = Math.min(funds, cost);
   state.funds = funds - paid;
   state.fleet = fleet;
+  recordVoyage(state, "income", sold.reduce((sum, row) => sum + row.proceeds, 0));
+  recordExpense(state, paid, "upkeep");
   return { cost, paid, shortage: cost - paid, sold };
 }

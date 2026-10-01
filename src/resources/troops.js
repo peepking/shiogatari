@@ -1,3 +1,4 @@
+import { recordTroopLoss } from "../core/voyageStats.js";
 import { PIRATE_IMAGES, troopImage } from "../pirates/pirateConfig.js";
 import { quantityControl, wireQuantityControls, refreshQuantity } from "../ui/quantityUI.js";
 import { confirmAction, pushLog, pushToast } from "../ui/dom.js";
@@ -344,9 +345,11 @@ export function totalTroops(troops = state.troops) {
 /**
  * 損耗を兵種ごとに適用する
  * @param {Record<string, number>} losses
+ * @param {string} cause 統計上の損耗原因。
  */
-export function applyTroopLosses(losses) {
+export function applyTroopLosses(losses, cause = "other") {
   if (!losses) return;
+  const before = totalTroops();
   Object.entries(losses).forEach(([type, loss]) => {
     let remain = Math.max(0, Number(loss) || 0);
     if (remain <= 0) return;
@@ -379,6 +382,7 @@ export function applyTroopLosses(losses) {
     // 安全策: 残数があってもレベル情報が尽きたら種別を削除する
     if (!Object.keys(levels).length) delete state.troops[type];
   });
+  recordTroopLoss(state, before - totalTroops(), cause);
 }
 
 /**

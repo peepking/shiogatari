@@ -74,6 +74,7 @@ async function main() {
   const toasts=[];
   const tideModule = await load("./tideAlliance.js"); await tideModule.evaluate();
   const context=vm.createContext({state:fixture,TROOP_STATS:{infantry:{upkeep:2}},getUpkeepForecast,payShipUpkeep,
+    ...modules.get("./voyageStats.js").namespace,
     grantFaithSeason: modules.get("./faith.js").namespace.grantFaithSeason, calcSupplyCap: () => 60,
     settleTideSeason: tideModule.namespace.settleTideSeason,
     fishingRewards: () => {}, grantFishingSeason: () => 0,

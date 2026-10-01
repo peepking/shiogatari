@@ -1,3 +1,4 @@
+import { receiveFunds } from "../core/voyageStats.js";
 import { recordCrime, WANTED_FACTIONS } from "./playerWanted.js";
 import { wantedEntryReason } from "./wantedPolicy.js";
 import { MODE_LABEL } from "../core/constants.js";
@@ -53,7 +54,7 @@ export function commitTheft(state, settlement, kind, space, reward) {
   activity[rule.raid ? "raidSeason" : "theftSeason"] = state.year * SEASONS_PER_YEAR + state.season;
   if (rule.raid) activity.bannedUntil = absDay(state) + rule.banDays;
   if (rule.battle) return true;
-  state.funds += reward.funds;
+  receiveFunds(state, reward.funds);
   state.supplies ||= {};
   for (const [id, qty] of Object.entries(reward.supplies)) state.supplies[id] = (state.supplies[id] || 0) + qty;
   return true;
@@ -71,7 +72,7 @@ export function finishTheftBattle(state, encounter, won) {
   state.supplies ||= {};
   const resources = [];
   if (encounter.theftFunds > 0) {
-    state.funds += encounter.theftFunds;
+    receiveFunds(state, encounter.theftFunds);
     resources.push({ id: "funds", label: "資金", value: encounter.theftFunds });
   }
   return resources.concat(Object.entries(goods).map(([id, qty]) => {

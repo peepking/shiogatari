@@ -1163,6 +1163,8 @@ function openBaitPurchase() {
  */
 export function wireFishingUI() {
   if (!elements.fishingModal || typeof document === "undefined") return;
+  /** 新規航海へ古い釣り待機を持ち越さない。 */
+  document.addEventListener("game-reset", function resetFishingSession() { clearSessionTimer(); panelLocation = null; });
   document.querySelector(".workspace-actions")?.addEventListener("click", (e) => {
     const button = e.target.closest("button");
     if (button && button !== elements.fishBtn && button !== elements.fishingHutBtn && !elements.fishingModal.hidden) closeFishingPanel();

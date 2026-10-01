@@ -1,3 +1,4 @@
+import { receiveFaith } from "../core/voyageStats.js";
 import { FISH_SPECIES } from "./fishingConfig.js";
 
 /** 図鑑追加報酬の調整値。 */
@@ -41,6 +42,6 @@ export function grantFishingSeason(state) {
   const rewards = fishingRewards(state), season = state.year * 4 + state.season;
   if (!rewards.unlocked[3] || rewards.lastSeason >= season) return 0;
   rewards.lastSeason = season;
-  state.faith = (state.faith || 0) + FISHING_REWARDS.faith;
+  receiveFaith(state, FISHING_REWARDS.faith);
   return FISHING_REWARDS.faith;
 }

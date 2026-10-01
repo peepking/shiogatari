@@ -738,6 +738,15 @@ option {
   overflow: hidden;
 }
 
+/* 最終航海の本文と統計は狭い画面でも改行して読めるようにする。 */
+.ending-choices { display: grid; gap: 12px; }
+.ending-choice { display: grid; gap: 8px; text-align: left; white-space: normal; }
+.ending-choice span { font-size: 13px; line-height: 1.7; }
+.ending-story p { line-height: 2; }
+.ending-stat-group dl { margin: 0; }
+.ending-stat-group dl > div { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(0, 2fr); gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.ending-stat-group dd { margin: 0; overflow-wrap: anywhere; }
+
 .modal.modal-sm {
   width: min(420px, 92vw);
 }

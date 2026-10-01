@@ -1511,6 +1511,8 @@ function closeBattleView() {
  */
 export function wireBattleUI() {
   if (!elements.battleCanvas) return;
+  /** 新規航海を始める前に戦闘の進行と表示を終了する。 */
+  document.addEventListener("game-reset", function resetBattleSession() { closeBattleView(); battleState.started = false; });
   battleState.ctx = elements.battleCanvas.getContext("2d");
   resizeBattleCanvas();
   resetRoster();

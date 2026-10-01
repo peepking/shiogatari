@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const vm = require("node:vm");
 const path = require("node:path");
+const { loadTestModule } = require("./helpers/module.cjs");
 
 /** @returns {Promise<void>} 新兵種の雇用候補・敵候補・既存雇用枠の維持を検証する。 */
 async function main() {
@@ -20,7 +21,8 @@ async function main() {
   const module = new vm.SourceTextModule(await readSource("troops.js"), { context });
   const pirates = new vm.SourceTextModule(await readSource("pirateConfig.js"), {context});
   await pirates.link(() => {});
-  await module.link(name => name === "./pirateConfig.js" ? pirates : new vm.SyntheticModule(Object.keys(dependencies[name]), function () {
+  const voyage = await loadTestModule("voyageStats.js", context);
+  await module.link(name => name === "./voyageStats.js" ? voyage : name === "./pirateConfig.js" ? pirates : new vm.SyntheticModule(Object.keys(dependencies[name]), function () {
     for (const [key, value] of Object.entries(dependencies[name])) this.setExport(key, value);
   }, { context }));
   await module.evaluate();
@@ -56,6 +58,15 @@ async function main() {
   refreshSettlementRecruitment(existing);
   assert.equal(existing.recruitSlots.map(slot => slot.type).join(","), "infantry,archer,scout");
   assert.ok(existing.recruitSlots.every(slot => slot.remaining === 3));
+  const lossState = dependencies["./state.js"].state;
+  Object.assign(lossState, { year: 1000, season: 0, day: 1, troops: { infantry: { 1: 3, 3: 2 }, archer: 4 } });
+  lossState.voyageStats = voyage.namespace.createVoyageStats(lossState);
+  module.namespace.applyTroopLosses({ infantry: 100 }, "food");
+  assert.equal(lossState.voyageStats.losses.food, 5, "要求損耗より多く保有していなくても実損だけを数える");
+  module.namespace.applyTroopLosses({ archer: 2 }, "upkeep");
+  assert.equal(lossState.voyageStats.losses.upkeep, 2);
+  module.namespace.applyTroopLosses({ archer: 1 }, "calamity");
+  assert.equal(lossState.voyageStats.losses.calamity, 1);
   console.log("新兵種・雇用候補・敵プール・既存雇用枠: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

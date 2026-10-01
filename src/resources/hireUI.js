@@ -1,3 +1,4 @@
+import { spendFunds } from "../core/voyageStats.js";
 import { troopImage } from "../pirates/pirateConfig.js";
 import { wantedFacilityReason } from "../wanted/wantedPolicy.js";
 import { absDay } from "../quests/questUtils.js";
@@ -173,7 +174,7 @@ export function wireHireModal({ openModal, bindModal, syncUI }) {
     const summary = selections
       .map((s) => `${TROOP_STATS[s.type]?.name || s.type} Lv${s.entry.level} x${s.qty}`)
       .join(" / ");
-    state.funds = Math.max(0, state.funds - totalCost);
+    spendFunds(state, totalCost, "hire");
     pushLog("雇用", `雇用: ${summary} / 資金-${totalCost}`, "-");
     renderHireModal(settlement);
     syncUI?.();

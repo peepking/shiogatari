@@ -1,3 +1,4 @@
+import { recordVariant } from "../core/voyageStats.js";
 import { SHIP_TYPES, SHIP_REWARD_WEIGHT_EXPONENT } from "./shipConfig.js";
 import { VARIANT_SHIPS, normalizeVariants } from "./variantShips.js";
 
@@ -34,6 +35,7 @@ export function addVariantShip(state, variantId, sourceName, acquiredAbs) {
   if (!Number.isSafeInteger(fleet.nextVariantId + 1)) throw new Error("船の記録が上限に達しました。");
   const record = { id: fleet.nextVariantId++, variantId, sourceName, acquiredAbs };
   fleet.variants.push(record); state.fleet = fleet;
+  recordVariant(state, record.id);
   return record;
 }
 

@@ -1,3 +1,4 @@
+import { spendFunds } from "../core/voyageStats.js";
 import { WANTED_POLICY } from "./wantedPolicy.js";
 
 /** 通常在庫とは独立した季節枠。占領で勢力が変わっても拠点の使用数は引き継ぐ。
@@ -19,7 +20,7 @@ export function quoteEmergencyFood(state, settlement, price, space) {
 export function buyEmergencyFood(state, settlement, price, space, qty, expected) {
   const quote = quoteEmergencyFood(state, settlement, price, space);
   if (!settlement?.id || !state.wanted || !Number.isSafeInteger(qty) || qty <= 0 || qty > quote.max || quote.unitPrice !== expected) return false;
-  state.funds -= qty * quote.unitPrice;
+  spendFunds(state, qty * quote.unitPrice, "trade");
   state.supplies ||= {};
   state.supplies.food = (state.supplies.food || 0) + qty;
   state.wanted.emergencyFood ||= {};

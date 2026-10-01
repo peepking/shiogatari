@@ -75,9 +75,9 @@ function requestChange(action, id, syncUI) {
   const body = action === "equip" ? capacityNotice(projectedEquipment(id)) : `${price}資金を支払います。${action === "buy" ? "購入した設備は保管されます。装備する際は改めて付け替えてください。" : "空の装備枠を1つ増やします。"}`;
   confirmAction({ title, body, confirmText: "確定", onConfirm: () => {
     if (!canChange() || before !== JSON.stringify({ funds: state.funds, fleet: state.fleet, equipment: state.expansion.outfitting, troops: state.troops, supplies: state.supplies })) { pushToast("再確認してください", "状況が変わったため、変更内容をもう一度確認してください。", "warn"); return; }
-    const funds = state.funds; const equipment = state.expansion.outfitting;
+    const funds = state.funds; const equipment = state.expansion.outfitting; const stats = structuredClone(state.voyageStats);
     if (!changeOutfitting(state, action, id, slot)) return;
-    if (!saveGameToStorage()) { state.funds = funds; state.expansion.outfitting = equipment; pushToast("保存できません", "変更を取り消しました。", "warn"); return; }
+    if (!saveGameToStorage()) { state.funds = funds; state.expansion.outfitting = equipment; state.voyageStats = stats; pushToast("保存できません", "変更を取り消しました。", "warn"); return; }
     pushLog("船の艤装", title, "-");
     syncUI();
   } });

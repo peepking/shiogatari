@@ -58,11 +58,12 @@ function requestTrade(settlement, canChange, syncUI) {
       if (!canChange() || getCurrentSettlement() !== settlement || signature !== tradeSignature(settlement)) {
         pushToast("再確認してください", "状況が変わりました。取引内容を確認してください。", "warn"); syncUI(); return;
       }
-      const before = { fleet: state.fleet, funds: state.funds, stock: settlement.shipyard.stock, variants: settlement.shipyard.variants };
+      const before = { fleet: state.fleet, funds: state.funds, stock: settlement.shipyard.stock, variants: settlement.shipyard.variants, stats: structuredClone(state.voyageStats) };
       const result = tradeShip(state, settlement, type, direction, count);
       if (result.error) { pushToast("取引できません", result.error, "warn"); return; }
       if (!saveGameToStorage()) {
         state.fleet = before.fleet; state.funds = before.funds; settlement.shipyard.stock = before.stock;
+        state.voyageStats = before.stats;
         settlement.shipyard.variants = before.variants;
         pushToast("保存できません", "取引を取り消しました。", "warn"); syncUI(); return;
       }

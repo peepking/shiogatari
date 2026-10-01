@@ -68,7 +68,8 @@ const settlementNames = {
 };
 
 const goodsPool = ["食料", "木材", "石材", "鉄", "繊維", "塩", "織物", "酒", "武具", "香辛料", "なめし革"];
-const DEFAULT_WORLD_SEED = 2025;
+/** @type {number} 初期起動時と未指定のリセットで使うマップシード。 */
+export const DEFAULT_WORLD_SEED = 2025;
 
 /** @type {Array} 生成済み拠点の一覧 */
 export const settlements = [];
@@ -967,7 +968,8 @@ export function restoreWorld(snapshot) {
 }
 
 /**
- * ワールドを初期スナップショットへリセットする。
+ * 指定したシードでワールドを再生成する。地形・建物配置のみシードで再現し、拠点名や在庫などは毎回抽選する。
+ * @param {number} [seed=DEFAULT_WORLD_SEED] マップ生成用シード。
  * @returns {boolean} リセット成功ならtrue
  */
 export function resetWorld(seed = DEFAULT_WORLD_SEED) {

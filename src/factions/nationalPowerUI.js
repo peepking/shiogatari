@@ -1,3 +1,4 @@
+import { spendFunds } from "../core/voyageStats.js";
 import { state } from "../core/state.js";
 import { honorSuspensionReason } from "../wanted/wantedPolicy.js";
 import { absDay } from "../quests/questUtils.js";
@@ -99,11 +100,11 @@ export function initNationalPowerUI(getContext, syncUI) {
     if (!confirmation) { confirmation = { signature: signature(), amount }; update(); return; }
     if (confirmation.signature !== signature() || confirmation.amount !== amount) { confirmation = null; update(); pushToast("再確認してください", "状況が変わったため予告を更新しました。", "warn"); return; }
     confirmation = null;
-    const before = { funds: state.funds, power: structuredClone(state.nationalPower) };
-    state.funds -= amount;
+    const before = { funds: state.funds, power: structuredClone(state.nationalPower), stats: structuredClone(state.voyageStats) };
+    spendFunds(state, amount, "support");
     const actual = changeNationalPower(state.nationalPower, factionId, quote.delta);
     if (!saveGameToStorage()) {
-      state.funds = before.funds; state.nationalPower = before.power; update();
+      state.funds = before.funds; state.nationalPower = before.power; state.voyageStats = before.stats; update();
       pushToast("保存できません", "軍資金提供を取り消しました。", "warn"); return;
     }
     const text = `${FACTIONS.find(f => f.id === factionId).name} / 資金−${number(amount, 0)} / 国力＋${number(actual, 3)}`;

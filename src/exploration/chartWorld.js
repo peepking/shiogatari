@@ -1,3 +1,4 @@
+import { receiveFunds, spendFunds } from "../core/voyageStats.js";
 import { state } from "../core/state.js";
 import { mapData } from "../world/map.js";
 import { CHART_CONFIG as CONFIG } from "../core/expansionConfig.js";
@@ -109,7 +110,7 @@ export function announceFragment(chart, source) {
  * @param {object} quest 依頼。 @param {number} [funds] 通常の資金報酬。 @returns {number} 実際の資金報酬。
  */
 export function payQuestFunds(quest, funds = quest.reward || 0) {
-  if (!quest.rewardFragment) { state.funds += funds; return funds; }
+  if (!quest.rewardFragment) { receiveFunds(state, funds); return funds; }
   const chart = state.expansion.charts.active.find(c => c.id === quest.rewardFragment.chartId);
   if (claimFragment(chart, "quest", quest.id)) announceFragment(chart, "依頼報酬");
   quest.reward = 0;
@@ -178,10 +179,10 @@ export function handleChartPurchase(action) {
   if (payload.genuine) {
     const chart = allocate(payload.offer);
     if (!chart || !claimFragment(chart, payload.source)) return true;
-    state.funds -= settings.price;
+    spendFunds(state, settings.price, "trade");
     announceFragment(chart, payload.source === "sailor" ? "海図売りからの購入" : "古文書商からの購入");
   } else {
-    state.funds -= settings.price;
+    spendFunds(state, settings.price, "trade");
     enqueueEvent({ title: "偽物の海図", body: "切れ端を詳しく調べると、もっともらしく描かれた偽物でした。海図の断片は手に入りませんでした。", resources: [{ id: "funds", label: "購入代金", value: `−${settings.price}` }] });
     pushLog("偽物の海図", `${settings.price}資金を支払いましたが、切れ端は偽物でした。`, "-");
   }

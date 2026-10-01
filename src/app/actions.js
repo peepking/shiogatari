@@ -1,3 +1,4 @@
+import { receiveFunds, spendFunds, recordVisit } from "../core/voyageStats.js";
 import { buildGrandReserve } from "../battle/grandBattle.js";
 import { canRollPursuit, hunterTier } from "../wanted/pursuit.js";
 import { crimeRestriction, honorSuspensionReason, wantedEntryReason } from "../wanted/wantedPolicy.js";
@@ -391,6 +392,7 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
     return false;
   }
   state.modeLabel = insideLabel;
+  recordVisit(state, hereSettlement);
   enqueueSettlementCheckpoint(hereSettlement, enqueueCheckpointEvent);
   if (!hereSettlement?.pirateHaven) visitTideSite(state, hereSettlement?.id);
   const recruit = rollFaithRecruitment(state, hereSettlement, TROOP_STATS);
@@ -784,7 +786,7 @@ function handleSmuggleAction(action) {
         if (ctx.settlementId && ctx.factionId) adjustSupport(ctx.settlementId, ctx.factionId, 2);
         addWarScore(getPlayerFactionId(), ctx.factionId || "pirates", 3, absDay(state), 0, 0);
         const gain = randInt(20, 50);
-        state.funds = Math.max(0, (state.funds || 0) + gain);
+        receiveFunds(state, gain);
         pushToast("摘発成功", `摘発に成功しました。資金+${gain}`, "good");
         pushLog("密輸摘発", `摘発成功。支援と好感を得たようだ。資金+${gain}`, "-");
         travelSync?.();
@@ -896,7 +898,7 @@ function handleCheckpointAction(action) {
         pushToast("資金不足", "賄賂の資金が足りません。", "warn");
         return true;
       }
-      state.funds = Math.max(0, (state.funds || 0) - cost);
+      spendFunds(state, cost);
       if (info?.nobleId) adjustNobleFavor(info.nobleId, 3);
       pushLog("検問賄賂", `資金-${cost}`, "-");
       pushToast("賄賂成功", `資金-${cost}`, "info");
@@ -1018,7 +1020,7 @@ function handleTraitorAction(action) {
         pushToast("資金不足", "資金が足りません。", "warn");
         return true;
       }
-      state.funds = Math.max(0, (state.funds || 0) - cost);
+      spendFunds(state, cost);
       const fid = info?.factionId || "pirates";
       addWarScore(getPlayerFactionId(), fid, 4, absDay(state), 0, 0);
       pushLog("内通者との取引", `資金-${cost}で情報を買った。敵勢力の動きをつかんだ。`, "-");

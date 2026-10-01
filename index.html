@@ -5,8 +5,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
-  <link rel="stylesheet" href="styles.css?v=20260915-number-inputs-center" />
-  <link rel="stylesheet" href="layout.css?v=20261002-map-info" />
+  <link rel="stylesheet" href="styles.css?v=20261002-final-voyage" />
+  <link rel="stylesheet" href="layout.css?v=20261002-workspace-drawers" />
 </head>
 
 <body>
@@ -367,6 +367,7 @@
                 <button class="btn primary" id="oracleBattleBtn" hidden>討伐</button>
                 <button class="btn" id="modePrayBtn">海に祈る</button>
                 <button class="btn" id="modeWaitBtn">1日待機</button>
+                <button class="btn good" id="finalVoyageBtn" hidden>最終航海</button>
                 <button class="btn" id="exploreBtn" hidden>探索する</button>
                 <button class="btn" id="chartExploreBtn" hidden>海図の地点を探索</button>
                 <div class="tiny" id="exploreInfo" hidden></div>
@@ -495,6 +496,29 @@
           <button class="btn bad" id="confirmOk">実行</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="resetModal" hidden>
+    <div class="modal modal-sm" role="dialog" aria-modal="true" aria-labelledby="resetModalTitle" aria-describedby="resetModalNote">
+      <div class="modal-hd">
+        <div id="resetModalTitle">ゲームをリセット</div>
+        <button class="modal-close" id="resetModalClose" type="button">閉じる</button>
+      </div>
+      <form class="modal-bd" id="resetForm" novalidate>
+        <p class="note" id="resetModalNote">状態とログをリセットし、新しいマップで開始します。</p>
+        <label for="resetSeedInput">マップのシード値</label>
+        <input id="resetSeedInput" type="text" inputmode="numeric" autocomplete="off" aria-describedby="resetSeedNote resetSeedError" />
+        <div class="row mt-12">
+          <button class="btn" id="resetSeedRandom" type="button">ランダム生成</button>
+        </div>
+        <p class="tiny" id="resetSeedNote">0〜4294967295の整数。空欄の場合は既定値を使います。</p>
+        <p class="note" id="resetSeedError" role="alert"></p>
+        <div class="row mt-12 justify-end">
+          <button class="btn" id="resetCancel" type="button">キャンセル</button>
+          <button class="btn bad" id="resetConfirm" type="submit">リセットして開始</button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -666,15 +690,38 @@
       </div>
       <div class="modal-bd">
         <div class="sbBody">
-          <p class="tiny">最終航海とエンディングはβ版では未実装です。以下は今後追加予定の結末です。</p>
+          <p class="tiny">旅の果てに記せる神話です。達成すると「旅の行動」から結末と航海統計を見られます。記録した後も旅を続けられます。</p>
+          <ul class="sbList">
+            <li>畏怖神話＝その名は港を震わせ、姿なき帆影が人々の畏れとして語り継がれる。</li>
+            <li>討伐神話＝強敵の旗を越えて船を連ね、海を脅かす者たちを退けた航跡が神話となる。</li>
+            <li>解体神話＝富と船団を港へ還し、船を解き、旗を畳んで新たな暮らしへ渡す。</li>
+            <li>立身神話＝人々を率いて名を成した潮語りが、民草の尊敬を集める旗となる。</li>
+            <li>溶合神話＝祈りを沿岸に根づかせ、海の意思を理解した潮語りが海そのものとなる。</li>
+            <li>大航海神話＝幾代もの港と季節を渡り、果てなき旅そのものが海の記憶となる。</li>
+            <li>蒐集神話＝海の命を航海録に集め、その一頁が遠い岸の学びとなる。</li>
+            <li>救済神話＝行き場を失った人々を岸へ届け、その名が帰る場所として語り継がれる。</li>
+            <li>踏破神話＝あらゆる港に足跡を残し、離れていた岸をひとつの旅で結ぶ。</li>
+            <li>探奥神話＝散らばった海図を読み解き、忘れられた海の奥に眠る物語を呼び覚ます。</li>
+          </ul>
+          <p class="tiny">条件未定・未実装の候補</p>
           <ul class="sbList">
             <li>海没神話＝越えるべき試練で倒れ、嵐に呑まれ消える。</li>
-            <li>討伐神話＝奪うべく格上へ挑み、敗れ海の残響となる。</li>
-            <li>解体神話＝最終航海後に港到達。船を解き、旗を畳んで終わる。</li>
-            <li>立身神話＝名声を高めた潮語りが民草から尊敬される。</li>
-            <li>溶合神話＝海の意思を理解し、海そのものとなる。</li>
           </ul>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="finalVoyageModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="finalVoyageTitle">
+      <div class="modal-hd">
+        <div id="finalVoyageTitle">最終航海</div>
+        <button class="modal-close" id="finalVoyageClose" type="button">閉じる</button>
+      </div>
+      <div class="modal-bd" id="finalVoyageBody"></div>
+      <div class="row flex-wrap modal-hd justify-end">
+        <button class="btn" id="finalVoyageContinue" type="button">旅を続ける</button>
+        <button class="btn bad" id="finalVoyageRestart" type="button">最初から始める</button>
       </div>
     </div>
   </div>

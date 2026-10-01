@@ -44,4 +44,30 @@ for (const [type, pickup] of [["noble_refugee", "markNobleRefugeePickup"], ["war
   assert.equal(vm.runInContext("questToPin(q, 0)[0].x", context), 8);
   assert.equal(vm.runInContext("questToPin(q, 0)[0].kind", context), "supply");
 }
+// 難民は受け入れや合流時に数えず、目的地への引き渡しで一度だけ累計へ加える。
+vm.runInContext(read("calendar.js").replace(/^export /gm, ""), context);
+vm.runInContext(read("voyageStats.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
+Object.assign(state, { year: 1000, season: 0, day: 1 });
+state.voyageStats = vm.runInContext("createVoyageStats(state)", context);
+Object.assign(context, { adjustSupport() {}, addWarScore() {}, adjustNobleFavor() {}, enqueueQuestResult() {},
+  getPlayerFactionId: () => "north", awardQuestNationalPower() {}, resolvePirateRelations() {}, payQuestFunds() {} });
+for (const name of ["completeRefugeeEscortAt", "completeNobleRefugeeAt"]) load(quests, name);
+context.settlement = { id: "home", factionId: "north" };
+state.quests.active = [{ id: 3, type: "refugee_escort", targetId: "home", refugeeCount: 30 }];
+assert.equal(vm.runInContext("completeRefugeeEscortAt({id:'wrong'})", context), false);
+assert.equal(state.voyageStats.refugeesRescued, 0);
+assert.equal(vm.runInContext("completeRefugeeEscortAt(settlement)", context), true);
+assert.equal(vm.runInContext("completeRefugeeEscortAt(settlement)", context), false);
+assert.equal(state.voyageStats.refugeesRescued, 30);
+context.q = { id: 4, type: "noble_refugee", originId: "home", target: { x: 1, y: 2 }, refugeeCount: 30, picked: false };
+state.quests.active = [context.q];
+assert.equal(vm.runInContext("completeNobleRefugeeAt(settlement)", context), false);
+vm.runInContext("markNobleRefugeePickup(q.target)", context);
+assert.equal(state.voyageStats.refugeesRescued, 30);
+assert.equal(vm.runInContext("completeNobleRefugeeAt(settlement)", context), true);
+assert.equal(vm.runInContext("completeNobleRefugeeAt(settlement)", context), false);
+assert.equal(state.voyageStats.refugeesRescued, 60);
+state.quests.active = [{ id: 5, type: "refugee_escort", targetId: "home" }];
+assert.equal(vm.runInContext("completeRefugeeEscortAt(settlement)", context), true);
+assert.equal(state.voyageStats.refugeesRescued, 60, "旧進行依頼から人数を推定しない");
 console.log("補給封鎖の進捗・完了・再戦防止、護送2種のマーカー切替: 全項目成功");

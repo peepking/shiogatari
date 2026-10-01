@@ -1,4 +1,5 @@
 import { state } from "../core/state.js";
+import { recordVoyage } from "../core/voyageStats.js";
 import { MODE_LABEL } from "../core/constants.js";
 import { CHART_CONFIG as CONFIG } from "../core/expansionConfig.js";
 import { visibleChartSites, rollChartReward, claimFragment } from "./charts.js";
@@ -57,6 +58,8 @@ function applyReward(reward) {
   for (const [id, label] of [["funds", "資金"], ["faith", "信仰"], ["fame", "名声"]]) {
     if (!reward[id]) continue;
     state[id] += reward[id];
+    if (id === "funds") recordVoyage(state, "income", reward[id]);
+    if (id === "faith") recordVoyage(state, "faithEarned", reward[id]);
     resources.push({ id, label, value: `+${reward[id]}` });
   }
   for (const [id, qty] of Object.entries(reward.supplies)) {
@@ -101,6 +104,8 @@ export function resumeChartExploration(syncUI) {
     if (claimFragment(chart, "rumor")) announceFragment(chart, "噂の現地回収");
   } else {
     const resources = applyReward(pending.reward);
+    // 断片の完成だけでは数えず、現地探索で報酬を受け取った海図を一度だけ記録する。
+    recordVoyage(state, "chartsCompleted", 1);
     data.active = data.active.filter(c => c.id !== chart.id);
     enqueueEvent({ title: `${CONFIG.rewards[chart.kind].name}を発見`, body: "海図を読み解き、隠された場所を発見しました。上限を超えた物資は詳細画面で整理できます。", resources });
     pushLog("海図の発見", `${chartLabel(chart)} / ${resources.map(r => `${r.label}${r.value}`).join(" / ")}`, "-");

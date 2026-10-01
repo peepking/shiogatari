@@ -7,6 +7,7 @@ import { FACTIONS } from "../world/lore.js";
 import { createExpansionState } from "./expansionState.js";
 import { normalizeFleet } from "../fleet/fleet.js";
 import { createNationalPower, nationalPowerDay } from "../factions/nationalPower.js";
+import { createVoyageStats } from "./voyageStats.js";
 
 /**
  * ゲームの初期状態を生成する。
@@ -81,6 +82,8 @@ const createState = () => {
   selectedPosition: null,
   };
   initial.nationalPower = createNationalPower(nationalPowerDay(initial));
+  initial.voyageStats = createVoyageStats(initial);
+  initial.finalVoyage = { version: 1, unlocked: {}, records: {} };
   return initial;
 };
 

@@ -1,3 +1,4 @@
+import { spendFunds } from "../core/voyageStats.js";
 import { OUTFITTING_CONFIG, OUTFITTING_ITEMS } from "../core/expansionConfig.js";
 import { normalizeOutfitting } from "../core/expansionState.js";
 import { fleetEffects } from "./fleet.js";
@@ -132,11 +133,11 @@ export function changeOutfitting(state, action, id, slot = 0) {
   const item = Object.hasOwn(OUTFITTING_ITEMS, id) ? OUTFITTING_ITEMS[id] : null;
   if (action === "buy") {
     if (!item || data.owned.includes(id) || state.funds < item.price) return false;
-    state.funds -= item.price; data.owned.push(id);
+    spendFunds(state, item.price, "trade"); data.owned.push(id);
   } else if (action === "expand") {
     const price = OUTFITTING_CONFIG.unlockPrices[data.slots + 1];
     if (!price || state.funds < price) return false;
-    state.funds -= price; data.slots++; data.equipped.push(null);
+    spendFunds(state, price, "trade"); data.slots++; data.equipped.push(null);
   } else if (action === "equip") {
     if (!Number.isInteger(slot) || slot < 0 || slot >= data.slots || (id !== null && (!data.owned.includes(id) || data.equipped.includes(id)))) return false;
     data.equipped[slot] = id;

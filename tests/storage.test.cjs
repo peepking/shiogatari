@@ -48,7 +48,7 @@ async function main() {
   }
   const modules = {
     "./state.js": mockModule({ state, resetState }),
-    "./constants.js": mockModule({ MODE_LABEL: { NORMAL: "normal", PREP: "prep", BATTLE: "battle" } }),
+    "./constants.js": mockModule({ MODE_LABEL: { NORMAL: "normal", PREP: "prep", BATTLE: "battle", IN_TOWN: "town", IN_VILLAGE: "village", AUDIENCE: "audience" } }),
     "./map.js": mockModule({ snapshotWorld, restoreWorld }),
   };
   /** @param {string} specifier @returns {Promise<vm.Module>} 実ファイルを読み込む。 */
@@ -233,6 +233,26 @@ async function main() {
   assert.equal(JSON.stringify(state.nationalPower), powerBefore);
   assert.equal(loadGameFromStorage(), true);
   assert.equal(JSON.stringify(state.nationalPower), powerBefore);
+  // 統計導入前の保存は現在資産を最高値へ引き継ぎ、収入や過去の訪問は推定しない。
+  delete state.voyageStats; delete state.finalVoyage;
+  state.modeLabel = "village";
+  world.settlements[0].coords = { ...state.position };
+  state.fame = 123; state.troops = { infantry: { 1: 8 } };
+  assert.equal(saveGameToStorage(), true);
+  assert.equal(loadGameFromStorage(), true);
+  assert.equal(state.voyageStats.partial, true); assert.equal(state.voyageStats.income, 0);
+  assert.equal(state.voyageStats.startedAbs, 120001); assert.equal(state.voyageStats.measuredAbs, 120679);
+  assert.equal(state.voyageStats.peaks.ships, 5); assert.equal(state.voyageStats.peaks.troops, 8);
+  assert.equal(state.voyageStats.peaks.fame, 123); assert.equal(state.voyageStats.visited[0], "village");
+  state.modeLabel = "normal";
+  state.finalVoyage.unlocked.hunt = 120679;
+  modules["./endings.js"].namespace.recordEnding(state, "hunt", world.settlements);
+  const finalBefore = JSON.stringify(state.finalVoyage);
+  const statsBefore = JSON.stringify(state.voyageStats);
+  assert.equal(saveGameToStorage(), true);
+  assert.equal(loadGameFromStorage(), true);
+  assert.equal(JSON.stringify(state.finalVoyage), finalBefore);
+  assert.equal(JSON.stringify(state.voyageStats), statsBefore);
   const validSave = saved;
   state.modeLabel = "prep";
   state.pendingEncounter = { active: true, bountyId: 5, enemyName: "赤帆の保存名", enemyFormation: [{ type: "infantry", count: 10, level: 2 }] };

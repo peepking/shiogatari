@@ -1,3 +1,4 @@
+import { recordVoyage, recordExpense } from "../core/voyageStats.js";
 import { state } from '../core/state.js';
 import { MODE_LABEL } from '../core/constants.js';
 import { settlements } from '../world/map.js';
@@ -58,8 +59,11 @@ function confirmSupport(panel, syncUI) {
       if (selected !== id || !canSupport() || fingerprint !== JSON.stringify([state.funds, state.troops, state.tideAlliance])) {
         pushToast('状況が変わりました', '現在の資金・人員で支援をやり直してください。'); return;
       }
-      const previous = { funds:state.funds, troops:state.troops, tideAlliance:state.tideAlliance };
+      const previous = { funds:state.funds, troops:state.troops, tideAlliance:state.tideAlliance, voyageStats: structuredClone(state.voyageStats) };
       Object.assign(state, { funds:proposal.funds, troops:proposal.troops, tideAlliance:proposal.tideAlliance });
+      recordVoyage(state, "tideFunds", funds);
+      recordVoyage(state, "tidePeople", proposal.people);
+      recordExpense(state, funds, "support");
       if (!saveGameToStorage()) { Object.assign(state, previous); pushToast('支援を取り消しました', '保存できなかったため、資金・人員は変更していません。'); return; }
       support = null;
       pushLog('潮盟への支援', `${settlements.find(row => row.id === id)?.name}へ資金${funds}、担い手${proposal.people}人。${TIDE_STAGES[proposal.stage].name}。`);

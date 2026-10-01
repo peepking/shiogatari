@@ -1,3 +1,4 @@
+import { spendFunds, recordVoyageFish } from "../core/voyageStats.js";
 import { FISH_SPECIES, BAIT_DEFS, ROD_DEFS, FISHING_CONFIG, ROD_UPGRADE_THRESHOLDS } from "./fishingConfig.js";
 import { fishingRewards, normalizeFishingRewards, FISHING_REWARDS } from "./fishingRewards.js";
 
@@ -288,6 +289,7 @@ export function isPullWithinWindow(windowSeconds, elapsedMs) {
  * @returns {void}
  */
 export function recordCatch(state, { species, size }) {
+  recordVoyageFish(state, species, size);
   const data = state.expansion.fishing;
   data.counts[species.id] = (data.counts[species.id] || 0) + 1;
   const entry = data.codex[species.id] || (data.codex[species.id] = { count: 0, maxSize: 0, maxSizeAbs: null, maxSizePos: null });
@@ -424,7 +426,7 @@ export function purchaseBait(state, baitId, qty) {
   const n = Math.max(1, Math.trunc(qty || 1));
   const cost = bait.price * n;
   if (state.funds < cost) return false;
-  state.funds -= cost;
+  spendFunds(state, cost, "trade");
   const data = state.expansion.fishing;
   data.bait[baitId] = (data.bait[baitId] || 0) + n;
   return { cost };

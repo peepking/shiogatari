@@ -4,6 +4,7 @@ import { VARIANT_SHIPS, normalizeVariants } from "./variantShips.js";
 import { fishingRewards } from "../fishing/fishingRewards.js";
 import { wantedFacilityReason, wantedEntryReason } from "../wanted/wantedPolicy.js";
 import { absDay } from "../core/calendar.js";
+import { recordVoyage, recordExpense, recordVariant } from "../core/voyageStats.js";
 
 /** 解放済みの漁船だけ別枠で季節補充する。 @param {object} state 状態。 @param {object} settlement 街。 @returns {object|null} 造船所。 */
 export function fishingShipyard(state, settlement) {
@@ -85,6 +86,10 @@ export function tradeShip(state, settlement, type, mode, quantity) {
   if (result.error) return result;
   state.fleet = result.fleet; state.funds = result.funds; settlement.shipyard.stock = result.stock;
   if (result.variants) settlement.shipyard.variants = result.variants;
+  if (mode === "buy") {
+    recordExpense(state, result.amount, "trade");
+    if (type.startsWith("variant:")) recordVariant(state, Number(type.slice(8)));
+  } else recordVoyage(state, "income", result.amount);
   return result;
 }
 

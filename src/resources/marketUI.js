@@ -7,6 +7,7 @@ import { sellCatch } from "../fishing/fishing.js";
 import { state } from "../core/state.js";
 import { CONTRABAND } from "../pirates/pirateConfig.js";
 import { piracyState } from "../pirates/pirateEncounters.js";
+import { recordVoyage, recordExpense } from "../core/voyageStats.js";
 import { absDay } from "../quests/questUtils.js";
 import { SUPPLY_ITEMS, calcSupplyCap, calcSupplyPrice, totalSupplies } from "./supplies.js";
 import { resourceIcon } from "../ui/resourceUI.js";
@@ -100,7 +101,7 @@ function collectTrade(eventTrade = false) {
   const settlement = eventTrade ? null : getCurrentSettlement();
   const root = eventTrade ? elements.eventTradeTableBody : elements.tradeTableBody;
   const buys = {}, sells = {};
-  let fundsDelta = 0, quantityDelta = 0, baitDelta = 0, error = "";
+  let fundsDelta = 0, income = 0, expense = 0, quantityDelta = 0, baitDelta = 0, error = "";
   const isBaitTrade = getEventTradeSource() === "bait";
   root?.querySelectorAll('input').forEach(input => {
     refreshQuantity(input);
@@ -126,6 +127,9 @@ function collectTrade(eventTrade = false) {
     else if (value > 0) buys[id] = value;
     else sells[id] = -value;
     fundsDelta += dir === "sell" ? value * price : -value * price;
+    const proceeds = dir === "sell" ? value * price : -value * price;
+    income += Math.max(0, proceeds);
+    expense += Math.max(0, -proceeds);
     if (dir !== "sell") {
       if (isBaitTrade) baitDelta += value;
       else quantityDelta += value;
@@ -137,7 +141,7 @@ function collectTrade(eventTrade = false) {
   if (state.funds + fundsDelta < 0) shortages.push(`資金が${-(state.funds + fundsDelta)}不足しています。`);
   if (!isBaitTrade && after > cap) shortages.push(`物資上限を${after - cap}個超えています。`);
   error = (!eventTrade && wantedFacilityReason(state, settlement, "trade", absDay(state))) || error || shortages.join(" ");
-  return { buys, sells, fundsDelta, after, cap, error, empty: !Object.keys(buys).length && !Object.keys(sells).length, isBaitTrade, baitDelta };
+  return { buys, sells, fundsDelta, income, expense, after, cap, error, empty: !Object.keys(buys).length && !Object.keys(sells).length, isBaitTrade, baitDelta };
 }
 
 /** 既存の資金・エラー表示を更新し、取引後の積載と確定可否を表示する。 */
@@ -251,7 +255,7 @@ function confirmEventTrade(closeModal, syncUI) {
     state.eventTrade = null;
     return;
   }
-  const { buys, sells, fundsDelta, error, empty } = recalcEventTradeDelta();
+  const { buys, sells, fundsDelta, income, expense, error, empty } = recalcEventTradeDelta();
   if (error || empty) return;
   if (!state.supplies) state.supplies = {};
   const isBait = getEventTradeSource() === "bait";
@@ -271,6 +275,8 @@ function confirmEventTrade(closeModal, syncUI) {
     }
   });
   state.funds += fundsDelta;
+  recordVoyage(state, "income", income);
+  recordExpense(state, expense, "trade");
   if (getEventTradeSource() === "smuggle") {
     const sid = currentEventTrade?.settlementId;
     const fid = currentEventTrade?.factionId;
@@ -321,7 +327,7 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
   elements.tradeConfirm?.addEventListener("click", () => {
     const settlement = getCurrentSettlement();
     if (!settlement) return;
-    const { buys, sells, fundsDelta, error, empty } = recalcTradeDelta();
+    const { buys, sells, fundsDelta, income, expense, error, empty } = recalcTradeDelta();
     if (error || empty) return;
     const allIds = new Set([...Object.keys(buys), ...Object.keys(sells)]);
     for (const id of allIds) {
@@ -333,6 +339,8 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
       state.supplies[id] = Math.max(0, (state.supplies[id] ?? 0) + buy - sell);
     }
     state.funds += fundsDelta;
+    recordVoyage(state, "income", income);
+    recordExpense(state, expense, "trade");
     if (elements.tradeFunds) elements.tradeFunds.textContent = String(state.funds);
     const buySummary = Object.entries(buys)
       .map(([id, q]) => `${SUPPLY_ITEMS.find((i) => i.id === id)?.name ?? id} x${q}`)

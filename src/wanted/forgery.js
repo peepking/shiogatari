@@ -1,3 +1,4 @@
+import { spendFunds } from "../core/voyageStats.js";
 import { absDay } from "../core/calendar.js";
 import { BOUNTY_CONFIG } from "../bounty/bountyConfig.js";
 import { PIRATE_CONFIG, pirateRelation } from "../pirates/pirateConfig.js";
@@ -27,7 +28,7 @@ export function quoteForgery(state, port, factionId) {
 export function applyForgery(state, port, factionId, expected, expectedCost) {
   const quote = quoteForgery(state, port, factionId);
   if (quote.error || !quote.affordable || quote.amount !== expected || quote.cost !== expectedCost) return false;
-  state.funds -= quote.cost;
+  spendFunds(state, quote.cost);
   const record = state.wanted.byFaction[factionId];
   record.amount = quote.remaining;
   if (!record.amount) record.lastCrimeAbs = null;

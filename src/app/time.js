@@ -1,3 +1,4 @@
+import { spendFunds } from "../core/voyageStats.js";
 import { settleTideSeason } from "../faith/tideAlliance.js";
 import { fishingRewards, grantFishingSeason } from "../fishing/fishingRewards.js";
 import { updateBountyWorld } from "../bounty/bountyWorld.js";
@@ -78,7 +79,7 @@ function applySeasonUpkeep() {
   const fundsBefore = state.funds || 0;
   const fundsPaid = Math.min(fundsBefore, upkeepCost);
   const deficitFunds = Math.max(0, upkeepCost - fundsPaid);
-  state.funds = Math.max(0, fundsBefore - upkeepCost);
+  spendFunds(state, upkeepCost, "upkeep");
 
   if (forecast.funds === 0) return;
 
@@ -87,7 +88,7 @@ function applySeasonUpkeep() {
   if (deficitFunds > 0) {
     lossCount = Math.floor(deficitFunds / 6);
     if (lossCount > 0) {
-      applyTroopLosses(buildLossesMap(lossCount));
+      applyTroopLosses(buildLossesMap(lossCount), "upkeep");
     }
   }
   const shipPayment = payShipUpkeep(state, forecast.shipFunds);
@@ -124,7 +125,7 @@ function applyPeriodicFood() {
     const unfed = deficit * 4;
     lossCount = Math.floor(unfed * 0.5);
     lossCount = Math.min(lossCount, totalTroops()); // 安全上の上限を設ける
-    applyTroopLosses(buildLossesMap(lossCount));
+    applyTroopLosses(buildLossesMap(lossCount), "food");
   }
 
   pushLog(
@@ -215,7 +216,7 @@ export function processScheduledOmens(todayAbs) {
     } else {
       const total = totalTroops();
       const loss = Math.max(1, Math.floor(total * 0.1));
-      applyTroopLosses(buildLossesMap(loss));
+      applyTroopLosses(buildLossesMap(loss), "calamity");
       pushLog("災い", `災いにより兵士を失いました（-${loss}人）。`, "-");
       enqueueEvent({
         title: "災い",
