@@ -31,6 +31,7 @@ import { elements, pushLog, pushToast, renderLogs, setInlineMessage, setOutput }
 import { initEventQueueUI, showNextEvent } from "./events.js";
 import { renderLocationHeader } from "../ui/locationHeader.js";
 import { wireGuideHelp } from "../ui/guideUI.js";
+import { wireDebugTools } from "../ui/debugUI.js";
 import { wireAssetCodex, refreshAssetCodex } from "../codex/assetCodexUI.js";
 import { updateExplorationWorld, renderExplorationControl, resumeExploration, finishExploration } from "../exploration/explorationUI.js";
 import { updateBountyWorld, finishBounty } from "../bounty/bountyWorld.js";
@@ -43,7 +44,6 @@ import { renderOutfittingControl } from "../fleet/outfittingUI.js";
 import { syncChartReservations, awardBattleFragment, chartLabel } from "../exploration/chartWorld.js";
 import { renderChartCards, renderChartControl, resumeChartExploration } from "../exploration/chartUI.js";
 import { renderFishingControl, resumeFishing, wireFishingUI } from "../fishing/fishingUI.js";
-import { unlockAllCodex } from "../fishing/fishing.js";
 import {
   addHonorFaction,
   addWarScore,
@@ -1689,9 +1689,7 @@ wireMarketModals({ openModal, closeModal, bindModal, syncUI, clearActionMessage 
  * モーダルをまとめてバインドする。
  */
 function bindBaseModals() {
-  const openManualModal = () => openModal(elements.manualModal);
-  elements.manualModalBtn?.addEventListener("click", openManualModal);
-  bindModal(elements.manualModal, elements.manualModalClose);
+  wireDebugTools({ openModal, bindModal, syncUI });
   wireGuideHelp();
   wireAssetCodex();
   bindModal(elements.loreModal, elements.loreModalClose);
@@ -1791,25 +1789,9 @@ function bindMapShortcuts() {
 }
 
 /**
- * 手動同期やヘルプなどユーティリティ系ボタンをバインドする。
+ * ヘルプや記録整理などユーティリティ系ボタンをバインドする。
  */
 function bindCoreUtilityButtons() {
-  document.getElementById("syncBtn")?.addEventListener("click", () => {
-    state.fleet = normalizeFleet(state.fleet);
-    state.fleet.counts.cog = normalizeFleet(Math.max(0, Math.floor(Number(elements.shipsIn?.value) || 0))).counts.cog;
-    state.faith = Math.max(0, Number(elements.faithIn?.value) || 0);
-    state.funds = Math.max(0, Number(elements.fundsIn?.value) || 0);
-    state.fame = Math.max(0, Number(elements.fameIn?.value) || 0);
-    syncUI();
-    const troopDisplay = formatTroopDisplay();
-    const supplyDisplay = formatSupplyDisplay();
-    pushLog(
-      "手動更新",
-      `従船=${totalShips(state.fleet)} / 部隊=${troopDisplay.total}/${troopDisplay.cap} / 信仰=${state.faith} / 物資=${supplyDisplay.total}/${supplyDisplay.cap} / 資金=${state.funds} / 名声=${state.fame}`,
-      state.lastRoll ?? "-"
-    );
-  });
-
   document.getElementById("loreBtn")?.addEventListener("click", () => openModal(elements.loreModal));
   document.getElementById("endingsBtn")?.addEventListener("click", () => openModal(elements.endingsModal));
 
@@ -1818,14 +1800,6 @@ function bindCoreUtilityButtons() {
     state.logs = [];
     renderLogs();
     scheduleGameSave();
-  });
-
-  document.getElementById("unlockCodexBtn")?.addEventListener("click", () => {
-    if (!confirm("魚図鑑を全開放しますか？")) return;
-    unlockAllCodex(state);
-    syncUI();
-    const completion = Object.keys(state.expansion.fishing.codex).length;
-    pushLog("魚図鑑全開放", `全 ${completion} 種を図鑑に登録しました。`);
   });
 
   wireWorldResetUI({
@@ -1984,7 +1958,7 @@ if (state.expansion.exploration.pending) resumeExploration(syncUI);
   if (!restored) pushLog("起動", "潮語り航海録を開始。");
   resumeDetention(syncUI);
 }
-import { awardShips, totalShips, normalizeFleet } from "../fleet/fleet.js";
+import { awardShips, totalShips } from "../fleet/fleet.js";
 import { snapshotBattlePower, completeBattlePower } from "../factions/nationalPowerRules.js";
 import { nationalPowerAtWar, nationalPowerResources } from "../factions/nationalPowerWorld.js";
 import { initNationalPowerUI, renderNationalPowerControls } from "../factions/nationalPowerUI.js";

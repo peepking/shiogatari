@@ -6,13 +6,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
   <link rel="stylesheet" href="styles.css?v=20261002-asset-codex" />
-  <link rel="stylesheet" href="layout.css?v=20261002-workspace-drawers" />
+  <link rel="stylesheet" href="layout.css?v=20261002-debug-menu" />
 </head>
 
 <body>
   <header class="game-header" aria-label="航海の状況">
     <div class="wrap game-toolbar" id="gameToolbar">
-      <details class="game-menu" id="gameMenu"><summary>メニュー</summary></details>
+      <details class="game-menu" id="gameMenu"><summary>メニュー</summary><div class="game-menu-panel" id="gameMenuPanel"><section class="game-debug-tools" id="gameDebugTools" aria-labelledby="gameDebugTitle" hidden><div class="tiny" id="gameDebugTitle">デバッグ</div></section></div></details>
     </div>
   </header>
 
@@ -157,8 +157,8 @@
             <div class="hd">
               <div class="row flex-wrap">
                 <span class="pill"><span id="gameTime">神歴1000年 / 春 / 1日</span></span>
-                <button class="btn ghost" id="manualModalBtn">状態手動上書き</button>
-                <button class="btn ghost" id="unlockCodexBtn">魚図鑑全開放</button>
+                <button class="btn ghost" id="manualModalBtn" hidden>状態手動上書き</button>
+                <button class="btn ghost" id="unlockCodexBtn" hidden>魚図鑑全開放</button>
                 <button class="btn bad" id="resetBtn">リセット</button>
               </div>
             </div>

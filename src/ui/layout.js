@@ -1,3 +1,5 @@
+import { DEBUG_MODE } from "../core/debugMode.js";
+
 /**
  * 既存の操作要素を移動し、探索と戦闘で共通の画面枠を組み立てる。
  * IDと要素自体を維持することで、既存の操作・詳細表示を引き継ぐ。
@@ -10,9 +12,11 @@ export function initWorkspaceLayout() {
   const assets = navigator.querySelector(".asset-grid");
   toolbar.prepend(document.getElementById("gameTime"), assets);
   assets.classList.remove("mb-12");
-  document.getElementById("gameMenu").append(
-    document.getElementById("manualModalBtn"), document.getElementById("unlockCodexBtn"), document.getElementById("resetBtn")
-  );
+  const debugTools = document.getElementById("gameDebugTools");
+  debugTools.append(document.getElementById("manualModalBtn"), document.getElementById("unlockCodexBtn"));
+  debugTools.hidden = !DEBUG_MODE;
+  debugTools.querySelectorAll("button").forEach(button => { button.hidden = !DEBUG_MODE; });
+  document.getElementById("gameMenuPanel").prepend(document.getElementById("resetBtn"));
   navigator.querySelector(".hd").remove();
   for (const asset of assets.children) {
     asset.setAttribute("role", "button");
