@@ -93,7 +93,7 @@ export function renderHireModal(settlement) {
       return `
         <tr>
           <td class="ta-center"><img src="${imgSrc}" alt="${name}" class="hire-icon"></td>
-          <td>${name}${faith ? `<br><span class="pill">潮盟の便り・Lv${level}</span>` : fishing ? '<br><span class="pill">釣り仲間の伝手・Lv1</span>' : ""}</td>
+          <td>${name}${faith ? `<br><span class="pill">潮盟の便り・Lv${level}</span>` : fishing ? '<br><span class="pill">釣り仲間の伝手・Lv1</span>' : ""}<br><button class="btn ghost" data-asset-codex="troops" data-codex-id="${slot.type}" aria-label="${name}の図鑑を開く">図鑑で見る</button></td>
           <td class="ta-center">${hire}</td>
           <td class="ta-center">${remaining}</td>
           <td class="ta-center">

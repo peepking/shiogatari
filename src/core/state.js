@@ -8,6 +8,7 @@ import { createExpansionState } from "./expansionState.js";
 import { normalizeFleet } from "../fleet/fleet.js";
 import { createNationalPower, nationalPowerDay } from "../factions/nationalPower.js";
 import { createVoyageStats } from "./voyageStats.js";
+import { collectAssetCodex } from "../codex/assetCodex.js";
 
 /**
  * ゲームの初期状態を生成する。
@@ -84,6 +85,7 @@ const createState = () => {
   initial.nationalPower = createNationalPower(nationalPowerDay(initial));
   initial.voyageStats = createVoyageStats(initial);
   initial.finalVoyage = { version: 1, unlocked: {}, records: {} };
+  initial.assetCodex = collectAssetCodex({ ...initial, assetCodex: { partial: false } });
   return initial;
 };
 

@@ -30,6 +30,8 @@ import { BATTLE_RESULT, BATTLE_RESULT_LABEL, MODE_LABEL, NONE_LABEL, PLACE } fro
 import { elements, pushLog, pushToast, renderLogs, setInlineMessage, setOutput } from "../ui/dom.js";
 import { initEventQueueUI, showNextEvent } from "./events.js";
 import { renderLocationHeader } from "../ui/locationHeader.js";
+import { wireGuideHelp } from "../ui/guideUI.js";
+import { wireAssetCodex, refreshAssetCodex } from "../codex/assetCodexUI.js";
 import { updateExplorationWorld, renderExplorationControl, resumeExploration, finishExploration } from "../exploration/explorationUI.js";
 import { updateBountyWorld, finishBounty } from "../bounty/bountyWorld.js";
 import { renderBountyControls, bountyRestriction } from "../bounty/bountyUI.js";
@@ -1148,8 +1150,16 @@ function updateModeControls(loc) {
   document.getElementById("locationActions")?.classList.toggle("is-settlement", visible);
   const oracleNote = document.getElementById("oracleUnavailable");
   if (oracleNote) {
-    oracleNote.hidden = !visible || lockActions || canReceiveOracle();
+    oracleNote.hidden = lockActions || inAudience || canReceiveOracle();
     oracleNote.textContent = hasActiveOracle() ? "神託：進行中の神託があります" : "神託：今季は授与済みです";
+  }
+  const prayerReason = canPray() ? "" : state.faith < 10
+    ? "海に祈る：信仰10以上が必要です。"
+    : "海に祈る：今季は使用済みです。次の季節に再び祈れます。";
+  const prayerNote = document.getElementById("prayerUnavailable");
+  if (prayerNote) {
+    prayerNote.hidden = lockActions || inAudience || !prayerReason;
+    prayerNote.textContent = prayerReason;
   }
   const hereSettlement = getCurrentSettlement();
   const underSiege = hereSettlement ? isSettlementUnderSiege(hereSettlement.id) : false;
@@ -1310,6 +1320,11 @@ function updateModeControls(loc) {
     elements.battlePrepFightBtn.title = hasBattleTroops ? "" : "部隊員がいないため戦闘できません。";
   }
   if (elements.battlePrepPrayBtn) elements.battlePrepPrayBtn.disabled = !prepActive || !canPray();
+  const battlePrayerNote = document.getElementById("battlePrayerUnavailable");
+  if (battlePrayerNote) {
+    battlePrayerNote.hidden = !prepActive || inBattle || battleVisible || inAudience || !prayerReason;
+    battlePrayerNote.textContent = prayerReason;
+  }
   if (elements.battlePrepInfo) {
     const showInfo = prepActive && !inBattle && !battleVisible;
     if (!showInfo) {
@@ -1391,6 +1406,7 @@ function syncUI() {
   renderLocationHeader(getCurrentSettlement(), state.modeLabel, getTerrainAt(state.position.x, state.position.y),
     isAudienceMode() ? getNobleById(getAudienceContext().nobleId) : null);
   renderGameTime(gameTimeEl, state);
+  refreshAssetCodex();
 
   if (shipsIn) shipsIn.value = String(state.fleet?.counts.cog || 0);
   if (troopsIn) troopsIn.value = String(troopDisplay.total);
@@ -1676,7 +1692,8 @@ function bindBaseModals() {
   const openManualModal = () => openModal(elements.manualModal);
   elements.manualModalBtn?.addEventListener("click", openManualModal);
   bindModal(elements.manualModal, elements.manualModalClose);
-  bindModal(elements.helpModal, elements.helpModalClose);
+  wireGuideHelp();
+  wireAssetCodex();
   bindModal(elements.loreModal, elements.loreModalClose);
   bindModal(elements.endingsModal, elements.endingsModalClose);
   bindModal(elements.battleResultModal, elements.battleResultClose);
@@ -1793,7 +1810,6 @@ function bindCoreUtilityButtons() {
     );
   });
 
-  document.getElementById("helpBtn")?.addEventListener("click", () => openModal(elements.helpModal));
   document.getElementById("loreBtn")?.addEventListener("click", () => openModal(elements.loreModal));
   document.getElementById("endingsBtn")?.addEventListener("click", () => openModal(elements.endingsModal));
 

@@ -16,6 +16,7 @@ import { normalizeFinalVoyage } from "../endings/endings.js";
 import { normalizeNationalPower, nationalPowerDay } from "../factions/nationalPower.js";
 import { bindQuestPower } from "../factions/nationalPowerRules.js";
 import { FACTIONS } from "../world/lore.js";
+import { collectAssetCodex } from "../codex/assetCodex.js";
 
 const SAVE_KEY = "shiogatari-save";
 let saveScheduled = false;
@@ -64,9 +65,11 @@ export function saveGameToStorage({ battleComplete = false, battlePreparation = 
   const grandPreparation = battlePreparation && state.pendingEncounter?.active && state.pendingEncounter.battleKind === "grand" && state.pendingEncounter.preparation;
   if (!battleComplete && unsafe && !fixedPreparation && !grandPreparation) return false;
   try {
+    const assetCodex = collectAssetCodex(state);
     const data = {
       state: {
         ...state,
+        assetCodex,
         logs: normalizeLogs(state.logs),
         ...(grandPreparation ? { modeLabel: MODE_LABEL.PREP } : {}),
         ...(battleComplete ? {
@@ -80,6 +83,7 @@ export function saveGameToStorage({ battleComplete = false, battlePreparation = 
     const hash = simpleHash(payload);
     const blob = JSON.stringify({ hash, payload, savedAt: Date.now() });
     localStorage.setItem(SAVE_KEY, blob);
+    state.assetCodex = assetCodex;
     return true;
   } catch (e) {
     console.error("saveGameToStorage failed", e);
@@ -127,6 +131,7 @@ export function loadGameFromStorage() {
     state.nationalPower = normalizeNationalPower(snapshot.state.nationalPower, nationalPowerDay(state));
     state.logs = normalizeLogs(state.logs);
     state.expansion = normalizeExpansionState(state.expansion);
+    state.assetCodex = collectAssetCodex({ ...state, assetCodex: snapshot.state.assetCodex });
     state.voyageStats = normalizeVoyageStats(snapshot.state.voyageStats, state);
     state.finalVoyage = normalizeFinalVoyage(snapshot.state.finalVoyage);
     if (!snapshot.state.voyageStats && [MODE_LABEL.IN_TOWN, MODE_LABEL.IN_VILLAGE, MODE_LABEL.AUDIENCE].includes(state.modeLabel)) {

@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
-  <link rel="stylesheet" href="styles.css?v=20261002-final-voyage" />
+  <link rel="stylesheet" href="styles.css?v=20261002-asset-codex" />
   <link rel="stylesheet" href="layout.css?v=20261002-workspace-drawers" />
 </head>
 
@@ -129,6 +129,7 @@
                   <p class="tiny" id="rosterOptionsStatus" role="status">設定は自動保存され、次回の初期編成にも使われます。今の編成を変えるには「おまかせ編成」を押してください。</p>
                 </fieldset>
               </details>
+              <p class="tiny">変更を出撃に使うには「編成を反映」を押してください。配置は部隊の開始位置、陣形は部隊ごとの戦い方です。</p>
               <div class="roster-cols">
                 <div class="roster-col">
                   <div class="tiny mb-4">待機（兵種ごと）</div>
@@ -197,7 +198,7 @@
                     <div class="asset-value">
                       <span class="sub"></span><b id="faith">0</b>
                     </div>
-                    <div class="asset-note">海への貢</div>
+                    <div class="asset-note">祈りと航海の恩恵</div>
                   </div>
                 </div>
                 <div class="asset-card" id="asset-supplies">
@@ -373,6 +374,7 @@
                 <div class="tiny" id="exploreInfo" hidden></div>
                 </div>
                 <p class="location-action-note" id="oracleUnavailable" hidden></p>
+                <p class="location-action-note" id="prayerUnavailable" hidden></p>
                 </section>
                 <div class="location-action-exit">
                 <button class="btn ghost" id="enterVillageBtn" hidden>村に入る</button>
@@ -389,6 +391,7 @@
                 <button class="btn good" id="battlePrepPrayBtn">海に祈る</button>
                 <button class="btn bad" id="battlePrepSurrenderBtn">降伏する</button>
                 </div>
+                <p class="location-action-note" id="battlePrayerUnavailable" hidden></p>
                 <span class="pill" id="battlePrepInfo" hidden>敵推定: - 人</span>
               </section>
               <section class="location-actions command-actions" id="warActionRow" aria-labelledby="warActionsTitle" hidden>
@@ -423,6 +426,9 @@
             <div class="bd">
               <div class="row flex-wrap">
                 <button class="btn ghost" id="helpBtn">ルール要約</button>
+                <button class="btn ghost" id="troubleBtn">困ったとき</button>
+                <button class="btn ghost" data-asset-codex="troops">兵の図鑑</button>
+                <button class="btn ghost" data-asset-codex="ships">船・艤装の図鑑</button>
                 <button class="btn ghost" id="loreBtn">世界観</button>
                 <button class="btn ghost" id="endingsBtn">最終航海</button>
               </div>
@@ -633,31 +639,200 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="assetCodexModal" hidden>
+    <div class="modal asset-codex-modal" role="dialog" aria-modal="true" aria-labelledby="assetCodexTitle">
+      <div class="modal-hd"><div id="assetCodexTitle">兵の図鑑</div><button class="modal-close" id="assetCodexClose" type="button">閉じる</button></div>
+      <div class="asset-codex-controls">
+        <div class="row flex-wrap" id="assetCodexTabs" aria-label="図鑑の種類" hidden>
+          <button class="btn" data-codex-tab="ships" aria-pressed="true" type="button">船</button>
+          <button class="btn" data-codex-tab="equipment" aria-pressed="false" type="button">艤装</button>
+          <button class="btn" data-codex-tab="variants" aria-pressed="false" type="button">固有船</button>
+        </div>
+        <div class="asset-codex-search"><label for="assetCodexSearch">名前・役割で検索<input id="assetCodexSearch" type="search" placeholder="名前や用途を入力" autocomplete="off"></label><label for="assetCodexFilter">種類・用途<select id="assetCodexFilter"></select></label></div>
+        <p class="tiny" id="assetCodexCount" role="status"></p>
+        <p class="tiny" id="assetCodexHistoryNote" hidden>記録はこの図鑑の追加時点からです。既存セーブは現在の保有品から補完し、過去に手放した品は復元しません。</p>
+      </div>
+      <div class="modal-bd asset-codex-body">
+        <div class="asset-codex-layout" id="assetCodexLayout" data-detail="false"><div class="asset-codex-list" id="assetCodexList" aria-label="図鑑の一覧"></div><section class="asset-codex-detail" id="assetCodexDetail" aria-label="図鑑の詳細"></section></div>
+        <section class="asset-codex-comparison" id="assetCodexComparison" aria-label="選択した項目の比較" hidden></section>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="helpModal" hidden>
-    <div class="modal">
+    <div class="modal guide-modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
       <div class="modal-hd">
-        <div>ルール要約</div>
+        <div id="helpTitle">ルール要約 — 航海の基本</div>
         <button class="modal-close" id="helpModalClose">閉じる</button>
       </div>
-      <div class="modal-bd">
-        <div class="sbBody">
-          <ul class="sbList">
-            <li>マップ：現在地は白枠、移動可能範囲は赤枠で強調されている。マップ上のアイコンはマウスホバーまたはクリックによる選択で詳細を確認可能。</li>
-            <li>移動：マップクリックで上下左右1マスに移動し1日経過。村/街の中では外に出てから移動。</li>
-            <li>村/街：マップ上で村は●、街は◆のアイコン。現在地にある村・街へ入る/出るボタンで入出する。物資取引と依頼受注が可能。</li>
-            <li>物資取引：村や街で物資を売買できる。物資の相場は季節ごとに変化する。</li>
-            <li>造船所：街で船取引と艤装変更ができる。船種ごとに価格・容量・固有効果が異なり、詳細確認で船団全体の効果を確認できる。</li>
-            <li>依頼：季節ごとに依頼が更新。依頼は依頼一覧から確認/完了が可能。</li>
-            <li>部隊員雇用：村/街で部隊員を雇用できる。雇用枠は季節ごとに補充される。</li>
-            <li>戦闘準備：敵に遭遇すると通常行動不可。戦闘開始、逃走（確率判定）、海に祈る（確定逃走）、降伏を選択できる。</li>
-            <li>戦闘：出撃編成で戦闘に出す兵を決定→味方フォーメーションを変更→作戦を変更→開始の手順で戦闘が始まる。</li>
-            <li>戦闘後：戦闘後は地図に戻る。勝利の場合、物資と資金と確率で捕虜を入手および部隊員がレベルアップ。敗北の場合、名声と資金、確率で兵を失う。</li>
-            <li>神託：季節ごとに神託を授かることができる。受注中の神託があると新規神託は不可。神託は依頼一覧から確認/完了が可能。</li>
-            <li>海に祈る：季節毎に1回、信仰10以上の場合海に祈ることができる。信仰10%を捧げ、資金と食料を得る。</li>
-            <li>毎季節1日：部隊維持費と船維持費を支払う。部隊維持費が足りない場合は兵員が損耗し、船維持費が足りない場合は安価な船から自動売却される。</li>
-            <li>毎季節10日・30日：部隊員4人につき食料1を消費し、足りない場合は兵員が損耗する。</li>
-          </ul>
-        </div>
+      <div class="modal-bd guide-body">
+        <p class="guide-intro">旅の基本をまとめました。操作で迷ったら「困ったとき」から、知りたい項目だけ読めます。</p>
+        <section class="guide-section">
+          <h3>自由な旅</h3>
+          <p>潮語りとして、交易・依頼・探索・戦闘・釣りなどを楽しむゲームです。決まった攻略順や必須の目標はありません。「最終航海」は任意の区切りで、記録した後も旅を続けられます。</p>
+          <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-purpose">何をするゲームなのか</button>
+        </section>
+        <section class="guide-section">
+          <h3>移動と拠点</h3>
+          <p>地図のマスを押して選択し、同じマスをもう一度押すと上下左右の隣接マスへ移動します。遠いマスなら自動移動を始めます。移動は1マスにつき1日、待機は「1日待機」を使います。</p>
+          <p>村・街・無法港では入場して施設を利用します。旅を再開するときは拠点を出てください。地図の現在地は白枠、選択中のマスは黄枠で表示されます。</p>
+          <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-movement">移動できないとき</button>
+        </section>
+        <section class="guide-section">
+          <h3>日数と資産</h3>
+          <p>1季節は30日です。毎季節1日に部隊・船の維持費、10日と30日に部隊員4人につき食料1を消費します。船や艤装、信仰の恩恵で負担を軽減できます。</p>
+          <p>支払い不足では兵員の損耗や船の自動売却が起こります。物資・部隊の容量を超えると移動できません。画面上部の資産を押すと、上限や次回の消費見込みを確認できます。</p>
+          <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-upkeep">資産が減ったとき</button>
+        </section>
+        <section class="guide-section">
+          <h3>依頼と神託</h3>
+          <p>受注前に必要な物資・目的地・期限を確認しましょう。受注後は「受注中の依頼」で進行状況を確認し、条件を満たしたら「完了」で報酬を受け取ります。</p>
+          <p>神託は季節に1回で、受注中の神託がある間は次を授かれません。「海に祈る」も季節に1回、信仰10以上で一部を捧げ、資金と食料を得られます。</p>
+          <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-quests">依頼が終わらないとき</button>
+          <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-prayer">神託・祈りを使えないとき</button>
+        </section>
+        <section class="guide-section">
+          <h3>戦闘</h3>
+          <p>編成を反映し、配置・作戦を確認して戦闘を始めます。迷ったら「おまかせ編成」を使えます。開始後も一時停止して、部隊ごと・まとめて陣形を指示できます。</p>
+          <p>被害や包囲で士気が下がり、敗走することがあります。勝利・敗北・引き分けがあり、結果と損耗は戦果報告で確認できます。遭遇時には逃走・祈りによる離脱・降伏も選べますが、討伐依頼などでは離脱できません。</p>
+          <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-battle">戦闘の準備と進め方</button>
+        </section>
+        <section class="guide-section">
+          <h3>旅を広げる</h3>
+          <p>船と艤装で船団を整え、信仰と潮盟で各地の支えを育てられます。探索や海図で発見を楽しみ、釣りでは魚図鑑を埋められます。勢力との関係や指名手配は、利用できる施設に関わります。</p>
+          <div class="row flex-wrap">
+            <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-ships">船・艤装</button>
+            <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-faith">信仰・潮盟</button>
+            <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-exploration">探索・海図</button>
+            <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-fishing">釣り</button>
+            <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-wanted">勢力・手配</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="troubleModal" hidden>
+    <div class="modal guide-modal" role="dialog" aria-modal="true" aria-labelledby="troubleTitle">
+      <div class="modal-hd">
+        <div id="troubleTitle">困ったとき</div>
+        <button class="modal-close" id="troubleModalClose">閉じる</button>
+      </div>
+      <div class="modal-bd guide-body">
+        <p class="guide-intro">気になる質問を開いてください。旅の全体像は「ルール要約」で確認できます。</p>
+        <button class="btn ghost" data-guide-dialog="helpModal">ルール要約を見る</button>
+        <h3 class="guide-group-title">最初に知りたいこと</h3>
+        <details class="guide-question" id="guide-purpose">
+          <summary>何をするゲームなのか</summary>
+          <p>海を信仰する旅人「潮語り」として、自分で旅の目的を決めるゲームです。商いで船団を大きくする、依頼で人々を助ける、強敵に挑む、各地を巡る、魚を集めるなど、好きな活動を組み合わせて遊べます。</p>
+          <p>最初は近くの村や街へ入り、依頼と物資取引を見てみましょう。手持ちの物資で達成できる調達依頼や、行きたい拠点への配達依頼が取り組みやすい選択です。戦闘に挑むなら、先に部隊員を雇って準備してください。</p>
+          <p>釣り小屋で竿と餌を用意して釣りを始めたり、神託の条件を確認して信仰を得たりする道もあります。旅の記録は航海ログに残り、自分のメモも書けます。</p>
+          <p>決まった攻略順や必須の勝利条件はありません。目標が欲しくなったら「最終航海」の紹介を読んでみてください。条件を満たして神話を記録した後も、同じ旅を続けられます。</p>
+        </details>
+        <details class="guide-question" id="guide-movement">
+          <summary>移動できない・地図の操作がわからない</summary>
+          <ol>
+            <li>地図のマスを1回押すと選択、同じマスをもう一度押すと移動します。隣接マスへは1日で移動し、遠いマスへは自動移動を始めます。</li>
+            <li>村・街・無法港の中なら「村を出る」「街を出る」で外へ出ます。謁見中なら先に「村/街に戻る」を使います。</li>
+            <li>物資や部隊が上限を超えていないか、画面上部の詳細で確認します。取引・物資の破棄・部隊員の解雇などで整理できます。</li>
+            <li>イベントの選択、戦闘、探索や釣りなどの途中なら、先にその操作を終えてください。</li>
+          </ol>
+          <p>自動移動は地図を押すと止まります。移動せず日数を進めるには「1日待機」を使います。現在地を押すだけでは日数は進みません。</p>
+        </details>
+        <details class="guide-question" id="guide-upkeep">
+          <summary>兵員や船が減った・維持費と食料が心配</summary>
+          <p>毎季節1日に部隊・船の維持費を支払います。部隊維持費が不足すると兵員が損耗し、船維持費が不足すると船が自動売却されます。10日と30日には食料を消費し、不足すると兵員が損耗します。</p>
+          <p>戦闘では、撃破された部隊から兵員を失うことがあります。敗走しただけの部隊は、それだけで保有兵員を失いません。衛生兵は待機中でも戦闘後の損耗を抑えます。</p>
+          <p>神託へ人身を捧げたり、潮盟の担い手として送り出したりした兵員も部隊から離れます。実行前の確認画面で、消費する人数と戻せないことを確認してください。</p>
+          <p>画面上部の部隊・物資の詳細で、次回の維持費・食料消費・支払いまでの日数・不足量を確認できます。直前の出来事は航海ログと戦果報告を見てください。船が減って容量を超えた場合は、整理してから移動します。</p>
+        </details>
+        <details class="guide-question" id="guide-quests">
+          <summary>依頼を達成したつもりなのに終わらない</summary>
+          <p>「受注中の依頼」で、進行状況・報告先・期限・次に必要な行動を確認してください。報告が必要な依頼は、条件と報告先が揃うと「完了」を押せます。戦闘後などに自動完了する依頼もあるので、一覧の案内を確認しましょう。「目的地を地図で確認」で行き先を探せます。</p>
+          <p>到着や戦闘だけでは報酬を受け取れない依頼もあります。物資は依頼ごとに取り置かれず、売却や別の依頼への納品で減ります。同じ物資を必要とする依頼を複数受けたら、必要な総数と完了する順番に注意してください。</p>
+          <p>期限を過ぎると失敗になります。神託もこの一覧から条件と完了操作を確認できます。</p>
+        </details>
+        <details class="guide-question" id="guide-prayer">
+          <summary>神託を授かれない・海に祈れない</summary>
+          <p>神託は季節に1回です。進行中の神託がある場合は、その神託が達成または失敗するまで次を授かれません。条件は「受注中の依頼」で確認できます。</p>
+          <p>「海に祈る」は信仰10以上が必要で、季節に1回だけ使えます。通常の祈りと遭遇時の離脱は同じ季節の1回分を使います。実行前の確認画面で、消費する信仰を確認してください。</p>
+          <p>祈りでは日数は進みません。信仰は蓄えている間にも恩恵があるため、現在の効果は画面上部の信仰から確認できます。</p>
+        </details>
+        <details class="guide-question" id="guide-trade">
+          <summary>物資を売買したい・交易で利益を出したい</summary>
+          <p>拠点内の「物資取引」で、数量をプラスにすると購入、マイナスにすると売却できます。品目ごとの買値・売値を確認し、取引後の資金と積載量を見てから「取引を確定」を押します。</p>
+          <p>相場は拠点・季節・勢力との関係・戦況によって変わります。安い場所で買い、高い場所で売ると利益になりますが、旅にかかる日数と維持費、部隊用の食料も残しておきましょう。</p>
+          <p>在庫がない品目は買えません。依頼用の物資も売却できてしまうため、必要な品は「受注中の依頼」で確認してください。移動中の行商人からは購入だけができます。</p>
+        </details>
+        <h3 class="guide-group-title">戦闘で迷ったとき</h3>
+        <details class="guide-question" id="guide-battle">
+          <summary>戦闘の準備と操作がわからない</summary>
+          <ol>
+            <li>「おまかせ編成」か手動操作で出撃兵を選び、「編成を反映」を押します。条件によって一部の兵が待機することがあります。</li>
+            <li>初期配置と作戦を確認します。配置を変えたら「配置を反映」を押し、カスタム配置は「保存」で確定してください。初期配置は開始位置、部隊陣形は各部隊の戦い方です。</li>
+            <li>「この編成で戦闘開始」を押します。開始後は速度変更や一時停止ができます。</li>
+          </ol>
+          <p>部隊を選んで「部隊陣形を指示」を開くか、一括指示欄を開くと自動で一時停止します。指示を終えたら「戦闘を再開」を押してください。部隊の詳細を見るだけでは停止しません。</p>
+          <p>前衛で後衛を守り、兵種の得意な地形を活かすと戦いやすくなります。海兵・海弓兵は水辺、騎兵は平原を得意とします。部隊の状態や能力は盤面か味方部隊一覧から確認できます。</p>
+        </details>
+        <details class="guide-question" id="guide-morale">
+          <summary>兵が逃げる・陣形の指示がすぐ変わらない</summary>
+          <p>部隊は被害や包囲、近くの味方の撃破・敗走で士気を失います。動揺すると攻撃が弱まり、さらに下がると敗走します。HPが残っていても、戦闘可能な部隊がいなくなれば敗北します。</p>
+          <p>盾壁は被害と火力を抑え、円陣は士気の維持に向きます。散開は射撃に強い一方で近接に弱く、突撃は火力と被害が増えます。迷ったら「おまかせ」で戦況に応じた陣形を選べます。</p>
+          <p>陣形を切り替えた直後は待ち時間があります。指示は予約され、切り替え可能になると反映されます。一時停止しても待ち時間は進みません。現在の陣形・予約・士気は部隊詳細で確認できます。</p>
+        </details>
+        <details class="guide-question" id="guide-outcomes">
+          <summary>戦闘を避けたい・引き分けや敗北はどうなるのか</summary>
+          <p>通常の遭遇では、戦闘前に「逃走する」を選べます。成功率は画面で確認でき、斥候がいると高まります。失敗すると戦闘が始まります。使用条件を満たせば「海に祈る」で確実に離脱できます。「降伏する」は敗北として扱われます。</p>
+          <p>討伐依頼や戦闘を伴う神託などでは逃走できません。敵規模や戦場を確認してから挑みましょう。</p>
+          <p>勝利では戦利品などを得られ、敗北では資金・物資・名声を失います。引き分けには勝利報酬や敗北時の資産喪失はありませんが、撃破された兵員の損耗は精算されます。戦果報告で結果を確認してください。</p>
+        </details>
+        <h3 class="guide-group-title">旅を広げたいとき</h3>
+        <details class="guide-question" id="guide-ships">
+          <summary>船や艤装をどう選ぶか・売るとどうなるのか</summary>
+          <p>船は物資・部隊の上限を増やし、一部の船種は船団全体の能力を支えます。交易なら容量、戦闘なら兵員の能力や支援射撃、長旅なら維持費を目安に選べます。購入後の維持費も確認しましょう。</p>
+          <p>街や無法港の「造船所」で船取引と艤装変更ができます。艤装は買って保管するだけでは効果がなく、装備枠に付けて使います。同じ設備を複数装備することはできません。船や艤装の戦闘効果は陸戦でも有効です。</p>
+          <p>売却や装備変更で容量が減っても、物資・兵員は自動では減りません。上限を超える場合は整理するまで移動できません。確定前の比較で容量・維持費・効果を確認してください。画面上部の船からは、場所を問わず船団詳細を見られます。</p>
+        </details>
+        <details class="guide-question" id="guide-faith">
+          <summary>信仰を蓄える意味・潮盟を支援する意味</summary>
+          <p>信仰は祈りに使えるほか、蓄えている間も維持費の軽減、売却額の増加、勝利後の損耗軽減などで航海を支えます。現在の信仰に応じて恩恵も変わります。祈りの後には交易・維持費の恩恵を一時的に強める「祈りの余潮」が残ります。</p>
+          <p>通常の街・村の「潮盟の拠点」では、資金を寄付したり、部隊員を担い手として送り出したりできます。施設の発展には資金と担い手の両方が必要です。送り出した人は部隊を離れ、呼び戻せません。</p>
+          <p>各地の支えは季節の信仰や神託報酬につながり、季節途中の発展は次の季節から反映されます。拠点の「今季の状態」「次季節の見込み」と、画面上部の信仰で確認できます。潮盟への支援は任意です。</p>
+        </details>
+        <details class="guide-question" id="guide-exploration">
+          <summary>探索や海図はどう進めるのか</summary>
+          <p>漂流物・難破船・戦場跡を見つけたら、現地で危険度を確認して「探索する」を選びます。探索は1日かかり、敵が現れた場合は勝利しなければ探索報酬を得られません。地点は一定期間で消えるので、準備と期限を考えて向かいましょう。</p>
+          <p>海図の断片は依頼・戦闘・探索などから得られます。「受注中の依頼」の末尾で枚数を確認でき、集め終えると発見地点が地図に現れます。「地図で確認」で場所を探し、現地で探索して報酬を受け取ります。</p>
+          <p>断片の噂を聞いたり、商人から購入したりできる場合もあります。売られている海図には偽物もあるため、購入は成功が保証されません。進行できる海図の数には上限があります。</p>
+        </details>
+        <details class="guide-question" id="guide-fishing">
+          <summary>釣りを始めたい・魚や図鑑は何に使うのか</summary>
+          <p>街・村の「釣り小屋」で粗末な釣り竿を受け取り、餌を用意します。海・浅瀬で釣りを始めると1日が経過し、最大5回まで糸を垂らせます。餌を選び、アタリが来たらゲージがなくなる前に「引く」を押してください。早すぎても遅すぎても失敗します。</p>
+          <p>釣れる魚は海域・季節・水深・餌で変わります。釣果は船倉とは別に保管され、図鑑へ自動登録されます。魚は釣り小屋で売却したり、食料・餌に加工したりできます。</p>
+          <p>図鑑を埋めると上位の竿や追加の報酬が解放されます。解放状況は図鑑で確認し、竿は釣り小屋で受け取れます。上位の竿ほど、引くまでの猶予が長くなります。</p>
+        </details>
+        <details class="guide-question" id="guide-wanted">
+          <summary>港の施設を使えない・指名手配された</summary>
+          <p>指名手配は勢力ごとに管理され、賞金額に応じて依頼・雇用・取引・入港などが制限されます。拠点が包囲されている場合や、襲撃後の利用禁止期間にも入場できないことがあります。「賞金首」の一覧で自分の勢力別の手配を確認できます。</p>
+          <p>拠点入口の「窓口で交渉」から賠償・投降などの対応を確認できます。入港拒否中でも窓口は利用でき、最低限の食料を買う手段もあります。投降では日数が進むので、依頼期限と維持費の見込みを確認してください。</p>
+          <p>手配を解消しても、悪化した支持度・好感度や襲撃後の利用禁止期間は戻りません。受注済み依頼は、元の報告先・条件・期限を満たせば報告を続けられます。</p>
+          <p>禁制品や無法港での取引は検問につながる場合があります。無法港での海賊依頼は通常勢力との関係を悪化させます。名誉家臣の間は新しい犯罪行動や海賊依頼の受注が制限されます。</p>
+        </details>
+        <details class="guide-question" id="guide-factions">
+          <summary>名声・支持度・好感度・国力は何が違うのか</summary>
+          <p>名声は旅で築いた評判です。機会が増える一方で敵も強くなるため、部隊や船団を整えながら活動を広げましょう。</p>
+          <p>支持度は各勢力からの評価で、所属拠点での購入価格などに関わります。好感度は貴族個人との関係で、仕官や貴族依頼に関わります。勢力・貴族の詳細で確認できます。</p>
+          <p>国家勢力の国力は戦争を続ける余力、戦況は戦争の優勢・劣勢です。仕官すると前線での戦闘や補給などを通じて所属勢力を支えられます。無法港の黒ひげとの関係は海賊依頼の報酬などに関わります。</p>
+        </details>
+        <h3 class="guide-group-title">記録と再開</h3>
+        <details class="guide-question" id="guide-save">
+          <summary>セーブはどこにあるのか・最初から始めるとどうなるのか</summary>
+          <p>進行状況と航海ログは操作後に、今使っているブラウザへ自動保存されます。別のブラウザや端末とは共有されず、ブラウザのサイトデータを削除すると失われます。戦闘途中に閉じた場合は、戦闘準備から再開します。</p>
+          <p>「ログを書き出す」は航海ログを文章として保存する機能です。ゲームを復元するためのセーブデータではありません。「ログ消去」は保存済みのログも消します。</p>
+          <p>「リセット」や最終航海の「最初から始める」で新規開始を確定すると、現在の世界・資産・依頼・ログ・航海統計・神話の記録が新しい旅に置き換わります。確認画面を開くだけでは初期化されません。</p>
+          <p>最終航海で「旅を続ける」を選べば、現在の旅をそのまま続けられます。</p>
+        </details>
       </div>
     </div>
   </div>
@@ -888,6 +1063,7 @@
         <button class="modal-close" id="questModalClose">閉じる</button>
       </div>
       <div class="modal-bd">
+        <p class="tiny">受注前に条件と期限を確認してください。報告が必要な依頼は「受注中の依頼」の「完了」で報酬を受け取ります。物資は依頼ごとに取り置かれません。</p>
         <div class="table mt-10 quest-offer-scroll" tabindex="0" role="region" aria-label="依頼受注一覧">
           <table class="trade-table quest-offer-table">
             <thead>

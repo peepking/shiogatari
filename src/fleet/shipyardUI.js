@@ -34,7 +34,7 @@ function tradeSignature(settlement) {
 function excessText(after) {
   const supplies = Math.max(0, totalSupplies() - after["物資上限"]);
   const troops = Math.max(0, totalTroops() - after["兵員上限"]);
-  return supplies || troops ? `変更後は物資${supplies}・兵員${troops}が上限超過します。売却可能ですが、移動前に売却・破棄・解雇で整理してください。` : "変更後の容量超過なし";
+  return supplies || troops ? `変更後は物資${supplies}・兵員${troops}が上限超過します。売却可能ですが、整理するまで移動できません。物資の売却・破棄や兵員の解雇で整理してください。` : "変更後の容量超過なし";
 }
 
 /**
@@ -98,7 +98,7 @@ export function renderShipTrade(body, canChange, syncUI) {
   if (!selected) { detail.innerHTML = '<p>船を購入すると、ここから売却できます。</p>'; return; }
   const ship = tradeSelection(selected, yard);
   const max = mode === "buy" ? Math.min(stock[selected] || 0, Math.floor(state.funds / ship.price)) : counts[selected];
-  detail.innerHTML = `<div class="ship-detail-heading">${shipIcon(ship.base)}<div><h3>${ship.name}</h3><p>${shipTradePrice(ship.base, mode).toLocaleString()}資金 / 隻</p></div></div><p>1隻あたり 物資上限＋${ship.supplies} / 部隊上限＋${ship.troops}</p><p>船維持費（軽減前）${ship.price * SHIP_UPKEEP_RATE}資金／隻・季節</p><p>${shipEffectText(ship.base)}</p>${ship.record ? variantShipDetails(ship.record) : ""}${ship.limit && fleetCounts(state.fleet)[ship.base] >= ship.limit ? '<p class="outfitting-notice">固有バフは上限到達済みです。通常船と固有船で上限を共有します。</p>' : ""}<label class="ship-quantity">${mode === "buy" ? "購入" : "売却"}数<input id="shipQuantity" type="number" min="1" max="${max}" step="1" value="${quantity}" ${max && !ship.record ? "" : "disabled"}></label><div id="shipTradePreview" aria-live="polite"></div><button class="btn primary ship-commit" id="shipCommit"></button>`;
+  detail.innerHTML = `<div class="ship-detail-heading">${shipIcon(ship.base)}<div><h3>${ship.name}</h3><p>${shipTradePrice(ship.base, mode).toLocaleString()}資金 / 隻</p></div></div><button class="btn ghost" data-asset-codex="${ship.record ? "variants" : "ships"}" data-codex-id="${ship.record ? ship.record.variantId : ship.base}">図鑑で見る</button><p>1隻あたり 物資上限＋${ship.supplies} / 部隊上限＋${ship.troops}</p><p>船維持費（軽減前）${ship.price * SHIP_UPKEEP_RATE}資金／隻・季節</p><p>${shipEffectText(ship.base)}</p>${ship.record ? variantShipDetails(ship.record) : ""}${ship.limit && fleetCounts(state.fleet)[ship.base] >= ship.limit ? '<p class="outfitting-notice">固有バフは上限到達済みです。通常船と固有船で上限を共有します。</p>' : ""}<label class="ship-quantity">${mode === "buy" ? "購入" : "売却"}数<input id="shipQuantity" type="number" min="1" max="${max}" step="1" value="${quantity}" ${max && !ship.record ? "" : "disabled"}></label><div id="shipTradePreview" aria-live="polite"></div><button class="btn primary ship-commit" id="shipCommit"></button>`;
   /** @returns {void} 入力を維持しながら数値予告と可否を更新する。 */
   function updatePreview() {
     const result = quoteShipTrade(state, settlement, selected, mode, quantity);

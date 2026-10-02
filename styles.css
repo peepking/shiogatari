@@ -870,6 +870,72 @@ option {
   margin: 6px 0;
 }
 
+/* 航海の要約と質問を、画面幅に合わせて読みやすく区切る。 */
+.modal.guide-modal { width: min(760px, 96vw); background: #111a2d; }
+.guide-body { font-size: 14px; line-height: 1.8; overflow-wrap: anywhere; }
+.guide-intro { margin-top: 0; color: var(--muted); }
+.guide-section { padding: 16px 0; border-top: 1px solid var(--line); }
+.guide-section h3 { margin: 0 0 8px; font-size: 16px; }
+.guide-section p { margin: 8px 0 12px; }
+.guide-section .btn, .guide-body > .btn { white-space: normal; text-align: left; }
+.guide-group-title { margin: 24px 0 10px; font-size: 15px; color: var(--muted); }
+.guide-question { margin: 8px 0; border: 1px solid var(--line); border-radius: 10px; }
+.guide-question summary { padding: 12px; cursor: pointer; font-weight: 700; }
+.guide-question[open] summary { border-bottom: 1px solid var(--line); }
+.guide-question p, .guide-question ol { margin: 12px; }
+.guide-question ol { padding-left: 24px; }
+.guide-question li { margin: 8px 0; }
+.guide-question summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; border-radius: 10px; }
+
+/* 図鑑は広い画面で一覧と詳細を並べ、狭い画面では往復して閲覧する。 */
+#assetCodexModal { z-index: 60; }
+.modal.asset-codex-modal { width: min(1120px, 96vw); height: min(850px, 92dvh); max-height: 92dvh; background: #111a2d; }
+.asset-codex-controls { flex-shrink: 0; padding: 12px var(--card-pad) 0; }
+.asset-codex-search { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; margin-top: 10px; }
+.asset-codex-search label { display: grid; gap: 4px; font-size: 12px; margin: 0; }
+.asset-codex-search input, .asset-codex-search select { width: 100%; min-width: 0; box-sizing: border-box; }
+.modal .asset-codex-body { display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: hidden; }
+.asset-codex-layout { display: grid; grid-template-columns: minmax(240px, 0.85fr) minmax(0, 1.5fr); gap: 16px; min-height: 0; flex: 1 1 0; }
+.asset-codex-list, .asset-codex-detail { min-width: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.asset-codex-detail { padding: 16px; border: 1px solid var(--line); border-radius: 12px; }
+.asset-codex-card { border: 1px solid var(--line); border-radius: 10px; margin-bottom: 8px; padding: 8px; }
+.asset-codex-card.is-selected { border-color: var(--accent); background: rgba(122, 167, 255, 0.06); }
+.asset-codex-choice { display: flex; align-items: center; gap: 12px; width: 100%; border: 0; padding: 6px; border-radius: 6px; color: var(--text); background: transparent; text-align: left; cursor: pointer; }
+.asset-codex-choice > span { display: grid; gap: 4px; }
+.asset-codex-choice b { font-size: 15px; }
+.asset-codex-choice span span { font-size: 12px; color: var(--muted); }
+.asset-codex-portrait { width: 48px; height: 64px; object-fit: contain; image-rendering: pixelated; flex-shrink: 0; }
+.asset-codex-symbol, .asset-codex-choice .ship-icon { width: 48px; height: 48px; flex-shrink: 0; }
+.asset-codex-unknown { display: grid; place-items: center; width: 48px; height: 48px; font-size: 28px; color: var(--muted); flex-shrink: 0; }
+.asset-codex-compare { margin-top: 6px; font-size: 11px; }
+.asset-codex-detail-heading { display: flex; align-items: center; gap: 16px; }
+.asset-codex-detail-heading .ship-icon { width: 80px; height: 80px; flex-shrink: 0; }
+.asset-codex-detail-heading .asset-codex-portrait { width: 72px; height: 96px; }
+.asset-codex-detail h3 { margin: 4px 0; font-size: 21px; }
+.asset-codex-detail p { line-height: 1.85; overflow-wrap: anywhere; }
+.asset-codex-detail h4 { margin: 20px 0 10px; }
+.asset-codex-metrics { margin: 0; }
+.asset-codex-metrics > div { display: grid; grid-template-columns: minmax(95px, 1fr) minmax(0, 1.4fr); gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.asset-codex-metrics dd { margin: 0; overflow-wrap: anywhere; }
+.asset-codex-metrics dt { color: var(--muted); }
+.asset-codex-history { list-style: none; padding: 0; }
+.asset-codex-history li { display: grid; gap: 4px; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13px; overflow-wrap: anywhere; }
+.asset-codex-history span { color: var(--muted); }
+.asset-codex-empty { color: var(--muted); padding: 12px; font-size: 13px; line-height: 1.8; }
+.asset-codex-comparison { flex: 0 0 auto; max-height: 38%; overflow-y: auto; border-top: 1px solid var(--line); padding-top: 10px; }
+.asset-codex-compare-scroll { overflow-x: auto; }
+.asset-codex-comparison table { table-layout: fixed; }
+#assetCodexComparison .outfitting-metrics td, #assetCodexComparison .outfitting-metrics th { white-space: normal; text-align: left; overflow-wrap: anywhere; }
+.asset-codex-choice:focus-visible { outline: 2px solid var(--accent); }
+.asset-codex-back { display: none; }
+@media (max-width: 700px) {
+  .asset-codex-layout { grid-template-columns: minmax(0, 1fr); }
+  .asset-codex-layout[data-detail="false"] .asset-codex-detail, .asset-codex-layout[data-detail="true"] .asset-codex-list { display: none; }
+  .asset-codex-back { display: inline-block; margin-bottom: 12px; }
+  .asset-codex-detail { padding: 12px; }
+  .asset-codex-search { gap: 8px; }
+}
+
 .faction-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

@@ -278,11 +278,32 @@ async function main() {
   assert.equal(state.pendingEncounter.enemyReserve[0].level, 3);
   state.modeLabel = "normal"; state.pendingEncounter = { active: false };
   saved = validSave;
+  const codexBeforeFailure = JSON.stringify(state.assetCodex);
+  state.troops.cavalier = { 1: 2 };
   failWrite = true;
   assert.equal(saveGameToStorage(), false);
   assert.equal(saved, validSave);
+  assert.equal(JSON.stringify(state.assetCodex), codexBeforeFailure, "保存失敗時は取得記録を確定しない");
   failWrite = false;
   assert.equal(saveGameToStorage(), true);
+  assert.ok(state.assetCodex.troops.includes("cavalier"));
+  delete state.troops.cavalier;
+  assert.equal(saveGameToStorage(), true);
+  resetState(); assert.equal(loadGameFromStorage(), true);
+  assert.ok(state.assetCodex.troops.includes("cavalier"), "手放した兵も再読込後に在籍記録を残す");
+  // 図鑑導入前の保存では現在保有分を補完し、失われた過去は推定しない。
+  const codexLegacy = JSON.parse(saved);
+  const codexPayload = JSON.parse(codexLegacy.payload);
+  delete codexPayload.state.assetCodex;
+  codexLegacy.payload = JSON.stringify(codexPayload);
+  let codexHash = 0;
+  for (let i = 0; i < codexLegacy.payload.length; i++) codexHash = (codexHash * 31 + codexLegacy.payload.charCodeAt(i)) >>> 0;
+  codexLegacy.hash = codexHash.toString(16);
+  saved = JSON.stringify(codexLegacy);
+  assert.equal(loadGameFromStorage(), true);
+  assert.equal(state.assetCodex.partial, true);
+  assert.ok(state.assetCodex.troops.includes("infantry"));
+  assert.ok(!state.assetCodex.troops.includes("cavalier"));
   console.log("保存・復元の回帰テスト: 全項目成功");
 }
 

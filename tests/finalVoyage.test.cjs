@@ -49,6 +49,8 @@ async function main() {
   assert.equal(ENDINGS.length, 10);
   for (const ending of ENDINGS) { assert.ok(ending.body.length >= 200 && ending.body.length <= 300); assert.doesNotMatch(ending.body + ending.description, /\d/); }
   assert.equal(state.voyageStats.partial, false);
+  assert.equal(state.assetCodex.partial, false);
+  assert.ok(state.assetCodex.troops.includes("infantry"));
   assert.equal(state.voyageStats.income, 0, "初期所持金は収入に含めない");
   state.fame = 3000; state.wanted.byFaction.north.amount = 100000;
   assert.equal(eligible("awe"), false);
@@ -117,7 +119,11 @@ async function main() {
   state.eventQueue.push({}); assert.equal(canOpenFinalVoyage(state, pending), false); state.eventQueue = [];
   pending.kind = "intensity"; assert.equal(canOpenFinalVoyage(state, pending), false); pending.kind = null;
   state.wanted.detention = {}; assert.equal(canOpenFinalVoyage(state, pending), false); state.wanted.detention = null;
+  state.assetCodex.equipment.push("cannon");
+  state.assetCodex.variants.push({ id: 1, variantId: "gull", sourceName: "前の旅", acquiredAbs: 120001 });
   resetState(); stats.receiveFunds(state, 150); stats.spendFunds(state, 50, "trade"); stats.spendFunds(state, 2000, "upkeep");
+  assert.equal(state.assetCodex.equipment.length, 0, "新しい旅で取得記録を初期化する");
+  assert.equal(state.assetCodex.variants.length, 0);
   assert.equal(state.voyageStats.income, 150); assert.equal(state.voyageStats.expenses.trade, 50);
   assert.equal(state.voyageStats.expenses.upkeep, 1100, "支払えた金額だけ記録する");
   stats.receiveFaith(state, 30); state.faith -= 5; assert.equal(state.voyageStats.faithEarned, 30);
