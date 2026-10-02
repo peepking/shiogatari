@@ -171,7 +171,7 @@ main .grid > * { min-width: 0; }
 .battle-result-list .resource-list { margin: 5px 0; }
 .trade-table td > .resource-icon { display: block; width: 22px; height: 22px; margin: 0 auto; }
 
-/* 依頼受注は操作列を確保し、狭い画面でもボタンを縦に折り返さない */
+/* PCの依頼受注は操作列を確保し、ボタンを縦に折り返さない。 */
 .modal.quest-offer-modal { width: min(960px, calc(100vw - 28px)); }
 .quest-offer-scroll { max-width: 100%; overflow-x: auto; }
 .quest-offer-table { table-layout: fixed; min-width: 640px; }
@@ -183,6 +183,22 @@ main .grid > * { min-width: 0; }
 .quest-offer-table .quest-accept { min-width: 64px; }
 .modal .trade-table .btn, .modal-close { white-space: nowrap; }
 .quest-offer-table .resource-list { gap: 6px 10px; }
+/* スマートフォンでは依頼をカードにまとめ、報酬・期限・受注を横スクロールなしで確認できるようにする。 */
+@media (max-width: 600px) {
+  .quest-offer-scroll { overflow-x: visible; }
+  .quest-offer-table { display: block; min-width: 0; }
+  .quest-offer-table tbody { display: grid; gap: 12px; }
+  .quest-offer-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 14px; background: #ffffff03; }
+  .quest-offer-table tbody td { min-width: 0; padding: 0; text-align: left; white-space: normal; }
+  .quest-offer-table td:first-child > .tiny { font-size: 12px; line-height: 1.7; }
+  .quest-offer-table td:first-child > b, .quest-offer-table td:first-child > div > b { font-size: 15px; line-height: 1.6; }
+  .quest-offer-table td:first-child > div + div { margin-top: 6px; }
+  .quest-offer-table td:nth-child(2) { padding-top: 10px; border-top: 1px solid var(--line); line-height: 1.7; }
+  .quest-offer-table td:nth-child(2)::before { content: "報酬"; display: block; margin-bottom: 4px; color: var(--muted); font-size: 12px; }
+  .quest-offer-table td:nth-child(3)::before { content: "期限："; color: var(--muted); }
+  .quest-offer-table .resource-list { margin: 6px 0; }
+  .quest-offer-table .quest-accept { width: 100%; min-height: 44px; margin-top: 2px; }
+}
 /* 補助カードは個別の高さで並べ、見出しの矢印・操作名・背景で開閉状態を示す。 */
 .workspace-drawers { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 10px; margin-top: 14px; }
 .workspace-drawer { flex: 1 1 260px; min-width: 0; border: 1px solid var(--line); border-radius: 10px; background: #10192c; }
