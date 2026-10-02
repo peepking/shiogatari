@@ -16,6 +16,7 @@ import { expireWanted } from "../wanted/playerWanted.js";
 function occupiedPositions() {
   const positions = [...(state.expansion?.exploration?.sites || []).map(s => s.position)];
   for (const c of state.expansion?.charts?.active || []) positions.push(c.destination, c.rumor);
+  positions.push(state.pirateKingStory?.active?.position);
   const quests = [...(state.quests?.active || []), ...Object.values(state.quests?.availableBySettlement || {}).flat(), ...Object.values(state.nobleQuests?.availableByNoble || {}).flat()];
   for (const q of quests) positions.push(q.target, ...(q.fights || []).map(f => f.target));
   return new Set(positions.filter(Boolean).map(p => `${p.x},${p.y}`));

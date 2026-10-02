@@ -9,6 +9,7 @@ import { normalizeFleet } from "../fleet/fleet.js";
 import { createNationalPower, nationalPowerDay } from "../factions/nationalPower.js";
 import { createVoyageStats } from "./voyageStats.js";
 import { collectAssetCodex } from "../codex/assetCodex.js";
+import { normalizePirateKingStory } from "../pirates/pirateKingStory.js";
 
 /**
  * ゲームの初期状態を生成する。
@@ -18,6 +19,7 @@ const createState = () => {
   const initial = {
   piracy: {lastTrade:null,checkpoint:null,nextId:1},
   bounties: normalizeBounties(),
+  pirateKingStory: normalizePirateKingStory(),
   wanted: normalizeWanted(),
   fleet: normalizeFleet(),
   expansion: createExpansionState(),

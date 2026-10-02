@@ -10,6 +10,7 @@ JavaScriptは `src/` の機能別フォルダへ配置する。各フォルダ�
 | --- | --- |
 | 兵・船・艤装の図鑑、比較、在籍・取得来歴の保存 | [兵・船・艤装の図鑑](asset-codex-design.md) |
 | 任意の結末・最終航海の解放条件・航海統計 | [最終航海・航海統計](final-voyage-design.md) |
+| 海賊五列強の物語・海賊王の海図・海没神話 | [海賊王の海図・海没神話](pirate-king-story-design.md) |
 | 戦闘基盤・士気・敗走・援軍投入・勝敗・戦後精算 | [戦闘基盤再設計](battle-redesign.md) |
 | 部隊ごとの5陣形・兵種別おまかせ・一時停止中の個別／一括指示（実装・検証済み） | [部隊陣形・一時停止指示](battle-unit-formations.md) |
 | 常駐NPC賞金首・討伐報酬・固有船・大会戦の前線効果 | [援軍・賞金首](bounty-system-design.md) |

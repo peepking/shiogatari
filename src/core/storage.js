@@ -17,6 +17,7 @@ import { normalizeNationalPower, nationalPowerDay } from "../factions/nationalPo
 import { bindQuestPower } from "../factions/nationalPowerRules.js";
 import { FACTIONS } from "../world/lore.js";
 import { collectAssetCodex } from "../codex/assetCodex.js";
+import { normalizePirateKingStory, pirateStoryEncounter, currentPirateStoryEncounter } from "../pirates/pirateKingStory.js";
 
 const SAVE_KEY = "shiogatari-save";
 let saveScheduled = false;
@@ -55,14 +56,15 @@ function simpleHash(str) {
 
 /**
  * ゲーム状態をローカルストレージへ保存する。
- * 原則として戦闘準備・戦闘中は保存しない。固定賞金首・犯罪成立後・大会戦の反映済み準備は保存できる。
+ * 原則として戦闘準備・戦闘中は保存しない。固定賞金首・物語の討伐・犯罪成立後・大会戦の反映済み準備は保存できる。
  * @param {{battleComplete?:boolean,battlePreparation?:boolean}} [options] 戦後処理完了・大会戦準備の指定
  * @returns {boolean}
  */
 export function saveGameToStorage({ battleComplete = false, battlePreparation = false } = {}) {
   const unsafe = state.modeLabel === MODE_LABEL.BATTLE || state.pendingEncounter?.active;
-  const fixedPreparation = state.modeLabel === MODE_LABEL.PREP && state.pendingEncounter?.active && (state.pendingEncounter.bountyId != null || state.pendingEncounter.crimeRecorded === true);
+  const fixedPreparation = state.modeLabel === MODE_LABEL.PREP && state.pendingEncounter?.active && (state.pendingEncounter.bountyId != null || state.pendingEncounter.crimeRecorded === true || currentPirateStoryEncounter(state, state.pendingEncounter));
   const grandPreparation = battlePreparation && state.pendingEncounter?.active && state.pendingEncounter.battleKind === "grand" && state.pendingEncounter.preparation;
+  const storyContinuation = battleComplete && currentPirateStoryEncounter(state, state.pendingEncounter) && state.pendingEncounter.storyId === "olav" && state.pendingEncounter.storyPhase === 2;
   if (!battleComplete && unsafe && !fixedPreparation && !grandPreparation) return false;
   try {
     const assetCodex = collectAssetCodex(state);
@@ -73,8 +75,8 @@ export function saveGameToStorage({ battleComplete = false, battlePreparation = 
         logs: normalizeLogs(state.logs),
         ...(grandPreparation ? { modeLabel: MODE_LABEL.PREP } : {}),
         ...(battleComplete ? {
-          modeLabel: MODE_LABEL.NORMAL,
-          pendingEncounter: { ...state.pendingEncounter, active: false },
+          modeLabel: storyContinuation ? MODE_LABEL.PREP : MODE_LABEL.NORMAL,
+          pendingEncounter: { ...state.pendingEncounter, active: storyContinuation },
         } : {}),
       },
       world: snapshotWorld(),
@@ -117,6 +119,13 @@ export function loadGameFromStorage() {
     Object.assign(state, snapshot.state);
     state.piracy = normalizePiracy(snapshot.state.piracy);
     state.bounties = normalizeBounties(snapshot.state.bounties);
+    state.pirateKingStory = normalizePirateKingStory(snapshot.state.pirateKingStory);
+    if (state.pendingEncounter?.active && state.pendingEncounter.storyId) {
+      if (currentPirateStoryEncounter(state, state.pendingEncounter)) {
+        Object.assign(state.pendingEncounter, pirateStoryEncounter(state.pirateKingStory));
+        state.modeLabel = MODE_LABEL.PREP;
+      } else { state.pendingEncounter = { active: false }; state.modeLabel = MODE_LABEL.NORMAL; }
+    }
     state.wanted = normalizeWanted(snapshot.state.wanted);
     for (const q of [...(state.quests?.active || []), ...Object.values(state.quests?.availableBySettlement || {}).flat()]) {
       if (q.type === "bounty_hunt" && !q.pirateKind) {

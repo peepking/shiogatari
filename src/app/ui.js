@@ -36,6 +36,10 @@ import { wireAssetCodex, refreshAssetCodex } from "../codex/assetCodexUI.js";
 import { updateExplorationWorld, renderExplorationControl, resumeExploration, finishExploration } from "../exploration/explorationUI.js";
 import { updateBountyWorld, finishBounty } from "../bounty/bountyWorld.js";
 import { renderBountyControls, bountyRestriction } from "../bounty/bountyUI.js";
+import { renderPirateStoryControls } from "../pirates/pirateKingUI.js";
+import { updatePirateKingWorld } from "../pirates/pirateKingWorld.js";
+import { currentPirateStoryEncounter, finishPirateStoryBattle, pirateStoryEncounter, abandonPirateStory } from "../pirates/pirateKingStory.js";
+import { VARIANT_SHIPS, variantBonusText } from "../fleet/variantShips.js";
 import { renderOfficeControls } from "../wanted/locationOfficeUI.js";
 import { confirmAction } from "../ui/dom.js";
 import { processScheduledOmens } from "./time.js";
@@ -245,6 +249,7 @@ function renderBattleSummary(summary, resultLabel, pending, enemyTotal, isWin) {
   pushLog("戦闘結果", body, "-");
   pushToast("戦闘結果", resultLabel, isWin ? "good" : "warn");
   showBattleResultModal(summary, resultLabel);
+  if (elements.battleResultBack) elements.battleResultBack.textContent = pending.storyId === "olav" && pending.storyPhase === 1 && isWin ? "2戦目の準備へ" : "地図に戻る";
 }
 
 /**
@@ -627,6 +632,7 @@ function startAutoMove(target) {
  * @returns {void}
  */
 function escapeBattleSuccess(reason) {
+  if (state.pendingEncounter?.storyId) abandonPirateStory(state.pirateKingStory);
   finishPursuit(state, state.pendingEncounter, absDay(state));
   if (state.pendingEncounter?.explorationId != null) finishExploration(false);
   const text = reason || "敵との接触を回避しました。";
@@ -700,6 +706,7 @@ function processBattleOutcome(resultCode, meta) {
   if (meta) meta.outcomeApplied = true;
   finishPursuit(state, pending, absDay(state));
   if (pending.bountyId != null && !state.bounties?.active.some(s => s.id === pending.bountyId)) { clearBattlePrep(true); syncUI(); return; }
+  if (pending.storyId && !currentPirateStoryEncounter(state, pending)) { clearBattlePrep(true); syncUI(); return; }
   const enemyTotal = Array.isArray(meta?.units)
     ? meta.units.filter(u => u.side === "enemy" && wasBattleDeployed(u)).reduce((sum, u) => sum + u.count, 0)
     : pending.enemyTotal || enemyTotalEstimate(meta);
@@ -712,6 +719,8 @@ function processBattleOutcome(resultCode, meta) {
   const resultLabel = BATTLE_RESULT_LABEL[resultCode] || resultCode;
   const isWin = resultCode === BATTLE_RESULT.WIN;
   const isDraw = resultCode === BATTLE_RESULT.DRAW;
+  const kingFirstWin = isWin && pending.storyId === "olav" && pending.storyPhase === 1;
+  let storyContinuation = false;
   const questId = pending.questId;
   const questType = pending.questType;
   const questFightIdx = pending.questFightIdx ?? null;
@@ -776,7 +785,7 @@ function processBattleOutcome(resultCode, meta) {
     return { texts, resources };
   };
   try {
-    if (isWin) {
+    if (isWin && !kingFirstWin) {
       state.fame += fameDelta;
       const fundsGainBase = enemyTotal * 20;
       const fundsGain = Math.round(fundsGainBase * (0.9 + Math.random() * 0.2) * (isStrong ? 2 : 1));
@@ -793,7 +802,7 @@ function processBattleOutcome(resultCode, meta) {
         pickedMap[key] = (pickedMap[key] || 0) + 1;
         state.supplies[key] = (state.supplies[key] ?? 0) + 1;
       }
-      const fragment = awardBattleFragment(questId);
+      const fragment = pending.storyId ? null : awardBattleFragment(questId);
       if (!fragment) receiveFunds(state, fundsGain);
       state.supplies.food = (state.supplies.food ?? 0) + foodGain;
       summary.push({ text: `名声 +${fameDelta}`, icon: "fame" });
@@ -807,7 +816,7 @@ function processBattleOutcome(resultCode, meta) {
           })
           .join(" / ") || "なし";
       summary.push({ text: `物資: ${matText}`, label: "物資", resources: Object.entries(pickedMap).map(([id, qty]) => ({ id, label: SUPPLY_ITEMS.find(item => item.id === id)?.name || id, value: `+${qty}` })) });
-    } else if (!isDraw) {
+    } else if (!isDraw && !isWin) {
       state.fame = Math.max(0, state.fame - fameDelta);
       const lossRate = 0.45 + Math.random() * 0.1; // 45-55%
       const fundsLost = Math.round(state.funds * lossRate);
@@ -842,7 +851,7 @@ function processBattleOutcome(resultCode, meta) {
       .join(" / ") || NONE_LABEL;
     summary.push({ text: `損耗:${lossText === NONE_LABEL ? lossText : " " + lossText}`, label: "損耗", ...(lossEntries.length ? { resources: Object.entries(losses).map(([id, qty]) => ({ id, label: TROOP_STATS[id]?.name || id, value: `-${qty}` })) } : { icon: "troops" }) });
 
-    const captured = calcCaptures(meta, eventTag);
+    const captured = kingFirstWin ? {} : calcCaptures(meta, eventTag);
     Object.entries(captured).forEach(([key, qty]) => {
       const [type, lvlStr] = key.split("|");
       addTroops(type, Number(lvlStr) || 1, qty);
@@ -983,7 +992,7 @@ function processBattleOutcome(resultCode, meta) {
       }
     }
     // 依頼以外の海賊遭遇に勝利したら、近傍拠点の貴族好感度をわずかに上げる
-    if (!pending.theftKind && pending.bountyId == null && !questId && enemyFactionId === "pirates" && isWin) {
+    if (!pending.storyId && !pending.theftKind && pending.bountyId == null && !questId && enemyFactionId === "pirates" && isWin) {
       const nearest = settlements
         .filter(s => !s.pirateHaven)
         .map((s) => ({ s, d: manhattan(s.coords, state.position) }))
@@ -998,27 +1007,43 @@ function processBattleOutcome(resultCode, meta) {
     }
     // 戦況スコア反映（敵勢力ID必須化）
     let delta = isWin ? 8 : resultCode === BATTLE_RESULT.LOSE ? -6 : 0;
-    if (!pending.theftKind && pending.bountyId == null && !questId && !questType && enemyFactionId !== "pirates") {
+    if (!pending.storyId && !pending.theftKind && pending.bountyId == null && !questId && !questType && enemyFactionId !== "pirates") {
       delta = isWin ? 3 : resultCode === BATTLE_RESULT.LOSE ? -2 : 0;
       if (delta > 0) summary.push("戦況がわずかに有利に傾いた");
       if (delta < 0) summary.push("戦況がわずかに不利に傾いた");
     }
-    if (!pending.theftKind && pending.bountyId == null && delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
+    if (!pending.storyId && !pending.theftKind && pending.bountyId == null && delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
 
     if (pending.explorationId != null) {
       const resources = finishExploration(isWin);
       summary.push(resources.length ? { label: "探索報酬", text: `探索報酬: ${resources.map(r => `${r.label} ${r.value}`).join(" / ")}`, resources } : "探索失敗: 探索地点は消滅しました。");
     }
     if (pending.bountyId != null && isWin) summary.push(...finishBounty(pending.bountyId));
+    if (pending.storyId) {
+      const story = finishPirateStoryBattle(state, pending, resultCode, absDay(state));
+      storyContinuation = story?.continuation === true;
+      if (storyContinuation) summary.push("王の本隊が現れた。残った兵で編成を見直し、2戦目の大会戦へ進みます。資産報酬は連戦勝利時に受け取ります。");
+      else if (story?.defeated) {
+        if (story.king) summary.push({ text: "海賊王オーラヴを討伐：ヴァイキングシップ1隻を獲得。海没神話への航路が開かれました。", icon: "ships" });
+        else {
+          summary.push({ text: `${story.name}を討伐：海賊王の海図の破片＋1（${story.fragments}/6枚）`, icon: "chart" });
+          summary.push({ text: `${VARIANT_SHIPS[story.variantId].name} 1隻を獲得（${variantBonusText(story.variantId)}）`, icon: "ships" });
+        }
+      } else if (story?.king) summary.push("海賊王は海に残っています。次の挑戦は1戦目からです。");
+    }
     if (pending.theftKind) {
       const resources = finishTheftBattle(state, pending, isWin);
       summary.push(resources.length ? { label: "犯罪戦闘の戦利品", text: resources.map(r => `${r.label}＋${r.value}`).join(" / "), resources } : "犯罪戦闘からの追加報酬はありません。");
     }
-    const powerResources = pending.theftKind || pending.bountyId != null ? [] : nationalPowerResources(completeBattlePower(state, pending, isWin));
+    const powerResources = pending.storyId || pending.theftKind || pending.bountyId != null ? [] : nationalPowerResources(completeBattlePower(state, pending, isWin));
     if (powerResources.length) summary.push({ label: "国力への貢献", text: powerResources.map(r => `${r.label} ${r.value}`).join(" / "), resources: powerResources });
     renderBattleSummary(summary, resultLabel, pending, enemyTotal, isWin);
   } finally {
     clearBattlePrep(true);
+    if (storyContinuation) {
+      state.pendingEncounter = pirateStoryEncounter(state.pirateKingStory);
+      state.modeLabel = MODE_LABEL.PREP;
+    }
     syncUI();
   }
 }
@@ -1029,12 +1054,15 @@ function processBattleOutcome(resultCode, meta) {
  */
 function startPrepBattle() {
   if (!state.pendingEncounter?.active) return;
+  if (state.pendingEncounter.storyId && (!currentPirateStoryEncounter(state, state.pendingEncounter) || totalTroops() <= 0)) {
+    pushToast("討伐不可", "対象または部隊員を確認してください。連戦から離脱して兵を整えることもできます。", "warn"); return;
+  }
   if (state.pendingEncounter.bountyId != null) {
     const site = state.bounties?.active.find(s => s.id === state.pendingEncounter.bountyId);
     const reason = bountyRestriction(site);
     if (reason) { pushToast("討伐不可", reason, "warn"); clearBattlePrep(); syncUI(); return; }
   }
-  state.pendingEncounter.powerContext ||= snapshotBattlePower(state, state.pendingEncounter, nationalPowerAtWar);
+  if (!state.pendingEncounter.storyId) state.pendingEncounter.powerContext ||= snapshotBattlePower(state, state.pendingEncounter, nationalPowerAtWar);
   setEnemyFormation(state.pendingEncounter.enemyFormation || []);
   const enemyFactionId = state.pendingEncounter?.enemyFactionId || "pirates";
   setBattleEnemyFaction(enemyFactionId);
@@ -1099,6 +1127,9 @@ function startOracleBattle() {
  */
 function tryRunFromEncounter() {
   if (!state.pendingEncounter?.active) return;
+  if (state.pendingEncounter.storyId) {
+    escapeBattleSuccess(state.pendingEncounter.storyId === "olav" ? "討伐の準備を取りやめました。海賊王への再挑戦は1戦目からです。" : "討伐の準備を取りやめました。対象は同じ海域に残っています。"); return;
+  }
   const rate = escapeSuccessRate();
   const roll = Math.random() * 100;
   if (roll < rate) {
@@ -1129,7 +1160,7 @@ function tryPrayEscape() {
  */
 function surrenderBattle() {
   if (!state.pendingEncounter?.active) return;
-  processBattleOutcome("敗北", { enemyFormation: state.pendingEncounter.enemyFormation });
+  processBattleOutcome(BATTLE_RESULT.LOSE, { enemyFormation: state.pendingEncounter.enemyFormation });
 }
 
 // 移動/待機/入退場の処理は actions.js に集約。
@@ -1304,7 +1335,8 @@ function updateModeControls(loc) {
       elements.battlePrepSurrenderBtn && (elements.battlePrepSurrenderBtn.hidden = false);
       if (elements.battlePrepRunBtn) {
         const rate = Math.round(escapeSuccessRate());
-        elements.battlePrepRunBtn.title = `逃走成功率: ${rate}%`;
+        elements.battlePrepRunBtn.textContent = state.pendingEncounter.storyId ? "準備を取りやめる" : "逃走する";
+        elements.battlePrepRunBtn.title = state.pendingEncounter.storyId ? "討伐対象は残り、海賊王との連戦は1戦目へ戻ります。" : `逃走成功率: ${rate}%`;
       }
     }
     if (!showPrepRow && elements.battlePrepRunBtn) {
@@ -1334,7 +1366,7 @@ function updateModeControls(loc) {
       const strong = state.pendingEncounter.strength === "elite";
       const enemyFactionId = state.pendingEncounter?.enemyFactionId || "pirates";
       elements.battlePrepInfo.hidden = false;
-      elements.battlePrepInfo.textContent = state.pendingEncounter.bountyId != null ? `${state.pendingEncounter.enemyName} / ${total}人（強編成）` : `敵推定: ${total}人${
+      elements.battlePrepInfo.textContent = state.pendingEncounter.storyId ? `${state.pendingEncounter.enemyName} / ${total}人${state.pendingEncounter.battleKind === "grand" ? "（前衛200人＋予備隊100人）" : ""}` : state.pendingEncounter.bountyId != null ? `${state.pendingEncounter.enemyName} / ${total}人（強編成）` : `敵推定: ${total}人${
         strong ? (enemyFactionId !== "pirates" ? "（正規軍）" : "（強編成）") : ""
       }`;
     }
@@ -1378,6 +1410,7 @@ function syncUI() {
   renderFaithDetails();
   updateExplorationWorld();
   updateBountyWorld();
+  updatePirateKingWorld();
   syncChartReservations();
   if (!state.expansion.exploration.pending && !state.expansion.charts.pending && !state.pendingEncounter?.active && !state.eventQueue?.length && (!elements.battleBlock || elements.battleBlock.hidden) && (!elements.battleResultModal || elements.battleResultModal.hidden)) processScheduledOmens(absDay(state));
   const {
@@ -1422,6 +1455,7 @@ function syncUI() {
   renderNationalPowerControls(getAudienceContext);
 renderExplorationControl(syncUI);
   renderBountyControls(syncUI);
+  renderPirateStoryControls(syncUI);
   renderOfficeControls(syncUI);
   renderChartControl(syncUI);
   renderFishingControl(syncUI);
@@ -1918,7 +1952,10 @@ function bindBattlePrepButtons() {
     elements.battleBackBtn?.click();
   });
   elements.battleBackBtn?.addEventListener("click", () => {
-    setTimeout(() => syncUI(), 0);
+    setTimeout(() => {
+      if (state.pendingEncounter?.active && currentPirateStoryEncounter(state, state.pendingEncounter)) state.modeLabel = MODE_LABEL.PREP;
+      syncUI();
+    }, 0);
   });
 }
 

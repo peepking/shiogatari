@@ -43,6 +43,7 @@ export function eligibleEndings(state, settlements) {
     salvation: stats?.refugeesRescued >= 300,
     exploration: sites.length > 0 && sites.every(s => stats?.visited.includes(s.id)),
     discovery: stats?.chartsCompleted >= 10,
+    sea: state.pirateKingStory?.completed === true,
   };
   return ENDINGS.filter(e => checks[e.id]).map(e => e.id);
 }

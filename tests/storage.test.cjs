@@ -14,6 +14,7 @@ async function main() {
   let failWrite = false;
   const context = vm.createContext({
     queueMicrotask,
+    structuredClone,
     console,
     localStorage: {
       /** @returns {string|null} 保存データを返す。 */
@@ -276,6 +277,23 @@ async function main() {
   assert.equal(state.modeLabel, "prep");
   assert.equal(state.pendingEncounter.preparation.seed, 123);
   assert.equal(state.pendingEncounter.enemyReserve[0].level, 3);
+  state.modeLabel = "normal"; state.pendingEncounter = { active: false };
+  const story = modules["./pirateKingStory.js"].namespace;
+  const storyConfig = modules["./pirateKingConfig.js"].namespace;
+  state.pirateKingStory = story.normalizePirateKingStory({ defeated: storyConfig.PIRATE_LORDS.map(lord => lord.id) });
+  state.pirateKingStory.active = story.createStorySite(storyConfig.PIRATE_KING, { x: 5, y: 5 });
+  state.pirateKingStory.waitingId = null; state.pirateKingStory.kingPhase = 2;
+  state.pendingEncounter = story.pirateStoryEncounter(state.pirateKingStory); state.modeLabel = "prep";
+  assert.equal(saveGameToStorage(), true);
+  resetState(); assert.equal(loadGameFromStorage(), true);
+  assert.equal(state.pirateKingStory.kingPhase, 2); assert.equal(state.pendingEncounter.storyPhase, 2);
+  assert.equal(state.pendingEncounter.enemyReserve.length, 10);
+  assert.equal(state.modeLabel, "prep");
+  assert.equal(saveGameToStorage({ battleComplete: true }), true, "1戦目の戦後保存でも2戦目の準備を失わない");
+  resetState(); assert.equal(loadGameFromStorage(), true);
+  assert.equal(state.modeLabel, "prep"); assert.equal(state.pendingEncounter.active, true);
+  assert.equal(state.pirateKingStory.kingPhase, 2);
+  state.modeLabel = "battle"; assert.equal(saveGameToStorage(), false, "物語でも戦闘途中は保存しない");
   state.modeLabel = "normal"; state.pendingEncounter = { active: false };
   saved = validSave;
   const codexBeforeFailure = JSON.stringify(state.assetCodex);

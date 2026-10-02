@@ -11,7 +11,14 @@ export const VARIANT_SHIPS = Object.freeze(Object.fromEntries([
   ["carrack", ["stone", "storm", "devourer"], ["黒礁号", "嵐呼び号", "海喰らい号"]],
   ["galleass", ["ember", "anvil", "tide"], ["残火号", "鉄槌号", "断潮号"]],
   ["galleon", ["eclipse", "abyss", "throne"], ["日蝕号", "深淵号", "空位の玉座号"]],
-].flatMap(([base, ids, names]) => ids.map((id, i) => [id, Object.freeze({ id, base, name: names[i], supplies: [10, 0, 5][i], troops: [0, 10, 5][i] })]))));
+].flatMap(([base, ids, names]) => ids.map((id, i) => [id, Object.freeze({ id, base, name: names[i], supplies: [10, 0, 5][i], troops: [0, 10, 5][i] })])).concat([
+  { id: "story_bjorn", base: "longship", name: "豪勇号", supplies: 0, troops: 20 },
+  { id: "story_erik", base: "galley", name: "赤毛号", supplies: 20, troops: 0 },
+  { id: "story_ivar", base: "fluyt", name: "骨無し号", supplies: 10, troops: 10 },
+  { id: "story_ragnar", base: "carrack", name: "強襲号", supplies: 30, troops: 0 },
+  { id: "story_sigvard", base: "galleass", name: "蛇の目号", supplies: 0, troops: 30 },
+  { id: "story_thorkell", base: "galleon", name: "巨躯号", supplies: 15, troops: 15 },
+].map(ship => [ship.id, Object.freeze({ ...ship, story: true })]))));
 
 /** 保存された個体を検証し、重複IDは最初の記録だけを残す。 @param {unknown} value 保存値。 @returns {Array} 独立した個体一覧。 */
 export function normalizeVariants(value) {

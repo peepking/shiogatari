@@ -399,6 +399,7 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
   if (recruit) enqueueEvent({ title: "潮盟の便り", body: `潮の縁者の紹介で、${TROOP_STATS[recruit.type].name} Lv${recruit.level} ${recruit.remaining}人が雇用候補に加わりました。` });
   rollChartRumor(hereSettlement);
   rollChartMerchant(hereSettlement);
+  onPirateStoryEntry(hereSettlement);
   resetEncounterMeter();
   setOutput("入場", `${targetPlace}に入りました。`, [
     { text: targetPlace, kind: "" },
@@ -1411,5 +1412,6 @@ function checkRefugeeEscortArrival() {
   clearEscort();
 }
 import { rollChartRumor, rollChartMerchant, enqueueChartMerchant, handleChartPurchase } from "../exploration/chartWorld.js";
+import { onPirateStoryEntry } from "../pirates/pirateKingWorld.js";
 import { CHART_CONFIG } from "../core/expansionConfig.js";
 import { awardShips } from "../fleet/fleet.js";

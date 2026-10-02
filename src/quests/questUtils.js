@@ -6,6 +6,7 @@ import { state } from "../core/state.js";
 function explorationPositions() {
   const positions = (state.expansion?.exploration.sites || []).map(s => s.position);
   for (const chart of state.expansion?.charts.active || []) positions.push(chart.destination, chart.rumor);
+  positions.push(state.pirateKingStory?.active?.position);
   return new Set(positions.filter(Boolean).map(p => `${p.x},${p.y}`));
 }
 

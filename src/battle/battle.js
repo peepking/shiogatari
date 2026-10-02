@@ -624,6 +624,7 @@ function buildDeploySlots(side, size) {
 
 /**
  * 兵種情報から戦闘ユニットを生成する。味方は人数・レベル補正後に艤装倍率を一度だけ適用する。
+ * HPは人数・レベル・戦闘HP倍率を反映した後、味方だけ船団HP効果を一度乗算して切り捨てる。予備隊も同じ規則を使う。
  * @param {string} type
  * @param {"ally"|"enemy"} side
  * @param {number} index
@@ -642,7 +643,8 @@ function createUnit(type, side, index, pos, count, level = 1) {
   const lvlRounded = Math.min(5, Math.round(Number(level) * 10) / 10); // 上限Lv5
   const lvlMultRaw = 1 + 0.1 * (lvlRounded - 1);
   const lvlMult = Math.round(lvlMultRaw * 100) / 100; // 小数2桁
-  const hpVal = Math.max(1, Math.floor(baseHp * ratio * lvlMult)) * BATTLE_HP_MULTIPLIER;
+  const basicHp = Math.max(1, Math.floor(baseHp * ratio * lvlMult)) * BATTLE_HP_MULTIPLIER;
+  const hpVal = side === "ally" ? Math.floor(basicHp * (100 + (battleState.outfitting.effects.hp || 0)) / 100) : basicHp;
   const atkVal = Math.max(1, Math.floor(baseAtk * ratio * lvlMult));
   const defVal = Math.max(1, Math.floor(baseDef * lvlMult));
   return {
@@ -938,7 +940,7 @@ function finishBattle(forceDraw = false) {
       faithRescue: battleState.faithRescue || 0,
     });
   }
-  saveGameToStorage({ battleComplete: true });
+  if (!saveGameToStorage({ battleComplete: true })) pushToast("保存できません", "戦果は現在の旅に反映されています。保存容量を確認し、保存できるまで画面を閉じないでください。", "warn");
 }
 
 /**

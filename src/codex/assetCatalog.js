@@ -29,7 +29,7 @@ export function codexEquipmentEffect(item) {
 
 /** @param {object} ship 船種。 @returns {string} 固有効果と有効隻数の上限。 */
 function shipEffect(ship) {
-  const names = { upkeepReduction: "部隊維持費", shipUpkeepReduction: "船維持費", supplyCap: "物資上限", troopCap: "兵員上限", atk: "全兵員の攻撃力", def: "全兵員の防御力", supportPower: "支援射撃威力", baitSaving: "餌を消費しない確率" };
+  const names = { upkeepReduction: "部隊維持費", shipUpkeepReduction: "船維持費", supplyCap: "物資上限", troopCap: "兵員上限", atk: "全兵員の攻撃力", def: "全兵員の防御力", hp: "全兵員のHP", supportPower: "支援射撃威力", baitSaving: "餌を消費しない確率" };
   const effects = Object.entries(ship.effects).map(([key, value]) => `${names[key]}${key.endsWith("Reduction") ? "−" : "＋"}${value}%／隻`);
   return effects.length ? `${effects.join(" / ")}（${ship.limit}隻まで有効）` : "固有効果なし・容量を重視した船";
 }

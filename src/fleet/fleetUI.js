@@ -10,7 +10,7 @@ import { faithEffects } from "../faith/faith.js";
 
 /** @param {string} id 船種。 @returns {string} 既存の線画に合わせた船種別の帆装アイコン。 */
 export function shipIcon(id) {
-  const index = id === "fishing_boat" ? 0 : Object.keys(SHIP_TYPES).indexOf(id);
+  const index = id === "fishing_boat" ? 0 : id === "viking_ship" ? 2 : Object.keys(SHIP_TYPES).indexOf(id);
   const masts = index >= 5 ? [21, 35, 47] : index === 2 ? [31] : [26, 42];
   const sails = masts.map((x, i) => `<path d="M${x} ${12 + i * 4}v31"/><path d="M${x - 2} ${14 + i * 4}l-10 20h10Z" fill="currentColor" fill-opacity=".2"/>${index !== 0 && index !== 4 ? `<path d="M${x + 2} ${15 + i * 4}q12 7 10 18h-10Z" fill="currentColor" fill-opacity=".12"/>` : ""}`).join("");
   const oars = [2, 4, 6].includes(index) ? '<path d="m20 45-6 9m14-9-6 9m14-9-6 9m14-9-6 9m14-9-6 9"/>' : "";
@@ -21,7 +21,7 @@ export function shipIcon(id) {
 export function shipEffectText(id) {
   const ship = SHIP_TYPES[id];
   if (id === "fishing_boat") return `餌を消費しない確率＋${ship.effects.baitSaving}%/隻（${ship.limit}隻で${ship.effects.baitSaving * ship.limit}%）・漁師の伝手`;
-  const names = { upkeepReduction: "部隊維持費", shipUpkeepReduction: "船維持費", supplyCap: "物資上限", troopCap: "部隊上限", atk: "部隊ATK", def: "部隊DEF", supportPower: "支援射撃威力" };
+  const names = { upkeepReduction: "部隊維持費", shipUpkeepReduction: "船維持費", supplyCap: "物資上限", troopCap: "部隊上限", atk: "部隊ATK", def: "部隊DEF", hp: "全兵員HP", supportPower: "支援射撃威力" };
   const effects = Object.entries(ship.effects).map(([key, n]) => `${names[key]} ${key.endsWith("Reduction") ? "−" : "+"}${n}%/隻`);
   return effects.length ? `${effects.join(" / ")}（${ship.limit}隻で上限）` : "固有バフなし・容量重視の船";
 }
@@ -36,7 +36,7 @@ export function fleetMetrics(state, includeUnequipped = true) {
     "次回維持費": cost.funds, "部隊維持費": cost.troopFunds, "船維持費": cost.shipFunds,
     "船維持費軽減（%）": e.shipUpkeepReduction + faithEffects(state).upkeep * 100, "次回食料消費": cost.food, "衛生兵効果（人分）": support.medics, "斥候効果（人分）": support.scouts,
     "近接ATK倍率（%）": 100 + e.atk + e.meleeAtk, "遠隔ATK倍率（%）": 100 + e.atk + e.rangedAtk,
-    "近接DEF倍率（%）": 100 + e.def + e.meleeDef, "遠隔DEF倍率（%）": 100 + e.def + e.rangedDef };
+    "近接DEF倍率（%）": 100 + e.def + e.meleeDef, "遠隔DEF倍率（%）": 100 + e.def + e.rangedDef, "全兵員HP倍率（%）": 100 + e.hp };
   for (const [id, name] of Object.entries({ harpoon: "モリ投擲", ballista: "バリスタ", fire_ballista: "ファイヤバリスタ", grape_ballista: "ブドウ弾バリスタ", fire_grape_ballista: "火炎ブドウ弾バリスタ", cannon: "砲撃支援" })) {
     const attack = e.attacks.find(a => a.id === id);
     if (!attack) {
@@ -63,7 +63,7 @@ export function fleetDetails(state) {
     const troops = ship.troops * n + variants.reduce((sum, v) => sum + VARIANT_SHIPS[v.variantId].troops, 0);
     return `<div class="outfitting-equipped ship-owned">${shipIcon(id)}<div><b>${ship.name} ${n}隻</b><button class="btn ghost" data-asset-codex="ships" data-codex-id="${id}">図鑑で見る</button>${variants.length ? `<p class="tiny">通常船 ${fleet.counts[id]}隻 / 固有船 ${variants.length}隻</p>` : ""}<p>物資容量＋${supplies} / 部隊容量＋${troops}</p><p>船維持費（軽減前）${ship.price * SHIP_UPKEEP_RATE * n}資金／季節</p><p>${shipEffectText(id)}${ship.limit ? ` / 有効${Math.min(n, ship.limit)}隻分${n >= ship.limit ? "・上限到達" : ""}` : ""}</p>${variants.length ? `<details><summary>固有船と来歴（${variants.length}隻）</summary><div class="variant-ship-history">${variants.map(variantShipDetails).join("")}</div></details>` : ""}</div></div>`;
   }).join("");
-  return `<h3>保有船と固有効果</h3>${rows || '<p class="tiny">従船はありません。</p>'}<p class="tiny">船のバフ合計：物資上限＋${e.supplyCap}% / 部隊上限＋${e.troopCap}% / 部隊維持費−${e.upkeepReduction}% / 船維持費−${e.shipUpkeepReduction}% / ATK＋${e.atk}% / DEF＋${e.def}% / 支援射撃威力＋${e.supportPower}%</p>${e.supportPower && !attacks.length ? '<p class="tiny">ガレアス：対応する支援射撃艤装は未装備です。</p>' : ""}`;
+  return `<h3>保有船と固有効果</h3>${rows || '<p class="tiny">従船はありません。</p>'}<p class="tiny">船のバフ合計：物資上限＋${e.supplyCap}% / 部隊上限＋${e.troopCap}% / 部隊維持費−${e.upkeepReduction}% / 船維持費−${e.shipUpkeepReduction}% / ATK＋${e.atk}% / DEF＋${e.def}% / HP＋${e.hp}% / 支援射撃威力＋${e.supportPower}%</p>${e.supportPower && !attacks.length ? '<p class="tiny">ガレアス：対応する支援射撃艤装は未装備です。</p>' : ""}`;
 }
 
 /** @param {object} record 所有個体。 @returns {string} 船名・容量補正・船長と獲得日。 */

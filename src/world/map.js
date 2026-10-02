@@ -1,6 +1,8 @@
 import { buildPirateHavens } from "../pirates/pirateWorld.js";
 import { bountyName } from "../bounty/bounty.js";
 import { drawBountySite } from "../bounty/bountyMapArt.js";
+import { pirateStoryTarget } from "../pirates/pirateKingConfig.js";
+import { drawPirateStorySite } from "../pirates/pirateKingMapArt.js";
 import { elements } from "../ui/dom.js";
 import { mapViewport } from "./mapViewport.js";
 import { drawMapTile, drawMapPlayer, drawExplorationSite, drawChartSite } from "./mapArt.js";
@@ -712,6 +714,8 @@ function formatCellInfo(gx, gy) {
   if (!cell) return "";
   const t = terrainKinds.find((t) => t.key === cell.terrain);
   const terr = t ? t.name : cell.terrain;
+  const story = state.pirateKingStory?.active;
+  if (story?.position.x === gx && story.position.y === gy) return `(${gx + 1}, ${gy + 1}) ${terr} / ${pirateStoryTarget(story.id)?.name || "海賊五列強"} / 海賊王の海図 / 期限なし`;
   const bounty = state.bounties?.active.find(s => s.position.x === gx && s.position.y === gy);
   if (bounty) return `(${gx + 1}, ${gy + 1}) ${terr} / ${bountyName(bounty)}（${FACTIONS.find(f => f.id === bounty.factionId)?.name || bounty.factionId}） / ${bounty.total}人 / 賞金 ${bounty.reward}`;
   const site = (state.expansion?.exploration.sites || []).find(s => s.position.x === gx && s.position.y === gy);
@@ -812,6 +816,12 @@ export function renderMap() {
     drawExplorationSite(ctx, site.kind, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1, isZoom);
   }
   const chartSites = visibleChartSites(state.expansion?.charts);
+  const storySites = state.pirateKingStory?.active ? [state.pirateKingStory.active] : [];
+  for (const site of storySites) {
+    const { x, y } = site.position;
+    if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
+    drawPirateStorySite(ctx, site, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1);
+  }
   for (const site of state.bounties?.active || []) {
     const { x, y } = site.position;
     if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
@@ -843,7 +853,7 @@ export function renderMap() {
 
   // 現在地の地形に合わせて帆船または人物を描き、枠を最後に重ねる。
   if (isZoom) {
-    drawMapPlayer(ctx, { ...mapData[state.position.y][state.position.x], exploration: [...(state.expansion?.exploration.sites || []), ...(state.bounties?.active || []), ...chartSites].some(s => s.position.x === state.position.x && s.position.y === state.position.y) },
+    drawMapPlayer(ctx, { ...mapData[state.position.y][state.position.x], exploration: [...(state.expansion?.exploration.sites || []), ...(state.bounties?.active || []), ...chartSites, ...storySites].some(s => s.position.x === state.position.x && s.position.y === state.position.y) },
       pad + (state.position.x - startX) * cellSize,
       pad + (state.position.y - startY) * cellSize, cellSize - 1);
   }

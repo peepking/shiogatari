@@ -19,6 +19,8 @@ import { initializeExploration, tickExploration, describeDanger, rollExploration
  */
 function blockedPositions() {
   const result = new Set();
+  const story = state.pirateKingStory?.active;
+  if (story) result.add(`${story.position.x},${story.position.y}`);
   for (const site of state.bounties?.active || []) result.add(`${site.position.x},${site.position.y}`);
   const quests = [...(state.quests?.active || []), ...Object.values(state.quests?.availableBySettlement || {}).flat(), ...Object.values(state.nobleQuests?.availableByNoble || {}).flat()];
   for (const quest of quests) {

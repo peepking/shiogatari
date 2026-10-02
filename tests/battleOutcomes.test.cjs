@@ -9,6 +9,10 @@ const { loadTestModule } = require("./helpers/module.cjs");
  */
 async function main() {
   const voyage = await loadTestModule("voyageStats.js");
+  const storyContext = vm.createContext({ structuredClone });
+  const storyRules = (await loadTestModule("pirateKingStory.js", storyContext)).namespace;
+  const storyConfig = (await loadTestModule("pirateKingConfig.js", storyContext)).namespace;
+  const variants = (await loadTestModule("variantShips.js", storyContext)).namespace;
   const raw = await readSource("ui.js");
   const start = raw.indexOf("function processBattleOutcome(");
   const body = raw.slice(start, raw.indexOf("\n}", start) + 2);
@@ -28,7 +32,7 @@ async function main() {
   const theft = await loadPursuitDependency("./settlementCrime.js"); await theft.evaluate();
   const QUEST_TYPES = Object.fromEntries(["ORACLE_HUNT", "ORACLE_ELITE", "PIRATE_HUNT", "BOUNTY_HUNT",
     "NOBLE_SECURITY", "NOBLE_HUNT", "WAR_DEFEND_RAID", "WAR_ATTACK_RAID", "WAR_SKIRMISH", "WAR_BLOCKADE"].map(id => [id,id]));
-  const routes = ["normal", "armory", "raid", "pursuit", "hunter", "exploration", "bounty", ...Object.keys(QUEST_TYPES)];
+  const routes = ["normal", "armory", "raid", "pursuit", "hunter", "exploration", "bounty", "story_lord", "story_king1", "story_king2", ...Object.keys(QUEST_TYPES)];
   for (const route of routes) for (const outcome of ["win", "lose", "draw"]) {
     const quest = { id: 1 };
     const pending = { enemyFactionId: "north", enemyFormation: [{type:"infantry",count:20}], enemyTotal:120 };
@@ -41,11 +45,19 @@ async function main() {
     if (route === "raid") Object.assign(pending, { theftKind: "settlement_raid", theftReward: { food: 50, wood: 10 }, theftFunds: 5000 });
     const state = { funds:1000,fame:100,supplies:{food:50},troops:{infantry:{1:10}},quests:{active:[quest]},
       pendingEncounter:pending,bounties:{active:[{id:1}]},wanted:{} };
+    if (route.startsWith("story_")) {
+      const king = route !== "story_lord";
+      state.pirateKingStory = storyRules.normalizePirateKingStory({ defeated: king ? storyConfig.PIRATE_LORDS.map(lord => lord.id) : [] });
+      state.pirateKingStory.active = storyRules.createStorySite(king ? storyConfig.PIRATE_KING : storyConfig.PIRATE_LORDS[0], { x: 1, y: 1 });
+      state.pirateKingStory.waitingId = null;
+      state.pirateKingStory.kingPhase = route === "story_king2" ? 2 : 1;
+      Object.assign(pending, { storyId: king ? "olav" : "bjorn", storyPhase: state.pirateKingStory.kingPhase, enemyFactionId: "pirates" });
+    }
     state.voyageStats = voyage.namespace.createVoyageStats({ ...state, year: 1000, season: 0, day: 1 });
     const calls = [];
     /** @param {string} name 呼出名。 @returns {Function} 呼出記録。 */
     const record = name => (...args) => { calls.push({name,args}); return []; };
-    const context = vm.createContext({ state, QUEST_TYPES, ...voyage.namespace, ...personnel.namespace, ...pursuit.namespace, finishTheftBattle: theft.namespace.finishTheftBattle,
+    const context = vm.createContext({ state, QUEST_TYPES, ...voyage.namespace, ...personnel.namespace, ...pursuit.namespace, ...storyRules, ...variants, MODE_LABEL: { PREP: "prep" }, finishTheftBattle: theft.namespace.finishTheftBattle,
       Math:Object.assign(Object.create(Math),{random:()=>0.5}),
       BATTLE_RESULT:{WIN:"win",LOSE:"lose",DRAW:"draw"},BATTLE_RESULT_LABEL:{},NONE_LABEL:"なし",
       SUPPLY_ITEMS:[{id:"food",name:"食料"}],TROOP_STATS:{},BONUS_CAPTURE_EVENT_TAGS:new Set(),
@@ -73,9 +85,16 @@ async function main() {
     }
     assert.equal(calls.filter(c=>c.name==="clear").length,1);
     assert.equal(calls.find(c=>c.name==="summary").args[3],20,"未投入の敵を報酬基準へ含めない");
-    assert.equal(state.funds,outcome==="win"?(route==="raid"?6400:1400):outcome==="lose"?500:1000);
+    assert.equal(state.funds,outcome==="win"?(route==="raid"?6400:route==="story_king1"?1000:1400):outcome==="lose"?500:1000);
     if (route === "raid") assert.equal(calls.filter(c => c.name === "war").length, 0);
-    assert.equal(state.fame,outcome==="win"?105:outcome==="lose"?95:100);
+    assert.equal(state.fame,outcome==="win"?(route==="story_king1"?100:105):outcome==="lose"?95:100);
+    if (route.startsWith("story_")) {
+      assert.equal(calls.filter(c => c.name === "war").length, 0, "物語戦は戦況へ影響しない");
+      assert.equal(state.pirateKingStory.completed, route === "story_king2" && outcome === "win");
+      assert.equal(state.voyageStats.chartsCompleted, 0);
+      if (route === "story_king1" && outcome === "win") { assert.equal(state.pendingEncounter.storyPhase, 2); assert.equal(state.modeLabel, "prep"); }
+      if (route === "story_lord" && outcome === "win") assert.equal(state.fleet.variants.length, 1);
+    }
     const completion = calls.filter(c=>["oracleWin","oracleLose","hunt","noble","front"].includes(c.name));
     assert.equal(completion.length,QUEST_TYPES[route] && outcome!=="draw"?1:0);
     if (completion.length) {
@@ -93,12 +112,12 @@ async function main() {
     assert.equal(state.voyageStats.enemyDefeated, 10, "敗走・未投入を撃破数へ含めない");
     assert.equal(state.voyageStats.battles[outcome], 1);
     assert.equal(state.voyageStats.losses.battle, outcome === "win" ? 0 : 6, "救護で生還した兵士は恒久損耗へ含めない");
-    assert.equal(state.voyageStats.income, outcome === "win" ? (route === "raid" ? 5400 : 400) : 0);
+    assert.equal(state.voyageStats.income, outcome === "win" ? (route === "raid" ? 5400 : route === "story_king1" ? 0 : 400) : 0);
     assert.equal(state.voyageStats.expenses.other, outcome === "lose" ? 500 : 0);
     const beforeRepeated = JSON.stringify(state);
     vm.runInContext(`processBattleOutcome(${JSON.stringify(outcome)},meta)`,context);
     assert.equal(JSON.stringify(state), beforeRepeated, "結果の再処理で報酬・撃破・戦闘数を増やさない");
   }
-  console.log("戦後接続: 通常遭遇・神託・討伐・貴族・前線・探索・賞金首の39経路、未投入報酬除外: 成功");
+  console.log("戦後接続: 通常遭遇・神託・討伐・貴族・前線・探索・賞金首・海賊物語、未投入報酬除外: 成功");
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

@@ -234,7 +234,7 @@ export function renderQuestUI(syncUI) {
   if (!listEl) return;
   const active = quests.active || [];
   if (!active.length) {
-    listEl.innerHTML = state.expansion?.charts?.active?.length ? "" : `<div class="tiny">受注中の依頼はありません。</div>`;
+    listEl.innerHTML = state.expansion?.charts?.active?.length || state.pirateKingStory?.active || state.pirateKingStory?.waitingId || state.pirateKingStory?.defeated?.length ? "" : `<div class="tiny">受注中の依頼はありません。</div>`;
     return;
   }
   const now = absDay(state);

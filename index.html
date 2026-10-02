@@ -364,6 +364,7 @@
                 <button class="btn" id="identityOpenBtn">所属・身分</button>
                 <button class="btn" id="fishBtn" hidden>釣り</button>
                 <button class="btn warn" id="bountyVisitBtn" hidden>賞金首を確認</button>
+                <button class="btn warn" id="pirateStoryVisitBtn" hidden>海賊五列強を確認</button>
                 <button class="btn primary" id="oracleBtn">神託を授かる</button>
                 <button class="btn primary" id="oracleBattleBtn" hidden>討伐</button>
                 <button class="btn" id="modePrayBtn">海に祈る</button>
@@ -445,6 +446,7 @@
             <div class="bd max-h-240 overflow-auto" id="questBody">
               <div class="quest-list" id="questList"></div>
               <div class="chart-panel" id="chartPanel" hidden></div>
+              <div class="chart-panel" id="pirateStoryPanel" hidden></div>
             </div>
           </section>
 
@@ -487,6 +489,12 @@
     <div class="modal bounty-modal" role="dialog" aria-modal="true" aria-labelledby="bountyTitle">
       <div class="modal-hd"><h2 id="bountyTitle">賞金首</h2><button class="btn" id="bountyCloseBtn">閉じる</button></div>
       <div class="modal-bd" id="bountyBody"></div>
+    </div>
+  </div>
+  <div class="modal-backdrop" id="pirateStoryModal" hidden>
+    <div class="modal bounty-modal" role="dialog" aria-modal="true" aria-labelledby="pirateStoryTitle">
+      <div class="modal-hd"><h2 id="pirateStoryTitle">海賊五列強</h2><button class="btn" id="pirateStoryClose">閉じる</button></div>
+      <div class="modal-bd" id="pirateStoryBody"></div>
     </div>
   </div>
   <div class="modal-backdrop" id="confirmModal" hidden>
@@ -880,7 +888,7 @@
           </ul>
           <p class="tiny">条件未定・未実装の候補</p>
           <ul class="sbList">
-            <li>海没神話＝越えるべき試練で倒れ、嵐に呑まれ消える。</li>
+            <li>海没神話＝海賊王の帆影が途絶え、勝者を語る声も潮に消えた航海が、海の深みに残る。</li>
           </ul>
         </div>
       </div>

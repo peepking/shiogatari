@@ -46,7 +46,7 @@ async function main() {
   const { normalizeFleet, addVariantShip } = cache.get("fleet.js").namespace;
   /** @param {string} id 結末。 @returns {boolean} 現在条件の成立。 */
   const eligible = id => eligibleEndings(state, sites).includes(id);
-  assert.equal(ENDINGS.length, 10);
+  assert.equal(ENDINGS.length, 11);
   for (const ending of ENDINGS) { assert.ok(ending.body.length >= 200 && ending.body.length <= 300); assert.doesNotMatch(ending.body + ending.description, /\d/); }
   assert.equal(state.voyageStats.partial, false);
   assert.equal(state.assetCodex.partial, false);
@@ -119,6 +119,15 @@ async function main() {
   state.eventQueue.push({}); assert.equal(canOpenFinalVoyage(state, pending), false); state.eventQueue = [];
   pending.kind = "intensity"; assert.equal(canOpenFinalVoyage(state, pending), false); pending.kind = null;
   state.wanted.detention = {}; assert.equal(canOpenFinalVoyage(state, pending), false); state.wanted.detention = null;
+  assert.equal(eligible("sea"), false);
+  state.pirateKingStory.completed = true;
+  state.voyageStats.chartsCompleted = 9;
+  assert.equal(eligible("sea"), true);
+  assert.equal(eligible("discovery"), false, "海賊王の討伐では探奥神話の件数を増やさない");
+  assert.equal(updateFinalVoyage(state, sites).length, 1);
+  state.pirateKingStory.completed = false;
+  assert.equal(updateFinalVoyage(state, sites).length, 0);
+  assert.ok(state.finalVoyage.unlocked.sea, "海没神話の解放は維持する");
   state.assetCodex.equipment.push("cannon");
   state.assetCodex.variants.push({ id: 1, variantId: "gull", sourceName: "前の旅", acquiredAbs: 120001 });
   resetState(); stats.receiveFunds(state, 150); stats.spendFunds(state, 50, "trade"); stats.spendFunds(state, 2000, "upkeep");
@@ -201,6 +210,6 @@ async function main() {
   assert.equal(state.voyageStats.chartsCompleted, 0);
   assert.equal(Object.keys(state.finalVoyage.unlocked).length, 0); assert.equal(Object.keys(state.finalVoyage.records).length, 0);
   assert.equal(nodes.get("finalVoyageBtn").hidden, true);
-  console.log("最終航海: 10神話の境界・永続解放・初回統計・旧保存・原因別損耗・選択/続行/再出発/保存再試行: 成功");
+  console.log("最終航海: 11神話の境界・永続解放・初回統計・旧保存・原因別損耗・選択/続行/再出発/保存再試行: 成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

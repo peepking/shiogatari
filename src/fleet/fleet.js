@@ -41,7 +41,7 @@ export function addVariantShip(state, variantId, sourceName, acquiredAbs) {
 
 /** @param {object|number} fleet 船団。 @returns {object} 全容量と上限付き固有効果。 */
 export function fleetEffects(fleet) {
-  const result = { supplies: 0, troops: 0, upkeepReduction: 0, shipUpkeepReduction: 0, supplyCap: 0, troopCap: 0, atk: 0, def: 0, supportPower: 0, baitSaving: 0 };
+  const result = { supplies: 0, troops: 0, upkeepReduction: 0, shipUpkeepReduction: 0, supplyCap: 0, troopCap: 0, atk: 0, def: 0, hp: 0, supportPower: 0, baitSaving: 0 };
   for (const [id, count] of Object.entries(fleetCounts(fleet))) {
     const ship = SHIP_TYPES[id];
     result.supplies += ship.supplies * count;
