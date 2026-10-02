@@ -116,7 +116,7 @@ function handleCodexClick(event) {
       document.getElementById("assetCodexLayout").dataset.detail = "true";
       refreshAssetCodex();
       document.getElementById("assetCodexEntryTitle")?.focus();
-    } else document.getElementById("assetCodexSearch").focus();
+    } else document.getElementById("assetCodexClose").focus();
     return;
   }
   if (modal().hidden || !modal().contains(event.target)) return;

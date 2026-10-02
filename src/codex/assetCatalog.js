@@ -42,6 +42,7 @@ function shipMetrics(ship) {
 
 /**
  * 現在の設定値と保有・取得記録から閲覧用の名簿を作る。未発見の固有船は名前・性能・来歴を返さない。
+ * 海賊王の報酬船は討伐完了まで項目自体を返さず、検索・比較・個別表示でも情報を公開しない。
  * @param {string} tab 図鑑の分類。
  * @param {object} state 現在の状態。
  * @returns {object[]} 閲覧と比較に使う項目。
@@ -76,7 +77,7 @@ export function assetCatalog(tab, state) {
       hint: SHIP_GUIDES[variant.base][2], metrics: { ...shipMetrics(ship), "物資容量加算": ship.supplies + variant.supplies, "兵員容量加算": ship.troops + variant.troops },
       note: "通常船より容量が多い船です。同じ船種の固有効果の上限は、通常船と共有します。売却や喪失後も、取得した来歴は図鑑に残ります。" };
   });
-  const ships = Object.entries(SHIP_TYPES).map(([id, ship]) => {
+  const ships = Object.entries(SHIP_TYPES).filter(([id]) => id !== "viking_ship" || state.pirateKingStory?.completed === true).map(([id, ship]) => {
     const [category, description, hint] = SHIP_GUIDES[id];
     const variants = (state.fleet?.variants || []).filter(record => VARIANT_SHIPS[record.variantId]?.base === id).length;
     return { id, tab: "ships", name: ship.name, category, categories: id === "carrack" ? ["cargo", "troops"] : [category], tag: CODEX_LABELS[category], known: true, description, hint,

@@ -64,7 +64,25 @@ async function main() {
     assert.equal(Object.keys(entry.terrain).length, 6);
   }
   const ships = assetCatalog("ships", state);
-  assert.equal(ships.length, Object.keys(SHIP_TYPES).length + 1);
+  assert.equal(ships.length, Object.keys(SHIP_TYPES).length, "海賊王討伐前は報酬船を除き、聖船を加える");
+  assert.ok(!ships.some(entry => entry.id === "viking_ship"));
+  assert.equal(filterAssetCatalog(ships, SHIP_TYPES.viking_ship.name, "all").length, 0, "討伐前は船名で検索しても公開しない");
+  assert.ok(!assetCatalog("ships", { ...state, fleet: { counts: { viking_ship: 1 } } }).some(entry => entry.id === "viking_ship"), "手動で所持しても討伐完了までは公開しない");
+  const completed = { ...state, pirateKingStory: { completed: true }, fleet: { counts: { viking_ship: 1 }, variants: [] } };
+  const revealed = assetCatalog("ships", completed);
+  assert.equal(revealed.length, Object.keys(SHIP_TYPES).length + 1);
+  const rewardShip = revealed.find(entry => entry.id === "viking_ship");
+  assert.equal(rewardShip.name, SHIP_TYPES.viking_ship.name);
+  assert.equal(rewardShip.known, true);
+  assert.equal(rewardShip.metrics["物資容量加算"], 100);
+  assert.equal(rewardShip.metrics["兵員容量加算"], 50);
+  assert.ok(rewardShip.metrics["固有効果"].includes("HP＋20%"));
+  completed.assetCodex = collectAssetCodex(completed);
+  completed.fleet.counts.viking_ship = 0;
+  const soldReward = assetCatalog("ships", completed).find(entry => entry.id === "viking_ship");
+  assert.equal(soldReward.current, 0);
+  assert.equal(soldReward.recorded, true, "討伐後は売却しても公開・取得記録を維持する");
+  assert.ok(!assetCatalog("ships", {}).some(entry => entry.id === "viking_ship"), "新しい旅では再び非公開");
   assert.equal(ships.find(entry => entry.id === "caravel").current, 1);
   assert.equal(ships.find(entry => entry.id === "sacred").metrics["物資基本容量"], cache.get("supplies.js").namespace.BASE_SUPPLY_CAP);
   const equipment = assetCatalog("equipment", state);
@@ -104,7 +122,7 @@ async function main() {
   assert.equal(again.variants[0].sourceName, "取得時の船長");
   again.variants[0].sourceName = "候補の変更";
   assert.equal(state.assetCodex.variants[0].sourceName, "取得時の船長", "候補と確定した記録を共有しない");
-  console.log("兵・船・艤装の図鑑: 網羅・非公開情報・取得記録・検索の検証成功");
+  console.log("兵・船・艤装の図鑑: 網羅・海賊王討伐前の秘匿と討伐後の公開・取得記録・検索の検証成功");
 }
 
 /** @param {Error} error 検証失敗。 @returns {void} 失敗を報告する。 */
