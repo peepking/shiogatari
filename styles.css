@@ -888,6 +888,7 @@ option {
 .guide-question summary:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; border-radius: 10px; }
 
 /* 図鑑は広い画面で一覧と詳細を並べ、狭い画面では往復して閲覧する。 */
+.btn[data-asset-codex][data-codex-id] { margin-top: 4px; margin-bottom: 4px; }
 #assetCodexModal { z-index: 60; }
 .modal.asset-codex-modal { width: min(1120px, 96vw); height: min(850px, 92dvh); max-height: 92dvh; background: #111a2d; }
 .asset-codex-controls { flex-shrink: 0; padding: 12px var(--card-pad) 0; }
