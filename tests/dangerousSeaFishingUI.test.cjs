@@ -37,7 +37,7 @@ const context = vm.createContext({
   document: { getElementById: () => ({ value: "insect" }), dispatchEvent() {} }, CustomEvent: class {}, panelSync: () => calls.push("sync"),
   currentEnv: () => ({ sea: true, regionId: "sw", season: 0, depth: "sea", dangerousSea: dangerous ? { regionId: "sw", level: "core" } : null }),
   absDay: value => value.year * 120 + value.season * 30 + value.day,
-  dangerousSeaActionBlocked: () => blocked || !!(state.dangerousSeas.action || state.dangerousSeas.pendingHazard),
+  dangerousSeaActionBlocked: () => blocked || !!(state.dangerousSeas.action || (state.dangerousSeas.pendingHazard && state.dangerousSeas.pendingHazard.stage !== "watch")),
   beginDangerousSeaAction: kind => {
     assert.equal(kind, "fishing");
     assert.ok(!state.expansion.fishing.pending?.dayApplied, "日数適用前に行動開始を記録する");
@@ -171,7 +171,7 @@ assert.equal(state.expansion.fishing.pending.dayApplied, false, "日付が進ま
 assert.equal(state.dangerousSeas.action, null);
 
 context.advanceDayWithEvents = days => { state.day += days; };
-context.document = { getElementById: () => ({ value: "insect" }) };
+context.document = { getElementById: () => ({ value: "insect" }), dispatchEvent() {} };
 saved = false;
 const beforeFailedDay = JSON.stringify(state);
 assert.equal(vm.runInContext("resumeFishing()", context), false);
@@ -186,4 +186,33 @@ saved = true;
 vm.runInContext("beginFishing()", context);
 assert.equal(state.expansion.fishing.pending.dayApplied, true, "再開操作で一日分の保存を再試行できる");
 assert.equal(state.day, 4);
+
+// 続行済みの翌日襲撃予告は釣りの開始記録を妨げず、その一日の終了後まで襲撃を保留する。
+state.dangerousSeas = { action: null, pendingHazard: { id: 77, kind: "raid", stage: "watch", warningAccepted: true, arrivalDay: 120005 } };
+state.expansion.fishing.pending = null;
+context.elements.fishingModal.hidden = false;
+context.advanceDayWithEvents = days => {
+  assert.equal(state.dangerousSeas.action.kind, "fishing");
+  state.day += days;
+  state.dangerousSeas.pendingHazard.stage = "action_running";
+};
+const beginsBeforeWatch = begins, baitBeforeWatch = state.expansion.fishing.bait.insect;
+vm.runInContext("beginFishing()", context);
+assert.equal(state.day, 5, "明日襲撃の予告中も、開始確認後に釣りの一日を進める");
+assert.equal(state.expansion.fishing.pending.dayApplied, true);
+assert.equal(state.expansion.fishing.pending.castsLeft, 5);
+assert.equal(state.expansion.fishing.bait.insect, baitBeforeWatch, "釣りの開始だけでは餌を消費しない");
+assert.equal(begins, beginsBeforeWatch + 1);
+assert.equal(state.dangerousSeas.pendingHazard.id, 77);
+assert.equal(state.dangerousSeas.pendingHazard.stage, "action_running");
+vm.runInContext("resumeFishing()", context);
+assert.equal(state.day, 5, "同じ釣りの再開で日数を重ねない");
+const drawsBeforeWatchCast = draws;
+vm.runInContext("doCast()", context);
+assert.equal(draws, drawsBeforeWatchCast + 1, "到来した襲撃を保留したまま糸を垂らせる");
+assert.equal(state.expansion.fishing.bait.insect, baitBeforeWatch - 1);
+assert.equal(state.expansion.fishing.pending.castsLeft, 4); assert.equal(state.day, 5);
+vm.runInContext("closeFishingPanel()", context);
+assert.equal(state.dangerousSeas.pendingHazard.stage, "ready");
+assert.equal(state.expansion.fishing.pending, null);
 console.log("dangerousSeaFishingUI: 釣り再開・海域分岐・危険排他・終了・保存失敗の検証成功");

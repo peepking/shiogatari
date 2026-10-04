@@ -162,7 +162,38 @@ async function main() {
   assert.equal(state.dangerousSeas.pendingHazard, null); assert.equal(state.expansion.fishing.counts.aji, 40);
   assert.equal(time.advanceDayWithEvents(1), 1); assert.equal(hazards.processDangerousSeaHazards(), false);
   assert.equal(state.dangerousSeas.pendingHazard, null, "退避後の保存復帰や翌日でも過ぎた波を再発させない");
-  console.log("危険海域の実モジュール接続: 独立配置・日次・移動・港退避・固定戦闘/荒波の保存復帰・進入案内・強敵分布: 成功");
+
+  // 翌日襲撃の予告中に釣り開始直後で止まった保存を、一日分だけ再開して固定敵へ接続する。
+  stateModule.resetState(); world.buildWorld(2025); math.random = () => .99;
+  cache.get("fleet.js").namespace.addShips(state, { galleon: 2 });
+  state.day = 2; state.position = { x: 0, y: 49 }; state.modeLabel = mode.NORMAL;
+  state.supplies = { food: 100 }; state.eventQueue = []; state.pendingEncounter = { active: false };
+  const fishingUI = cache.get("fishingUI.js").namespace, calendar = cache.get("calendar.js").namespace;
+  const beforeFishingDay = calendar.absDay(state);
+  for (const region of Object.values(state.dangerousSeas.regions)) region.weather = { day: beforeFishingDay + 30, safeRoll: .99, known: false, avoided: false };
+  const watchedEnemy = { formation: [{ type: "pirate_spear", level: 2, count: 10 }], total: 10 };
+  state.dangerousSeas.pendingHazard = { id: 77, kind: "raid", regionId: "sw", day: beforeFishingDay, arrivalDay: beforeFishingDay + 1,
+    sourceActionId: null, stage: "watch", warningAccepted: true, detected: true, evasionSuccess: false, encounter: watchedEnemy };
+  state.expansion.fishing.rodId = "rod_basic"; state.expansion.fishing.bait.insect = 5;
+  assert.ok(hazards.beginDangerousSeaAction("fishing"));
+  state.expansion.fishing.pending = { castsLeft: 5, dayApplied: false, lastDay: null, catch: null, lastResult: null };
+  assert.equal(storage.saveGameToStorage(), true); assert.equal(storage.loadGameFromStorage(), true);
+  assert.equal(state.dangerousSeas.pendingHazard.stage, "watch");
+  assert.equal(fishingUI.resumeFishing(), true, "旧版で開始記録だけ残った釣りを再開できる");
+  assert.equal(calendar.absDay(state), beforeFishingDay + 1);
+  assert.equal(state.expansion.fishing.pending.dayApplied, true); assert.equal(state.expansion.fishing.pending.castsLeft, 5);
+  assert.equal(state.expansion.fishing.bait.insect, 5); assert.equal(state.dangerousSeas.pendingHazard.stage, "action_running");
+  assert.equal(hazards.processDangerousSeaHazards(), false); assert.equal(state.pendingEncounter.active, false, "釣りの途中へ固定襲撃を割り込ませない");
+  assert.equal(storage.saveGameToStorage(), true); assert.equal(storage.loadGameFromStorage(), true);
+  assert.equal(fishingUI.resumeFishing(), true); assert.equal(calendar.absDay(state), beforeFishingDay + 1, "釣り中の再読込で日数を重ねない");
+  assert.equal(hazards.processDangerousSeaHazards(), false);
+  state.expansion.fishing.pending = null; hazards.finishDangerousSeaAction("fishing");
+  assert.equal(hazards.processDangerousSeaHazards(), true); assert.equal(state.modeLabel, mode.PREP);
+  assert.equal(state.pendingEncounter.dangerousHazardId, 77);
+  assert.deepEqual(plain(state.pendingEncounter.enemyFormation), watchedEnemy.formation, "予告で固定した敵を釣り終了後に引き継ぐ");
+  assert.equal(storage.loadGameFromStorage(), true); assert.equal(state.modeLabel, mode.PREP);
+  assert.equal(state.pendingEncounter.dangerousHazardId, 77); assert.equal(calendar.absDay(state), beforeFishingDay + 1);
+  console.log("危険海域の実モジュール接続: 独立配置・日次・移動・港退避・固定戦闘/荒波の保存復帰・襲撃予告中の釣り再開・進入案内・強敵分布: 成功");
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

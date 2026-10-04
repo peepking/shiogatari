@@ -92,12 +92,13 @@ function currentEnv() {
 
 /**
  * 同日の釣り行動を継続できる保留と、解決待ちで操作を止める保留を区別する。
+ * 続行済みの予定襲撃は日数適用前も許し、当日の実襲撃は釣りの終了まで保留する。
  * @returns {boolean} 釣り操作と釣果管理を危険が妨げるか。
  */
 function fishingDangerBlocked() {
   const current = state.dangerousSeas;
   const sameFishing = current?.action?.kind === "fishing" && state.expansion.fishing.pending;
-  if (sameFishing && (!current.pendingHazard || current.pendingHazard.stage === "action_running")) return false;
+  if (sameFishing && (!current.pendingHazard || ["watch", "action_running"].includes(current.pendingHazard.stage))) return false;
   return dangerousSeaActionBlocked();
 }
 
