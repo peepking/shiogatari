@@ -6,10 +6,12 @@ import { createStorySite, rollPirateStoryRumor } from "./pirateKingStory.js";
 import { enqueueEvent } from "../app/events.js";
 import { pushLog } from "../ui/dom.js";
 import { scheduleGameSave } from "../core/storage.js";
+import { dangerousSeaReservedPositions } from "../dangerousSeas/dangerousSeaReservations.js";
 
 /** 未公開海図や受注前の討伐地点も予約し、物語の配置と重ねない。 @param {object} game 状態。 @returns {Set} 予約座標。 */
 export function pirateStoryBlockedPositions(game) {
   const positions = [...(game.bounties?.active || []), ...(game.expansion?.exploration?.sites || [])].map(site => site.position);
+  positions.push(...dangerousSeaReservedPositions(game));
   for (const chart of game.expansion?.charts?.active || []) positions.push(chart.destination, chart.rumor);
   const quests = [...(game.quests?.active || []), ...Object.values(game.quests?.availableBySettlement || {}).flat(), ...Object.values(game.nobleQuests?.availableByNoble || {}).flat()];
   for (const quest of quests) positions.push(quest.target, ...(quest.fights || []).map(fight => fight.target));

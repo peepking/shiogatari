@@ -17,6 +17,7 @@ JavaScriptは `src/` の機能別フォルダへ配置する。各フォルダ�
 | 犯罪・勢力別手配・施設制限・清算・手配追跡・黒ひげの経済補正 | [勢力別賞金・無法港拡張](faction-bounty-expansion-design.md) |
 | 無法港の配置・海賊兵・禁制品・海賊依頼・検問の基本処理 | [無法港・海賊勢力](pirate-havens-design.md) |
 | 自然探索・海図・艤装 | [探索・海図・艤装](expansion-design.md) |
+| 南西・南東の危険海域、釣り優遇・警戒・天候周期・斥候・追加探索・限定イベント・賞金首（実装・自動検証済み） | [危険海域](dangerous-seas-design.md) |
 | 通常船種・船種効果・造船所・船取引 | [船種・造船所](shipyard-design.md) |
 | 物資価格・交易UI | [物資相場・交易](trade-design.md) |
 | 国力・季節回復・戦争による消耗 | [国力](national-power-design.md) |
@@ -38,6 +39,7 @@ JavaScriptは `src/` の機能別フォルダへ配置する。各フォルダ�
 ## 開発時の確認
 
 - `npm test`：既存の自動テストを順番に実行する。
+- `npm run test:dangerous-seas`：危険海域の区域・釣り・天候・斥候・日次危険・探索・限定イベント・賞金首・配置予約を確認する。`npm test`にも含まれる。
 - `npx eslint .`：JavaScriptの静的検査を行う。
 - `npm run simulate:battles`：可変盤面・艤装・船種効果・大会戦の援軍を組み合わせた戦闘検証。`-- --details` で条件別の結果を確認する。
 

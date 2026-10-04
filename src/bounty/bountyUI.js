@@ -17,6 +17,7 @@ import { totalWanted, WANTED_FACTIONS, expireWanted } from "../wanted/playerWant
 import { absDay } from "../quests/questUtils.js";
 import { BOUNTY_CONFIG } from "./bountyConfig.js";
 import { wantedSettlement } from "../wanted/wantedUI.js";
+import { renderDangerousBountyList } from "../dangerousSeas/dangerousBountyUI.js";
 
 
 /** @param {object} site 個体。 @returns {string} 討伐不可理由。 */
@@ -83,7 +84,9 @@ function openBounties(sync, site = null) {
   }; });
   body.querySelectorAll("[data-bounty-fight]").forEach(button => { button.onclick = () => {
     const target = bountyAt(state.position);
-    if (target?.id !== Number(button.dataset.bountyFight) || bountyRestriction(target) || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active) return;
+    if (target?.id !== Number(button.dataset.bountyFight) || bountyRestriction(target) || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active
+      || state.eventQueue?.length || state.expansion?.fishing?.pending || state.expansion?.exploration?.pending || state.expansion?.charts?.pending
+      || (state.dangerousSeas?.pendingHazard && state.dangerousSeas.pendingHazard.stage !== "watch") || state.dangerousSeas?.action || state.dangerousSeas?.explorationPending || state.dangerousSeas?.events?.pending) return;
     if (!saveGameToStorage()) { pushToast("保存できません", "保存容量を確認してから再度お試しください。", "warn"); return; }
     close();
     state.pendingEncounter = { active: true, bountyId: target.id, enemyName: bountyName(target), enemyFormation: structuredClone(target.formation), enemyTotal: target.total, enemyFactionId: target.factionId, strength: "elite", terrain: getTerrainAt(target.position.x, target.position.y), eventTag: "world_bounty" };
@@ -94,6 +97,7 @@ function openBounties(sync, site = null) {
     }
     document.dispatchEvent(new CustomEvent("auto-move-stop")); sync();
   }; });
+  if (!site) renderDangerousBountyList(body, sync);
   modal.hidden = false; document.getElementById("bountyCloseBtn").focus();
 }
 
@@ -101,7 +105,9 @@ function openBounties(sync, site = null) {
 export function renderBountyControls(sync) {
   const list = document.getElementById("bountyOpenBtn"), visit = document.getElementById("bountyVisitBtn");
   if (!list || !visit) return;
-  const locked = state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE;
+  const locked = state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE || state.eventQueue?.length
+    || state.expansion?.fishing?.pending || state.expansion?.exploration?.pending || state.expansion?.charts?.pending
+    || (state.dangerousSeas?.pendingHazard && state.dangerousSeas.pendingHazard.stage !== "watch") || state.dangerousSeas?.action || state.dangerousSeas?.explorationPending || state.dangerousSeas?.events?.pending;
   list.hidden = locked || !wantedSettlement();
   list.textContent = "賞金首";
   list.onclick = () => openBounties(sync);

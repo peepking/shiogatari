@@ -166,6 +166,7 @@ async function verifyWorldSnapshots() {
     "quests.js":{QUEST_TYPES:{}},"questUtils.js":{absDay:noop},
     "bounty.js":{bountyName:noop},"bountyMapArt.js":{drawBountySite:noop},
     "pirateKingConfig.js":{pirateStoryTarget:noop},"pirateKingMapArt.js":{drawPirateStorySite:noop},
+    "dangerousSeaEventWorld.js":{visibleDangerousSeaEvents:()=>[]},
     "util.js":{displaySupportLabel:noop,displayWarLabel:noop,supportLabel:noop},
     "lore.js":{FACTIONS:[{id:"north",nobles:[{id:"north_noble"}]},{id:"pirates",nobles:[{id:"pirate_blackbeard"}]}]},
     "supplies.js":{

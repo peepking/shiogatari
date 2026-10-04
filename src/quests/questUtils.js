@@ -1,12 +1,16 @@
 import { mapData } from "../world/map.js";
 import { SUPPLY_ITEMS, SUPPLY_TYPES } from "../resources/supplies.js";
 import { state } from "../core/state.js";
+import { dangerousSeaReservedPositions } from "../dangerousSeas/dangerousSeaReservations.js";
+import { getDangerousSeaPositions } from "../dangerousSeas/dangerousSeaWorld.js";
 
-/** @returns {Set<string>} 自然探索と未公開の海図を含む予約座標。 */
+/** @returns {Set<string>} 自然探索・未公開海図の予約と、通常依頼から除く危険海域の座標。 */
 function explorationPositions() {
   const positions = (state.expansion?.exploration.sites || []).map(s => s.position);
   for (const chart of state.expansion?.charts.active || []) positions.push(chart.destination, chart.rumor);
   positions.push(state.pirateKingStory?.active?.position);
+  positions.push(...dangerousSeaReservedPositions(state));
+  positions.push(...getDangerousSeaPositions("sw"), ...getDangerousSeaPositions("se"));
   return new Set(positions.filter(Boolean).map(p => `${p.x},${p.y}`));
 }
 

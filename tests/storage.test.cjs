@@ -76,7 +76,9 @@ async function main() {
   /** @returns {void} 今回使わない勢力操作を置き換える。 */
   function unusedAction() {}
   modules["./actions.js"] = mockModule({ handleTravelEventAction: unusedAction, isBattleEventActionBlocked: () => false });
-  modules["./dom.js"] = mockModule({ elements: {} });
+  modules["./dom.js"] = mockModule({ elements: {}, pushLog: unusedAction });
+  modules["./dangerousSeaHazards.js"] = mockModule({ handleDangerousRaidAction: () => false });
+  modules["./dangerousSeaEventUI.js"] = mockModule({ handleDangerousSeaEventAction: () => false });
   modules["./faction.js"] = mockModule({
     addHonorFaction: unusedAction, addWarScore: unusedAction, adjustNobleFavor: unusedAction,
     adjustSupport: unusedAction, getPlayerFactionId: unusedAction,

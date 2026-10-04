@@ -672,6 +672,7 @@ const restartContext = vm.createContext({
   state: restartState, MODE_LABEL: { NORMAL: "normal" }, FISHING_CONFIG: { castsPerSession: 5 },
   elements: { fishingModal: { hidden: false } }, structuredClone,
   currentEnv: () => ({ sea: true }), refreshFishingDay() {},
+  dangerousSeaActionBlocked: () => false, beginDangerousSeaAction: () => "fishing-test",
   absDay: s => s.year * 120 + s.season * 30 + s.day,
   confirmAction: options => options.onConfirm(), saveGameToStorage: () => true,
   snapshotWorld: () => ({}), restoreWorld() {}, pushToast() {},
@@ -683,7 +684,7 @@ const restartContext = vm.createContext({
   },
   openFishingPanel: () => assert.fail("表示済み画面の再開は直接再描画する"),
 });
-for (const name of ["beginFishing", "resumeFishing"]) {
+for (const name of ["fishingDangerBlocked", "canContinueFishing", "beginFishing", "resumeFishing"]) {
   const body = uiSource.match(new RegExp(`function ${name}\\([^\\n]*\\) \\{[\\s\\S]*?\\n\\}`))?.[0];
   assert.ok(body);
   vm.runInContext(body, restartContext);
@@ -694,6 +695,33 @@ for (let session = 0; session < 2; session++) {
 }
 assert.equal(redraws, 2);
 assert.equal(restartState.day, 3);
+
+// 釣果の保存失敗では図鑑・報酬・航海統計を戻し、再試行時に一度だけ成立させる。
+const failedCatchState = makeState();
+failedCatchState.voyageStats = { fishCaught: 4, largestFish: { id: "aji", size: 1, day: 120001 } };
+failedCatchState.expansion.fishing.codex = Object.fromEntries(config.namespace.FISH_SPECIES
+  .filter(species => species.id !== "dangouo").map(species => [species.id, { count: 1 }]));
+failedCatchState.expansion.fishing.pending = { castsLeft: 0, catch: { speciesId: "dangouo", windowSeconds: 2 }, lastResult: null };
+const beforeFailedCatch = structuredClone(failedCatchState);
+let catchSaveSucceeds = false;
+const failedCatchContext = vm.createContext({
+  state: failedCatchState, structuredClone, resultScreen: null, panelSync: null,
+  clearSessionTimer() {}, pushToast() {}, renderFishingPanel() {},
+  speciesById: fishing.speciesById, rollSize: () => 10,
+  catchRecordFacts: fishing.catchRecordFacts, recordCatch: fishing.recordCatch,
+  saveGameToStorage: () => catchSaveSucceeds,
+});
+const resolveCatchBody = uiSource.match(/function resolveBite\([^\n]*\) \{[\s\S]*?\n\}/)?.[0];
+assert.ok(resolveCatchBody);
+vm.runInContext(resolveCatchBody, failedCatchContext);
+vm.runInContext("resolveBite(true)", failedCatchContext);
+assert.deepEqual(failedCatchState, beforeFailedCatch);
+catchSaveSucceeds = true;
+vm.runInContext("resolveBite(true)", failedCatchContext);
+assert.equal(failedCatchState.voyageStats.fishCaught, 5);
+assert.equal(failedCatchState.voyageStats.largestFish.id, "dangouo");
+assert.equal(failedCatchState.expansion.fishing.rewards.unlocked[3], true);
+assert.equal(failedCatchState.expansion.fishing.codex.dangouo.count, 1);
 
 console.log("釣り: 餌・竿・釣果・画面を閉じない連続セッション開始: 全項目成功");
 }

@@ -103,14 +103,14 @@ export function tickNationalPower(state, settlements, atWar) {
 export function snapshotBattlePower(state, encounter, atWar) {
   const ally = state.playerFactionId; const enemy = encounter.enemyFactionId;
   const regular = !encounter.eventTag || encounter.eventTag === "checkpoint_force";
-  const eligible = regular && encounter.questId == null && !encounter.questType && encounter.explorationId == null && isNationalPowerFaction(ally) && isNationalPowerFaction(enemy) && ally !== enemy && atWar(ally, enemy);
+  const eligible = regular && !encounter.dangerousRegionId && encounter.questId == null && !encounter.questType && encounter.explorationId == null && isNationalPowerFaction(ally) && isNationalPowerFaction(enemy) && ally !== enemy && atWar(ally, enemy);
   return { ally, enemy, eligible };
 }
 
 /** @param {object} state 状態。 @param {object} encounter 遭遇。 @param {boolean} won 勝利。 @returns {Array} 固定済み条件に基づく一度だけの国力報酬。 */
 export function completeBattlePower(state, encounter, won) {
   const context = encounter.powerContext;
-  if (!won || !context?.eligible || encounter.powerAwarded || encounter.questId != null || encounter.questType || encounter.explorationId != null) return [];
+  if (!won || !context?.eligible || encounter.powerAwarded || encounter.dangerousRegionId || encounter.questId != null || encounter.questType || encounter.explorationId != null) return [];
   encounter.powerAwarded = true;
   return applyNationalPowerPlan(state, [{ factionId: context.ally, delta: CONFIG.regularVictoryGain }, { factionId: context.enemy, delta: -CONFIG.regularVictoryLoss }]);
 }

@@ -36,6 +36,13 @@ import { wireAssetCodex, refreshAssetCodex } from "../codex/assetCodexUI.js";
 import { updateExplorationWorld, renderExplorationControl, resumeExploration, finishExploration } from "../exploration/explorationUI.js";
 import { updateBountyWorld, finishBounty } from "../bounty/bountyWorld.js";
 import { renderBountyControls, bountyRestriction } from "../bounty/bountyUI.js";
+import { updateDangerousBountyWorld, finishDangerousBounty } from "../dangerousSeas/dangerousBountyWorld.js";
+import { renderDangerousBountyControls, dangerousBountyRestriction } from "../dangerousSeas/dangerousBountyUI.js";
+import { updateDangerousExplorationWorld } from "../dangerousSeas/dangerousSeaLifecycle.js";
+import { dangerousSeaActionBlocked, processDangerousSeaIntroduction, processDangerousSeaHazards, finishDangerousSeaEncounter, recognizeDangerousWeather } from "../dangerousSeas/dangerousSeaHazards.js";
+import { renderDangerousSeaStatus } from "../dangerousSeas/dangerousSeaUI.js";
+import { updateDangerousSeaEvents } from "../dangerousSeas/dangerousSeaEventWorld.js";
+import { renderDangerousSeaEventControl, resumeDangerousSeaEvent, processDangerousSeaEvent, finishDangerousSeaEventEncounter } from "../dangerousSeas/dangerousSeaEventUI.js";
 import { renderPirateStoryControls } from "../pirates/pirateKingUI.js";
 import { updatePirateKingWorld } from "../pirates/pirateKingWorld.js";
 import { currentPirateStoryEncounter, finishPirateStoryBattle, pirateStoryEncounter, abandonPirateStory } from "../pirates/pirateKingStory.js";
@@ -549,6 +556,7 @@ function escapeSuccessRate() {
  * @returns {void}
  */
 function clearBattlePrep(resetMode = true) {
+  if (state.pendingEncounter?.dangerousHazardId != null) finishDangerousSeaEncounter(state.pendingEncounter);
   state.pendingEncounter = {
     active: false,
     enemyFormation: [],
@@ -634,7 +642,8 @@ function startAutoMove(target) {
 function escapeBattleSuccess(reason) {
   if (state.pendingEncounter?.storyId) abandonPirateStory(state.pirateKingStory);
   finishPursuit(state, state.pendingEncounter, absDay(state));
-  if (state.pendingEncounter?.explorationId != null) finishExploration(false);
+  if (state.pendingEncounter?.explorationId != null || state.pendingEncounter?.dangerousExplorationId != null) finishExploration(false);
+  if (state.pendingEncounter?.dangerousEventId != null) finishDangerousSeaEventEncounter(state.pendingEncounter, false);
   const text = reason || "敵との接触を回避しました。";
   clearBattlePrep();
   setOutput("戦闘回避", text, [
@@ -706,6 +715,7 @@ function processBattleOutcome(resultCode, meta) {
   if (meta) meta.outcomeApplied = true;
   finishPursuit(state, pending, absDay(state));
   if (pending.bountyId != null && !state.bounties?.active.some(s => s.id === pending.bountyId)) { clearBattlePrep(true); syncUI(); return; }
+  if (pending.dangerousBountyId != null && !state.dangerousSeas?.bounties.active.some(s => s.id === pending.dangerousBountyId)) { clearBattlePrep(true); syncUI(); return; }
   if (pending.storyId && !currentPirateStoryEncounter(state, pending)) { clearBattlePrep(true); syncUI(); return; }
   const enemyTotal = Array.isArray(meta?.units)
     ? meta.units.filter(u => u.side === "enemy" && wasBattleDeployed(u)).reduce((sum, u) => sum + u.count, 0)
@@ -992,7 +1002,7 @@ function processBattleOutcome(resultCode, meta) {
       }
     }
     // 依頼以外の海賊遭遇に勝利したら、近傍拠点の貴族好感度をわずかに上げる
-    if (!pending.storyId && !pending.theftKind && pending.bountyId == null && !questId && enemyFactionId === "pirates" && isWin) {
+    if (!pending.dangerousRegionId && !pending.storyId && !pending.theftKind && pending.bountyId == null && !questId && enemyFactionId === "pirates" && isWin) {
       const nearest = settlements
         .filter(s => !s.pirateHaven)
         .map((s) => ({ s, d: manhattan(s.coords, state.position) }))
@@ -1007,18 +1017,21 @@ function processBattleOutcome(resultCode, meta) {
     }
     // 戦況スコア反映（敵勢力ID必須化）
     let delta = isWin ? 8 : resultCode === BATTLE_RESULT.LOSE ? -6 : 0;
-    if (!pending.storyId && !pending.theftKind && pending.bountyId == null && !questId && !questType && enemyFactionId !== "pirates") {
+    if (!pending.dangerousRegionId && !pending.storyId && !pending.theftKind && pending.bountyId == null && !questId && !questType && enemyFactionId !== "pirates") {
       delta = isWin ? 3 : resultCode === BATTLE_RESULT.LOSE ? -2 : 0;
       if (delta > 0) summary.push("戦況がわずかに有利に傾いた");
       if (delta < 0) summary.push("戦況がわずかに不利に傾いた");
     }
-    if (!pending.storyId && !pending.theftKind && pending.bountyId == null && delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
+    if (!pending.dangerousRegionId && !pending.storyId && !pending.theftKind && pending.bountyId == null && delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
 
-    if (pending.explorationId != null) {
+    if (pending.explorationId != null || pending.dangerousExplorationId != null) {
       const resources = finishExploration(isWin);
       summary.push(resources.length ? { label: "探索報酬", text: `探索報酬: ${resources.map(r => `${r.label} ${r.value}`).join(" / ")}`, resources } : "探索失敗: 探索地点は消滅しました。");
     }
     if (pending.bountyId != null && isWin) summary.push(...finishBounty(pending.bountyId));
+    if (pending.dangerousBountyId != null) summary.push(...finishDangerousBounty(pending.dangerousBountyId, isWin));
+    if (pending.dangerousHazardId != null) finishDangerousSeaEncounter(pending);
+    if (pending.dangerousEventId != null) summary.push(...finishDangerousSeaEventEncounter(pending, isWin));
     if (pending.storyId) {
       const story = finishPirateStoryBattle(state, pending, resultCode, absDay(state));
       storyContinuation = story?.continuation === true;
@@ -1035,7 +1048,7 @@ function processBattleOutcome(resultCode, meta) {
       const resources = finishTheftBattle(state, pending, isWin);
       summary.push(resources.length ? { label: "犯罪戦闘の戦利品", text: resources.map(r => `${r.label}＋${r.value}`).join(" / "), resources } : "犯罪戦闘からの追加報酬はありません。");
     }
-    const powerResources = pending.storyId || pending.theftKind || pending.bountyId != null ? [] : nationalPowerResources(completeBattlePower(state, pending, isWin));
+    const powerResources = pending.dangerousRegionId || pending.storyId || pending.theftKind || pending.bountyId != null ? [] : nationalPowerResources(completeBattlePower(state, pending, isWin));
     if (powerResources.length) summary.push({ label: "国力への貢献", text: powerResources.map(r => `${r.label} ${r.value}`).join(" / "), resources: powerResources });
     renderBattleSummary(summary, resultLabel, pending, enemyTotal, isWin);
   } finally {
@@ -1063,6 +1076,11 @@ function startPrepBattle() {
     if (reason) { pushToast("討伐不可", reason, "warn"); clearBattlePrep(); syncUI(); return; }
   }
   if (!state.pendingEncounter.storyId) state.pendingEncounter.powerContext ||= snapshotBattlePower(state, state.pendingEncounter, nationalPowerAtWar);
+  if (state.pendingEncounter.dangerousBountyId != null) {
+    const site = state.dangerousSeas?.bounties.active.find(s => s.id === state.pendingEncounter.dangerousBountyId);
+    const reason = dangerousBountyRestriction(site);
+    if (reason) { pushToast("討伐不可", reason, "warn"); clearBattlePrep(); syncUI(); return; }
+  }
   setEnemyFormation(state.pendingEncounter.enemyFormation || []);
   const enemyFactionId = state.pendingEncounter?.enemyFactionId || "pirates";
   setBattleEnemyFaction(enemyFactionId);
@@ -1086,7 +1104,9 @@ function startPrepBattle() {
  */
 function startOracleBattle() {
   if (totalTroops() <= 0) return;
-  if (state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE) return;
+  if (state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE || dangerousSeaActionBlocked()
+    || state.expansion?.fishing?.pending || state.expansion?.exploration?.pending || state.expansion?.charts?.pending
+    || state.dangerousSeas?.explorationPending || state.eventQueue?.length) return;
   const meta = getBattleQuestAt(state.position);
   if (!meta) return;
   const quest = meta.quest;
@@ -1174,7 +1194,7 @@ function updateModeControls(loc) {
   const inBattle = state.modeLabel === MODE_LABEL.BATTLE;
   const inAudience = isAudienceMode();
   const battleVisible = Boolean(elements.battleBlock && elements.battleBlock.hidden === false);
-  const lockActions = prep || inBattle || battleVisible;
+  const lockActions = prep || inBattle || battleVisible || dangerousSeaActionBlocked();
   const prepActive = prep && !!state.pendingEncounter?.active;
   const battleQuestMeta = getBattleQuestAt(state.position);
   const visible = state.modeLabel === MODE_LABEL.IN_TOWN || state.modeLabel === MODE_LABEL.IN_VILLAGE;
@@ -1366,7 +1386,7 @@ function updateModeControls(loc) {
       const strong = state.pendingEncounter.strength === "elite";
       const enemyFactionId = state.pendingEncounter?.enemyFactionId || "pirates";
       elements.battlePrepInfo.hidden = false;
-      elements.battlePrepInfo.textContent = state.pendingEncounter.storyId ? `${state.pendingEncounter.enemyName} / ${total}人${state.pendingEncounter.battleKind === "grand" ? "（前衛200人＋予備隊100人）" : ""}` : state.pendingEncounter.bountyId != null ? `${state.pendingEncounter.enemyName} / ${total}人（強編成）` : `敵推定: ${total}人${
+      elements.battlePrepInfo.textContent = state.pendingEncounter.storyId ? `${state.pendingEncounter.enemyName} / ${total}人${state.pendingEncounter.battleKind === "grand" ? "（前衛200人＋予備隊100人）" : ""}` : state.pendingEncounter.bountyId != null || state.pendingEncounter.dangerousBountyId != null ? `${state.pendingEncounter.enemyName} / ${total}人（強編成）` : `敵推定: ${total}人${
         strong ? (enemyFactionId !== "pirates" ? "（正規軍）" : "（強編成）") : ""
       }`;
     }
@@ -1409,10 +1429,17 @@ function syncUI() {
   }
   renderFaithDetails();
   updateExplorationWorld();
+  updateDangerousExplorationWorld();
   updateBountyWorld();
+  updateDangerousBountyWorld();
   updatePirateKingWorld();
   syncChartReservations();
-  if (!state.expansion.exploration.pending && !state.expansion.charts.pending && !state.pendingEncounter?.active && !state.eventQueue?.length && (!elements.battleBlock || elements.battleBlock.hidden) && (!elements.battleResultModal || elements.battleResultModal.hidden)) processScheduledOmens(absDay(state));
+  recognizeDangerousWeather();
+  updateDangerousSeaEvents();
+  processDangerousSeaHazards();
+  processDangerousSeaEvent();
+  processDangerousSeaIntroduction();
+  if (!state.expansion.fishing?.pending && !state.dangerousSeas?.explorationPending && !state.expansion.exploration.pending && !state.expansion.charts.pending && !state.pendingEncounter?.active && !state.eventQueue?.length && (!elements.battleBlock || elements.battleBlock.hidden) && (!elements.battleResultModal || elements.battleResultModal.hidden)) processScheduledOmens(absDay(state));
   const {
     shipsEl,
     troopsEl,
@@ -1438,6 +1465,7 @@ function syncUI() {
   if (fameEl) fameEl.textContent = String(state.fame);
   renderLocationHeader(getCurrentSettlement(), state.modeLabel, getTerrainAt(state.position.x, state.position.y),
     isAudienceMode() ? getNobleById(getAudienceContext().nobleId) : null);
+  renderDangerousSeaStatus(syncUI);
   renderGameTime(gameTimeEl, state);
   refreshAssetCodex();
 
@@ -1453,8 +1481,10 @@ function syncUI() {
   renderTroopModal(elements.troopsDetail);
   updateModeControls(loc);
   renderNationalPowerControls(getAudienceContext);
-renderExplorationControl(syncUI);
+  renderExplorationControl(syncUI);
+  renderDangerousSeaEventControl(syncUI);
   renderBountyControls(syncUI);
+  renderDangerousBountyControls(syncUI);
   renderPirateStoryControls(syncUI);
   renderOfficeControls(syncUI);
   renderChartControl(syncUI);
@@ -1981,7 +2011,8 @@ export function initUI() {
   wireSupplyDiscard(elements.suppliesDetail, syncUI);
   wireMapHover();
   updateExplorationWorld();
-if (state.expansion.exploration.pending) resumeExploration(syncUI);
+  if (state.expansion.exploration.pending || state.dangerousSeas?.explorationPending) resumeExploration(syncUI);
+  if (state.dangerousSeas?.events?.pending) resumeDangerousSeaEvent(syncUI);
   if (state.expansion.charts.pending) resumeChartExploration(syncUI);
   if (state.expansion.fishing?.pending) resumeFishing();
   initEventQueueUI();

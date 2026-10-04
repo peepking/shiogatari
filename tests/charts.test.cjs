@@ -16,7 +16,7 @@ async function main() {
     }, { context });
   }
   const modules = new Map([
-    ["./state.js", mock({ state })], ["./map.js", mock({ mapData })],
+    ["./state.js", mock({ state })], ["./map.js", mock({ mapData, settlements: [] })],
     ["./events.js", mock({ enqueueEvent: e => events.push(e) })],
     ["./dom.js", mock({ pushLog: () => {}, pushToast: () => {} })],
   ]);

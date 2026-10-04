@@ -12,6 +12,7 @@ import { snapshotWorld, restoreWorld, focusMapPosition } from "../world/map.js";
 import { saveGameToStorage } from "../core/storage.js";
 import { escapeHtml } from "../core/util.js";
 import { resourceList, resourceIcon } from "../ui/resourceUI.js";
+import { beginDangerousSeaAction, finishDangerousSeaAction, dangerousSeaActionBlocked } from "../dangerousSeas/dangerousSeaHazards.js";
 
 /** @param {object} chart 海図。 @returns {string} 獲得前は数量を明かさず、報酬の種類だけを示す。 */
 function expectedReward(chart) {
@@ -111,6 +112,7 @@ export function resumeChartExploration(syncUI) {
     pushLog("海図の発見", `${chartLabel(chart)} / ${resources.map(r => `${r.label}${r.value}`).join(" / ")}`, "-");
   }
   data.pending = null;
+  finishDangerousSeaAction("chart");
   state.modeLabel = MODE_LABEL.NORMAL;
   saveGameToStorage();
   syncUI();
@@ -123,16 +125,18 @@ export function resumeChartExploration(syncUI) {
 function beginChartExploration(syncUI) {
   if (state.expansion.charts.pending) { resumeChartExploration(syncUI); return; }
   const site = visibleChartSites(state.expansion.charts).find(s => s.position.x === state.position.x && s.position.y === state.position.y);
-  if (!site || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active || state.expansion.exploration.pending) return;
+  if (!site || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active || state.expansion.exploration.pending || dangerousSeaActionBlocked()) return;
   const chart = state.expansion.charts.active.find(c => c.id === site.chartId);
   confirmAction({ title: site.kind === "rumor" ? "噂の断片を回収" : `${chartLabel(chart)}を探索`,
     body: "1日使って探索します。探索自体に戦闘はありません。日々の食料消費や維持費は通常どおり発生します。", confirmText: "1日使って探索",
     onConfirm: () => {
-      if (state.modeLabel !== MODE_LABEL.NORMAL || state.expansion.charts.pending || state.expansion.exploration.pending || state.pendingEncounter?.active || state.position.x !== site.position.x || state.position.y !== site.position.y) return;
+      if (state.modeLabel !== MODE_LABEL.NORMAL || state.expansion.charts.pending || state.expansion.exploration.pending || state.pendingEncounter?.active || dangerousSeaActionBlocked() || state.position.x !== site.position.x || state.position.y !== site.position.y) return;
+      const before = structuredClone(state);
       const kind = site.kind === "rumor" ? "rumor" : "destination";
       const reward = kind === "destination" ? rollChartReward(chart, SUPPLY_ITEMS.filter(i => i.type === SUPPLY_TYPES.processed).map(i => i.id)) : null;
       state.expansion.charts.pending = { chartId: chart.id, kind, dayApplied: false, reward };
-      if (!saveGameToStorage()) { state.expansion.charts.pending = null; pushToast("保存できません", "探索は開始していません。", "warn"); return; }
+      if (!beginDangerousSeaAction("chart")) { Object.assign(state, before); return; }
+      if (!saveGameToStorage()) { Object.assign(state, before); pushToast("保存できません", "探索は開始していません。", "warn"); return; }
       document.dispatchEvent(new CustomEvent("auto-move-stop"));
       resumeChartExploration(syncUI);
     } });
@@ -144,7 +148,7 @@ export function renderChartControl(syncUI) {
   if (!button) return;
   const pending = state.expansion.charts.pending;
   const site = visibleChartSites(state.expansion.charts).find(s => s.position.x === state.position.x && s.position.y === state.position.y);
-  button.hidden = !(pending || (site && state.modeLabel === MODE_LABEL.NORMAL && !state.pendingEncounter?.active && !state.expansion.exploration.pending));
+  button.hidden = !(pending || (site && state.modeLabel === MODE_LABEL.NORMAL && !state.pendingEncounter?.active && !state.expansion.exploration.pending && !dangerousSeaActionBlocked()));
   button.textContent = pending ? "海図の探索を再開" : site?.kind === "rumor" ? "噂の断片を回収" : "海図の発見地点を探索";
   button.onclick = () => beginChartExploration(syncUI);
 }

@@ -15,6 +15,12 @@ import { FRONT_DURATION_DAYS } from "../core/constants.js";
 import { QUEST_TYPES } from "../quests/quests.js";
 import { absDay } from "../quests/questUtils.js";
 import { state } from "../core/state.js";
+import { dangerousSeaAt } from "../dangerousSeas/dangerousSeaWorld.js";
+import { dangerousSeaName } from "../dangerousSeas/dangerousSeaConfig.js";
+import { drawDangerousSeaTile } from "../dangerousSeas/dangerousSeaMapArt.js";
+import { visibleDangerousSeaEvents } from "../dangerousSeas/dangerousSeaEventWorld.js";
+import { DANGEROUS_SEA_EVENT_DEFS } from "../dangerousSeas/dangerousSeaEventConfig.js";
+import { drawDangerousSeaEvent } from "../dangerousSeas/dangerousSeaEventMapArt.js";
 import {
   randomSupplyIdByType,
   refreshSettlementDemand,
@@ -716,12 +722,15 @@ function formatCellInfo(gx, gy) {
   const cell = mapData[gy]?.[gx];
   if (!cell) return "";
   const t = terrainKinds.find((t) => t.key === cell.terrain);
-  const terr = t ? t.name : cell.terrain;
+  const sea = dangerousSeaAt({ x: gx, y: gy });
+  const terr = (t ? t.name : cell.terrain) + (sea ? ` / ${dangerousSeaName(sea.regionId)}・${sea.level === "core" ? "核心" : "外縁"}` : "");
+  const seaEvent = visibleDangerousSeaEvents().find(event => event.position.x === gx && event.position.y === gy);
+  if (seaEvent) return `(${gx + 1}, ${gy + 1}) ${terr} / ${DANGEROUS_SEA_EVENT_DEFS[seaEvent.kind].name} / 期限まであと${Math.max(0, seaEvent.expiresAbs - absDay(state))}日`;
   const story = state.pirateKingStory?.active;
   if (story?.position.x === gx && story.position.y === gy) return `(${gx + 1}, ${gy + 1}) ${terr} / ${pirateStoryTarget(story.id)?.name || "海賊五列強"} / 海賊王の海図 / 期限なし`;
-  const bounty = state.bounties?.active.find(s => s.position.x === gx && s.position.y === gy);
+  const bounty = [...(state.bounties?.active || []), ...(state.dangerousSeas?.bounties.active || [])].find(s => s.position.x === gx && s.position.y === gy);
   if (bounty) return `(${gx + 1}, ${gy + 1}) ${terr} / ${bountyName(bounty)}（${FACTIONS.find(f => f.id === bounty.factionId)?.name || bounty.factionId}） / ${bounty.total}人 / 賞金 ${bounty.reward}`;
-  const site = (state.expansion?.exploration.sites || []).find(s => s.position.x === gx && s.position.y === gy);
+  const site = [...(state.expansion?.exploration.sites || []), ...Object.values(state.dangerousSeas?.regions || {}).flatMap(region => region.sites)].find(s => s.position.x === gx && s.position.y === gy);
   if (site) return `(${gx + 1}, ${gy + 1}) ${terr} / ${EXPLORATION_NAMES[site.kind]} / ${describeDanger(site.danger)} / 消滅まであと${Math.max(0, site.expiresAbs - absDay(state))}日`;
   const chartSite = visibleChartSites(state.expansion?.charts).find(s => s.position.x === gx && s.position.y === gy);
   if (chartSite) return `(${gx + 1}, ${gy + 1}) ${terr} / ${chartSite.kind === "rumor" ? "海図の断片の噂" : CHART_CONFIG.rewards[chartSite.kind].name} / 探索1日・期限なし`;
@@ -808,24 +817,33 @@ export function renderMap() {
       const factionId = cell.settlement?.factionId || cell.factionId;
       const factionColor = FACTIONS.find(faction => faction.id === factionId)?.color;
       drawMapTile(ctx, cell, pad + x * cellSize, pad + y * cellSize, cellSize - 1, isZoom, factionColor, (gx + gy) % 2);
+      drawDangerousSeaTile(ctx, dangerousSeaAt({ x: gx, y: gy }), pad + x * cellSize, pad + y * cellSize, cellSize - 1);
     }
   }
 
   // 移動可能範囲の強調表示（上下左右）。
   // 選択マスの強調表示
-  for (const site of state.expansion?.exploration.sites || []) {
+  const explorationSites = [...(state.expansion?.exploration.sites || []), ...Object.values(state.dangerousSeas?.regions || {}).flatMap(region => region.sites)];
+  for (const site of explorationSites) {
     const { x, y } = site.position;
     if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
     drawExplorationSite(ctx, site.kind, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1, isZoom);
   }
   const chartSites = visibleChartSites(state.expansion?.charts);
+  const seaEvents = visibleDangerousSeaEvents();
+  for (const event of seaEvents) {
+    const { x, y } = event.position;
+    if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
+    drawDangerousSeaEvent(ctx, event, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1);
+  }
   const storySites = state.pirateKingStory?.active ? [state.pirateKingStory.active] : [];
   for (const site of storySites) {
     const { x, y } = site.position;
     if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
     drawPirateStorySite(ctx, site, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1);
   }
-  for (const site of state.bounties?.active || []) {
+  const bountySites = [...(state.bounties?.active || []), ...(state.dangerousSeas?.bounties.active || [])];
+  for (const site of bountySites) {
     const { x, y } = site.position;
     if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
     drawBountySite(ctx, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1);
@@ -856,7 +874,7 @@ export function renderMap() {
 
   // 現在地の地形に合わせて帆船または人物を描き、枠を最後に重ねる。
   if (isZoom) {
-    drawMapPlayer(ctx, { ...mapData[state.position.y][state.position.x], exploration: [...(state.expansion?.exploration.sites || []), ...(state.bounties?.active || []), ...chartSites, ...storySites].some(s => s.position.x === state.position.x && s.position.y === state.position.y) },
+    drawMapPlayer(ctx, { ...mapData[state.position.y][state.position.x], exploration: [...explorationSites, ...bountySites, ...chartSites, ...storySites, ...seaEvents].some(s => s.position.x === state.position.x && s.position.y === state.position.y) },
       pad + (state.position.x - startX) * cellSize,
       pad + (state.position.y - startY) * cellSize, cellSize - 1);
   }

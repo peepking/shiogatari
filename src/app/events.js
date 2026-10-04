@@ -5,6 +5,10 @@ import { state } from "../core/state.js";
 import { scheduleGameSave } from "../core/storage.js";
 import { resourceList } from "../ui/resourceUI.js";
 import { crimeRestriction } from "../wanted/wantedPolicy.js";
+import { resolveRoughWave } from "../dangerousSeas/dangerousSeaState.js";
+import { pushLog } from "../ui/dom.js";
+import { handleDangerousRaidAction } from "../dangerousSeas/dangerousSeaHazards.js";
+import { handleDangerousSeaEventAction } from "../dangerousSeas/dangerousSeaEventUI.js";
 
 /**
  * イベントキューにイベントを追加し、未表示なら即座に表示する。
@@ -63,6 +67,9 @@ export function initEventQueueUI() {
 export function resolveCurrentEvent(force = false) {
   ensureQueue();
   if (!force && state.piracy?.checkpoint && state.eventQueue[0]?.actions?.some(a => a.type?.startsWith("pirate_"))) return;
+  if (!force && state.eventQueue[0]?.kind === "dangerous_wave" && state.dangerousSeas?.pendingHazard) return;
+  if (!force && state.eventQueue[0]?.kind === "dangerous_raid_warning" && state.dangerousSeas?.pendingHazard) return;
+  if (!force && state.eventQueue[0]?.kind === "dangerous_event" && state.dangerousSeas?.events?.pending) return;
   if (state.eventQueue.length) state.eventQueue.shift();
   showNextEvent();
   if (typeof document !== "undefined") document.dispatchEvent(new CustomEvent("quests-updated"));
@@ -99,6 +106,21 @@ function normalizeActions(actions, baseId) {
  * @returns {void}
  */
 function handleAction(action) {
+  if (action?.type === "dangerous_event_choice") {
+    if (handleDangerousSeaEventAction(action.payload)) resolveCurrentEvent(true);
+    return;
+  }
+  if (action?.type === "dangerous_raid_continue" || action?.type === "dangerous_raid_evade") {
+    if (handleDangerousRaidAction(action)) resolveCurrentEvent(true);
+    return;
+  }
+  if (action?.type === "dangerous_wave_protect" || action?.type === "dangerous_wave_accept") {
+    const result = resolveRoughWave(state, action.payload?.id, action.type === "dangerous_wave_protect");
+    if (!result) return;
+    pushLog("荒波の対策", result.protected ? "木材1・繊維1で魚を守りました。" : `魚${result.lost}匹を失いました。図鑑の記録は残ります。`, "-");
+    resolveCurrentEvent(true);
+    return;
+  }
   if (isBattleEventActionBlocked(action)) {
     showNextEvent();
     return;
@@ -175,13 +197,15 @@ export function showNextEvent() {
   if (state.wanted?.detention) return;
   const modal = elements.eventModal;
   if (!modal) return;
-  if (state.expansion?.exploration.pending || state.expansion?.charts.pending || (elements.battleBlock && !elements.battleBlock.hidden) || (elements.battleResultModal && !elements.battleResultModal.hidden)) {
+  const dangerousEvent = state.dangerousSeas?.events?.pending;
+  if (dangerousEvent && ["action", "battle"].includes(dangerousEvent.stage) && !dangerousEvent.pausedForHazard) { modal.hidden = true; return; }
+  if (state.expansion?.exploration.pending || state.expansion?.charts.pending || state.expansion?.fishing?.pending || (state.dangerousSeas?.explorationPending && !state.dangerousSeas.explorationPending.pausedForHazard && state.dangerousSeas.explorationPending.wreck?.stage !== "choice") || (elements.fishingModal && !elements.fishingModal.hidden) || (elements.battleBlock && !elements.battleBlock.hidden) || (elements.battleResultModal && !elements.battleResultModal.hidden)) {
     modal.hidden = true;
     return;
   }
   ensureQueue();
   const ev = state.eventQueue[0];
-  if (elements.eventModalClose) elements.eventModalClose.hidden = !!(state.piracy?.checkpoint && ev?.actions?.some(a => a.type?.startsWith("pirate_")));
+  if (elements.eventModalClose) elements.eventModalClose.hidden = ["dangerous_wave", "dangerous_raid_warning", "dangerous_event"].includes(ev?.kind) || !!(state.piracy?.checkpoint && ev?.actions?.some(a => a.type?.startsWith("pirate_")));
   if (!ev) {
     modal.hidden = true;
     return;

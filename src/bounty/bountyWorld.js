@@ -11,12 +11,14 @@ import { VARIANT_SHIPS, variantBonusText } from "../fleet/variantShips.js";
 import { SHIP_TYPES } from "../fleet/shipConfig.js";
 import { pushLog } from "../ui/dom.js";
 import { expireWanted } from "../wanted/playerWanted.js";
+import { dangerousSeaReservedPositions } from "../dangerousSeas/dangerousSeaReservations.js";
 
 /** 保存済みの地点や未公開の海図目的地も配置候補から除く。 @returns {Set} 予約座標。 */
 function occupiedPositions() {
   const positions = [...(state.expansion?.exploration?.sites || []).map(s => s.position)];
   for (const c of state.expansion?.charts?.active || []) positions.push(c.destination, c.rumor);
   positions.push(state.pirateKingStory?.active?.position);
+  positions.push(...dangerousSeaReservedPositions(state));
   const quests = [...(state.quests?.active || []), ...Object.values(state.quests?.availableBySettlement || {}).flat(), ...Object.values(state.nobleQuests?.availableByNoble || {}).flat()];
   for (const q of quests) positions.push(q.target, ...(q.fights || []).map(f => f.target));
   return new Set(positions.filter(Boolean).map(p => `${p.x},${p.y}`));

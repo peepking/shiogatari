@@ -14,6 +14,7 @@ async function main() {
     }, { context });
   }
   const modules = new Map([
+    ["./dangerousSeaHazards.js", mock({ beginDangerousSeaAction: () => 1, finishDangerousSeaAction: () => {}, dangerousSeaActionBlocked: () => false })],
     ["./state.js", mock({ state })],
     ["./constants.js", mock({ MODE_LABEL: { NORMAL: "normal", PREP: "prep" } })],
     ["./chartWorld.js", mock({ chartLabel: () => "海図", announceFragment: c => events.push(c.fragments) })],

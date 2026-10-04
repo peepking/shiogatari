@@ -1,4 +1,5 @@
 import { migratePirateHavens } from "./pirateWorld.js";
+import { dangerousSeaReservedPositions } from "../dangerousSeas/dangerousSeaReservations.js";
 
 /** 無法港の配置更新を保存済みの世界へ一度だけ適用するための版番号。 */
 export const PIRATE_HAVEN_LAYOUT_VERSION = 2;
@@ -18,6 +19,7 @@ function reservedPositions(game, ports) {
     if (!portIds.has(id)) quests.push(...list);
   }
   const positions = [game.pirateKingStory?.active?.position];
+  positions.push(...dangerousSeaReservedPositions(game));
   for (const site of game.expansion?.exploration.sites || []) positions.push(site.position);
   for (const chart of game.expansion?.charts.active || []) positions.push(chart.destination, chart.rumor);
   for (const site of game.bounties?.active || []) positions.push(site.position);

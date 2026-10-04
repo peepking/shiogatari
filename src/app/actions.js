@@ -38,6 +38,8 @@ import { calcSupplyPrice, calcSupplyCap, createSettlementDemand, SUPPLY_ITEMS, t
 import { advanceDayWithEvents } from "./time.js";
 import { TROOP_STATS, calcTroopCap, totalTroops, enemyTroopPool } from "../resources/troops.js";
 import { clamp, warScoreLabel } from "../core/util.js";
+import { dangerousSeaAt } from "../dangerousSeas/dangerousSeaWorld.js";
+import { beginDangerousSeaAction, finishDangerousSeaAction, dangerousSeaActionBlocked } from "../dangerousSeas/dangerousSeaHazards.js";
 
 /**
  * エンカウント歩数
@@ -118,7 +120,7 @@ function notifyAutoMoveStop() {
  * 最大20部隊・各10人とし、人数上限200人まで全員を配分する。兵種・レベルの抽選は従来どおり。
  * @param {"normal"|"elite"|null} forceStrength 強敵プール強制指定
  * @param {string|null} enemyFactionId 敵勢力ID（正規軍プール判定用）
- * @param {{kind?:string,scale?:number,regularPool?:boolean,totalRange?:{min:number,max:number}}} options 賞金稼ぎ、襲撃規模、商船護衛の兵種指定。追跡の人数範囲を指定した場合は範囲内の整数を均等抽選し、最大200人・20部隊へ配分する。
+ * @param {{kind?:string,scale?:number,regularPool?:boolean,totalRange?:{min:number,max:number},dangerousLevel?:string}} options 賞金稼ぎ、襲撃規模、商船護衛の兵種指定。危険海域は同じ倍率範囲で外縁二回・核心三回の最大乱数を使い、大きな編成を選びやすくする。
  * @returns {{formation:Array, total:number, strength:string, terrain?:string}} 生成結果
  */
 export function buildEnemyFormation(forceStrength, enemyFactionId = null, options = {}) {
@@ -135,7 +137,8 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null, option
   const maxSquads = 20;
   const maxUnitCount = 10;
   const kind = options.kind || (useRegular ? "regular" : useStrong ? "elite" : "normal");
-  const total = options.totalRange ? Math.max(1, Math.min(200, randInt(options.totalRange.min, options.totalRange.max))) : pirateEnemyCount(range, kind, options.scale || 1);
+  const random = options.dangerousLevel ? () => Math.max(...Array.from({ length: options.dangerousLevel === "core" ? 3 : 2 }, () => Math.random())) : Math.random;
+  const total = options.totalRange ? Math.max(1, Math.min(200, randInt(options.totalRange.min, options.totalRange.max))) : pirateEnemyCount(range, kind, options.scale || 1, random);
   const basePool = options.kind === "bounty" ? Object.keys(PIRATE_IMAGES) : enemyTroopPool(useRegular || options.regularPool, useStrong);
   const pool = basePool.slice().sort(() => Math.random() - 0.5).slice(0, Math.min(6, basePool.length));
   if (!pool.length) pool.push("infantry");
@@ -151,6 +154,15 @@ export function buildEnemyFormation(forceStrength, enemyFactionId = null, option
     remain -= chunk;
   }
   return { formation, total, strength: useStrongScale ? "elite" : "normal", kind };
+}
+
+/**
+ * 名声と既存の強敵プールを維持し、危険海域の段階だけ倍率の大きい側へ抽選を寄せる。
+ * 最大200人・20部隊・レベル1～3は通常の強敵と同じ。
+ * @param {{x:number,y:number}} position 位置。 @param {string} [level] 生成時に固定した段階。 @returns {object} 保存する固定編成。
+ */
+export function buildDangerousEnemyFormation(position, level) {
+  return buildEnemyFormation("elite", "pirates", { dangerousLevel: level || dangerousSeaAt(position)?.level || "outer" });
 }
 
 /**
@@ -207,14 +219,17 @@ function pickEncounterFaction(pos, terrain) {
 
 /**
  * エンカウントを生成し、戦闘準備用のメタデータを返す（UIは呼び出し側で処理）。
- * @returns {{title:string,message:string,log:string,detail:object}} UI表示用の情報
+ * @param {{pursuitOnly?:boolean,today?:number}} [options] 危険海域では追跡だけを優先判定する。
+ * @returns {{title:string,message:string,log:string,detail:object}|null} UI表示用の情報
  */
-function triggerEncounter() {
+function triggerEncounter(options = {}) {
   const terrain = getTerrainAt(state.position.x, state.position.y) || "plain";
-  const pursuitCandidate = canRollPursuit(state, absDay(state)) ? wantedFaction() : null;
+  const today = options.today ?? absDay(state);
+  const pursuitCandidate = canRollPursuit(state, today) ? wantedFaction() : null;
   const pursuit = pursuitCandidate && Math.random() < PIRATE_CONFIG.wantedChance ? pursuitCandidate : null;
-  const tier = !pursuit && canRollPursuit(state, absDay(state)) ? hunterTier(state, absDay(state)) : null;
+  const tier = !pursuit && canRollPursuit(state, today) ? hunterTier(state, today) : null;
   const hunter = tier && Math.random() < tier.chance ? tier : null;
+  if (options.pursuitOnly && !pursuit && !hunter) return null;
   const frontHint = pursuit || hunter ? null : pickFrontEncounter(state.position);
   const strongRange = pickAnchorRange(state.fame || 0, STRONG_ANCHORS);
   const basis = (strongRange.min + strongRange.max) / 2;
@@ -255,6 +270,7 @@ function triggerEncounter() {
  */
 function maybeTriggerEncounter() {
   if (state.pendingEncounter?.active) return { ok: false };
+  if (dangerousSeaAt(state.position)) return { ok: false };
   const loc = getLocationStatus();
   // 村/街タイル上ではエンカウントしないが、リセットもしない（入場時のみリセット）
   if (loc?.place === PLACE.VILLAGE || loc?.place === PLACE.TOWN) return { ok: false };
@@ -271,6 +287,20 @@ function maybeTriggerEncounter() {
     return { ok: true, info: { ...info, enemyFactionId } };
   }
   return { ok: false };
+}
+
+/**
+ * 通常の移動間隔を使い、危険海域では手配の追跡だけを日次襲撃より先に判定する。
+ * 抽選に外れた時も間隔を戻し、一般の移動遭遇を追加しない。
+ * @returns {object|null} 確定した追跡遭遇。
+ */
+function dangerousPursuitBeforeDay() {
+  if (!dangerousSeaAt(state.position)) return null;
+  state.encounterProgress = (state.encounterProgress || 0) + 1;
+  if (state.encounterProgress < clamp(state.encounterThreshold || ENCOUNTER_MIN, ENCOUNTER_MIN, ENCOUNTER_MAX)) return null;
+  const encounter = triggerEncounter({ pursuitOnly: true, today: absDay(state) + 1 });
+  if (!encounter) resetEncounterMeter();
+  return encounter;
 }
 
 /**
@@ -296,6 +326,7 @@ export function isValidMove(from, to) {
  * @returns {boolean} 移動成功か
  */
 export function moveToSelected(syncUI) {
+  if (dangerousSeaActionBlocked()) return { ok: false, code: "danger-pending" };
   // 謁見モードのまま移動した場合は通常モードに戻す
   if (state.modeLabel === MODE_LABEL.AUDIENCE) {
     state.modeLabel = MODE_LABEL.NORMAL;
@@ -326,6 +357,7 @@ export function moveToSelected(syncUI) {
   if (state.modeLabel === MODE_LABEL.IN_VILLAGE || state.modeLabel === MODE_LABEL.IN_TOWN) {
     state.modeLabel = MODE_LABEL.NORMAL;
   }
+  beginDangerousSeaAction("move");
   state.position = { ...dest };
   markNobleRefugeePickup(state.position);
   markWarEscortPickup(state.position);
@@ -333,9 +365,12 @@ export function moveToSelected(syncUI) {
   if (arrivedSet) {
     completeWarEscortAt(arrivedSet);
   }
-  advanceDayWithEvents(1);
+  const dangerousPursuit = dangerousPursuitBeforeDay();
+  advanceDayWithEvents(1, { activity: "move", suppressDangerRaid: !!dangerousPursuit });
+  finishDangerousSeaAction("move");
   setTravelEventSync(syncUI);
   const travelEventHit = rollTravelEvents();
+  if (dangerousPursuit) { notifyAutoMoveStop(); return { ok: true, code: "encounter", detail: dangerousPursuit }; }
   if (travelEventHit) {
     notifyAutoMoveStop();
     return { ok: false, code: "travel-event" };
@@ -359,6 +394,7 @@ export function moveToSelected(syncUI) {
  * @returns {boolean} 入場できたか
  */
 export function attemptEnter(target, clearActionMessage, syncUI) {
+  if (dangerousSeaActionBlocked()) return false;
   if (state.pendingEncounter?.active) {
     setOutput("入場できません", "戦闘準備中は拠点に入れません。先に戦闘を処理してください。", [
       { text: "戦闘準備", kind: "warn" },
@@ -452,6 +488,10 @@ export function attemptExit(target, elements, clearActionMessage, setTradeError,
  * @returns {void}
  */
 export function waitOneDay(elements, clearActionMessage, syncUI) {
+  if (dangerousSeaActionBlocked()) {
+    pushToast("行動待ち", "釣り・探索または危険海域の出来事を先に終えてください。", "warn");
+    return false;
+  }
   if (state.pendingEncounter?.active) {
     setOutput("待機できません", "戦闘準備中は待機できません。行動を選んでください。", [
       { text: "戦闘準備", kind: "warn" },
@@ -492,6 +532,7 @@ export function getCurrentSettlement() {
  * @returns {boolean} イベントが発生したか
  */
 export function rollTravelEvents() {
+  if (dangerousSeaAt(state.position) || state.dangerousSeas?.pendingHazard) return false;
   if (state.pendingEncounter?.active) return false;
   if (state.modeLabel === MODE_LABEL.BATTLE || state.modeLabel === MODE_LABEL.PREP) return false;
   if ((state.travelEventCooldown || 0) > 0) {
@@ -573,6 +614,7 @@ export function rollTravelEvents() {
  * @returns {boolean}
  */
 export function triggerWarAction(kind) {
+  if (dangerousSeaActionBlocked()) return false;
   const suspension = honorSuspensionReason(state, getPlayerFactionId(), absDay(state));
   if (suspension) { pushToast("家臣機能停止中", suspension, "warn"); return false; }
   const here = getSettlementAtPosition(state.position.x, state.position.y);

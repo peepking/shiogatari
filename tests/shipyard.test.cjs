@@ -99,8 +99,11 @@ async function main() {
   // 固有船は個体ごとに保存し、基礎船種のバフ上限と維持費を共有する。
   const { addVariantShip, fleetCounts, shipListText } = fleetModule.namespace;
   const { VARIANT_SHIPS } = modules.get("./variantShips.js").namespace;
-  assert.equal(Object.keys(VARIANT_SHIPS).length, 33);
-  for (const id of Object.keys(SHIP_TYPES).filter(id => !SHIP_TYPES[id].rewardExcluded)) assert.equal(Object.values(VARIANT_SHIPS).filter(v => !v.story && v.base === id).length, 3);
+  assert.equal(Object.keys(VARIANT_SHIPS).length, 42);
+  for (const id of Object.keys(SHIP_TYPES).filter(id => !SHIP_TYPES[id].rewardExcluded)) {
+    assert.equal(Object.values(VARIANT_SHIPS).filter(v => !v.story && !v.dangerous && v.base === id).length, 3);
+    assert.equal(Object.values(VARIANT_SHIPS).filter(v => v.dangerous && v.base === id).length, 1);
+  }
   const named = { funds: 100000, fleet: normalizeFleet({ counts: { longship: 4 } }) };
   const first = addVariantShip(named, "crown", "灰冠の船長", 120001);
   const second = addVariantShip(named, "crown", "灰冠の別の船長", 120031);

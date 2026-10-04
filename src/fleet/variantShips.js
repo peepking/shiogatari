@@ -18,7 +18,17 @@ export const VARIANT_SHIPS = Object.freeze(Object.fromEntries([
   { id: "story_ragnar", base: "carrack", name: "強襲号", supplies: 30, troops: 0 },
   { id: "story_sigvard", base: "galleass", name: "蛇の目号", supplies: 0, troops: 30 },
   { id: "story_thorkell", base: "galleon", name: "巨躯号", supplies: 15, troops: 15 },
-].map(ship => [ship.id, Object.freeze({ ...ship, story: true })]))));
+].map(ship => [ship.id, Object.freeze({ ...ship, story: true })])).concat([
+  { id: "danger_ironwake", base: "caravel", name: "鉄波号" },
+  { id: "danger_saltbone", base: "knarr", name: "塩骨号" },
+  { id: "danger_splitmast", base: "longship", name: "裂帆号" },
+  { id: "danger_greyhold", base: "cog", name: "灰櫃号" },
+  { id: "danger_falsebeacon", base: "galley", name: "偽灯号" },
+  { id: "danger_hollowmist", base: "fluyt", name: "虚霧号" },
+  { id: "danger_nightsurge", base: "carrack", name: "夜潮号" },
+  { id: "danger_silentreef", base: "galleass", name: "黙礁号" },
+  { id: "danger_outercrown", base: "galleon", name: "外洋冠号" },
+].map(ship => [ship.id, Object.freeze({ ...ship, supplies: 10, troops: 10, dangerous: true })]))));
 
 /** 保存された個体を検証し、重複IDは最初の記録だけを残す。 @param {unknown} value 保存値。 @returns {Array} 独立した個体一覧。 */
 export function normalizeVariants(value) {

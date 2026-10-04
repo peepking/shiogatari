@@ -5,18 +5,23 @@ import { CHART_CONFIG as CONFIG } from "../core/expansionConfig.js";
 import { chooseChart, canAssignChart, assignChart, claimFragment, reconcileCharts } from "./charts.js";
 import { enqueueEvent } from "../app/events.js";
 import { pushLog, pushToast } from "../ui/dom.js";
+import { dangerousSeaReservedPositions } from "../dangerousSeas/dangerousSeaReservations.js";
+import { getDangerousSeaPositions } from "../dangerousSeas/dangerousSeaWorld.js";
 
 /** @param {object} offer 海図の種類とサイズ。 @returns {string} 表示名。 */
 export function chartLabel(offer) { return `${CONFIG.rewards[offer.kind]?.name || "海図"}（${offer.size}枚）`; }
 
 /**
  * 地点の競合を防ぐため、未公開の完成地点と未受注依頼を含めて予約する。
- * @returns {Set<string>} 使用済み座標。
+ * 通常海図の新規割当では危険海域全体を除き、以前の目的地や噂はそのまま保持する。
+ * @returns {Set<string>} 使用済みまたは新規候補から除外する座標。
  */
 export function reservedChartPositions() {
   const positions = (state.expansion.exploration.sites || []).map(s => s.position);
   positions.push(...(state.bounties?.active || []).map(s => s.position));
   positions.push(state.pirateKingStory?.active?.position);
+  positions.push(...dangerousSeaReservedPositions(state));
+  positions.push(...getDangerousSeaPositions("sw"), ...getDangerousSeaPositions("se"));
   for (const c of state.expansion.charts.active) positions.push(c.destination, c.rumor);
   const quests = [...(state.quests?.active || []), ...Object.values(state.quests?.availableBySettlement || {}).flat(), ...Object.values(state.nobleQuests?.availableByNoble || {}).flat()];
   for (const q of quests) positions.push(q.target, ...(q.fights || []).map(f => f.target));

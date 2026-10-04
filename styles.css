@@ -1880,3 +1880,4 @@ fieldset.battle-unit-orders {
 /* 投獄の保存再試行中は背景操作を止める。 */
 .detention-dialog { max-width: min(32rem, 85vw); background: #15263a; color: #e7edf5; border: 1px solid #52677c; border-radius: 12px; padding: 24px; }
 .detention-dialog::backdrop { background: #080f20cc; }
+.dangerous-sea-info { color: #ffd0a8; line-height: 1.6; }

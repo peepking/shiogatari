@@ -18,6 +18,8 @@ import { bindQuestPower } from "../factions/nationalPowerRules.js";
 import { FACTIONS } from "../world/lore.js";
 import { collectAssetCodex } from "../codex/assetCodex.js";
 import { normalizePirateKingStory, pirateStoryEncounter, currentPirateStoryEncounter } from "../pirates/pirateKingStory.js";
+import { normalizeDangerousSeas } from "../dangerousSeas/dangerousSeaState.js";
+import { migrateDangerousSeaPlacements } from "../dangerousSeas/dangerousSeaMigration.js";
 
 const SAVE_KEY = "shiogatari-save";
 let saveScheduled = false;
@@ -62,7 +64,7 @@ function simpleHash(str) {
  */
 export function saveGameToStorage({ battleComplete = false, battlePreparation = false } = {}) {
   const unsafe = state.modeLabel === MODE_LABEL.BATTLE || state.pendingEncounter?.active;
-  const fixedPreparation = state.modeLabel === MODE_LABEL.PREP && state.pendingEncounter?.active && (state.pendingEncounter.bountyId != null || state.pendingEncounter.crimeRecorded === true || currentPirateStoryEncounter(state, state.pendingEncounter));
+  const fixedPreparation = state.modeLabel === MODE_LABEL.PREP && state.pendingEncounter?.active && (state.pendingEncounter.bountyId != null || state.pendingEncounter.dangerousBountyId != null || state.pendingEncounter.dangerousHazardId != null || state.pendingEncounter.dangerousExplorationId != null || state.pendingEncounter.dangerousEventId != null || state.pendingEncounter.crimeRecorded === true || currentPirateStoryEncounter(state, state.pendingEncounter));
   const grandPreparation = battlePreparation && state.pendingEncounter?.active && state.pendingEncounter.battleKind === "grand" && state.pendingEncounter.preparation;
   const storyContinuation = battleComplete && currentPirateStoryEncounter(state, state.pendingEncounter) && state.pendingEncounter.storyId === "olav" && state.pendingEncounter.storyPhase === 2;
   if (!battleComplete && unsafe && !fixedPreparation && !grandPreparation) return false;
@@ -116,6 +118,7 @@ export function loadGameFromStorage() {
     Object.assign(state, snapshot.state);
     state.piracy = normalizePiracy(snapshot.state.piracy);
     state.bounties = normalizeBounties(snapshot.state.bounties);
+    state.dangerousSeas = normalizeDangerousSeas(snapshot.state.dangerousSeas);
     state.pirateKingStory = normalizePirateKingStory(snapshot.state.pirateKingStory);
     if (state.pendingEncounter?.active && state.pendingEncounter.storyId) {
       if (currentPirateStoryEncounter(state, state.pendingEncounter)) {
@@ -137,9 +140,19 @@ export function loadGameFromStorage() {
     state.nationalPower = normalizeNationalPower(snapshot.state.nationalPower, nationalPowerDay(state));
     state.logs = normalizeLogs(state.logs);
     state.expansion = normalizeExpansionState(state.expansion);
+    if (state.pendingEncounter?.active && (state.pendingEncounter.dangerousBountyId != null || state.pendingEncounter.dangerousHazardId != null || state.pendingEncounter.dangerousExplorationId != null || state.pendingEncounter.dangerousEventId != null)) {
+      const encounter = state.pendingEncounter, danger = state.dangerousSeas;
+      const valid = encounter.dangerousBountyId != null ? danger.bounties.active.some(site => site.id === encounter.dangerousBountyId)
+        : encounter.dangerousHazardId != null ? danger.pendingHazard?.kind === "raid" && danger.pendingHazard.id === encounter.dangerousHazardId
+          : encounter.dangerousEventId != null ? danger.events.pending?.eventId === encounter.dangerousEventId && danger.events.pending.stage === "battle"
+            : danger.explorationPending?.siteId === encounter.dangerousExplorationId;
+      if (valid) state.modeLabel = MODE_LABEL.PREP;
+      else { state.pendingEncounter = { active: false }; state.modeLabel = MODE_LABEL.NORMAL; }
+    }
     if (snapshot.world) {
       if (restoreWorld(snapshot.world, { upgradePirateHavens: true }) === false) return false;
     }
+    const placementMigration = snapshot.world ? migrateDangerousSeaPlacements(state, snapshotWorld()) : null;
     state.assetCodex = collectAssetCodex({ ...state, assetCodex: snapshot.state.assetCodex });
     state.voyageStats = normalizeVoyageStats(snapshot.state.voyageStats, state);
     state.finalVoyage = normalizeFinalVoyage(snapshot.state.finalVoyage);
@@ -151,7 +164,7 @@ export function loadGameFromStorage() {
     reconcileWarFronts(state, snapshotWorld().settlements || []);
     const powerSettlements = snapshotWorld().settlements || [];
     for (const q of state.quests?.active || []) bindQuestPower(q, FACTIONS, powerSettlements);
-    if (snapshot.world && snapshotWorld().pirateHavenLayoutVersion !== snapshot.world.pirateHavenLayoutVersion) {
+    if (placementMigration?.changed || (snapshot.world && snapshotWorld().pirateHavenLayoutVersion !== snapshot.world.pirateHavenLayoutVersion)) {
       saveGameToStorage({ battlePreparation: state.modeLabel === MODE_LABEL.PREP && state.pendingEncounter?.battleKind === "grand" });
     }
     return true;

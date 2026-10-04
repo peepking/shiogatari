@@ -15,6 +15,7 @@ function renderedText(node) {
 const mapInfo = createElement();
 const context = vm.createContext({
   MAP_CELL: 14, state,
+  dangerousSeaAt: () => null, visibleDangerousSeaEvents: () => [],
   elements: { mapInfo }, document: { createElement },
   settlements: [{ id: "town", coords: { x: 0, y: 0 } }],
   absDay: () => 10, FRONT_DURATION_DAYS: 60,

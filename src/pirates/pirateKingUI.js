@@ -18,7 +18,8 @@ export function pirateStoryAt() {
 
 /** 先に保存可否を確認し、準備の保存失敗時は現在の旅へ戻す。 @param {Function} sync 表示同期。 @returns {boolean} 開始したか。 */
 export function beginPirateStoryBattle(sync) {
-  if (!pirateStoryAt() || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active || state.eventQueue?.length || totalTroops() <= 0 || state.expansion?.exploration?.pending || state.expansion?.charts?.pending || state.expansion?.fishing?.pending) return false;
+  if (!pirateStoryAt() || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active || state.eventQueue?.length || totalTroops() <= 0 || state.expansion?.exploration?.pending || state.expansion?.charts?.pending || state.expansion?.fishing?.pending
+    || (state.dangerousSeas?.pendingHazard && state.dangerousSeas.pendingHazard.stage !== "watch") || state.dangerousSeas?.action || state.dangerousSeas?.explorationPending || state.dangerousSeas?.events?.pending) return false;
   if (!saveGameToStorage()) { pushToast("保存できません", "討伐準備は開始していません。", "warn"); return false; }
   state.pendingEncounter = pirateStoryEncounter(state.pirateKingStory);
   state.modeLabel = MODE_LABEL.PREP;
@@ -60,7 +61,8 @@ function openPirateStoryModal(sync) {
  */
 export function renderPirateStoryControls(sync) {
   const data = state.pirateKingStory, panel = document.getElementById("pirateStoryPanel"), visit = document.getElementById("pirateStoryVisitBtn");
-  const locked = state.pendingEncounter?.active || state.modeLabel !== MODE_LABEL.NORMAL || state.eventQueue?.length || state.expansion?.exploration?.pending || state.expansion?.charts?.pending || state.expansion?.fishing?.pending;
+  const locked = state.pendingEncounter?.active || state.modeLabel !== MODE_LABEL.NORMAL || state.eventQueue?.length || state.expansion?.exploration?.pending || state.expansion?.charts?.pending || state.expansion?.fishing?.pending
+    || (state.dangerousSeas?.pendingHazard && state.dangerousSeas.pendingHazard.stage !== "watch") || state.dangerousSeas?.action || state.dangerousSeas?.explorationPending || state.dangerousSeas?.events?.pending;
   if (visit) {
     const site = pirateStoryAt(); visit.hidden = !site || !!locked;
     visit.textContent = site ? `${pirateStoryTarget(site.id).name}を確認` : "海賊五列強を確認";

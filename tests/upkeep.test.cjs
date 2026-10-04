@@ -78,6 +78,8 @@ async function main() {
     grantFaithSeason: modules.get("./faith.js").namespace.grantFaithSeason, calcSupplyCap: () => 60,
     settleTideSeason: tideModule.namespace.settleTideSeason,
     fishingRewards: () => {}, grantFishingSeason: () => 0,
+    dangerousSeaActionBlocked: () => false, beginDangerousSeaAction() {}, finishDangerousSeaAction() {},
+    updateDangerousSeaDay() {}, updateDangerousExplorationWorld() {}, updateDangerousBountyWorld() {}, updateDangerousSeaEvents() {},
     SHIP_TYPES:modules.get("./shipConfig.js").namespace.SHIP_TYPES,
     buildLossesMap:n=>n,applyTroopLosses:n=>{fixture.troops.infantry-=n;},pushLog(){},enqueueEvent:e=>notices.push(e),
     pushToast:(title,body)=>toasts.push({title,body}),

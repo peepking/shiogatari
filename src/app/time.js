@@ -17,15 +17,30 @@ import { FOOD_CONSUMPTION_DAYS, getUpkeepForecast } from "../resources/upkeep.js
 import { updateExplorationWorld } from "../exploration/explorationUI.js";
 import { payShipUpkeep } from "../fleet/shipUpkeep.js";
 import { SHIP_TYPES } from "../fleet/shipConfig.js";
+import { beginDangerousSeaAction, finishDangerousSeaAction, dangerousSeaActionBlocked, updateDangerousSeaDay } from "../dangerousSeas/dangerousSeaHazards.js";
+import { dangerousSeaAt } from "../dangerousSeas/dangerousSeaWorld.js";
+import { updateDangerousExplorationWorld } from "../dangerousSeas/dangerousSeaLifecycle.js";
+import { updateDangerousBountyWorld } from "../dangerousSeas/dangerousBountyWorld.js";
+import { updateDangerousSeaEvents } from "../dangerousSeas/dangerousSeaEventWorld.js";
 
 /**
  * 日付更新と、それに連動するイベント処理を進める。
- * @param {number} [days=1]
+ * 未解決の危険では新しい日を進めず、継続中の釣り・探索が終わるまで襲撃を保留する。
+ * @param {number} [days=1] 日数。
+ * @param {{activity?:string,suppressDangerRaid?:boolean}} [options] 行動と固定戦闘の優先指定。
+ * @returns {number} 実際に進めた日数。
  */
-export function advanceDayWithEvents(days = 1) {
+export function advanceDayWithEvents(days = 1, options = {}) {
+  const activeAction = state.dangerousSeas?.action;
+  if (!activeAction && !state.wanted?.detention && dangerousSeaActionBlocked()) return 0;
+  const activity = options.activity || activeAction?.kind || (state.expansion?.charts?.pending ? "chart" : state.expansion?.exploration?.pending || state.dangerousSeas?.explorationPending ? "exploration" : state.expansion?.fishing?.pending ? "fishing" : "wait");
+  if (!activeAction && !state.wanted?.detention) beginDangerousSeaAction(activity);
   fishingRewards(state);
+  let advanced = 0;
   for (let i = 0; i < days; i++) {
+    if (i > 0 && state.dangerousSeas?.pendingHazard && !state.wanted?.detention) break;
     baseAdvanceDay(1);
+    advanced += 1;
     const d = state.day;
     if (d === 1) {
       settlements.forEach(s => refreshShipyard(s, shipyardSeason(state)));
@@ -54,17 +69,23 @@ export function advanceDayWithEvents(days = 1) {
     }
     const today = absDay(state);
     updateExplorationWorld(true);
+    updateDangerousExplorationWorld(true);
     updateBountyWorld();
+    updateDangerousBountyWorld();
     tickDailyWar(today);
     tickRelationDrift(today);
     if (!state.wanted?.detention) maybeQueueHonorInvite(today);
     if (state.day % 7 === 0) {
       applySupportDrift();
     }
+    updateDangerousSeaDay({ activity, suppressRaid: options.suppressDangerRaid || !!state.expansion?.exploration?.pending?.encounter || !!state.dangerousSeas?.explorationPending?.encounter });
+    updateDangerousSeaEvents(true);
     if (!state.wanted?.detention) processScheduledOmens(today);
   }
   // 日付進行に合わせて依頼の期限/季節更新を処理する。
-  questTickDay(days);
+  questTickDay(advanced);
+  if (!activeAction) finishDangerousSeaAction();
+  return advanced;
 }
 
 /**
@@ -194,7 +215,7 @@ export function processScheduledOmens(todayAbs) {
       remaining.push(o);
       return;
     }
-    if (state.expansion?.exploration.pending || state.expansion?.charts.pending || state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE) {
+    if (dangerousSeaAt(state.position) || state.dangerousSeas?.pendingHazard || state.dangerousSeas?.action || state.dangerousSeas?.explorationPending || state.expansion?.fishing?.pending || state.expansion?.exploration.pending || state.expansion?.charts.pending || state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE) {
       remaining.push(o);
       return;
     }

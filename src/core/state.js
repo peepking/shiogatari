@@ -10,6 +10,7 @@ import { createNationalPower, nationalPowerDay } from "../factions/nationalPower
 import { createVoyageStats } from "./voyageStats.js";
 import { collectAssetCodex } from "../codex/assetCodex.js";
 import { normalizePirateKingStory } from "../pirates/pirateKingStory.js";
+import { createDangerousSeaState } from "../dangerousSeas/dangerousSeaState.js";
 
 /**
  * ゲームの初期状態を生成する。
@@ -19,6 +20,7 @@ const createState = () => {
   const initial = {
   piracy: {lastTrade:null,checkpoint:null,nextId:1},
   bounties: normalizeBounties(),
+  dangerousSeas: createDangerousSeaState(),
   pirateKingStory: normalizePirateKingStory(),
   wanted: normalizeWanted(),
   fleet: normalizeFleet(),

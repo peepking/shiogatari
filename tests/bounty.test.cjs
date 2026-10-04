@@ -377,6 +377,7 @@ async function main() {
   vm.runInContext('escapeBattleSuccess("祈りによる回避")', escapeContext);
   assert.equal(escapeContext.state.wanted.pursuitUntil, 23);
   const entryContext = vm.createContext({ state: { modeLabel: "normal", wanted: { byFaction: { north: { amount: 6000, lastCrimeAbs: 1 } } } },
+    dangerousSeaActionBlocked: () => false,
     MODE_LABEL: { IN_TOWN: "town", IN_VILLAGE: "village" }, PLACE: { TOWN: "town", VILLAGE: "village" },
     getLocationStatus: () => ({ place: "town" }), getSettlementAtPosition: () => ({ factionId: "north" }),
     absDay: () => 2, wantedEntryReason: policy.wantedEntryReason, pushToast() {},

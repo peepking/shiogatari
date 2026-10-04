@@ -9,6 +9,11 @@ import { SEASONS, escapeHtml } from "../core/util.js";
 import { FISHING_CONFIG, FISH_REGIONS, FISH_CATEGORIES, BAIT_DEFS, ROD_DEFS, FISH_SPECIES, DEPTH_NAMES } from "./fishingConfig.js";
 import { fishingRegionAt, rollCatch, windowFor, rollSize, recordCatch, dressCatch, speciesById, categoryTone, atariMessage, catchRecordFacts, consumeBait, processToBait, checkRodUpgrade, sessionDayRule, matchesCodexFilters, codexCompletion, codexRevealState, codexDetailReveal, fishSalePrice } from "./fishing.js";
 import { fishingRewards } from "./fishingRewards.js";
+import { rollDangerousSeaCatch } from "../dangerousSeas/dangerousSeaFishing.js";
+import { migrationFishIds } from "../dangerousSeas/dangerousSeaEventState.js";
+import { dangerousSeaAt } from "../dangerousSeas/dangerousSeaWorld.js";
+import { dangerousSeaName } from "../dangerousSeas/dangerousSeaConfig.js";
+import { beginDangerousSeaAction, finishDangerousSeaAction, dangerousSeaActionBlocked } from "../dangerousSeas/dangerousSeaHazards.js";
 
 /** 釣りパネルを開いた際に渡される表示同期。 bite/キャスト後に使う。 */
 let panelSync = null;
@@ -61,6 +66,7 @@ function refreshFishingDay() {
   const rule = sessionDayRule(pending, absDay(state));
   if (rule === "discard") {
     data.pending = null;
+    finishDangerousSeaAction("fishing");
   } else if (rule === "migrate") {
     pending.lastDay = absDay(state);
   } else {
@@ -71,7 +77,7 @@ function refreshFishingDay() {
 
 /**
  * 現在地の釣り環境を返す。
- * @returns {{regionId:string,season:number,depth:string,sea:boolean}}
+ * @returns {{regionId:string,season:number,depth:string,sea:boolean,dangerousSea:object|null}}
  */
 function currentEnv() {
   const terrain = getTerrainAt(state.position.x, state.position.y);
@@ -80,7 +86,34 @@ function currentEnv() {
     season: state.season,
     depth: terrain,
     sea: terrain === "sea" || terrain === "shoal",
+    dangerousSea: dangerousSeaAt(state.position),
   };
+}
+
+/**
+ * 同日の釣り行動を継続できる保留と、解決待ちで操作を止める保留を区別する。
+ * @returns {boolean} 釣り操作と釣果管理を危険が妨げるか。
+ */
+function fishingDangerBlocked() {
+  const current = state.dangerousSeas;
+  const sameFishing = current?.action?.kind === "fishing" && state.expansion.fishing.pending;
+  if (sameFishing && (!current.pendingHazard || current.pendingHazard.stage === "action_running")) return false;
+  return dangerousSeaActionBlocked();
+}
+
+/**
+ * 戦闘・探索・解決待ちの危険に割り込まず、釣りを進められるかを返す。
+ * 同日の釣り行動が進行中なら、その終了後に発生する保留危険は妨げない。
+ * @returns {boolean} 釣り操作を進められるか。
+ */
+function canContinueFishing() {
+  return state.modeLabel === MODE_LABEL.NORMAL &&
+    !state.pendingEncounter?.active &&
+    !state.expansion.exploration?.pending &&
+    !state.expansion.charts?.pending &&
+    !state.dangerousSeas?.explorationPending &&
+    !state.dangerousSeas?.events?.pending &&
+    !fishingDangerBlocked();
 }
 
 /**
@@ -145,17 +178,14 @@ export function renderFishingControl(syncUI) {
   const online =
     hasRod &&
     env.sea &&
-    state.modeLabel === MODE_LABEL.NORMAL &&
-    !state.pendingEncounter?.active &&
-    !state.expansion.exploration?.pending &&
-    !state.expansion.charts?.pending;
+    canContinueFishing();
   const pending = !!fishing?.pending;
   let label;
   let action;
   if (pending) {
     label = "釣り（続き）";
     action = () => openFishingPanel(syncUI);
-    button.disabled = false;
+    button.disabled = !canContinueFishing();
   } else if (online) {
     label = "釣り";
     action = () => openFishingPanel(syncUI);
@@ -284,6 +314,7 @@ export function resumeFishing() {
   if (!pending) return false;
   refreshFishingDay();
   if (!data.pending) return false;
+  if (!canContinueFishing()) return false;
   const current = data.pending;
   if (current.catch) current.catch = null;
   current.waitUntil = null;
@@ -291,13 +322,21 @@ export function resumeFishing() {
   if (!current.dayApplied) {
     const before = structuredClone(state);
     const world = structuredClone(snapshotWorld());
+    if (!state.dangerousSeas?.action && !beginDangerousSeaAction("fishing")) return false;
+    const startingDay = absDay(state);
     advanceDayWithEvents(1);
+    if (absDay(state) === startingDay) {
+      Object.assign(state, before);
+      restoreWorld(world);
+      return false;
+    }
     current.dayApplied = true;
     current.lastDay = absDay(state);
     if (!saveGameToStorage()) {
       Object.assign(state, before);
       restoreWorld(world);
       pushToast("保存できません", "釣りの日数適用に失敗しました。", "warn");
+      if (elements.fishingModal && !elements.fishingModal.hidden) renderFishingPanel();
       return false;
     }
   }
@@ -312,13 +351,16 @@ export function resumeFishing() {
  */
 function beginFishing() {
   const data = state.expansion.fishing;
-  if (data.pending) return;
+  if (data.pending) {
+    if (!data.pending.dayApplied) resumeFishing();
+    return;
+  }
   if (!data.rodId) {
     pushToast("釣り", "釣り竿を持っていません。街・村の釣り小屋で入手してください。", "warn");
     return;
   }
   const env = currentEnv();
-  if (!env.sea || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active || state.expansion.exploration?.pending || state.expansion.charts?.pending) {
+  if (!env.sea || !canContinueFishing()) {
     pushToast("釣り", "今は釣りを始められません。", "warn");
     return;
   }
@@ -331,10 +373,13 @@ function beginFishing() {
     cancelText: "キャンセル",
     onConfirm: () => {
       if (state.modeLabel !== mode || state.position.x !== pos.x || state.position.y !== pos.y) return;
-      if (state.pendingEncounter?.active || state.expansion.exploration?.pending || state.expansion.charts?.pending) return;
+      if (!canContinueFishing()) return;
+      const previousDanger = structuredClone(state.dangerousSeas);
+      if (!beginDangerousSeaAction("fishing")) return;
       data.pending = { dayApplied: false, castsLeft: FISHING_CONFIG.castsPerSession, catch: null, lastResult: null, lastDay: null };
       if (!saveGameToStorage()) {
         data.pending = null;
+        state.dangerousSeas = previousDanger;
         pushToast("保存できません", "釣りは開始していません。", "warn");
         return;
       }
@@ -364,6 +409,11 @@ function doCast() {
   const data = state.expansion.fishing;
   const pending = data.pending;
   if (!pending || biteActive() || isWaiting() || (pending.castsLeft ?? 0) <= 0) return;
+  if (!canContinueFishing()) return;
+  if (!pending.dayApplied) {
+    resumeFishing();
+    return;
+  }
   // 現在選択中の餌を取得
   const select = document.getElementById("fishingBaitSelect");
   const currentBaitId = select?.value;
@@ -371,6 +421,8 @@ function doCast() {
     pushToast("餌が選択されていません", "餌を選択してから釣るを押してください。", "warn");
     return;
   }
+  const snapshot = structuredClone(data.pending);
+  const previousBaitCount = data.bait[currentBaitId];
   // 餌消費
   if (!consumeBait(state, currentBaitId)) {
     pushToast("餌が足りません", `${BAIT_DEFS[currentBaitId]?.name || currentBaitId} がありません。`, "warn");
@@ -379,8 +431,10 @@ function doCast() {
   // このキャストで使用する餌を確定
   pending.currentBaitId = currentBaitId;
   const env = currentEnv();
-  const species = rollCatch({ regionId: env.regionId, season: env.season, depth: env.depth, baitId: currentBaitId }, Math.random);
-  const snapshot = structuredClone(data.pending);
+  const species = env.dangerousSea
+    ? rollDangerousSeaCatch({ baitId: currentBaitId, codex: data.codex,
+      migrationFishIds: migrationFishIds(state, env.dangerousSea.regionId, absDay(state)) }, Math.random)
+    : rollCatch({ regionId: env.regionId, season: env.season, depth: env.depth, baitId: currentBaitId }, Math.random);
   pending.castsLeft -= 1;
   pending.lastResult = null;
   pending.catch = null;
@@ -389,11 +443,19 @@ function doCast() {
   if (species) pending.waitUntil = Date.now() + biteWaitMs();
   if (!saveGameToStorage()) {
     data.pending = snapshot;
+    data.bait[currentBaitId] = previousBaitCount;
     pushToast("保存できません", "釣り実行は保持されません。", "warn");
   } else if (!species) {
     pushLog("釣果", "この場所と時期・餌では魚が掛からない。", "-");
-    if ((pending.castsLeft ?? 0) <= 0) data.pending = null;
+    if ((pending.castsLeft ?? 0) <= 0) {
+      data.pending = null;
+      finishDangerousSeaAction("fishing");
+    }
     saveGameToStorage();
+  }
+  if (!data.pending && state.dangerousSeas?.pendingHazard?.stage === "ready") {
+    closeFishingPanel();
+    return;
   }
   panelSync?.();
   renderFishingPanel();
@@ -411,10 +473,10 @@ function resolveBite(pulled) {
   const pending = data.pending;
   const caught = pending?.catch;
   if (!pending || !caught) return;
+  const before = { fishing: structuredClone(data), voyageStats: structuredClone(state.voyageStats) };
   clearSessionTimer();
   pending.catch = null;
   const s = speciesById(caught.speciesId);
-  const before = { counts: { ...data.counts }, codex: structuredClone(data.codex) };
   if (pulled) {
     const size = rollSize(caught.speciesId, Math.random);
     const facts = catchRecordFacts(data.codex[caught.speciesId], size);
@@ -427,11 +489,9 @@ function resolveBite(pulled) {
   }
   if ((pending.castsLeft ?? 0) <= 0) data.pending = null;
   if (!saveGameToStorage()) {
-    data.counts = before.counts;
-    data.codex = before.codex;
-    data.pending = pending;
-    pending.catch = caught;
-    pending.lastResult = null;
+    state.expansion.fishing = before.fishing;
+    if (before.voyageStats === undefined) delete state.voyageStats;
+    else state.voyageStats = before.voyageStats;
     resultScreen = null;
     pushToast("保存できません", "釣果は保持されません。", "warn");
   }
@@ -592,6 +652,10 @@ function sessionHtml() {
       '<button class="btn primary fishing-main-action" id="fishingStartBtn">釣りを始める</button>', "is-ready");
   }
   const pending = data.pending;
+  if (!pending.dayApplied) {
+    return fishingStage("<h3>釣りの再開待ち</h3><p>再開すると一日が進みます。</p>",
+      '<button class="btn primary fishing-main-action" id="fishingStartBtn">釣りを再開</button>', "is-ready");
+  }
   if (!pending.catch && !isWaiting()) {
     let selectedBaitId = pending.currentBaitId;
     if (!selectedBaitId || !(data.bait?.[selectedBaitId] > 0)) {
@@ -626,7 +690,7 @@ function sessionHtml() {
  */
 function inventoryHtml() {
   const data = state.expansion.fishing;
-  const busy = biteActive() || isWaiting();
+  const busy = biteActive() || isWaiting() || fishingDangerBlocked();
   // 餌所持数表示
   const baitList = Object.entries(data.bait || {})
     .map(([id, qty]) => `<span class="pill">${BAIT_DEFS[id]?.name || id} x${qty}</span>`)
@@ -730,7 +794,7 @@ function renderCodexModal() {
   if (progress) {
     const rewards = fishingRewards(state);
     const labels = ["釣り仲間の伝手：海兵系の雇用枠", "漁師の伝手：漁船の購入", "鮮度を保つ知恵：魚売値＋20%", "海を知る者：毎季節信仰＋5"];
-    progress.innerHTML += `<details class="fishing-rewards"><summary>図鑑の達成報酬</summary>${labels.map((label, i) => `<p class="tiny">${(i + 1) * 25}%・${rewards.unlocked[i] ? "解放済み" : "未解放"}：${label}</p>`).join("")}</details>`;
+    progress.innerHTML += `<details class="fishing-rewards"><summary>図鑑の達成報酬</summary>${labels.map((label, i) => `<p class="tiny">${(i + 1) * 25}%・${rewards.unlocked[i] ? "解放済み" : "未解放"}：${label}</p>`).join("")}</details><p class="tiny">生息域・季節・水深は通常の釣りの条件です。危険海域ではこれらを問わず現れますが、餌の相性は必要です。</p>`;
   }
   const filterCount = document.getElementById("codexFilterCount");
   const count = codexCats.size + codexRegions.size + codexSeasons.size;
@@ -985,6 +1049,12 @@ function wireCodexModal() {
 function envText() {
   const env = currentEnv();
   const depthName = DEPTH_NAMES[env.depth] || "陸地";
+  if (env.dangerousSea) {
+    const name = dangerousSeaName(env.dangerousSea.regionId);
+    const level = env.dangerousSea.level === "core" ? "核心" : "外縁";
+    const migration = migrationFishIds(state, env.dangerousSea.regionId, absDay(state)).length ? " 巨大魚の回遊中。魚影の一部が釣れやすくなっています。" : "";
+    return `${name}・${level} / 海域・季節・水深を問わず釣れます。餌の相性は必要です。${migration}`;
+  }
   return `${FISH_REGIONS[env.regionId] || "?"} / 水深: ${depthName} / ${SEASONS[env.season]}`;
 }
 
@@ -1000,7 +1070,7 @@ function renderFishingPanel() {
   const restoreFocus = sessionEl.contains(document.activeElement);
   envEl ? (envEl.textContent = envText()) : null;
   const data = state.expansion.fishing;
-  const busy = biteActive() || isWaiting();
+  const busy = biteActive() || isWaiting() || fishingDangerBlocked();
   const manageOnly = !currentEnv().sea && !data.pending;
   sessionEl.hidden = manageOnly;
   if (!manageOnly) sessionEl.innerHTML = sessionHtml();
@@ -1033,8 +1103,14 @@ function wireSessionButtons() {
     endBtn.addEventListener("click", () => {
       clearSessionTimer();
       state.expansion.fishing.pending = null;
+      resultScreen = null;
+      finishDangerousSeaAction("fishing");
       saveGameToStorage();
       pushLog("釣り", "釣りを終了した。", "-");
+      if (state.dangerousSeas?.pendingHazard?.stage === "ready") {
+        closeFishingPanel();
+        return;
+      }
       renderFishingPanel();
       panelSync?.();
     });
@@ -1050,9 +1126,16 @@ function wireSessionButtons() {
         pending.catch = null;
         pending.waitUntil = null;
         pending.hookSpeciesId = null;
-        if ((pending.castsLeft ?? 0) <= 0) data.pending = null;
+        if ((pending.castsLeft ?? 0) <= 0) {
+          data.pending = null;
+          finishDangerousSeaAction("fishing");
+        }
         pushLog("釣果", "早すぎて魚は掛かっていなかった…。", "-");
         saveGameToStorage();
+        if (!data.pending && state.dangerousSeas?.pendingHazard?.stage === "ready") {
+          closeFishingPanel();
+          return;
+        }
         renderFishingPanel();
         panelSync?.();
         return;
@@ -1073,6 +1156,14 @@ function wireSessionButtons() {
         pushLog("釣果", "魚に逃げられた。", "-");
       }
       resultScreen = null;
+      if (!state.expansion.fishing.pending) {
+        finishDangerousSeaAction("fishing");
+        saveGameToStorage();
+        if (state.dangerousSeas?.pendingHazard?.stage === "ready") {
+          closeFishingPanel();
+          return;
+        }
+      }
       panelSync?.();
       renderFishingPanel();
       if (!state.expansion.fishing.pending) {
@@ -1090,6 +1181,7 @@ function wireSessionButtons() {
 function wireInventoryButtons() {
   for (const btn of document.querySelectorAll("#fishingInventory [data-dress]")) {
     btn.addEventListener("click", () => {
+      if (fishingDangerBlocked()) return;
       const id = btn.getAttribute("data-dress");
       const data = state.expansion.fishing;
       const held = data.counts[id] || 0;
@@ -1105,6 +1197,7 @@ function wireInventoryButtons() {
   }
   for (const btn of document.querySelectorAll("#fishingInventory [data-process]")) {
     btn.addEventListener("click", () => {
+      if (fishingDangerBlocked()) return;
       const id = btn.getAttribute("data-process");
       const data = state.expansion.fishing;
       const held = data.counts[id] || 0;
@@ -1127,6 +1220,7 @@ function wireInventoryButtons() {
  * @returns {void}
  */
 function openFishSale() {
+  if (fishingDangerBlocked() || !canSell()) return;
   const data = state.expansion.fishing;
   const deals = Object.entries(data.counts)
     .map(([id, qty]) => {
@@ -1145,6 +1239,7 @@ function openFishSale() {
  * @returns {void}
  */
 function openBaitPurchase() {
+  if (fishingDangerBlocked()) return;
   if (!canSell()) {
     pushToast("餌購入", "街・村の釣り小屋でのみ購入できます。", "warn");
     return;
@@ -1187,6 +1282,16 @@ function closeFishingPanel() {
   if (elements.fishingModal) elements.fishingModal.hidden = true;
   panelLocation = null;
   cancelBite();
+  if (state.expansion.fishing.pending) {
+    state.expansion.fishing.pending = null;
+    resultScreen = null;
+    finishDangerousSeaAction("fishing");
+    saveGameToStorage();
+  } else if (resultScreen) {
+    resultScreen = null;
+    finishDangerousSeaAction("fishing");
+    saveGameToStorage();
+  }
   panelSync?.();
   (canSell() ? elements.fishingHutBtn : elements.fishBtn)?.focus({ preventScroll: true });
 }
