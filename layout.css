@@ -87,7 +87,11 @@ main .grid > * { min-width: 0; }
 .location-action-note { margin: 8px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
 .location-action-exit { display: grid; gap: 7px; padding-top: 12px; border-top: 1px solid var(--line); }
 .location-action-exit .btn { justify-content: center; min-height: 44px; background: transparent; color: #b4c8dd; --action-icon: url('./image/ui/action-exit.svg'); }
-.location-action-grid #exploreInfo { grid-column: 1 / -1; }
+.location-action-grid #exploreInfo,
+.location-action-grid #dangerousSeaEventInfo { grid-column: 1 / -1; }
+/* 難破船の選択は全列を使って縦に並べ、長い斥候情報でボタンが押し潰されるのを防ぐ。 */
+.location-action-grid #dangerousWreckChoices { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 7px; }
+.location-action-grid #dangerousWreckChoices .tiny { margin: 4px 0 0; overflow-wrap: anywhere; }
 #tradeBtn { --action-icon: url('./image/ui/supplies.svg'); }
 #outfittingOpenBtn { --action-icon: url('./image/ui/ship.svg'); }
 #hireBtn { --action-icon: url('./image/ui/troops.svg'); }

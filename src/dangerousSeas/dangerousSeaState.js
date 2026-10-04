@@ -69,6 +69,23 @@ export function normalizeDangerousSeas(raw) {
 }
 
 /**
+ * 現在の作用海域を離れた荒波を棄却する。襲撃後へ保留した波は当日・同海域の分だけ保持する。
+ * 域内で確定した波の損失・行動・敵編成には触れず、退避や旧保存の復帰で域外へ被害を持ち越さない。
+ * @param {object} data 危険海域状態。 @param {object|null} sea 共通地形判定による現在海域。
+ * @param {number} today 通算日。 @returns {boolean} 無効になった波を取り除いたか。
+ */
+export function discardRoughWaveOutsideRegion(data, sea, today) {
+  const hazard = data?.pendingHazard;
+  if (!hazard) return false;
+  if (hazard.kind === "wave" && hazard.regionId !== sea?.regionId) { data.pendingHazard = null; return true; }
+  if (hazard.kind === "raid" && hazard.deferredWave
+    && (hazard.deferredWave.regionId !== sea?.regionId || hazard.deferredWave.day !== today)) {
+    hazard.deferredWave = null; return true;
+  }
+  return false;
+}
+
+/**
  * 日次の警戒を一度だけ更新する。荒波は独立した12～18日周期、襲撃は警戒度と斥候から抽選する。
  * 外に出ても二日間は警戒を保持し、三日目以降に二ずつ低下する。拘留日は回復だけ適用する。
  * 予報の到来日は新しい危険を抽選せず、探索などの固定戦闘がある日は追加襲撃を抑える。
@@ -77,10 +94,12 @@ export function normalizeDangerousSeas(raw) {
  * @param {Function} [random=Math.random] 乱数源。 @returns {object|null} 新しく確定した危険。
  */
 export function tickDangerousSeaDay(data, sea, today, options = {}, random = Math.random) {
+  if (data.lastProcessedAbs != null && today < data.lastProcessedAbs) return null;
+  const here = options.detained ? null : sea;
+  discardRoughWaveOutsideRegion(data, here, today);
   if (data.lastProcessedAbs != null && today <= data.lastProcessedAbs) return null;
   data.lastProcessedAbs = today;
   const waves = updateDangerousWeather(data, today, options.scouts || 0, random);
-  const here = options.detained ? null : sea;
   for (const [id, region] of Object.entries(data.regions)) {
     if (here?.regionId === id) {
       region.outsideDays = 0;

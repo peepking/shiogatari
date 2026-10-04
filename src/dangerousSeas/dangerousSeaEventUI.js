@@ -14,7 +14,7 @@ import { beginDangerousSeaAction, finishDangerousSeaAction, dangerousSeaActionBl
 import { dangerousSeaAt } from "./dangerousSeaWorld.js";
 import { getDangerousSeaEventAt, visibleDangerousSeaEvents } from "./dangerousSeaEventWorld.js";
 import { DANGEROUS_SEA_EVENT_DEFS as DEFS, dangerousEventScoutRules } from "./dangerousSeaEventConfig.js";
-import { closeDangerousSeaEvent, dangerousSeaEventOutcome } from "./dangerousSeaEventState.js";
+import { closeDangerousSeaEvent, dangerousSeaEventOutcome, getDangerousSeaEventById } from "./dangerousSeaEventState.js";
 
 /** 結果の確認後に現在地の操作を同期する。 */
 let eventSync = null;
@@ -24,10 +24,10 @@ let handlingChoice = false;
 /** @returns {object|null} 限定イベントの途中記録。 */
 function pending() { return state.dangerousSeas?.events?.pending || null; }
 
-/** @returns {object|null} 途中記録が参照する一枠の地点。 */
+/** @returns {object|null} 途中記録のIDと海域が一致する、通常枠または置き土産枠の地点。 */
 function currentEvent() {
-  const progress = pending(), event = progress && state.dangerousSeas.events.active[progress.regionId];
-  return event?.id === progress?.eventId ? event : null;
+  const progress = pending(), event = progress && getDangerousSeaEventById(state.dangerousSeas.events, progress.eventId);
+  return event && event.regionId === progress.regionId ? event : null;
 }
 
 /** @returns {boolean} 別の処理を始めずに出来事へ参加できるか。 */
@@ -36,12 +36,12 @@ function available() {
     && !state.expansion?.fishing?.pending && !state.expansion?.exploration?.pending && !state.expansion?.charts?.pending && !dangerousSeaActionBlocked();
 }
 
-/** 正体と事故率の手掛かりを段階的に表示する。 @param {object} event 地点。 @returns {string} 手掛かり。 */
+/** 出来事の様子と、斥候が確認した灯火の正体を表示する。 @param {object} event 地点。 @returns {string} 手掛かり。 */
 function hintText(event) {
-  if (event.kind !== "fog_light") return event.hintTier >= 5 ? "斥候が安全な接近経路を調べました。事故の危険が下がります。" : "現地の調査には1日かかります。斥候がいると事故の危険が下がります。";
-  if (event.hintTier >= 10) return { rescue: "斥候は救難信号と乗員の姿を確認しました。", trap: "斥候は灯火の陰に潜む海賊船を確認しました。", empty: "斥候は船に乗員がいないことを確認しました。" }[event.variant];
-  if (event.hintTier >= 5) return event.variant === "trap" ? "灯火の周囲に、不自然に揃った帆影があります。" : "灯火の周囲に、待ち伏せの帆影は見当たりません。";
-  return event.hintTier >= 1 ? "霧の中に船の灯火が見えます。救難か罠かはまだ分かりません。" : "霧の中から灯火が揺れています。正体は近づくまで分かりません。";
+  if (event.kind !== "fog_light") return { storm_aftermath: "嵐が運んだ積荷が漂着しています。", sinking_treasure: "沈みかけた船に積荷と乗員が残っています。", seabed_bell: "海底から鐘の音が聞こえます。" }[event.kind] || "";
+  if (event.hintTier >= 10) return { rescue: "斥候が救難信号と乗員を確認しました。", trap: "斥候が灯火の陰に潜む海賊船を確認しました。", empty: "斥候の報告では無人船です。" }[event.variant];
+  if (event.hintTier >= 5) return event.variant === "trap" ? "灯火の周囲に、不自然に揃った帆影があります。" : "待ち伏せの帆影は見当たりません。";
+  return event.hintTier >= 1 ? "船の灯火を発見。救難か罠かは不明です。" : "霧の中に灯火が見えます。正体は不明です。";
 }
 
 /** 固定報酬を既存イベントの資源表示へ変換する。 @param {object|null} reward 報酬。 @returns {object[]} 表示資源。 */
@@ -95,15 +95,15 @@ export function processDangerousSeaEvent() {
     || (elements.battleResultModal && !elements.battleResultModal.hidden) || (elements.battleBlock && !elements.battleBlock.hidden)) return false;
   const def = DEFS[event.kind];
   if (progress.stage === "result") {
-    enqueueEvent({ kind: "dangerous_event", title: def.name, body: `${progress.resultText}${progress.accident ? " 接近中の事故で資金と物資の回収量が半分になりました。" : ""}\n上限を超えた物資・兵員は航海を再開する前に整理してください。`,
-      resources: progress.applied ? rewardResources(progress.reward) : [], actions: [{ label: progress.complete ? "成果を確認して航海を再開" : "手掛かりを記録して航海へ戻る", type: "dangerous_event_choice", payload: { eventId: event.id, choice: "ack" } }] });
+    enqueueEvent({ kind: "dangerous_event", title: def.name, body: `${progress.resultText}${progress.accident ? " 事故で回収資金・物資が半減しました。" : ""}\n積載上限を超えた物資・兵員は整理してください。`,
+      resources: progress.applied ? rewardResources(progress.reward) : [], actions: [{ label: progress.complete ? "航海を再開" : "手掛かりを記録して戻る", type: "dangerous_event_choice", payload: { eventId: event.id, choice: "ack" } }] });
     return true;
   }
   const choices = event.kind === "seabed_bell" ? [["listen", "descend", "answer"][event.progress]] : Object.keys(def.choices);
-  const body = event.kind === "sinking_treasure" ? "宝船が沈みかけています。積荷か乗員、片方しか運び出せません。\n積荷: 資金3000・香辛料4・織物3 / 救助: 資金300・海兵4人・斥候2人。"
-    : event.kind === "seabed_bell" ? `海底から鐘の音が響きます。調査 ${event.progress + 1}/3。各段階で1日を使います。`
+  const body = event.kind === "sinking_treasure" ? "積荷か乗員、片方だけを運び出せます。\n積荷: 資金3000・香辛料4・織物3 / 救助: 資金300・海兵4人・斥候2人。"
+    : event.kind === "seabed_bell" ? `海底から鐘の音が響きます。調査 ${event.progress + 1}/3（各1日）。`
       : hintText(event);
-  enqueueEvent({ kind: "dangerous_event", title: def.name, body: `${body}\n期限まであと${Math.max(0, event.expiresAbs - absDay(state))}日。選んだ活動は1日かかります。事故では回収資金・物資が半減します。`,
+  enqueueEvent({ kind: "dangerous_event", title: def.name, body: `${body}\n期限まであと${Math.max(0, event.expiresAbs - absDay(state))}日。事故で回収資金・物資が半減する恐れがあります。`,
     actions: [...choices.map(choice => ({ label: `${def.choices[choice]}（1日）`, type: "dangerous_event_choice", payload: { eventId: event.id, choice } })),
       { label: "参加を見送る", type: "dangerous_event_choice", payload: { eventId: event.id, choice: "leave" } }] });
   return true;
@@ -125,7 +125,7 @@ function settleEvent(success, save = true) {
     event.progress++;
   } else {
     progress.reward = { funds: 0, supplies: {}, troops: {} }; progress.complete = true; progress.accident = false;
-    progress.resultText = "海賊の罠から退きました。この出来事の積荷・救助報酬は得られませんでした。";
+    progress.resultText = "海賊の罠から退きました。報酬は得られませんでした。";
   }
   event.completed = progress.complete;
   event.choices.push({ choice: progress.choice, day: absDay(state), success, accident: progress.accident, reward: structuredClone(progress.reward) });
@@ -173,7 +173,7 @@ export function resumeDangerousSeaEvent(syncUI) {
   if (progress.encounter) {
     const oldEncounter = state.pendingEncounter, oldMode = state.modeLabel;
     state.pendingEncounter = structuredClone(progress.encounter); state.modeLabel = MODE_LABEL.PREP; progress.stage = "battle";
-    if (!saveGameToStorage()) { state.pendingEncounter = oldEncounter; state.modeLabel = oldMode; progress.stage = "action"; pushToast("保存できません", "固定された海賊の罠を再開してください。", "warn"); return false; }
+    if (!saveGameToStorage()) { state.pendingEncounter = oldEncounter; state.modeLabel = oldMode; progress.stage = "action"; pushToast("保存できません", "灯火の調査を再開してください。", "warn"); return false; }
     pushToast("霧中の海賊の罠", "灯火の陰から海賊船が現れました。戦闘・逃走・降伏を選んでください。", "warn");
   } else if (!settleEvent(true)) return false;
   processDangerousSeaEvent(); eventSync?.();
@@ -225,6 +225,7 @@ export function finishDangerousSeaEventEncounter(encounter, won = true) {
 
 /**
  * 既存の探索ボタン付近へ出来事の入口と発見済み情報を追加する。回遊は海域全体で期限まで有効で、調査による消費をしない。
+ * 同じ海域の通常枠と置き土産枠を両方表示し、現在地・途中記録と同じIDは重ねない。
  * @param {Function} syncUI 表示同期。 @returns {void}
  */
 export function renderDangerousSeaEventControl(syncUI) {
@@ -243,7 +244,14 @@ export function renderDangerousSeaEventControl(syncUI) {
   button.textContent = progress ? "海域の出来事を再開" : `${DEFS[event?.kind]?.name || "出来事"}を調べる`;
   button.onclick = () => beginEvent(eventSync);
   const regionId = dangerousSeaAt(state.position)?.regionId;
-  const known = event || visibleDangerousSeaEvents().find(site => site.regionId === regionId);
-  info.hidden = !known;
-  info.textContent = known ? `${DEFS[known.kind].name} (${known.position.x + 1}, ${known.position.y + 1}) / 期限まであと${Math.max(0, known.expiresAbs - absDay(state))}日 / ${known.kind === "fish_migration" ? "この海域の一部の巨大魚が釣れやすい期間です。希少・未登録枠と餌の相性は維持されます。" : hintText(known)}` : "";
+  const known = new Map(visibleDangerousSeaEvents().filter(site => site.regionId === regionId).map(site => [site.id, site]));
+  if (event) known.set(event.id, event);
+  info.hidden = !known.size;
+  info.textContent = "";
+  for (const site of known.values()) {
+    if (info.childNodes.length) info.append(document.createElement("br"));
+    const line = document.createElement("span");
+    line.textContent = `${DEFS[site.kind].name} (${site.position.x + 1}, ${site.position.y + 1}) / あと${Math.max(0, site.expiresAbs - absDay(state))}日 / ${site.kind === "fish_migration" ? "この海域で一部の巨大魚が釣れやすくなっています。" : hintText(site)}`;
+    info.append(line);
+  }
 }

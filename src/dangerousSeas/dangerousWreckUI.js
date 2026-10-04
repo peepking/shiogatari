@@ -9,7 +9,7 @@ import { beginDangerousSeaAction, finishDangerousSeaAction } from "./dangerousSe
 import { dangerousWreckPending, chooseDangerousWreckStage, closeDangerousWreck, dangerousWreckHints } from "./dangerousWreck.js";
 
 /** @returns {void} 固定した探索を保存できない時の再試行を案内する。 */
-function saveFailure() { pushToast("保存できません", "探索結果は変更せず保留しています。保存容量を確認して探索を再開してください。", "warn"); }
+function saveFailure() { pushToast("保存できません", "保存容量を確認して探索を再開してください。", "warn"); }
 
 /** @returns {boolean} 戦闘・結果画面を閉じる前の追加探索を止めるか。 */
 function wreckScreenBlocked() {
@@ -60,14 +60,14 @@ export function resumeDangerousWreck(sync, finish) {
     const previous = state.pendingEncounter, mode = state.modeLabel;
     state.pendingEncounter = structuredClone(pending.encounter); state.modeLabel = MODE_LABEL.PREP;
     if (!saveGameToStorage()) { state.pendingEncounter = previous; state.modeLabel = mode; saveFailure(); sync?.(); return false; }
-    pushToast("難破船の待伏せ", "固定した敵船団と戦うか、逃走するかを選んでください。", "warn");
+    pushToast("難破船の待ち伏せ", "敵が潜んでいました。戦うか、逃走するかを選んでください。", "warn");
   } else {
     const before = structuredClone(state);
     state.modeLabel = MODE_LABEL.NORMAL;
     const resources = finish(true);
     if (!saveGameToStorage()) { Object.assign(state, before); saveFailure(); sync?.(); return false; }
     enqueueEvent({ title: pending.wreck.stage === "choice" ? "甲板の探索完了" : "船倉の探索完了",
-      body: dangerousWreckPending(state.dangerousSeas) ? "甲板の積荷を回収しました。引き上げるか、追加1日で積荷または生存者を探せます。" : "難破船の探索を終えました。積載上限を超えた場合は積荷や兵員を整理してください。", resources });
+      body: dangerousWreckPending(state.dangerousSeas) ? "甲板の積荷を回収。引き上げるか、追加1日で積荷または生存者を探せます。" : "探索を終えました。積載上限を超えた積荷・兵員は整理してください。", resources });
   }
   sync?.(); return true;
 }
@@ -105,5 +105,5 @@ export function renderDangerousWreckChoice(button, sync, finish) {
     const option = document.createElement("button"); option.className = "btn"; option.textContent = text;
     option.onclick = () => chooseDangerousWreckBranch(id, sync, finish); choices.append(option);
   }
-  const hints = document.createElement("p"); hints.className = "tiny"; hints.textContent = dangerousWreckHints(pending); choices.append(hints);
+  const hints = document.createElement("p"); hints.className = "tiny"; hints.textContent = `積荷か救助、どちらか一方を選べます。\n${dangerousWreckHints(pending)}`; choices.append(hints);
 }

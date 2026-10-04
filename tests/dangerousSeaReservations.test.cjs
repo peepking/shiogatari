@@ -12,7 +12,9 @@ async function main() {
   const game = { year: 0, season: 0, day: 1, position: { x: 0, y: 30 },
     expansion: { exploration: { sites: [] }, charts: { active: [] } },
     quests: { active: [], availableBySettlement: {} }, nobleQuests: { availableByNoble: {} },
-    dangerousSeas: { regions: { sw: { sites: [{ position: { x: 0, y: 40 } }] }, se: { sites: [] } }, bounties: { active: [{ position: { x: 1, y: 40 } }] } } };
+    dangerousSeas: { regions: { sw: { sites: [{ position: { x: 0, y: 40 } }] }, se: { sites: [] } }, bounties: { active: [{ position: { x: 1, y: 40 } }] },
+      events: { version: 2, active: { sw: { id: 1, position: { x: 10, y: 40 } }, se: null },
+        stormAftermath: { sw: { id: 2, position: { x: 2, y: 40 } }, se: null } } } };
   const grid = Array.from({ length: 50 }, () => Array.from({ length: 50 }, () => ({ terrain: "plain", building: "none" })));
   for (let x = 0; x <= 10; x++) grid[40][x].terrain = "sea";
   const stubs = {
@@ -44,26 +46,26 @@ async function main() {
     return module.namespace;
   }
   const reservations = await load("dangerousSeaReservations.js");
-  assert.equal(reservations.dangerousSeaReservedPositions(game).length, 2);
-  assert.ok(["0,40", "1,40"].every(key => reservations.worldReservedPositions(game).has(key)));
+  assert.equal(reservations.dangerousSeaReservedPositions(game).length, 4);
+  assert.ok(["0,40", "1,40", "2,40", "10,40"].every(key => reservations.worldReservedPositions(game).has(key)), "通常枠と置き土産枠を同時に予約する");
   const quests = await load("questUtils.js");
   const sea = await load("dangerousSeaWorld.js");
   assert.deepEqual(JSON.parse(JSON.stringify(quests.randomSeaTarget(game.position))), { x: 8, y: 40 }, "通常神託は円内の空きマスを避け、削った角側の通常海を使える");
   const hunt = quests.randomHuntTarget({ x: 1, y: 40 }, 1, 1, [{ x: 1, y: 39 }, { x: 1, y: 41 }]);
   assert.equal(sea.dangerousSeaAt(hunt), null, "通常討伐の範囲を緩和しても危険海域を使わない");
   const chart = await load("chartWorld.js");
-  assert.ok(["0,40", "1,40"].every(key => chart.reservedChartPositions().has(key)));
+  assert.ok(["0,40", "1,40", "2,40", "10,40"].every(key => chart.reservedChartPositions().has(key)), "海図の未公開地点も両イベント枠を避ける");
   assert.ok(chart.reservedChartPositions().has("7,40"), "海図も円内の空き危険マスを新規候補から除く");
   assert.equal(chart.reservedChartPositions().has("9,40"), false, "削った角は通常海図の候補に戻る");
   const bounties = await load("bountyWorld.js");
   bounties.updateBountyWorld();
-  assert.equal(game.bounties.active.length, 9);
-  assert.ok(game.bounties.active.every(site => !["0,40", "1,40"].includes(`${site.position.x},${site.position.y}`)));
-  assert.deepEqual(JSON.parse(JSON.stringify(game.bounties.active[0].position)), { x: 2, y: 40 });
+  assert.equal(game.bounties.active.length, 7);
+  assert.ok(game.bounties.active.every(site => !["0,40", "1,40", "2,40", "10,40"].includes(`${site.position.x},${site.position.y}`)), "通常賞金首の補充は置き土産も避ける");
+  assert.deepEqual(JSON.parse(JSON.stringify(game.bounties.active[0].position)), { x: 3, y: 40 });
 
   const story = await load("pirateKingWorld.js");
   const blocked = story.pirateStoryBlockedPositions(game);
-  assert.ok(["0,40", "1,40", "2,40"].every(key => blocked.has(key)));
+  assert.ok(["0,40", "1,40", "2,40", "3,40", "10,40"].every(key => blocked.has(key)), "物語の配置も置き土産を予約する");
   grid[41][2].terrain = "sea";
   const progress = { completed: false, active: null, waitingId: "bjorn", rumorOrigin: game.position };
   const lord = story.placePirateStory(progress, grid, game.position, blocked, () => 0);

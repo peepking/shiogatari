@@ -10,8 +10,16 @@ async function main() {
   const state = {}, context = vm.createContext({ structuredClone, CustomEvent: class {}, console });
   let saves = 0, failAt = 0, days = 0, scouts = 0, newHazard = null;
   const nodes = new Map();
-  /** @returns {object} ボタン追加に必要な最小限のDOM。 */
-  function node() { return { hidden: true, insertAdjacentElement(where, child) { nodes.set(child.id, child); } }; }
+  /** @param {string} [tag="div"] 要素名。 @returns {object} ボタンと複数の発見情報を保持する最小限のDOM。 */
+  function node(tag = "div") { return { tagName: tag.toUpperCase(), hidden: true, childNodes: [],
+    /** @param {string} value 表示内容。 @returns {void} 子の発見情報を消して文字を置く。 */
+    set textContent(value) { this.text = value; this.childNodes = []; },
+    /** @returns {string} 子を含む表示内容。 */
+    get textContent() { return (this.text || "") + this.childNodes.map(child => child.textContent).join(""); },
+    /** @param {object} child 子要素。 @returns {void} 発見情報を追加する。 */
+    append(child) { this.childNodes.push(child); },
+    /** @param {string} where 挿入位置。 @param {object} child 後続要素。 @returns {void} 動的要素のIDを登録する。 */
+    insertAdjacentElement(where, child) { nodes.set(child.id, child); } }; }
   nodes.set("exploreBtn", node());
   context.document = { getElementById: id => nodes.get(id), createElement: node, dispatchEvent() {} };
   const cache = new Map();
@@ -32,8 +40,8 @@ async function main() {
       return count;
     } },
     "dangerousSeaWorld.js": { dangerousSeaAt: () => ({ regionId: "sw", level: "outer" }) },
-    "dangerousSeaEventWorld.js": { getDangerousSeaEventAt: position => Object.values(state.dangerousSeas.events.active).find(event => event?.position.x === position.x && event.position.y === position.y),
-      visibleDangerousSeaEvents: () => Object.values(state.dangerousSeas.events.active).filter(event => event?.discovered) },
+    "dangerousSeaEventWorld.js": { getDangerousSeaEventAt: position => rules.activeDangerousSeaEvents(state.dangerousSeas.events).find(event => event.position.x === position.x && event.position.y === position.y),
+      visibleDangerousSeaEvents: () => rules.activeDangerousSeaEvents(state.dangerousSeas.events).filter(event => event.discovered) },
     "dangerousSeaHazards.js": {
       dangerousSeaActionBlocked: () => !!((state.dangerousSeas.pendingHazard && state.dangerousSeas.pendingHazard.stage !== "watch") || state.dangerousSeas.action || state.dangerousSeas.events.pending),
       beginDangerousSeaAction: kind => {
@@ -87,8 +95,55 @@ async function main() {
     return accepted;
   }
 
-  // 入口と選択の保存失敗で、日数・選択・報酬・統計を進めない。
+  /** @returns {void} 旧版の同一枠に保存した置き土産と途中参照を新枠へ復元する。 */
+  function restoreLegacyStorm() {
+    const data = plain(state.dangerousSeas.events);
+    data.version = 1; data.active.sw = data.stormAftermath.sw; delete data.stormAftermath;
+    state.dangerousSeas.events = rules.normalizeDangerousSeaEvents(data);
+  }
+
+  // 置き土産と回遊を共に知らせ、置き土産を回収しても回遊の地点・効果を保持する。
   let event = prepare("storm_aftermath");
+  const migration = rules.spawnDangerousSeaEvent(state.dangerousSeas.events, "sw", "fish_migration",
+    [{ x: 1, y: 49, level: "outer", travelDays: 2 }], 120001, () => null, () => .9);
+  event.discovered = true; migration.discovered = true;
+  ui.renderDangerousSeaEventControl(() => {});
+  const info = nodes.get("dangerousSeaEventInfo");
+  assert.ok(info.textContent.includes("嵐の置き土産") && info.textContent.includes("巨大魚の回遊"), "両枠の発見情報を同時表示する");
+  assert.equal(info.childNodes.filter(child => child.tagName === "SPAN").length, 2, "現在地と発見済みの同じ地点を重複表示しない");
+  assert.equal(info.childNodes.filter(child => child.tagName === "BR").length, 1, "出来事ごとに改行する");
+  open(event); choose(event.id, "recover"); choose(event.id, "ack");
+  assert.equal(state.dangerousSeas.events.stormAftermath.sw, null);
+  assert.equal(state.dangerousSeas.events.active.sw.id, migration.id);
+  assert.equal(rules.migrationFishIds(state, "sw", 120002).length, 3, "回収後も回遊効果を維持する");
+
+  // 他イベントを終了しても別位置の置き土産を残す。
+  event = prepare("sinking_treasure");
+  const storm = rules.spawnDangerousSeaEvent(state.dangerousSeas.events, "sw", "storm_aftermath",
+    [{ x: 1, y: 49, level: "outer", travelDays: 2 }], 120001, () => null, () => .9);
+  storm.discovered = true; open(event); choose(event.id, "cargo"); choose(event.id, "ack");
+  assert.equal(state.dangerousSeas.events.active.sw, null);
+  assert.equal(state.dangerousSeas.events.stormAftermath.sw.id, storm.id);
+
+  // 旧版の選択画面と支給済み結果から復帰し、正しい専用枠だけを終了する。
+  event = prepare("storm_aftermath"); open(event); restoreLegacyStorm();
+  assert.equal(state.dangerousSeas.events.active.sw, null);
+  assert.equal(state.dangerousSeas.events.pending.stage, "choice");
+  assert.equal(choose(event.id, "recover"), true); assert.equal(state.day, 2); assert.equal(state.funds, 1800);
+  restoreLegacyStorm(); ui.resumeDangerousSeaEvent();
+  assert.equal(state.day, 2); assert.equal(state.funds, 1800, "旧結果の再開で報酬を再支給しない");
+  assert.equal(choose(event.id, "ack"), true); assert.equal(state.dangerousSeas.events.stormAftermath.sw, null);
+
+  // 荒波に中断された旧版の活動は消費済みの一日から再開し、固定報酬を一度だけ付与する。
+  event = prepare("storm_aftermath"); open(event); newHazard = "wave"; choose(event.id, "recover"); restoreLegacyStorm();
+  assert.equal(state.dangerousSeas.events.pending.stage, "action"); assert.equal(state.dangerousSeas.events.pending.dayApplied, true);
+  assert.equal(ui.resumeDangerousSeaEvent(), false);
+  state.dangerousSeas.pendingHazard = null; newHazard = null; ui.resumeDangerousSeaEvent(); ui.resumeDangerousSeaEvent();
+  assert.equal(state.day, 2); assert.equal(state.funds, 1800);
+  assert.equal(choose(event.id, "ack"), true);
+
+  // 入口と選択の保存失敗で、日数・選択・報酬・統計を進めない。
+  event = prepare("storm_aftermath");
   failAt = 1; ui.renderDangerousSeaEventControl(() => {}); nodes.get("dangerousSeaEventBtn").onclick();
   assert.equal(state.dangerousSeas.events.pending, null); assert.equal(days, 0);
   failAt = 0; open(event);
@@ -97,9 +152,9 @@ async function main() {
   failAt = 0; assert.equal(choose(event.id, "recover"), true);
   assert.equal(days, 1); assert.equal(state.funds, 1800); assert.equal(state.voyageStats.income, 1800);
   assert.equal(state.dangerousSeas.events.pending.stage, "result");
-  assert.ok(state.dangerousSeas.events.active.sw, "報酬確認までは一枠を保持");
+  assert.ok(state.dangerousSeas.events.stormAftermath.sw, "報酬確認までは置き土産枠を保持");
   assert.equal(choose(event.id, "recover"), false); assert.equal(state.funds, 1800);
-  assert.equal(choose(event.id, "ack"), true); assert.equal(state.dangerousSeas.events.active.sw, null); assert.equal(state.dangerousSeas.action, null);
+  assert.equal(choose(event.id, "ack"), true); assert.equal(state.dangerousSeas.events.stormAftermath.sw, null); assert.equal(state.dangerousSeas.action, null);
 
   // 日数適用直後に保存できなかった場合、確定済み選択から一日だけ再開する。
   event = prepare("sinking_treasure"); open(event); failAt = saves + 2;
@@ -154,7 +209,7 @@ async function main() {
   event = prepare("sinking_treasure"); open(event); state.day = event.expiresAbs - 120000;
   assert.equal(choose(event.id, "cargo"), true); assert.equal(days, 0); assert.equal(state.funds, 0); assert.equal(state.dangerousSeas.events.active.sw, null, "期限後の調査は始めない");
   state.eventQueue = [{ kind: "dangerous_event", actions: [{}] }]; ui.processDangerousSeaEvent(); assert.equal(state.eventQueue.length, 0);
-  console.log("dangerousSeaEventUI: 固定選択・保存失敗・危険保留・再開・戦後一意精算・鐘三段階の検証成功");
+  console.log("dangerousSeaEventUI: 両枠表示・独立終了・旧置き土産の再開・保存失敗・危険保留・一意精算・鐘三段階の検証成功");
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -77,7 +77,7 @@ async function main() {
   function unusedAction() {}
   modules["./actions.js"] = mockModule({ handleTravelEventAction: unusedAction, isBattleEventActionBlocked: () => false });
   modules["./dom.js"] = mockModule({ elements: {}, pushLog: unusedAction });
-  modules["./dangerousSeaHazards.js"] = mockModule({ handleDangerousRaidAction: () => false });
+  modules["./dangerousSeaHazards.js"] = mockModule({ handleDangerousRaidAction: () => false, resolveDangerousSeaWave: () => null, discardInvalidDangerousWaveNotifications: () => false });
   modules["./dangerousSeaEventUI.js"] = mockModule({ handleDangerousSeaEventAction: () => false });
   modules["./faction.js"] = mockModule({
     addHonorFaction: unusedAction, addWarScore: unusedAction, adjustNobleFavor: unusedAction,

@@ -139,6 +139,29 @@ async function main() {
     averages.push(sum / 500);
   }
   assert.ok(averages[1] > averages[0] + 8 && averages[2] > averages[1] + 4, plain(averages));
+
+  // 円の境界から通常の海へ退避する当日に予定波が到来しても、到着地へ被害を持ち出さない。
+  stateModule.resetState(); world.buildWorld(2025); math.random = () => .99;
+  cache.get("fleet.js").namespace.addShips(state, { galleon: 2 });
+  state.day = 2; state.modeLabel = mode.NORMAL; state.supplies = { food: 100, wood: 1, fiber: 1 };
+  state.expansion.fishing.counts = { aji: 40 }; state.eventQueue = [];
+  const edge = geometry.getDangerousSeaPositions("sw").flatMap(point => [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({
+    from: point, to: { x: point.x + dx, y: point.y + dy },
+  }))).find(pair => world.mapData[pair.to.y]?.[pair.to.x]?.terrain === "sea"
+    && !world.mapData[pair.to.y][pair.to.x].settlement && !geometry.dangerousSeaAt(pair.to));
+  assert.ok(edge, "共通円形判定で隣接する通常海域の退避先を選べる");
+  state.position = { x: edge.from.x, y: edge.from.y }; state.selectedPosition = { ...edge.to };
+  const dueDay = cache.get("calendar.js").namespace.absDay(state) + 1;
+  state.dangerousSeas.regions.sw.weather = { day: dueDay, safeRoll: .9, known: true, avoided: false };
+  state.dangerousSeas.regions.sw.forecast = { day: dueDay, avoided: false };
+  assert.equal(actions.moveToSelected().ok, true); assert.equal(geometry.dangerousSeaAt(state.position), null);
+  assert.equal(state.dangerousSeas.pendingHazard, null); assert.equal(hazards.processDangerousSeaHazards(), false);
+  assert.equal(state.eventQueue.some(event => event.kind === "dangerous_wave"), false);
+  assert.equal(state.expansion.fishing.counts.aji, 40); assert.equal(state.supplies.wood, 1); assert.equal(state.supplies.fiber, 1);
+  assert.equal(storage.saveGameToStorage(), true); assert.equal(storage.loadGameFromStorage(), true);
+  assert.equal(state.dangerousSeas.pendingHazard, null); assert.equal(state.expansion.fishing.counts.aji, 40);
+  assert.equal(time.advanceDayWithEvents(1), 1); assert.equal(hazards.processDangerousSeaHazards(), false);
+  assert.equal(state.dangerousSeas.pendingHazard, null, "退避後の保存復帰や翌日でも過ぎた波を再発させない");
   console.log("危険海域の実モジュール接続: 独立配置・日次・移動・港退避・固定戦闘/荒波の保存復帰・進入案内・強敵分布: 成功");
 }
 

@@ -1,5 +1,5 @@
 /** 海域限定の出来事の初期調整値。各海域の一枠は途中選択・戦闘・結果確認中も占有する。 */
-export const DANGEROUS_SEA_EVENT_CONFIG = Object.freeze({ dailyChance: 0.05, marginDays: 5, migrationMultiplier: 2 });
+export const DANGEROUS_SEA_EVENT_CONFIG = Object.freeze({ dailyChance: 0.05, marginDays: 10, migrationMultiplier: 2 });
 
 /** 斥候の実効人数による発見距離と事故率。人数上限は十人、ゼロ人でも現地で参加できる。 */
 export const DANGEROUS_EVENT_SCOUT_RULES = Object.freeze([

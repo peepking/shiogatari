@@ -54,20 +54,31 @@ function squaredDangerousDistance(a, b) {
 
 /**
  * 基準矩形内で既定中心に上下左右で最も近い無法港を選ぶ。同距離なら上・左の順とする。
- * 核心候補5×5の四隅を半径6に含む整数中心から、実港への直線距離が最小の位置を選ぶ。
- * 同距離なら既定中心への直線距離、上・左の順で決め、港がずれても核心候補を削らない。
- * 港がない海域は既定中心を使い、地形や港位置は変更しない。
- * @param {object} ranges 基準矩形・核心候補・既定中心。 @param {Array} settlements 拠点。
- * @returns {{x:number,y:number}} 円の中心。
+ * 円中心の補正と港での予報表示は、この同じ実港を使う。
+ * @param {string} regionId 海域ID。 @param {Array} [settlements] 拠点。
+ * @returns {object|null} 対応する遠征港。候補がなければnull。
  */
-function dangerousSeaCenter(ranges, settlements) {
+export function dangerousSeaExpeditionPort(regionId, settlements = []) {
+  const ranges = Object.hasOwn(REGIONS, regionId) ? REGIONS[regionId] : null;
+  if (!ranges) return null;
   const ports = settlements.filter(port => port?.pirateHaven && port.coords && inDangerousRange(port.coords, ranges.outer));
   ports.sort((a, b) => {
     const distanceA = Math.abs(a.coords.x - ranges.anchor.x) + Math.abs(a.coords.y - ranges.anchor.y);
     const distanceB = Math.abs(b.coords.x - ranges.anchor.x) + Math.abs(b.coords.y - ranges.anchor.y);
     return distanceA - distanceB || a.coords.y - b.coords.y || a.coords.x - b.coords.x;
   });
-  const target = ports[0]?.coords || ranges.anchor;
+  return ports[0] || null;
+}
+
+/**
+ * 核心候補5×5の四隅を半径6に含む整数中心から、実港への直線距離が最小の位置を選ぶ。
+ * 同距離なら既定中心への直線距離、上・左の順で決め、港がずれても核心候補を削らない。
+ * 港がない海域は既定中心を使い、地形や港位置は変更しない。
+ * @param {string} regionId 海域ID。 @param {object} ranges 基準矩形・核心候補・既定中心。 @param {Array} settlements 拠点。
+ * @returns {{x:number,y:number}} 円の中心。
+ */
+function dangerousSeaCenter(regionId, ranges, settlements) {
+  const target = dangerousSeaExpeditionPort(regionId, settlements)?.coords || ranges.anchor;
   const corners = [
     { x: ranges.core[0], y: ranges.core[2] }, { x: ranges.core[1], y: ranges.core[2] },
     { x: ranges.core[0], y: ranges.core[3] }, { x: ranges.core[1], y: ranges.core[3] },
@@ -94,7 +105,7 @@ export function buildDangerousSeaGeometry(map, settlements = []) {
   const mother = largestDangerousSea(map), byPosition = new Map(), positions = { sw: [], se: [] };
   const supplyPositions = settlements.filter(settlement => settlement?.coords && (settlement.kind === "town" || settlement.kind === "village" || settlement.pirateHaven)).map(settlement => settlement.coords);
   for (const [regionId, ranges] of Object.entries(REGIONS)) {
-    const center = dangerousSeaCenter(ranges, settlements);
+    const center = dangerousSeaCenter(regionId, ranges, settlements);
     for (let y = center.y - DANGEROUS_SEA_RADIUS; y <= center.y + DANGEROUS_SEA_RADIUS; y++) for (let x = center.x - DANGEROUS_SEA_RADIUS; x <= center.x + DANGEROUS_SEA_RADIUS; x++) {
       const position = { x, y }, cell = map[y]?.[x], key = `${x},${y}`;
       if (squaredDangerousDistance(position, center) > DANGEROUS_SEA_RADIUS ** 2) continue;

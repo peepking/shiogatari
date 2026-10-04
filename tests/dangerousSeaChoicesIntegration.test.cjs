@@ -19,6 +19,8 @@ async function main() {
     set id(value) { this.identifier = value; nodes.set(value, this); }
     /** @returns {string} 要素ID。 */
     get id() { return this.identifier; }
+    /** @returns {Element[]} 発見情報の子要素。 */
+    get childNodes() { return this.children; }
     /** @param {string} value 表示内容。 */
     set innerHTML(value) { this.html = value; this.children = []; }
     /** @returns {string} 表示内容。 */
@@ -143,7 +145,67 @@ async function main() {
     assert.equal(eventUI.handleDangerousSeaEventAction({ eventId: site.id, choice }), false, "もう一方の枝と報酬の再受取を拒否する");
     flush();
   }
-  console.log("危険海域の選択接続: 実甲板報告→三択→積荷/救助、宝船選択→結果→確認、保存直後の旧通知復帰: 成功");
+  // 旧保存の置き土産を実際の保存復元と通知キューで進め、併存する宝船を消さない。
+  reset();
+  const storm = eventRules.spawnDangerousSeaEvent(state.dangerousSeas.events, "sw", "storm_aftermath",
+    [{ ...state.position, level: "core", travelDays: 8 }], calendar.absDay(state), () => null, () => .99);
+  syncViews(); nodes.get("dangerousSeaEventBtn").click();
+  const legacy = state.dangerousSeas.events;
+  legacy.version = 1; legacy.active.sw = legacy.stormAftermath.sw; delete legacy.stormAftermath;
+  assert.equal(storage.saveGameToStorage(), true); assert.equal(storage.loadGameFromStorage(), true);
+  assert.equal(state.dangerousSeas.events.version, 2); assert.equal(state.dangerousSeas.events.active.sw, null);
+  assert.deepEqual(plain(state.dangerousSeas.events.stormAftermath.sw), plain(storm), "旧置き土産の固定内容・期限を復元する");
+  const treasure = eventRules.spawnDangerousSeaEvent(state.dangerousSeas.events, "sw", "sinking_treasure",
+    [{ x: state.position.x + 1, y: state.position.y, level: "core", travelDays: 8 }], calendar.absDay(state), () => null, () => .99);
+  treasure.discovered = true;
+  eventUI.resumeDangerousSeaEvent(syncViews); syncViews();
+  assert.equal(state.eventQueue[0].actions[0].payload.eventId, storm.id);
+  nodes.get("eventModalActions").children[0].click();
+  assert.equal(state.day, 3); assert.equal(state.dangerousSeas.events.pending.stage, "result");
+  const recoveredFunds = state.funds;
+  assert.equal(storage.saveGameToStorage(), true); assert.equal(storage.loadGameFromStorage(), true);
+  eventUI.resumeDangerousSeaEvent(syncViews); syncViews();
+  assert.equal(state.funds, recoveredFunds); assert.equal(state.day, 3);
+  assert.equal(state.eventQueue[0].actions[0].payload.choice, "ack");
+  nodes.get("eventModalActions").children[0].click(); flush();
+  assert.equal(state.dangerousSeas.events.pending, null); assert.equal(state.dangerousSeas.events.stormAftermath.sw, null);
+  assert.equal(state.dangerousSeas.events.active.sw.id, treasure.id, "置き土産の結果確認で併存する宝船を保持する");
+  assert.equal(state.dangerousSeas.events.history.length, 1);
+  assert.equal(eventUI.handleDangerousSeaEventAction({ eventId: storm.id, choice: "recover" }), false);
+
+  // 域外の旧保存に荒波通知が残っても初回の表示前に除き、別の通知と魚・物資を保持する。
+  for (const position of [{ x: 20, y: 20 }, { x: 4, y: 4 }, { x: 4, y: 45 }, { x: 49, y: 49 }]) {
+    reset(); state.position = position;
+    state.expansion.fishing.counts = { aji: 40 }; state.supplies = { wood: 2, fiber: 2 };
+    state.dangerousSeas.pendingHazard = { id: 77, kind: "wave", regionId: "sw", day: calendar.absDay(state), stage: "displaying", losses: { aji: 2 } };
+    state.eventQueue = [
+      { id: 1, kind: "dangerous_wave", title: "古い荒波", actions: [{ id: "1-0", label: "対策", type: "dangerous_wave_protect", payload: { id: 77 } }] },
+      { id: 2, kind: "info", title: "通常の通知", actions: [{ id: "2-0", label: "閉じる", type: "close" }] },
+    ];
+    assert.equal(storage.saveGameToStorage(), true); assert.equal(storage.loadGameFromStorage(), true);
+    events.showNextEvent(); flush();
+    assert.equal(state.dangerousSeas.pendingHazard, null, "港・通常海・別の危険海域では旧荒波を解除する");
+    assert.equal(state.eventQueue.length, 1); assert.equal(state.eventQueue[0].title, "通常の通知");
+    assert.equal(nodes.get("eventModalTitle").textContent, "通常の通知"); assert.equal(nodes.get("eventModalClose").hidden, false);
+    assert.deepEqual(plain(state.expansion.fishing.counts), { aji: 40 }); assert.deepEqual(plain(state.supplies), { wood: 2, fiber: 2 });
+  }
+
+  // 表示後に現在地が変わった場合もクリック直前に確認し、次の通知を誤って閉じない。
+  for (const actionType of ["dangerous_wave_protect", "dangerous_wave_accept"]) {
+    reset(); state.expansion.fishing.counts = { aji: 40 }; state.supplies = { wood: 2, fiber: 2 };
+    state.dangerousSeas.pendingHazard = { id: 78, kind: "wave", regionId: "sw", day: calendar.absDay(state), stage: "displaying", losses: { aji: 2 } };
+    state.eventQueue = [
+      { id: 3, kind: "dangerous_wave", title: "荒波", actions: [{ id: "3-0", label: "選択", type: actionType, payload: { id: 78 } }] },
+      { id: 4, kind: "info", title: "残す通知", actions: [{ id: "4-0", label: "閉じる", type: "close" }] },
+    ];
+    events.showNextEvent(); const waveButton = nodes.get("eventModalActions").children[0];
+    assert.equal(nodes.get("eventModalTitle").textContent, "荒波"); state.position = { x: 20, y: 20 };
+    waveButton.click(); flush();
+    assert.equal(state.dangerousSeas.pendingHazard, null); assert.equal(state.eventQueue.length, 1);
+    assert.equal(state.eventQueue[0].title, "残す通知"); assert.equal(nodes.get("eventModalTitle").textContent, "残す通知");
+    assert.deepEqual(plain(state.expansion.fishing.counts), { aji: 40 }); assert.deepEqual(plain(state.supplies), { wood: 2, fiber: 2 });
+  }
+  console.log("危険海域の選択接続: 実甲板/船倉・宝船・保存直後の通知復帰・域外荒波の表示/操作/資源保護: 成功");
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -145,7 +145,7 @@ export function resumeExploration(syncUI) {
       Object.assign(state, before);
       restoreWorld(world);
       state.modeLabel = MODE_LABEL.PREP;
-      pushToast("保存できません", "探索を中断しました。保存容量などを確認し、探索を再開してください。", "warn");
+      pushToast("保存できません", "保存容量を確認して探索を再開してください。", "warn");
       syncUI();
       return;
     }
@@ -158,7 +158,7 @@ export function resumeExploration(syncUI) {
   } else {
     const resources = finishExploration(true);
     state.modeLabel = MODE_LABEL.NORMAL;
-    enqueueEvent({ title: "探索完了", body: "探索で資金と物資を回収しました。上限を超えた場合は物資の破棄・兵員の解雇で整理してください。", resources });
+    enqueueEvent({ title: "探索完了", body: "資金と物資を回収しました。積載上限を超えた物資・兵員は整理してください。", resources });
     saveGameToStorage();
   }
   syncUI();
@@ -176,7 +176,7 @@ function beginExploration(syncUI) {
   if (!site || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active || state.expansion.charts.pending || dangerousSeaActionBlocked()) return;
   const staged = site.regionId && site.kind === "wreck";
   confirmAction({ title: `${EXPLORATION_NAMES[site.kind]}を探索`,
-    body: `${staged ? "甲板の探索に1日かかります。回収後は引き上げるか、追加1日で積荷または生存者を探せます。" : "探索に1日かかります。"}消滅まであと${site.expiresAbs - absDay(state)}日。\n${describeDanger(site.danger)}\n敵は賞金首相当です。敗北・逃走・引き分けでは現在の段階の報酬を得られず、この地点は消えます。`,
+    body: `${staged ? "甲板の探索は1日。続けるなら積荷か救助の一方を選び、さらに1日かかります。" : "探索に1日かかります。"}\n期限まであと${site.expiresAbs - absDay(state)}日。\n${describeDanger(site.danger)}\n敵は賞金首相当。敗北・逃走・引き分けでは、この段階の報酬を受け取れず地点は消えます。`,
     confirmText: "1日使って探索",
     onConfirm: () => {
       const currentSite = getExplorationAt(state.position);
@@ -205,7 +205,7 @@ function beginExploration(syncUI) {
       if (!beginDangerousSeaAction("exploration")) { Object.assign(state, before); return; }
       if (!saveGameToStorage()) {
         Object.assign(state, before);
-        pushToast("保存できません", "探索は開始していません。保存容量などを確認してください。", "warn");
+        pushToast("保存できません", "探索は開始していません。保存容量を確認してください。", "warn");
         return;
       }
       document.dispatchEvent(new CustomEvent("auto-move-stop"));
@@ -234,7 +234,7 @@ export function renderExplorationControl(syncUI) {
   button.onclick = () => beginExploration(syncUI);
   info.hidden = button.hidden;
   info.textContent = site ? `${site.regionId ? `危険海域・${site.level === "core" ? "核心" : "外縁"} / ` : ""}${describeDanger(site.danger)} / ${site.regionId && site.kind === "wreck" ? "甲板1日・船倉は積荷か救助の追加1日" : "探索1日"}` : "";
-  if (wreck?.pausedForHazard) info.textContent = "難破船の探索を保留しています。危険を解決した後、同じ段階から再開できます。";
+  if (wreck?.pausedForHazard) info.textContent = "難破船の探索は中断中。危険を解決すると再開できます。";
   renderDangerousWreckChoice(button, syncUI, finishExploration);
 }
 import { addShips, prepareShipReward, shipListText } from "../fleet/fleet.js";

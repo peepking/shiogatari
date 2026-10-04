@@ -53,12 +53,12 @@ export function createDangerousWreckPending(site, reward, encounter, scouts, cre
 /** @param {object} pending 段階探索。 @returns {string} 固定斥候情報。 */
 export function dangerousWreckHints(pending) {
   const wreck = pending.wreck;
-  if (!wreck.tier) return "斥候の事前情報はありません。船倉には待伏せや浸水の恐れがあります。";
+  if (!wreck.tier) return "船倉には待ち伏せや浸水の恐れがあります。";
   const cargo = wreck.branches.cargo, rescue = wreck.branches.rescue;
-  const hints = ["斥候が船倉への進路を調べています。"];
-  if (wreck.tier >= 1) hints.push(cargo.encounter || rescue.encounter ? "奥から人影や武器の音を認めました。" : "目立つ待伏せの兆候はありません。警戒は必要です。");
+  const hints = [];
+  if (wreck.tier >= 1) hints.push(cargo.encounter || rescue.encounter ? "奥に人影があり、武器の音が聞こえます。" : "待ち伏せの兆候はありません。");
   if (wreck.tier >= 2) hints.push(cargo.accident ? "積荷の区画に浸水の兆候があります。" : "積荷の区画は比較的安定しています。", rescue.reward.fragment ? "生存者が航路の手掛かりを持っているようです。" : "船倉から生存者の声が聞こえます。");
-  if (wreck.tier >= 3) hints.push(rescue.accident ? "救助用の足場が傷んでいます。資材の損失に備えてください。" : "救助用の足場と退避経路を確認しました。", "積荷と救助はそれぞれ追加1日。どちらか一方だけを選べます。");
+  if (wreck.tier >= 3) hints.push(rescue.accident ? "救助の足場が傷んでいます。資材の損失に注意。" : "救助の足場と退避経路を確認しました。");
   return hints.join("\n");
 }
 

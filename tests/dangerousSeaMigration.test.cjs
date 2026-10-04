@@ -23,7 +23,7 @@ function legacyGame() {
     pendingEncounter: { active: false }, expansion: { exploration: { sites: [] }, charts: { active: [] } },
     bounties: { active: [] }, quests: { active: [], availableBySettlement: {} }, nobleQuests: { availableByNoble: {} },
     dangerousSeas: { regions: { sw: { sites: [] }, se: { sites: [] } }, bounties: { active: [], history: [{ id: 99 }] },
-      events: { active: { sw: null, se: null }, history: [{ id: 88 }] }, explorationPending: null, pendingHazard: null, action: null } };
+      events: { active: { sw: null, se: null }, stormAftermath: { sw: null, se: null }, history: [{ id: 88 }] }, explorationPending: null, pendingHazard: null, action: null } };
 }
 
 /** @param {number} id 個体。 @param {string} regionId 海域。 @param {object} position 位置。 @param {string} [level="outer"] 段階。 @returns {object} 固定情報のある旧探索。 */
@@ -76,11 +76,13 @@ async function main() {
   game.dangerousSeas.bounties.active = [{ id: 4, regionId: "sw", position: { x: 9, y: 41 }, reward: 123456, formation: [{ type: "marine", count: 7, level: 4 }], expiresAbs: 500 }];
   game.dangerousSeas.events.active.se = { id: 3, regionId: "se", position: { x: 40, y: 40 }, level: "outer", progress: 0, choices: [],
     rewards: { cargo: { funds: 3456 } }, accidentRoll: .123, fishIds: ["oarfish"], expiresAbs: 77 };
-  const dedicated = [...sites, ...game.dangerousSeas.bounties.active, game.dangerousSeas.events.active.se];
+  game.dangerousSeas.events.stormAftermath.se = { id: 5, kind: "storm_aftermath", regionId: "se", position: { x: 41, y: 40 }, level: "outer", progress: 0, choices: [],
+    rewards: { collect: { funds: 1234, supplies: { spice: 3 }, troops: {} } }, accidentRoll: .321, expiresAbs: 88 };
+  const dedicated = [...sites, ...game.dangerousSeas.bounties.active, game.dangerousSeas.events.active.se, game.dangerousSeas.events.stormAftermath.se];
   const fixed = dedicated.map(fixedContent), before = plain(game), reserved = reservations.worldReservedPositions(game);
   const noRandom = math.random; math.random = () => { throw new Error("移行で再抽選しない"); };
   const result = migrate(game, world);
-  assert.deepEqual(plain(result), { changed: true, moved: 4, unplaced: 0, deferred: 0, complete: true });
+  assert.deepEqual(plain(result), { changed: true, moved: 5, unplaced: 0, deferred: 0, complete: true });
   assert.equal(game.dangerousSeas.placementVersion, 1);
   dedicated.forEach((site, index) => {
     assert.equal(shape.byPosition.get(key(site.position)).regionId, site.regionId);
@@ -114,15 +116,17 @@ async function main() {
   assert.equal(fallback.dangerousSeas.regions.sw.sites[0].profile, "danger_core"); assert.equal(fallback.dangerousSeas.regions.sw.sites[0].level, "core");
 
   // 未選択のイベントでもpendingなら保護し、鐘の途中履歴や専用戦闘・保留危険も位置を維持する。
-  for (const route of ["exploration", "event_choice", "event_progress", "event_history", "bounty_battle", "exploration_battle", "event_battle", "hazard"]) {
+  for (const route of ["exploration", "event_choice", "event_progress", "event_history", "storm_choice", "storm_history", "storm_battle", "bounty_battle", "exploration_battle", "event_battle", "hazard"]) {
     const kept = legacyGame(), position = { x: 9, y: 40 };
     let site;
-    if (route.startsWith("event")) {
-      site = { id: 1, regionId: "sw", position, level: "outer", progress: 0, choices: [] }; kept.dangerousSeas.events.active.sw = site;
-      if (route === "event_choice") kept.dangerousSeas.events.pending = { eventId: 1, regionId: "sw", stage: "choice" };
+    if (route.startsWith("event") || route.startsWith("storm")) {
+      site = { id: 1, regionId: "sw", position, level: "outer", progress: 0, choices: [] };
+      if (route.startsWith("storm")) kept.dangerousSeas.events.stormAftermath.sw = site;
+      else kept.dangerousSeas.events.active.sw = site;
+      if (route === "event_choice" || route === "storm_choice") kept.dangerousSeas.events.pending = { eventId: 1, regionId: "sw", stage: "choice" };
       if (route === "event_progress") site.progress = 1;
-      if (route === "event_history") site.choices = [{ choice: "listen", day: 20 }];
-      if (route === "event_battle") kept.pendingEncounter = { active: true, dangerousEventId: 1 };
+      if (route === "event_history" || route === "storm_history") site.choices = [{ choice: "listen", day: 20 }];
+      if (route === "event_battle" || route === "storm_battle") kept.pendingEncounter = { active: true, dangerousEventId: 1 };
     } else if (route === "bounty_battle") {
       site = { id: 1, regionId: "sw", position }; kept.dangerousSeas.bounties.active = [site]; kept.pendingEncounter = { active: true, dangerousBountyId: 1 };
     } else {
@@ -174,12 +178,17 @@ async function main() {
     state.dangerousSeas.bounties.active.find(site => site.regionId === "sw").position = { x: 9, y: 40 };
     cache.get("dangerousSeaEventState.js").namespace.spawnDangerousSeaEvent(state.dangerousSeas.events, "se", "sinking_treasure",
       [{ x: 40, y: 40, level: "outer", travelDays: 20 }], cache.get("calendar.js").namespace.absDay(state), () => null, () => .99);
+    cache.get("dangerousSeaEventState.js").namespace.spawnDangerousSeaEvent(state.dangerousSeas.events, "se", "storm_aftermath",
+      [{ x: 41, y: 40, level: "outer", travelDays: 20 }], cache.get("calendar.js").namespace.absDay(state), () => null, () => .99);
     delete state.dangerousSeas.placementVersion;
     assert.equal(storage.saveGameToStorage(), true);
   }
   /** @returns {Array} 比較する全専用地点。 */
-  function activeSites() { return [...Object.values(state.dangerousSeas.regions).flatMap(region => region.sites), ...state.dangerousSeas.bounties.active, ...Object.values(state.dangerousSeas.events.active).filter(Boolean)]; }
+  function activeSites() { return [...Object.values(state.dangerousSeas.regions).flatMap(region => region.sites), ...state.dangerousSeas.bounties.active,
+    ...cache.get("dangerousSeaEventState.js").namespace.activeDangerousSeaEvents(state.dangerousSeas.events)]; }
   prepareLegacy();
+  assert.equal(state.dangerousSeas.events.active.se.kind, "sinking_treasure");
+  assert.equal(state.dangerousSeas.events.stormAftermath.se.kind, "storm_aftermath");
   const actualBefore = activeSites().map(fixedContent), beforeLoad = writes;
   assert.equal(storage.loadGameFromStorage(), true);
   assert.equal(writes, beforeLoad + 1); assert.equal(state.dangerousSeas.placementVersion, 1);

@@ -62,7 +62,9 @@ async function testDangerousOutcomes(uiSource, voyage, personnel, pursuit) {
         reward: structuredClone(event.rewards.trap), encounter: pending, complete: true, accident: false, resultText: "灯火は海賊の罠でした。" };
       danger.action = { id: 1, kind: "event", startedAbs: 1 };
       danger.pendingHazard = { id: 100, kind: "wave", stage: "action_running", regionId: "sw", losses: { herring: 1 } };
+      eventRules.spawnDangerousSeaEvent(danger.events, "sw", "storm_aftermath", [{ x: 1, y: 49, level: "core", travelDays: 8 }], 1, () => null, () => .9);
     }
+    const stormBefore = JSON.stringify(danger.events.stormAftermath.sw);
     const state = { funds: 1000, fame: 100, supplies: { food: 50, wood: 5 }, troops: { infantry: { 1: 10 } },
       quests: { active: [] }, pendingEncounter: pending, bounties: { active: [] }, dangerousSeas: danger, wanted: {},
       expansion: { exploration: { pending: null }, fishing: { counts: { herring: 20 } } }, position: { x: 0, y: 49 },
@@ -73,10 +75,13 @@ async function testDangerousOutcomes(uiSource, voyage, personnel, pursuit) {
     const record = name => (...args) => { calls.push({ name, args }); return []; };
     const context = vm.createContext({ state, structuredClone, ...voyage, ...personnel, ...pursuit, ...rules, ...bountyRules, ...explorationRules, ...wreckRules, ...fleet, ...variants, ...ships,
       DEFS: eventConfig.DANGEROUS_SEA_EVENT_DEFS,
+      getDangerousSeaEventById: eventRules.getDangerousSeaEventById,
       Math: Object.assign(Object.create(Math), { random: () => 0.5 }), FACTIONS: lore.FACTIONS, CONFIG: bountyConfig.DANGEROUS_BOUNTY_CONFIG,
       MODE_LABEL: { NORMAL: "normal", PREP: "prep", BATTLE: "battle" }, BATTLE_RESULT: { WIN: "win", LOSE: "lose", DRAW: "draw" }, BATTLE_RESULT_LABEL: {}, NONE_LABEL: "なし",
       QUEST_TYPES: {}, SUPPLY_ITEMS: [{ id: "food", name: "食料" }, { id: "wood", name: "木材" }], TROOP_STATS: {}, BONUS_CAPTURE_EVENT_TAGS: new Set(),
       getPlayerFactionId: () => "north", calcLosses: () => ({ lossProb: 0.6 }), calcCaptures: () => ({}), awardBattleFragment: () => null, absDay: () => 1,
+      /** @returns {object} 固定戦闘の現在地は南西の核心にある。 */
+      dangerousSeaAt() { return { regionId: "sw", level: "core" }; },
       settlements: [{ nobleId: "nearby_noble", coords: { x: 1, y: 49 } }], manhattan: () => 1,
       addWarScore: record("war"), completeBattlePower: record("power"), nationalPowerResources: record("powerResources"),
       adjustSupport: record("support"),
@@ -130,6 +135,7 @@ async function testDangerousOutcomes(uiSource, voyage, personnel, pursuit) {
       assert.equal(danger.events.pending.applied, true, `${label}: 報酬と進行の精算を一度だけ記録する`);
       assert.equal(state.supplies.iron || 0, outcome === "win" ? 3 : 0, `${label}: 罠の報酬は勝利時だけ付与する`);
       assert.equal(danger.events.active.sw.progress, outcome === "win" ? 1 : 0);
+      assert.equal(JSON.stringify(danger.events.stormAftermath.sw), stormBefore, `${label}: 併存する置き土産へ戦果を誤適用しない`);
       assert.equal(danger.pendingHazard.stage, "action_running", `${label}: 荒波は報告確認後の区切りまで保留する`);
       const settled = JSON.stringify(state);
       context.encounter = pending;

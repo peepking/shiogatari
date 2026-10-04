@@ -58,7 +58,7 @@ export function migrateDangerousSeaPlacements(game, world) {
     const groups = [
       ["exploration", data.regions?.[regionId]?.sites || []],
       ["bounty", (data.bounties?.active || []).filter(site => site.regionId === regionId)],
-      ["event", data.events?.active?.[regionId] ? [data.events.active[regionId]] : []],
+      ["event", [data.events?.active?.[regionId], data.events?.stormAftermath?.[regionId]].filter(Boolean)],
     ];
     for (const [kind, sites] of groups) for (const site of [...sites].sort((a, b) => a.id - b.id)) {
       if (!site.position || inside.has(placementKey(site.position))) continue;

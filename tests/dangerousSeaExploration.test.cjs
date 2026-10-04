@@ -168,8 +168,8 @@ async function main() {
   assert.equal(safe.explorationPending.wreck.branches.cargo.accident, null);
   assert.equal(stagedWreck(zero, 10).explorationPending.wreck.branches.rescue.encounter.enemyTotal, 10, "斥候最大でも戦闘の成功を保証しない");
   for (const [count, tier] of [[0, 0], [1, 1], [4, 1], [5, 2], [9, 2], [10, 3]]) assert.equal(wreck.dangerousWreckScoutTier(count), tier);
-  assert.ok(wreck.dangerousWreckHints(risky.explorationPending).includes("情報はありません"));
-  assert.ok(wreck.dangerousWreckHints(safe.explorationPending).includes("追加1日"));
+  assert.ok(wreck.dangerousWreckHints(risky.explorationPending).includes("待ち伏せや浸水"));
+  assert.ok(wreck.dangerousWreckHints(safe.explorationPending).includes("救助の足場と退避経路"));
   for (const damaged of ["cargo", "rescue"]) {
     const failed = stagedWreck();
     failed.explorationPending.dayApplied = true; failed.explorationPending.wreck.branches.deck.appliedDays = 1;

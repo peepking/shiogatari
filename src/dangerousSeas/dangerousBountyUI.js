@@ -60,7 +60,7 @@ export function beginDangerousBounty(id, sync) {
  */
 export function renderDangerousBountyList(container, sync, site = null) {
   const section = document.createElement("section"), active = site ? [site] : state.dangerousSeas?.bounties?.active || [];
-  section.innerHTML = `<h3>危険海域の賞金首</h3><p class="tiny">各海域2人まで。通常の賞金首とは別枠です。</p><div class="bounty-list">${active.map(dangerousBountyCard).join("") || "<p>現在、活動中の賞金首はいません。</p>"}</div>`;
+  section.innerHTML = `<h3>危険海域の賞金首</h3><div class="bounty-list">${active.map(dangerousBountyCard).join("") || "<p>現在、活動中の賞金首はいません。</p>"}</div>`;
   container.append(section);
   const modal = document.getElementById("bountyModal");
   section.querySelectorAll("[data-dangerous-bounty-map]").forEach(button => {

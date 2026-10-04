@@ -5,8 +5,8 @@ import { saveGameToStorage } from "../core/storage.js";
 import { elements, pushLog, pushToast, setOutput } from "../ui/dom.js";
 import { enqueueEvent } from "../app/events.js";
 import { buildDangerousEnemyFormation } from "../app/actions.js";
-import { dangerousSeaAt } from "./dangerousSeaWorld.js";
-import { createDangerousSeaState, tickDangerousSeaDay, rollRoughWaveLosses } from "./dangerousSeaState.js";
+import { dangerousSeaAt, dangerousSeaForecastRegionAt } from "./dangerousSeaWorld.js";
+import { createDangerousSeaState, tickDangerousSeaDay, rollRoughWaveLosses, discardRoughWaveOutsideRegion, resolveRoughWave } from "./dangerousSeaState.js";
 import { dangerousSeaName } from "./dangerousSeaConfig.js";
 import { snapshotOutfitting } from "../fleet/outfitting.js";
 import { updateDangerousWeather } from "./dangerousSeaWeather.js";
@@ -20,7 +20,7 @@ let failedHazardId = null;
 function notifyHazardSaveFailure(id) {
   if (failedHazardId === id) return;
   failedHazardId = id;
-  pushToast("保存できません", "危険の結果は確定済みです。保存容量を確認し、現在地の「危険判定の表示を再試行」を押してください。", "warn");
+  pushToast("保存できません", "保存容量を確認し、現在地の「通知を再表示」を押してください。", "warn");
 }
 
 /** @returns {object} 新規・旧保存の両方に独立状態を保証する。 */
@@ -47,12 +47,46 @@ export function beginDangerousSeaAction(kind) {
 export function finishDangerousSeaAction(kind) {
   const current = state.dangerousSeas;
   if (!current || (kind && current.action?.kind !== kind)) return;
+  discardRoughWaveOutsideRegion(current, state.wanted?.detention ? null : dangerousSeaAt(state.position), absDay(state));
   const hazard = current.pendingHazard;
   if (hazard?.stage === "action_running") {
     if (hazard.kind === "wave" && !hazard.losses) hazard.losses = rollRoughWaveLosses(state.expansion?.fishing?.counts);
     hazard.stage = "ready";
   }
   current.action = null;
+}
+
+/**
+ * 現在地に作用しない保留波と古い荒波通知を掃除する。港・通常海域・別海域では波の画面を開かない。
+ * 表示済みの旧保存でも他の通知は残し、固定波の同海域復帰では通知と損失をそのまま保持する。
+ * @returns {boolean} 保存対象の波または通知を棄却したか。
+ */
+export function discardInvalidDangerousWaveNotifications() {
+  const current = state.dangerousSeas;
+  let changed = discardRoughWaveOutsideRegion(current, state.wanted?.detention ? null : dangerousSeaAt(state.position), absDay(state));
+  if (Array.isArray(state.eventQueue)) {
+    const previousLength = state.eventQueue.length, hazard = current?.pendingHazard;
+    state.eventQueue = state.eventQueue.filter(event => event.kind !== "dangerous_wave"
+      || (hazard?.kind === "wave" && hazard.stage === "displaying" && event.actions?.some(action => action.payload?.id === hazard.id)));
+    changed ||= state.eventQueue.length !== previousLength;
+  }
+  if (changed) saveGameToStorage();
+  return changed;
+}
+
+/**
+ * 対策選択の直前にも共通地形で作用海域を検査し、域外の旧ボタンでは魚・資材を消費しない。
+ * 無効化した同一通知は呼び出し側が閉じるため、ここではキューを動かさない。
+ * @param {number} eventId 確定波ID。 @param {boolean} protect 木材と繊維で守るか。
+ * @returns {object|null} 適用結果、域外ならcancelled、別IDや解決済みならnull。
+ */
+export function resolveDangerousSeaWave(eventId, protect) {
+  const hazard = state.dangerousSeas?.pendingHazard;
+  if (!hazard || hazard.kind !== "wave" || hazard.stage !== "displaying" || hazard.id !== eventId) return null;
+  if (discardRoughWaveOutsideRegion(state.dangerousSeas, state.wanted?.detention ? null : dangerousSeaAt(state.position), absDay(state))) {
+    return { cancelled: true, protected: false, lost: 0 };
+  }
+  return resolveRoughWave(state, eventId, protect);
 }
 
 /**
@@ -67,7 +101,7 @@ export function updateDangerousSeaDay(options = {}) {
     suppressRaid: options.suppressRaid || !!state.pendingEncounter?.active || !!state.piracy?.checkpoint,
     createRaid: () => buildDangerousEnemyFormation(state.position) });
   if (result?.kind === "wave_avoided") {
-    pushToast("荒波を回避", "斥候が見つけた安全な潮筋を進み、荒波の被害を防ぎました。", "good");
+    pushToast("荒波を回避", "安全な潮筋を進み、被害を防ぎました。", "good");
     pushLog("荒波を回避", dangerousSeaName(result.regionId), "-");
   }
   notifyNewDangerousForecasts(before);
@@ -75,15 +109,20 @@ export function updateDangerousSeaDay(options = {}) {
 }
 
 /**
- * 初めて認識した予報と安全航路だけを通知する。海域外でも港で出発準備に使える。
+ * 初めて認識した予報と安全航路だけを、現在の危険海域または対応する遠征港で通知する。
+ * 全海域の天候予定・既知情報は維持し、他の港・通常海域・街では通知しない。
  * @param {object} before 更新前の予報。 @returns {void}
  */
 function notifyNewDangerousForecasts(before) {
+  const here = dangerousSeaForecastRegionAt(state.position);
+  if (!here) return;
+  const inPort = !dangerousSeaAt(state.position), title = inPort ? "周辺海域の予報（港内は安全）" : "荒波の予報";
   for (const [regionId, region] of Object.entries(data().regions)) {
+    if (regionId !== here) continue;
     const forecast = region.forecast;
     if (!forecast || (before[regionId]?.day === forecast.day && (before[regionId]?.avoided || !forecast.avoided))) continue;
-    const text = `${dangerousSeaName(regionId)} / 荒波まであと${Math.max(0, forecast.day - absDay(state))}日。${forecast.avoided ? "安全な潮筋を発見しました。この荒波は被害を回避できます。" : "退避日数を確認してください。木材1・繊維1でも魚を守れます。"}`;
-    pushToast("荒波の予報", text, forecast.avoided ? "good" : "warn"); pushLog("荒波の予報", text, "-");
+    const text = `${dangerousSeaName(regionId)} / 荒波まであと${Math.max(0, forecast.day - absDay(state))}日。${forecast.avoided ? "安全な潮筋を発見。被害を避けられます。" : "木材1・繊維1で魚を守れます。"}`;
+    pushToast(title, text, forecast.avoided ? "good" : "warn"); pushLog(title, text, "-");
     if (typeof document !== "undefined") document.dispatchEvent(new CustomEvent("auto-move-stop"));
   }
 }
@@ -114,7 +153,7 @@ export function processDangerousSeaIntroduction() {
   current.tutorialSeen = true;
   if (!saveGameToStorage()) { current.tutorialSeen = false; return false; }
   enqueueEvent({ kind: "dangerous_sea_intro", title: "危険海域へ到達しました",
-    body: `${dangerousSeaName(sea.regionId)}では希少魚や図鑑未登録の魚を狙えます。海域・季節・水深の制限はありませんが、餌の条件は有効です。滞在で警戒が高まり、強敵が接近します。荒波は12～18日周期です。斥候が多いほど早く予報を察知し、安全な潮筋や船団を発見しやすくなります。予報と退避までの日数を確認し、木材1・繊維1も備えましょう。警戒は海域外に出て3日目から下がります。` });
+    body: `${dangerousSeaName(sea.regionId)}です。荒波や強敵に注意してください。詳しくは「ガイド」の「危険海域」をご覧ください。` });
   return true;
 }
 
@@ -124,6 +163,7 @@ export function processDangerousSeaIntroduction() {
  * @returns {boolean} 表示または準備が開始したか。
  */
 export function processDangerousSeaHazards() {
+  discardInvalidDangerousWaveNotifications();
   const current = state.dangerousSeas;
   if (Array.isArray(state.eventQueue)) state.eventQueue = state.eventQueue.filter(event => event.kind !== "dangerous_raid_warning"
     || (current?.pendingHazard?.kind === "raid" && current.pendingHazard.stage === "warning"
@@ -141,9 +181,9 @@ export function processDangerousSeaHazards() {
       hazard.stage = "warning";
       if (!saveGameToStorage()) { hazard.stage = "ready"; notifyHazardSaveFailure(hazard.id); return false; }
       enqueueEvent({ kind: "dangerous_raid_warning", title: "斥候が船団を察知",
-        body: `強敵船団（推定${hazard.encounter.total}人）が明日の航路を探しています。活動を続けると、次の1日の終わりに襲撃されます。釣り・探索に入る前に、活動を続けるか、1日かけて回避航路を探すか選べます。`,
-        actions: [{ label: "活動を続ける・翌日の襲撃に備える", type: "dangerous_raid_continue", payload: { id: hazard.id } },
-          { label: "1日かけて回避航路を探す", type: "dangerous_raid_evade", payload: { id: hazard.id } }] });
+        body: `強敵船団（推定${hazard.encounter.total}人）が接近しています。活動を続けると翌日の終わりに襲撃されます。回避航路を探すには1日かかります。`,
+        actions: [{ label: "活動を続ける", type: "dangerous_raid_continue", payload: { id: hazard.id } },
+          { label: "回避航路を探す（1日）", type: "dangerous_raid_evade", payload: { id: hazard.id } }] });
       return true;
     }
     const previous = state.pendingEncounter, previousMode = state.modeLabel;
@@ -171,8 +211,8 @@ export function processDangerousSeaHazards() {
   if (lost && canProtect) actions.push({ label: "木材1・繊維1で魚を守る", type: "dangerous_wave_protect", payload: { id: hazard.id } });
   actions.push({ label: lost ? `対策せず魚${lost}匹を失う` : "被害なし・航海を続ける", type: "dangerous_wave_accept", payload: { id: hazard.id } });
   enqueueEvent({ kind: "dangerous_wave", title: "危険海域の荒波", body: lost
-    ? `船倉へ荒波が押し寄せています。魚${lost}匹が流されます。木材1・繊維1で積荷を守れます。${canProtect ? "" : "対策材料が足りません。"}`
-    : "荒波を受けましたが、流された魚はありませんでした。", actions });
+    ? `荒波で魚${lost}匹が流されます。木材1で魚箱を補強し、繊維1で縛って魚を守れます。${canProtect ? "" : "材料が足りません。"}`
+    : "荒波による魚の被害はありませんでした。", actions });
   return true;
 }
 
@@ -190,6 +230,7 @@ export function finishDangerousSeaEncounter(encounter) {
  * @param {object} current 危険海域状態。 @param {object} hazard 解決した襲撃。 @returns {void}
  */
 function handOverDeferredWave(current, hazard) {
+  discardRoughWaveOutsideRegion(current, state.wanted?.detention ? null : dangerousSeaAt(state.position), absDay(state));
   current.pendingHazard = hazard.deferredWave ? { id: current.nextEventId++, kind: "wave", ...hazard.deferredWave,
     stage: "ready", sourceActionId: null, losses: rollRoughWaveLosses(state.expansion?.fishing?.counts) } : null;
 }
@@ -209,10 +250,10 @@ export function handleDangerousRaidAction(action) {
     current.action = null;
     if (hazard.evasionSuccess) {
       handOverDeferredWave(current, hazard); current.raidSafeUntil = absDay(state) + 3;
-      pushLog("船団を回避", "1日かけて航跡を外しました。次の3日間は日次襲撃を受けません。", "-");
-    } else { hazard.warningAccepted = true; hazard.stage = "ready"; pushToast("回避航路を見つけられませんでした", "戦闘準備で戦闘・逃走・降伏を選んでください。", "warn"); }
+      pushLog("船団を回避", "1日かけて航跡を外し、船団をかわしました。", "-");
+    } else { hazard.warningAccepted = true; hazard.stage = "ready"; pushToast("回避できませんでした", "戦闘準備で戦闘・逃走・降伏を選んでください。", "warn"); }
   } else if (action.type === "dangerous_raid_continue") { hazard.warningAccepted = true; hazard.stage = "watch"; }
   else return false;
-  if (!saveGameToStorage()) { Object.assign(state, before); restoreWorld(world); pushToast("保存できません", "選択は適用していません。再試行してください。", "warn"); return false; }
+  if (!saveGameToStorage()) { Object.assign(state, before); restoreWorld(world); pushToast("保存できません", "もう一度選んでください。", "warn"); return false; }
   return true;
 }

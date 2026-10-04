@@ -18,8 +18,22 @@ function positionValid(value) { return integer(value?.x) && value.x < 50 && inte
 
 /** @returns {object} 両海域で共有参照を持たない限定イベント領域。 */
 export function createDangerousSeaEvents() {
-  return { version: 1, nextId: 1, lastTickAbs: null, lastWaveAbs: { sw: null, se: null }, active: { sw: null, se: null }, pending: null, history: [] };
+  return { version: 2, nextId: 1, lastTickAbs: null, lastWaveAbs: { sw: null, se: null }, active: { sw: null, se: null },
+    stormAftermath: { sw: null, se: null }, pending: null, history: [] };
 }
+
+/** 両海域の通常枠と置き土産枠をまとめる。 @param {object} data 限定状態。 @returns {object[]} 活動中の地点。 */
+export function activeDangerousSeaEvents(data) {
+  return [...Object.values(data?.active || {}), ...Object.values(data?.stormAftermath || {})].filter(Boolean);
+}
+
+/** @param {object} data 限定状態。 @param {number} id 地点ID。 @returns {object|null} 両枠を通じて一致する地点。 */
+export function getDangerousSeaEventById(data, id) {
+  return activeDangerousSeaEvents(data).find(event => event.id === id) || null;
+}
+
+/** @param {object} data 限定状態。 @param {string} kind 種類。 @returns {object} 種類に対応する独立枠。 */
+function eventSlots(data, kind) { return kind === "storm_aftermath" ? data.stormAftermath : data.active; }
 
 /** 固定報酬の既存IDと安全な数量を検証し、版変更でも有効な確定値を維持する。 @param {*} raw 保存値。 @returns {object|null} 報酬。 */
 function normalizeReward(raw) {
@@ -69,7 +83,8 @@ function normalizeEvent(raw, regionId) {
 }
 
 /**
- * 有効な正体・報酬・段階を保ち、同海域一件と全海域のID一意性を検証する。壊れた参照は活動を停止させず除外する。
+ * 有効な正体・報酬・段階を保ち、同海域の通常枠と置き土産枠各一件・全海域のID一意性を検証する。
+ * 旧active内の置き土産を専用枠へ移す。重複時はactiveの既存参照を先に保持し、壊れた参照は除外する。
  * @param {*} raw 保存値。 @returns {object} 正規化した限定イベント状態。
  */
 export function normalizeDangerousSeaEvents(raw) {
@@ -78,14 +93,19 @@ export function normalizeDangerousSeaEvents(raw) {
   data.lastTickAbs = integer(raw?.lastTickAbs) ? raw.lastTickAbs : null;
   for (const regionId of ["sw", "se"]) {
     data.lastWaveAbs[regionId] = integer(raw?.lastWaveAbs?.[regionId]) ? raw.lastWaveAbs[regionId] : null;
-    const event = normalizeEvent(raw?.active?.[regionId], regionId);
-    if (event && !used.has(event.id)) { data.active[regionId] = event; used.add(event.id); data.nextId = Math.max(data.nextId, event.id + 1); }
+    const saved = normalizeEvent(raw?.active?.[regionId], regionId), aftermath = normalizeEvent(raw?.stormAftermath?.[regionId], regionId);
+    for (const event of [saved, aftermath?.kind === "storm_aftermath" ? aftermath : null]) {
+      if (!event || used.has(event.id) || eventSlots(data, event.kind)[regionId]) continue;
+      eventSlots(data, event.kind)[regionId] = event;
+      used.add(event.id);
+      data.nextId = Math.max(data.nextId, event.id + 1);
+    }
   }
   data.history = (Array.isArray(raw?.history) ? raw.history : []).filter(row => integer(row?.id) && row.id > 0 && DEFS[row.kind]
     && DEFS[row.kind].regions.includes(row.regionId) && integer(row.finishedAbs)).map(row => ({ ...row }));
   for (const row of data.history) data.nextId = Math.max(data.nextId, row.id + 1);
-  const pending = raw?.pending, event = pending && data.active[pending.regionId];
-  if (event && pending && event.id === pending.eventId && ["choice", "action", "battle", "result"].includes(pending.stage)) {
+  const pending = raw?.pending, event = pending && getDangerousSeaEventById(data, pending.eventId);
+  if (event && pending && event.regionId === pending.regionId && ["choice", "action", "battle", "result"].includes(pending.stage)) {
     const reward = pending.reward == null ? null : normalizeReward(pending.reward);
     const encounter = pending.encounter == null ? null : normalizeEncounter(pending.encounter, event);
     if ((pending.reward == null || reward) && (pending.encounter == null || encounter) && (!pending.applied || pending.stage === "result")) {
@@ -100,15 +120,16 @@ export function normalizeDangerousSeaEvents(raw) {
 }
 
 /**
- * 空枠へ固定結果の地点を生成する。種類内の位置と灯火の正体は均等、回遊は既存超大物から重複なしで三種選ぶ。
+ * 通常枠または独立した置き土産枠へ固定結果の地点を生成し、片方の占有で他方を妨げない。
+ * 種類内の位置と灯火の正体は均等、回遊は既存超大物から重複なしで三種選ぶ。
  * @param {object} data 限定イベント領域。 @param {string} regionId 海域。 @param {string} kind 種類。
  * @param {object[]} positions 予約除外済み座標と移動日数。 @param {number} now 通算日。
  * @param {Function} createEnemy 既存の敵編成生成。 @param {Function} [random=Math.random] 乱数。
  * @returns {object|null} 生成地点。
  */
 export function spawnDangerousSeaEvent(data, regionId, kind, positions, now, createEnemy, random = Math.random) {
-  const def = DEFS[kind];
-  if (data.active[regionId] || !def?.regions.includes(regionId) || !positions.length) return null;
+  const def = DEFS[kind], slots = eventSlots(data, kind);
+  if (!def?.regions.includes(regionId) || slots[regionId] || !positions.length) return null;
   const point = positions[Math.min(positions.length - 1, Math.floor(random() * positions.length))];
   const event = { id: data.nextId++, kind, regionId, position: { x: point.x, y: point.y }, level: point.level,
     spawnedAbs: now, expiresAbs: now + point.travelDays + def.days + CONFIG.marginDays,
@@ -125,16 +146,16 @@ export function spawnDangerousSeaEvent(data, regionId, kind, positions, now, cre
     const pool = [...giantIds];
     while (event.fishIds.length < 3 && pool.length) event.fishIds.push(pool.splice(Math.min(pool.length - 1, Math.floor(random() * pool.length)), 1)[0]);
   }
-  data.active[regionId] = event;
+  slots[regionId] = event;
   return event;
 }
 
-/** 地点を履歴へ一度移し、別の出来事を置けるようにする。 @param {object} data 限定状態。 @param {number} id 地点ID。 @param {number} now 通算日。 @param {string} reason 完了理由。 @returns {boolean} 移動できたか。 */
+/** 地点を履歴へ一度移し、対応する枠だけを空ける。 @param {object} data 限定状態。 @param {number} id 地点ID。 @param {number} now 通算日。 @param {string} reason 完了理由。 @returns {boolean} 移動できたか。 */
 export function closeDangerousSeaEvent(data, id, now, reason = "complete") {
-  const event = Object.values(data.active).find(site => site?.id === id);
+  const event = getDangerousSeaEventById(data, id);
   if (!event) return false;
   data.history.push({ ...structuredClone(event), finishedAbs: now, reason });
-  data.active[event.regionId] = null;
+  eventSlots(data, event.kind)[event.regionId] = null;
   return true;
 }
 

@@ -5,9 +5,8 @@ import { state } from "../core/state.js";
 import { scheduleGameSave } from "../core/storage.js";
 import { resourceList } from "../ui/resourceUI.js";
 import { crimeRestriction } from "../wanted/wantedPolicy.js";
-import { resolveRoughWave } from "../dangerousSeas/dangerousSeaState.js";
 import { pushLog } from "../ui/dom.js";
-import { handleDangerousRaidAction } from "../dangerousSeas/dangerousSeaHazards.js";
+import { handleDangerousRaidAction, resolveDangerousSeaWave, discardInvalidDangerousWaveNotifications } from "../dangerousSeas/dangerousSeaHazards.js";
 import { handleDangerousSeaEventAction } from "../dangerousSeas/dangerousSeaEventUI.js";
 
 /**
@@ -115,9 +114,9 @@ function handleAction(action) {
     return;
   }
   if (action?.type === "dangerous_wave_protect" || action?.type === "dangerous_wave_accept") {
-    const result = resolveRoughWave(state, action.payload?.id, action.type === "dangerous_wave_protect");
+    const result = resolveDangerousSeaWave(action.payload?.id, action.type === "dangerous_wave_protect");
     if (!result) return;
-    pushLog("荒波の対策", result.protected ? "木材1・繊維1で魚を守りました。" : `魚${result.lost}匹を失いました。図鑑の記録は残ります。`, "-");
+    if (!result.cancelled) pushLog("荒波の対策", result.protected ? "木材1・繊維1で魚を守りました。" : `魚${result.lost}匹を失いました。図鑑の記録は残ります。`, "-");
     resolveCurrentEvent(true);
     return;
   }
@@ -194,6 +193,7 @@ function handleAction(action) {
  * @returns {void}
  */
 export function showNextEvent() {
+  discardInvalidDangerousWaveNotifications();
   if (state.wanted?.detention) return;
   const modal = elements.eventModal;
   if (!modal) return;

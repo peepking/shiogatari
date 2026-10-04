@@ -1,10 +1,11 @@
 /**
- * 危険海域の探索と賞金首の位置だけを取得し、既存の配置処理でも同じ予約を使う。
+ * 危険海域の探索・賞金首・両枠の限定イベントを取得し、既存の配置処理でも同じ予約を使う。
  * @param {object} game ゲーム状態。 @returns {Array<{x:number,y:number}>} 予約座標。
  */
 export function dangerousSeaReservedPositions(game) {
   const data = game.dangerousSeas;
-  return [...Object.values(data?.regions || {}).flatMap(r => r.sites || []), ...(data?.bounties?.active || []), ...Object.values(data?.events?.active || {})]
+  return [...Object.values(data?.regions || {}).flatMap(r => r.sites || []), ...(data?.bounties?.active || []),
+    ...Object.values(data?.events?.active || {}), ...Object.values(data?.events?.stormAftermath || {})]
     .filter(Boolean)
     .map(site => site.position).filter(Boolean);
 }

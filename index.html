@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
   <link rel="stylesheet" href="styles.css?v=20261002-codex-spacing" />
-  <link rel="stylesheet" href="layout.css?v=20261002-mobile-quests" />
+    <link rel="stylesheet" href="layout.css?v=20261005-dangerous-events" />
 </head>
 
 <body>
@@ -276,7 +276,6 @@
                 </div>
                 <canvas id="mapCanvas" width="640" height="640" aria-label="航路マップ"></canvas>
                 <div id="mapInfo" tabindex="0" aria-label="マップの地点情報"></div>
-                <p class="tiny">南西の赤い海・南東の紫の海は危険海域です。斜線のマスは核心で、長く留まるほど危険が増します。</p>
               </div>
               <section class="outfitting-panel" id="outfittingPanel" aria-labelledby="outfittingTitle" hidden>
                 <div class="outfitting-heading"><h2 id="outfittingTitle" tabindex="-1">造船所</h2><div class="outfitting-heading-actions"><button class="btn ghost" id="outfittingEdit" aria-pressed="true">艤装変更</button><button class="btn ghost" id="outfittingTrade" aria-pressed="false">船取引</button><button class="btn ghost" id="outfittingDetails" aria-pressed="false">詳細確認</button><button class="btn ghost" id="outfittingClose">地図に戻る</button></div></div>
@@ -714,6 +713,7 @@
             <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-faith">信仰・潮盟</button>
             <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-exploration">探索・海図</button>
             <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-fishing">釣り</button>
+            <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-dangerous-seas">危険海域</button>
             <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-wanted">勢力・手配</button>
           </div>
         </section>
@@ -820,6 +820,13 @@
           <p>街・村の「釣り小屋」で粗末な釣り竿を受け取り、餌を用意します。海・浅瀬で釣りを始めると1日が経過し、最大5回まで糸を垂らせます。餌を選び、アタリが来たらゲージがなくなる前に「引く」を押してください。早すぎても遅すぎても失敗します。</p>
           <p>釣れる魚は海域・季節・水深・餌で変わります。釣果は船倉とは別に保管され、図鑑へ自動登録されます。魚は釣り小屋で売却したり、食料・餌に加工したりできます。</p>
           <p>図鑑を埋めると上位の竿や追加の報酬が解放されます。解放状況は図鑑で確認し、竿は釣り小屋で受け取れます。上位の竿ほど、引くまでの猶予が長くなります。</p>
+        </details>
+        <details class="guide-question" id="guide-dangerous-seas">
+          <summary>危険海域の見分け方・荒波を避けるには</summary>
+          <p>南西の赤い海・南東の紫の海は危険海域です。斜線のマスは核心です。警戒は滞在で上がり、海域外で連続3日目から下がります。日次の敵襲を解決すると、その後の3日間は再襲撃を受けません。探索・賞金首の戦闘は別です。</p>
+          <p>街・村・無法港のマスでは、危険海域の敵襲や荒波を受けません。区域外でも荒波の被害はありません。南西・南東の遠征拠点の無法港で周辺海域の予報を確認し、地図の位置と荒波までの日数を見て、発生日までに港か区域外へ着けるよう退避しましょう。</p>
+          <p>斥候や見張り台は、早い予報、安全な潮筋の発見、敵襲の察知を助けます。退避が間に合わない場合は、木材1と繊維1で所持釣果を守れます。</p>
+          <p>釣りでは海域・季節・水深を問わず、餌に合う希少魚や図鑑未登録魚を狙えます。餌と対策材料を用意し、帰るまでの日数を考えて活動してください。</p>
         </details>
         <details class="guide-question" id="guide-wanted">
           <summary>港の施設を使えない・指名手配された</summary>

@@ -22,7 +22,8 @@ async function main() {
     "outfitting.js": { snapshotOutfitting() { return { scouts: 0 }; } },
     "time.js": { advanceDayWithEvents() { state.day++; return 1; } },
     "map.js": { snapshotWorld() { return {}; }, restoreWorld() {} },
-    "dangerousSeaWorld.js": { dangerousSeaAt(position) { return position.x < 5 ? { regionId: "sw", level: "outer" } : null; } },
+    "dangerousSeaWorld.js": { dangerousSeaAt(position) { return position.x === 4 && position.y === 45 ? null : position.x < 5 ? { regionId: "sw", level: "outer" } : position.x >= 45 ? { regionId: "se", level: "outer" } : null; },
+      dangerousSeaForecastRegionAt(position) { return position.x < 5 ? "sw" : position.x >= 45 ? "se" : null; } },
   };
   /** @param {string} specifier 論理名。 @returns {vm.Module} 実際の純粋処理または画面依存の代替。 */
   function get(specifier) {
@@ -82,6 +83,28 @@ async function main() {
   assert.equal(escapedForecast.regions.sw.forecast, null); assert.equal(escapedForecast.pendingHazard, null);
   rules.tickDangerousSeaDay(escapedForecast, sw, 120003, { activity: "move" }, () => 0.99);
   assert.equal(escapedForecast.pendingHazard, null, "退避済みの古い予報が後日再発しない");
+  for (const destination of [null, se]) {
+    const escapedWave = rules.createDangerousSeaState();
+    escapedWave.lastProcessedAbs = 120002;
+    escapedWave.pendingHazard = { id: 10, kind: "wave", regionId: "sw", stage: "action_running", day: 120002, losses: { fish: 2 } };
+    rules.tickDangerousSeaDay(escapedWave, destination, 120002, {}, () => { throw new Error("同日の退避確認では再抽選しない"); });
+    assert.equal(escapedWave.pendingHazard, null, "同日の表示再開でも別海域の保留波を棄却する");
+    const watch = rules.createDangerousSeaState();
+    watch.pendingHazard = { id: 11, kind: "raid", regionId: "sw", stage: "watch", arrivalDay: 120003, encounter: structuredClone(formation),
+      deferredWave: { regionId: "sw", day: 120002 } };
+    rules.tickDangerousSeaDay(watch, destination, 120003, { activity: "move" }, () => .99);
+    assert.equal(watch.pendingHazard, null, "watchからの域外退避で古い保留波を再発させない");
+  }
+  const staleDeferred = rules.createDangerousSeaState();
+  staleDeferred.lastProcessedAbs = 120002;
+  staleDeferred.pendingHazard = { id: 12, kind: "raid", regionId: "sw", stage: "battle", encounter: structuredClone(formation),
+    deferredWave: { regionId: "sw", day: 120002 } };
+  const deferredBefore = JSON.stringify(staleDeferred);
+  rules.tickDangerousSeaDay(staleDeferred, sw, 120001, {}, () => { throw new Error("過去日は波の作用日も変更しない"); });
+  rules.tickDangerousSeaDay(staleDeferred, sw, 120002, {}, () => { throw new Error("同日同域で固定波を再抽選しない"); });
+  assert.equal(JSON.stringify(staleDeferred), deferredBefore, "過去日や同日同域の再更新で固定波を失わない");
+  rules.tickDangerousSeaDay(staleDeferred, sw, 120003, {}, () => { throw new Error("保留波の期限確認で再襲撃を抽選しない"); });
+  assert.equal(staleDeferred.pendingHazard.kind, "raid"); assert.equal(staleDeferred.pendingHazard.deferredWave, null, "同海域でも翌日に古い保留波を持ち越さない");
   const attack = rules.createDangerousSeaState(); attack.action = { id: 11, kind: "fishing", startedAbs: 120001 };
   let rolls = 0, builds = 0;
   const raid = rules.tickDangerousSeaDay(attack, sw, 120002, { createRaid() { builds++; return structuredClone(formation); } }, () => { rolls++; return 0; });
@@ -200,6 +223,61 @@ async function main() {
   assert.equal(hazards.handleDangerousRaidAction({ type: "dangerous_raid_evade", payload: { id: 33 } }), true);
   assert.equal(state.dangerousSeas.pendingHazard.stage, "ready"); assert.equal(state.dangerousSeas.pendingHazard.warningAccepted, true);
   assert.equal(hazards.processDangerousSeaHazards(), true); assert.equal(state.pendingEncounter.dangerousHazardId, 33);
+  // 旧保存の波や表示済みの旧ボタンは、通常海域・港・別危険海域へ被害を持ち出さない。
+  state.pendingEncounter = { active: false }; state.modeLabel = mode.NORMAL; state.day = 2;
+  state.expansion = { fishing: { counts: { fish: 40 }, pending: null } }; state.supplies = { wood: 1, fiber: 1 };
+  const originalPosition = { x: 0, y: 49 };
+  for (const position of [{ x: 20, y: 35 }, { x: 4, y: 45 }, { x: 45, y: 49 }, { x: 9, y: 40 }]) {
+    state.position = position;
+    for (const stage of ["action_running", "ready", "displaying"]) {
+      state.dangerousSeas = rules.createDangerousSeaState();
+      state.dangerousSeas.pendingHazard = { id: 41, kind: "wave", regionId: "sw", day: 120002, stage, losses: { fish: 2 } };
+      state.eventQueue = [{ kind: "dangerous_wave", actions: [{ payload: { id: 41 } }] }, { kind: "info", title: "残す通知" }];
+      const queueBefore = queue.length, inventoryBefore = JSON.stringify(state.expansion.fishing.counts), materialsBefore = JSON.stringify(state.supplies);
+      assert.equal(hazards.processDangerousSeaHazards(), false);
+      assert.equal(state.dangerousSeas.pendingHazard, null); assert.equal(state.eventQueue.length, 1); assert.equal(state.eventQueue[0].kind, "info");
+      assert.equal(queue.length, queueBefore, "域外へ新しい荒波通知を積まない");
+      assert.equal(JSON.stringify(state.expansion.fishing.counts), inventoryBefore); assert.equal(JSON.stringify(state.supplies), materialsBefore);
+      assert.equal(hazards.dangerousSeaActionBlocked(), false);
+    }
+    for (const protect of [false, true]) {
+      state.dangerousSeas = rules.createDangerousSeaState();
+      state.dangerousSeas.pendingHazard = { id: 42, kind: "wave", regionId: "sw", day: 120002, stage: "displaying", losses: { fish: 2 } };
+      state.eventQueue = [{ kind: "dangerous_wave", actions: [{ payload: { id: 42 } }] }, { kind: "info" }];
+      assert.deepEqual(plain(hazards.resolveDangerousSeaWave(42, protect)), { cancelled: true, protected: false, lost: 0 });
+      assert.equal(state.expansion.fishing.counts.fish, 40); assert.deepEqual(state.supplies, { wood: 1, fiber: 1 });
+      assert.equal(state.eventQueue.length, 2, "キャンセルした旧ボタンは呼び出し側が一件だけ閉じる");
+      assert.equal(hazards.resolveDangerousSeaWave(42, protect), null);
+    }
+    state.dangerousSeas = rules.createDangerousSeaState();
+    state.dangerousSeas.pendingHazard = { id: 43, kind: "raid", regionId: "sw", stage: "battle", encounter: structuredClone(formation), deferredWave: { regionId: "sw", day: 120002 } };
+    hazards.finishDangerousSeaEncounter({ dangerousHazardId: 43 });
+    assert.equal(state.dangerousSeas.pendingHazard, null, "域外の戦後処理から保留波を再生成しない");
+  }
+  state.position = originalPosition; state.eventQueue = []; state.dangerousSeas = rules.createDangerousSeaState();
+  state.dangerousSeas.action = { id: 44, kind: "fishing", startedAbs: 120002 };
+  state.dangerousSeas.pendingHazard = { id: 44, kind: "wave", regionId: "sw", day: 120002, stage: "action_running", losses: { fish: 2 } };
+  state.expansion.fishing.pending = { castsLeft: 2 };
+  const fixedInside = JSON.stringify(state.dangerousSeas.pendingHazard);
+  assert.equal(hazards.processDangerousSeaHazards(), false); assert.equal(JSON.stringify(state.dangerousSeas.pendingHazard), fixedInside, "域内の途中釣りでは確定波を保持する");
+  state.expansion.fishing.pending = null; hazards.finishDangerousSeaAction("fishing");
+  assert.equal(hazards.processDangerousSeaHazards(), true);
+  const insideSaved = rules.normalizeDangerousSeas(plain(saved.dangerousSeas));
+  assert.deepEqual(plain(insideSaved.pendingHazard.losses), { fish: 2 }); assert.equal(insideSaved.pendingHazard.stage, "displaying");
+  assert.deepEqual(plain(hazards.resolveDangerousSeaWave(44, false)), { protected: false, lost: 2 }); assert.equal(state.expansion.fishing.counts.fish, 38);
+  state.expansion.fishing.counts.fish = 40; state.eventQueue = [];
+  state.dangerousSeas.pendingHazard = { id: 45, kind: "raid", regionId: "sw", stage: "battle", encounter: structuredClone(formation), deferredWave: { regionId: "sw", day: 120001 } };
+  hazards.finishDangerousSeaEncounter({ dangerousHazardId: 45 }); assert.equal(state.dangerousSeas.pendingHazard, null, "同海域の戦後でも前日の保留波を引き継がない");
+  state.dangerousSeas.pendingHazard = { id: 46, kind: "raid", regionId: "sw", stage: "battle", encounter: structuredClone(formation), deferredWave: { regionId: "sw", day: 120002 } };
+  hazards.finishDangerousSeaEncounter({ dangerousHazardId: 46 });
+  assert.equal(state.dangerousSeas.pendingHazard.kind, "wave"); assert.equal(state.dangerousSeas.pendingHazard.regionId, "sw", "同日同域で確定した保留波は戦後へ引き継ぐ");
+  state.dangerousSeas.action = { id: 47, kind: "fishing", startedAbs: 120002 }; state.position = { x: 20, y: 35 };
+  hazards.finishDangerousSeaAction("fishing"); assert.equal(state.dangerousSeas.pendingHazard, null); assert.equal(state.dangerousSeas.action, null, "域外で継続行動を終えても波を確定し直さない");
+  state.dangerousSeas.action = { id: 48, kind: "fishing", startedAbs: 120002 };
+  state.dangerousSeas.pendingHazard = { id: 48, kind: "wave", regionId: "sw", stage: "action_running", day: 120002, losses: null };
+  state.expansion.fishing.pending = { castsLeft: 2 }; state.eventQueue = [];
+  assert.equal(hazards.processDangerousSeaHazards(), false); assert.equal(state.dangerousSeas.pendingHazard, null);
+  assert.equal(state.dangerousSeas.action.id, 48); assert.equal(state.expansion.fishing.pending.castsLeft, 2, "域外の旧波を棄却しても保存された行動の進行を失わない");
   console.log("危険海域日次: 警戒・予報・排他・固定荒波・資材同時消費・図鑑維持・保存再開: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
