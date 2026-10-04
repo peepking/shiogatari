@@ -314,14 +314,14 @@ export function getAvailableNobleQuests(nobleId) {
 }
 
 /**
- * 季節依頼が未生成なら初日に生成する。
+ * 初回の依頼は日付を問わず生成し、既存の季節依頼は季節初日に更新する。
  * @param {object} settlement
  */
 export function ensureSeasonalQuests(settlement) {
   ensureState();
   if (!settlement) return;
   const last = state.quests.lastSeasonBySettlement[settlement.id];
-  if (state.day === 1 && (!last || last.year !== state.year || last.season !== state.season)) {
+  if (!last || (state.day === 1 && (last.year !== state.year || last.season !== state.season))) {
     generateSeasonQuestsForSettlement(settlement);
   }
 }

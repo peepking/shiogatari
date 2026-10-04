@@ -1,4 +1,5 @@
 import { buildPirateHavens } from "../pirates/pirateWorld.js";
+import { migratePirateHavenWorld, PIRATE_HAVEN_LAYOUT_VERSION } from "../pirates/pirateHavenMigration.js";
 import { bountyName } from "../bounty/bounty.js";
 import { drawBountySite } from "../bounty/bountyMapArt.js";
 import { pirateStoryTarget } from "../pirates/pirateKingConfig.js";
@@ -235,6 +236,7 @@ function generateMap(seed = 1) {
 /** @type {Array} マップの地形/建物データ */
 export let mapData = [];
 let lastDemandSeason = { year: state.year, season: state.season };
+let pirateHavenLayoutVersion = PIRATE_HAVEN_LAYOUT_VERSION;
 
 /**
  * マップと拠点を再生成する。
@@ -371,6 +373,7 @@ export function buildWorld(seed = DEFAULT_WORLD_SEED) {
   buildPirateHavens(mapData, settlements, nobleHome, port => {
     initSettlementRecruitment(port); refreshSettlementDemand(port); refreshSettlementStock(port);
   });
+  pirateHavenLayoutVersion = PIRATE_HAVEN_LAYOUT_VERSION;
   lastDemandSeason = { year: state.year, season: state.season };
 }
 
@@ -909,7 +912,7 @@ export function getTerrainAt(x, y) {
 
 /**
  * 現在のマップ/拠点情報をスナップショットとして返す。
- * @returns {{cells:Array,settlements:Array,nobleHome:Array}}
+ * @returns {{cells:Array,settlements:Array,nobleHome:Array,pirateHavenLayoutVersion:number}}
  */
 export function snapshotWorld() {
   const cells = mapData.map((row) =>
@@ -922,15 +925,16 @@ export function snapshotWorld() {
   );
   const settlementsSnap = settlements.map((s) => ({ ...s, coords: { ...s.coords } }));
   const nobleHomeSnap = Array.from(nobleHome.entries());
-  return { cells, settlements: settlementsSnap, nobleHome: nobleHomeSnap };
+  return { cells, settlements: settlementsSnap, nobleHome: nobleHomeSnap, pirateHavenLayoutVersion };
 }
 
 /**
  * スナップショットからマップ/拠点を復元する。
- * @param {{cells:Array,settlements:Array,nobleHome:Array}|null} snapshot
+ * @param {{cells:Array,settlements:Array,nobleHome:Array,pirateHavenLayoutVersion?:number}|null} snapshot
+ * @param {{upgradePirateHavens?:boolean}} [options] 読込時だけ旧配置を更新する。
  * @returns {boolean} 復元成功時 true
  */
-export function restoreWorld(snapshot) {
+export function restoreWorld(snapshot, { upgradePirateHavens = false } = {}) {
   try {
     if (!snapshot?.cells || !snapshot?.settlements) return false;
     if (
@@ -970,6 +974,14 @@ export function restoreWorld(snapshot) {
         }
       });
     });
+    pirateHavenLayoutVersion = snapshot.pirateHavenLayoutVersion ?? 0;
+    if (upgradePirateHavens && pirateHavenLayoutVersion < PIRATE_HAVEN_LAYOUT_VERSION) {
+      if (!nobleHome.size) ensureNobleHomes();
+      migratePirateHavenWorld(mapData, settlements, nobleHome, port => {
+        initSettlementRecruitment(port); refreshSettlementDemand(port); refreshSettlementStock(port);
+      }, state);
+      pirateHavenLayoutVersion = PIRATE_HAVEN_LAYOUT_VERSION;
+    }
     return true;
   } catch (e) {
     console.error("restoreWorld failed", e);

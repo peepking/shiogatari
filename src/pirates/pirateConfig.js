@@ -1,12 +1,14 @@
 /** 海賊システムの調整値。 */
 export const PIRATE_CONFIG = {
-  ports: 10, nobleId: "pirate_blackbeard", favorDelta: 3,
+  ports: 15, havenEdgeMargin: 3, havenCornerInset: 4, havenSettlementDistance: 4, havenSpacing: 6,
+  nobleId: "pirate_blackbeard", favorDelta: 3,
   wantedFavor: 30, wantedNobleFavor: -20, wantedChance: 0.3, bountyChance: 0.15,
   recordDays: 30, inspectionChance: 0.5, bribeBase: 200, bribePerItem: 10,
   entryContrabandCap: 100, entryCheckpointMax: 0.2, entrySupportReduction: 0.9,
   bribeBaseChance: 0.4, bribeFameScale: 2000, bribeTroopScale: 1000, bribeItemPenalty: 0.005,
   bribeMin: 0.2, bribeMax: 0.8, bribeFailureFavor: -3, recordPenalty: -3,
   minScale: 0.5, maxScale: 1.5, raidScale: 1.25, raidRewardScale: 1.5,
+  smuggleMaxDistance: 20,
   minimum: { normal: 3, elite: 30, bounty: 20, regular: 40 },
   contrabandStock: [10,15], demandLow: [1,3], demandHigh: [8,10],
   relationHostile: -30, relationNeutral: 0, lawfulRadius: 8,

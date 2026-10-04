@@ -66,7 +66,7 @@ async function main() {
   const grid=Array.from({length:50},()=>Array.from({length:50},()=>({terrain:"sea",building:"none"})));
   const sets=[], homes=new Map();
   world.namespace.buildPirateHavens(grid,sets,homes,()=>{});
-  assert.equal(sets.length,10);assert.equal(new Set(sets.map(s=>`${s.coords.x},${s.coords.y}`)).size,10);
+  assert.equal(sets.length,15);assert.equal(new Set(sets.map(s=>`${s.coords.x},${s.coords.y}`)).size,15);
   assert.equal(homes.get(c.PIRATE_CONFIG.nobleId),sets[0].id);
   assert.ok(sets.every(s=>grid[s.coords.y][s.coords.x].settlement===s));
   const originalPorts=JSON.stringify(sets);
@@ -87,7 +87,7 @@ async function main() {
     vm.runInContext("refreshSettlementDemandIfNeeded(); refreshSettlementDemandIfNeeded();",seasonalContext);
     assert.equal(JSON.stringify(sets),originalPorts);
   }
-  assert.deepEqual(refreshed,{demand:80,stock:80,recruit:80});
+  assert.deepEqual(refreshed,{demand:120,stock:120,recruit:120});
   const actionSource=await readSource("actions.js");
   const encounterState={position:{x:0,y:0},fame:0,warLedger:{entries:[]}};
   let relation="peace", builtFaction=null, rescued=null;

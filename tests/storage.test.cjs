@@ -12,6 +12,7 @@ async function main() {
   let saved = null;
   let writes = 0;
   let failWrite = false;
+  let restoreUpgrade = null;
   const context = vm.createContext({
     queueMicrotask,
     structuredClone,
@@ -37,8 +38,12 @@ async function main() {
   }
   /** @returns {object} 地図の状態を返す。 */
   function snapshotWorld() { return world; }
-  /** @param {object} value 地図の状態を復元する。 */
-  function restoreWorld(value) { world = value; }
+  /** @param {object} value 地図の状態。 @param {object} options 旧配置の更新指定。 @returns {boolean} 復元成功。 */
+  function restoreWorld(value, options) {
+    world = { ...value };
+    if (restoreUpgrade) restoreUpgrade(world, options);
+    return true;
+  }
   /** @param {object} exports @returns {vm.SyntheticModule} 依存モジュールを作る。 */
   function mockModule(exports) {
     /** @returns {void} モジュールの公開値を設定する。 */
@@ -322,6 +327,44 @@ async function main() {
   assert.equal(state.assetCodex.partial, true);
   assert.ok(state.assetCodex.troops.includes("infantry"));
   assert.ok(!state.assetCodex.troops.includes("cavalier"));
+
+  // 復元済みの進行情報で旧配置を更新し、その版と移設先を一度だけ保存する。
+  state.modeLabel = "normal"; state.pendingEncounter = { active: false };
+  state.funds = 4321;
+  world.pirateHavenLayoutVersion = 1;
+  assert.equal(saveGameToStorage(), true);
+  let upgrades = 0;
+  /** @param {object} value 旧世界。 @param {object} options 読込指定。 @returns {void} 地図側の一度限りの更新を模擬する。 */
+  restoreUpgrade = (value, options) => {
+    assert.equal(options.upgradePirateHavens, true);
+    assert.equal(state.funds, 4321, "地図移行前にプレイヤーを復元する");
+    assert.equal(state.expansion.version, 1, "予約座標の保存領域を補完してから地図を移行する");
+    if (value.pirateHavenLayoutVersion < 2) {
+      value.pirateHavenLayoutVersion = 2;
+      state.position = { x: 4, y: 4 };
+      upgrades++;
+    }
+  };
+  const writesBeforeUpgrade = writes;
+  resetState(); assert.equal(loadGameFromStorage(), true);
+  assert.equal(upgrades, 1);
+  assert.equal(writes, writesBeforeUpgrade + 1);
+  const upgradedPayload = JSON.parse(JSON.parse(saved).payload);
+  assert.equal(upgradedPayload.world.pirateHavenLayoutVersion, 2);
+  assert.deepEqual(upgradedPayload.state.position, { x: 4, y: 4 });
+  resetState(); assert.equal(loadGameFromStorage(), true);
+  assert.equal(upgrades, 1);
+  assert.equal(writes, writesBeforeUpgrade + 1, "更新済みの読込では再配置も再保存もしない");
+  world.pirateHavenLayoutVersion = 1;
+  state.modeLabel = "prep";
+  state.pendingEncounter = { active: true, battleKind: "grand", preparation: { version: 3, seed: 123 } };
+  assert.equal(saveGameToStorage({ battlePreparation: true }), true);
+  const writesBeforePreparationUpgrade = writes;
+  resetState(); assert.equal(loadGameFromStorage(), true);
+  assert.equal(writes, writesBeforePreparationUpgrade + 1, "大会戦の準備中も移行版を保存する");
+  const preparationPayload = JSON.parse(JSON.parse(saved).payload);
+  assert.equal(preparationPayload.world.pirateHavenLayoutVersion, 2);
+  assert.equal(preparationPayload.state.pendingEncounter.preparation.seed, 123);
   console.log("保存・復元の回帰テスト: 全項目成功");
 }
 

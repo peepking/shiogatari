@@ -17,7 +17,7 @@ function check(condition,message) { if (!condition) throw new Error(message); no
 function run() {
   buildWorld();
   const ports=settlements.filter(s=>s.pirateHaven), normal=settlements.filter(s=>!s.pirateHaven);
-  check(ports.length===10,"無法港10拠点");
+  check(ports.length===15,"無法港15拠点");
   check(ports.some(s=>s.id===nobleHome.get(PIRATE_CONFIG.nobleId)),"黒ひげの本拠地は無法港");
   check(normal.every(s=>s.nobleId!==PIRATE_CONFIG.nobleId),"通常拠点へ黒ひげを割り当てない");
   check(ports.every(s=>["sea","shoal"].includes(mapData[s.coords.y][s.coords.x].terrain)),"無法港は海域に配置");
@@ -39,7 +39,13 @@ function run() {
   const ordinary=normal.flatMap(s=>state.quests.availableBySettlement[s.id]);
   check(ordinary.every(q=>!CONTRABAND.some(i=>i.id===q.itemId)),"通常依頼に禁制品が混入しない");
   const all=ports.flatMap(s=>state.quests.availableBySettlement[s.id]);
-  check(all.length===30 && all.every(q=>q.pirateKind && q.pirateVictim),"海賊依頼30件と固定対象");
+  check(all.length===45 && all.every(q=>q.pirateKind && q.pirateVictim),"海賊依頼45件と固定対象");
+  check(all.filter(q=>q.pirateKind==="smuggle").every(
+    /** @param {object} q 密輸依頼。 @returns {boolean} 配送先が20マス以内か。 */
+    q=>{
+    const from=settlements.find(s=>s.id===q.originId).coords, to=settlements.find(s=>s.id===q.targetId).coords;
+    return Math.abs(from.x-to.x)+Math.abs(from.y-to.y)<=20;
+  }),"密輸先は20マス以内");
   const cargo=all.find(q=>q.type==="delivery");
   check(!!cargo,"配達型海賊依頼を生成");
   const origin=ports.find(s=>s.id===cargo.originId), reward=cargo.reward;
@@ -76,7 +82,7 @@ function run() {
     check(!piracyState().checkpoint && !state.supplies[CONTRABAND[0].id],"兵員・資金ゼロでも没収で解決");
   } finally {Math.random=random;}
   const world=snapshotWorld();
-  check(restoreWorld(world) && settlements.filter(s=>s.pirateHaven).length===10,"無法港を保存・復元");
+  check(restoreWorld(world) && settlements.filter(s=>s.pirateHaven).length===15,"無法港を保存・復元");
   output.textContent=notes.join("\n")+"\n全項目成功";
 }
 const previousSave=localStorage.getItem("shiogatari-save");

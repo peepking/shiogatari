@@ -23,7 +23,9 @@ function bindVictim(q, origin) {
 
 /**
  * 既存依頼の進捗・期限・マーカーを活用し、海賊固有の積荷と固定編成を設定する。
- * 5種を候補に毎季節3件を重複なしで一様抽選する。
+ * 5種を一様に並べ替え、生成可能な種類から毎季節3件を重複なしで選ぶ。
+ * 密輸は20マス以内の通常拠点、運び屋は距離制限なしの別の無法港を等確率で選ぶ。
+ * 配送先がない種類は依頼生成前に飛ばし、残りの種類で補充する。
  * @param {object} origin 発注港。 @param {object} factories 既存の依頼生成関数。 @returns {Array} 依頼。
  */
 export function makePirateQuests(origin, factories) {
@@ -34,13 +36,16 @@ export function makePirateQuests(origin, factories) {
   for (let i=kinds.length-1;i>0;i--) {
     const j=Math.floor(Math.random()*(i+1)); [kinds[i],kinds[j]]=[kinds[j],kinds[i]];
   }
-  return kinds.slice(0,3).map(kind => {
+  const quests = [];
+  for (const kind of kinds) {
+    const targets = kind === "smuggle" || kind === "courier"
+      ? settlements.filter(s => s.id !== origin.id && (kind === "courier" ? s.pirateHaven
+        : !s.pirateHaven && s.factionId !== "pirates" && manhattan(origin.coords,s.coords) <= PIRATE_CONFIG.smuggleMaxDistance)) : null;
+    if (targets && !targets.length) continue;
     const q = kind === "raid" ? factories.hunt(origin) : kind === "fleetRaid" ? factories.bounty(origin)
       : kind === "supply" ? factories.supply(origin) : factories.delivery(origin);
     q.pirateKind = kind;
     if (kind === "smuggle" || kind === "courier") {
-      const targets = settlements.filter(s => s.id !== origin.id && (kind === "courier" ? s.pirateHaven : !s.pirateHaven));
-      if (!targets.length) return null;
       const target=targets[Math.floor(Math.random()*targets.length)];
       const item=CONTRABAND[Math.floor(Math.random()*CONTRABAND.length)];
       q.itemId=item.id; q.targetId=target.id; q.qty=1;
@@ -59,8 +64,10 @@ export function makePirateQuests(origin, factories) {
     } else q.title=`海賊の物資納品：${q.title}`;
     bindPirateReward(q, getNobleFavor(PIRATE_CONFIG.nobleId));
     bindVictim(q,origin);
-    return q;
-  }).filter(Boolean);
+    quests.push(q);
+    if (quests.length === 3) break;
+  }
+  return quests;
 }
 
 /**

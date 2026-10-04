@@ -113,9 +113,6 @@ export function loadGameFromStorage() {
     const snapshot = JSON.parse(payload);
     if (!snapshot?.state) return false;
     resetState();
-    if (snapshot.world) {
-      restoreWorld(snapshot.world);
-    }
     Object.assign(state, snapshot.state);
     state.piracy = normalizePiracy(snapshot.state.piracy);
     state.bounties = normalizeBounties(snapshot.state.bounties);
@@ -140,6 +137,9 @@ export function loadGameFromStorage() {
     state.nationalPower = normalizeNationalPower(snapshot.state.nationalPower, nationalPowerDay(state));
     state.logs = normalizeLogs(state.logs);
     state.expansion = normalizeExpansionState(state.expansion);
+    if (snapshot.world) {
+      if (restoreWorld(snapshot.world, { upgradePirateHavens: true }) === false) return false;
+    }
     state.assetCodex = collectAssetCodex({ ...state, assetCodex: snapshot.state.assetCodex });
     state.voyageStats = normalizeVoyageStats(snapshot.state.voyageStats, state);
     state.finalVoyage = normalizeFinalVoyage(snapshot.state.finalVoyage);
@@ -151,6 +151,9 @@ export function loadGameFromStorage() {
     reconcileWarFronts(state, snapshotWorld().settlements || []);
     const powerSettlements = snapshotWorld().settlements || [];
     for (const q of state.quests?.active || []) bindQuestPower(q, FACTIONS, powerSettlements);
+    if (snapshot.world && snapshotWorld().pirateHavenLayoutVersion !== snapshot.world.pirateHavenLayoutVersion) {
+      saveGameToStorage({ battlePreparation: state.modeLabel === MODE_LABEL.PREP && state.pendingEncounter?.battleKind === "grand" });
+    }
     return true;
   } catch (e) {
     console.error("loadGameFromStorage failed", e);
