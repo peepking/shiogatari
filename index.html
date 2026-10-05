@@ -5,7 +5,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
-  <link rel="stylesheet" href="styles.css?v=20261002-codex-spacing" />
+  <link rel="stylesheet" href="styles.css?v=20261005-codex-stable-layout" />
     <link rel="stylesheet" href="layout.css?v=20261005-dangerous-events" />
 </head>
 
@@ -1041,26 +1041,48 @@
         <button class="modal-close" id="codexModalClose">閉じる</button>
       </div>
       <div class="modal-bd codex-bd">
-        <div id="codexProgress" class="codex-progress"></div>
-        <div class="codex-tools">
-          <input id="codexSearch" type="search" placeholder="魚名で検索" aria-label="魚名で検索">
-          <details class="codex-filter-disclosure">
-            <summary>絞り込み <span id="codexFilterCount"></span></summary>
-          <div class="codex-filters" id="codexFilterWrap">
-            <div class="codex-filter-row">
-              <span class="codex-filter-label">分類</span>
-              <div class="codex-filter-btns" data-group="category"></div>
+        <div class="codex-controls">
+          <div id="codexProgress" class="codex-progress">
+            <div class="codex-progress-heading">
+              <strong id="codexProgressText">発見 0／0種</strong>
+              <progress id="codexProgressBar" max="100" value="0" aria-label="釣り図鑑の発見率"></progress>
             </div>
-            <div class="codex-filter-row">
-              <span class="codex-filter-label">海域</span>
-              <div class="codex-filter-btns" data-group="region"></div>
-            </div>
-            <div class="codex-filter-row">
-              <span class="codex-filter-label">季節</span>
-              <div class="codex-filter-btns" data-group="season"></div>
-            </div>
+            <details id="codexInfoDisclosure" class="codex-info-disclosure">
+              <summary>報酬・釣りの条件</summary>
+              <div class="codex-info-content">
+                <div id="codexRewards"></div>
+              </div>
+            </details>
           </div>
-          </details>
+          <div class="codex-tools">
+            <div class="codex-toolbar">
+              <input id="codexSearch" type="search" placeholder="発見済みの魚名を検索" aria-label="発見済みの魚名を検索">
+              <button id="codexFilterToggle" class="btn ghost" type="button" aria-expanded="false" aria-controls="codexFilterPanel">絞り込み <span id="codexFilterCount"></span></button>
+              <span id="codexResultCount" class="codex-result-count" aria-live="polite"></span>
+            </div>
+            <div id="codexFilterPanel" class="codex-filter-panel" hidden>
+              <div class="codex-filters" id="codexFilterWrap">
+                <div class="codex-filter-row">
+                  <span class="codex-filter-label">分類</span>
+                  <div class="codex-filter-btns" data-group="category"></div>
+                </div>
+                <div class="codex-filter-row">
+                  <span class="codex-filter-label">海域</span>
+                  <div class="codex-filter-btns" data-group="region"></div>
+                </div>
+                <div class="codex-filter-row">
+                  <span class="codex-filter-label">季節</span>
+                  <div class="codex-filter-btns" data-group="season"></div>
+                </div>
+              </div>
+              <p class="codex-filter-help">同じ項目ではどれかに一致する魚を、項目をまたぐとすべてに一致する魚を表示します。</p>
+            </div>
+            <div id="codexActiveFilters" class="codex-active-filters" hidden>
+              <div id="codexFilterChips" class="codex-filter-chips"></div>
+              <button id="codexClearFilters" class="btn ghost" type="button">全解除</button>
+            </div>
+            <p id="codexFilterNotice" class="codex-filter-notice" hidden></p>
+          </div>
         </div>
         <div class="codex-list">
           <div class="section" id="codexBody"></div>

@@ -89,6 +89,21 @@ export function fishingRegionAt(x, y) {
 }
 
 /**
+ * 魚名検索を互換正規化し、前後の空白とかな表記の違いを吸収する。
+ * カタカナの文字コード範囲をひらがなへ変換し、半角カナや結合濁点も同じ検索語として扱う。
+ * @param {string} value 魚名または検索語。
+ * @returns {string} 比較用の検索語。
+ */
+function normalizeCodexSearch(value) {
+  let normalized = "";
+  for (const char of value.normalize("NFKC").trim()) {
+    const code = char.codePointAt(0);
+    normalized += code >= 0x30a1 && code <= 0x30f6 ? String.fromCodePoint(code - 0x60) : char;
+  }
+  return normalized;
+}
+
+/**
  * 図鑑のフィルタ条件に種が合致するかを判定する。
  * 各グループ（分類・海域・季節）は未選択（空のSet）なら絞り込みなし、グループ内はOR・グループ間はANDで判定する。
  * 未発見魚の開示仕様（段階公開）に合わせて、フィールドごとに公開条件を分けて適用する。
@@ -99,6 +114,7 @@ export function fishingRegionAt(x, y) {
  * - 季節（seasons）: 発見済みなら常に適用。未発見魚は seasonsRevealed（図鑑完成率25%以上）で公開され、
  *   公開前は季節グループ選択中であれば対象外、公開後は実データを適用する。
  * - 検索（search）: 未発見魚の名前は非公開のため、検索キーワードがある場合は未発見魚を対象外にする。
+ *   かな表記や半角・全角の違い、前後の空白を吸収する。空白だけの検索は絞り込みなしとする。
  *   （内部の name 一致で ??? が検索結果に現れるのを防ぐ）
  * - 水深・有効餌: 図鑑フィルタ化の際は、公開閾値（水深50%・有効餌75%）前は指定中に未発見魚を対象外とし、
  *   公開後に実データを適用する同パターンとする。
@@ -113,11 +129,11 @@ export function fishingRegionAt(x, y) {
 export function matchesCodexFilters(s, sel, opts = {}) {
   const caught = opts.caught !== false;
   const seasonsRevealed = !!opts.seasonsRevealed;
-  const search = opts.search || "";
+  const search = normalizeCodexSearch(opts.search || "");
   if (sel.categories.size > 0 && (!caught || !sel.categories.has(s.category))) return false;
   if (sel.regions.size > 0 && !s.regions.some((r) => sel.regions.has(r))) return false;
   if (sel.seasons.size > 0 && (!(caught || seasonsRevealed) || !s.seasons.some((x) => sel.seasons.has(x)))) return false;
-  if (search && (!caught || !s.name.includes(search))) return false;
+  if (search && (!caught || !normalizeCodexSearch(s.name).includes(search))) return false;
   return true;
 }
 

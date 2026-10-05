@@ -344,6 +344,19 @@ async function main() {
     false
   );
 
+  // かな・半角カナ・結合濁点・前後の空白を吸収し、未発見の魚名は引き続き非公開にする。
+  const emptyCodexFilters = { categories: new Set(), regions: new Set(), seasons: new Set() };
+  for (const search of ["あじ", "ｱｼﾞ", "あし\u3099", " アジ ", "\u3000あじ\u3000"]) {
+    assert.equal(fishing.matchesCodexFilters(fishing.speciesById("aji"), emptyCodexFilters, { search }), true);
+    assert.equal(fishing.matchesCodexFilters(fishing.speciesById("aji"), emptyCodexFilters, { search, caught: false, seasonsRevealed: true }), false);
+  }
+  assert.equal(fishing.matchesCodexFilters(fishing.speciesById("aji"), emptyCodexFilters, { search: "あし" }), false);
+  assert.equal(fishing.matchesCodexFilters({ ...fishing.speciesById("aji"), name: "ｱｼﾞ" }, emptyCodexFilters, { search: "あじ" }), true);
+
+  // 空白だけなら名前検索は無効になり、未発見魚もほかの条件だけで判定する。
+  assert.equal(fishing.matchesCodexFilters(fishing.speciesById("aji"), emptyCodexFilters, { search: " \t\u3000 ", caught: false }), true);
+  assert.equal(fishing.matchesCodexFilters(fishing.speciesById("aji"), { ...emptyCodexFilters, categories: new Set(["big"]) }, { search: "あじ" }), false);
+
   // 完成率: 発見済み数 / 総数で、既存の図鑑登録状態のみから算出
   const completion = fishing.codexCompletion({ aji: { count: 3 }, madai: { count: 1 }, hamadai: { count: 1 } });
   assert.equal(completion.caught, 3);
