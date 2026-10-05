@@ -1060,7 +1060,8 @@ function envText() {
 }
 
 /**
- * パネル全体を再描画する。アタリ中はタイマーを再開する。
+ * パネル全体を再描画する。街・村の釣り小屋では地形に関係なく釣り操作を隠す。
+ * アタリ中はタイマーを再開する。
  * @returns {void}
  */
 function renderFishingPanel() {
@@ -1072,7 +1073,7 @@ function renderFishingPanel() {
   envEl ? (envEl.textContent = envText()) : null;
   const data = state.expansion.fishing;
   const busy = biteActive() || isWaiting() || fishingDangerBlocked();
-  const manageOnly = !currentEnv().sea && !data.pending;
+  const manageOnly = canSell() || (!currentEnv().sea && !data.pending);
   sessionEl.hidden = manageOnly;
   if (!manageOnly) sessionEl.innerHTML = sessionHtml();
   if (invEl) invEl.innerHTML = inventoryHtml();

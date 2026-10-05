@@ -723,7 +723,40 @@ assert.equal(failedCatchState.voyageStats.largestFish.id, "dangouo");
 assert.equal(failedCatchState.expansion.fishing.rewards.unlocked[3], true);
 assert.equal(failedCatchState.expansion.fishing.codex.dangouo.count, 1);
 
-console.log("釣り: 餌・竿・釣果・画面を閉じない連続セッション開始: 全項目成功");
+// 海上の無法港でも釣り小屋は管理専用とし、出港後は釣り画面に戻る。
+const hutState = makeState();
+const hutSession = { hidden: false, innerHTML: "", contains: () => false };
+const hutInventory = { innerHTML: "" };
+const hutElements = { fishingSellBtn: {}, fishingBaitBuyBtn: {} };
+const hutContext = vm.createContext({
+  state: hutState, MODE_LABEL: { IN_TOWN: "town", IN_VILLAGE: "village" },
+  elements: hutElements, sea: false,
+  document: { getElementById: id => ({ fishingSession: hutSession, fishingInventory: hutInventory })[id] },
+  currentEnv: () => ({ sea: hutContext.sea }),
+  biteActive: () => false, isWaiting: () => false, fishingDangerBlocked: () => false,
+  hasAnyFish: () => true, sessionHtml: () => "釣り操作", inventoryHtml: () => "釣果管理",
+  wireSessionButtons() {}, wireInventoryButtons() {}, startSessionTimer() {},
+});
+for (const name of ["canSell", "renderFishingPanel"]) {
+  const body = uiSource.match(new RegExp(`function ${name}\\([^\\n]*\\) \\{[\\s\\S]*?\\n\\}`))?.[0];
+  assert.ok(body);
+  vm.runInContext(body, hutContext);
+}
+for (const [mode, sea, hidden] of [
+  ["town", false, true], ["village", false, true],
+  ["town", true, true], ["village", true, true], ["normal", true, false],
+]) {
+  hutState.modeLabel = mode;
+  hutContext.sea = sea;
+  vm.runInContext("renderFishingPanel()", hutContext);
+  assert.equal(hutSession.hidden, hidden, `${mode}/${sea}: 施設内では釣り操作を隠す`);
+  assert.equal(hutInventory.innerHTML, "釣果管理", "釣果管理は引き続き表示する");
+  assert.equal(hutElements.fishingSellBtn.hidden, mode === "normal");
+  assert.equal(hutElements.fishingBaitBuyBtn.hidden, mode === "normal");
+}
+assert.equal(hutSession.innerHTML, "釣り操作", "出港後は海上の釣り操作を表示する");
+
+console.log("釣り: 餌・竿・釣果・画面を閉じない連続セッション開始・釣り小屋表示: 全項目成功");
 }
 
 main().catch((error) => {
