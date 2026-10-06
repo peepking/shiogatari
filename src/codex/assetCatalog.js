@@ -22,7 +22,7 @@ function troopTraits(stat) {
 
 /** @param {object} item 設備。 @returns {string} 現在の公開設定に基づく効果。 */
 export function codexEquipmentEffect(item) {
-  if (item.attack) return `${item.attack.interval}カウントごとに${item.attack.allEnemies ? "敵全部隊" : "敵1部隊"}へ威力${item.attack.power}の支援射撃。防御で軽減されます。`;
+  if (item.attack) return "支援射撃";
   const names = { atk: "全兵員の攻撃力", def: "全兵員の防御力", meleeAtk: "近接兵の攻撃力", meleeDef: "近接兵の防御力", rangedAtk: "射撃兵の攻撃力", rangedDef: "射撃兵の防御力", supplyCap: "物資上限", troopCap: "兵員上限", foodReduction: "食料消費", upkeepReduction: "部隊維持費", shipUpkeepReduction: "船維持費", medics: "衛生兵効果", scouts: "斥候効果" };
   return Object.entries(item.effects).map(([key, value]) => `${names[key]}${key.endsWith("Reduction") ? "−" : "＋"}${value}${["medics", "scouts"].includes(key) ? `人分（兵員と合わせて最大${OUTFITTING_CONFIG.supportLimit}人分）` : "%"}`).join(" / ");
 }
@@ -56,14 +56,14 @@ export function assetCatalog(tab, state) {
       current: codexTroopCount(state.troops?.[id]), recorded: history.troops.includes(id),
       metrics: { "雇用費／人": stat.hire, "部隊維持費／人・季節（軽減前）": stat.upkeep, "基礎HP": stat.hp, "攻撃力": stat.atk, "防御力": stat.def,
         "攻撃間隔": `${stat.spd}カウント`, "射程": `${stat.range}マス`, "移動力": `${stat.move}マス`, "特性": troopTraits(stat) },
-      terrain: suitability, note: "兵種の基礎値です。実戦の能力は人数・レベル・地形・船団・陣形などで変わります。攻撃間隔は小さいほど頻繁に攻撃します。地形適性は100%が基準で、攻撃力と防御力に関わります。" };
+      terrain: suitability, note: "能力は兵種の基礎値です。" };
   });
   if (tab === "equipment") return Object.entries(OUTFITTING_ITEMS).map(([id, item]) => {
     const [category, description, hint] = EQUIPMENT_GUIDES[id];
     return { id, tab, name: item.name, category, categories: id === "expanded_hold" ? ["cargo", "troops"] : [category], tag: CODEX_LABELS[category], description, hint, known: true,
       current: state.expansion?.outfitting?.owned?.includes(id) ? 1 : 0, equipped: state.expansion?.outfitting?.equipped?.includes(id), recorded: history.equipment.includes(id),
       metrics: { "購入価格": item.price, "効果": codexEquipmentEffect(item), ...(item.attack ? { "発射間隔": `${item.attack.interval}カウント`, "威力": item.attack.power, "対象": item.attack.allEnemies ? "敵全部隊" : "敵1部隊" } : {}) },
-      note: `装備して初めて効果が出ます。船団共通で陸戦にも有効です。同じ設備は複数装備できません。装備枠は最大${OUTFITTING_CONFIG.maxSlots}枠です。射撃の威力は艤装単独の値で、実際の被害は防御・陣形などにより変わります。` };
+      note: "装備すると効果が出ます。" };
   });
   if (tab === "variants") return Object.values(VARIANT_SHIPS).map((variant, index) => {
     const records = history.variants.filter(record => record.variantId === variant.id);
@@ -75,18 +75,18 @@ export function assetCatalog(tab, state) {
       current: (state.fleet?.variants || []).filter(record => record.variantId === variant.id).length, records,
       description: "賞金首の船長から拿捕した一隻。通常船の特徴に加え、人や荷を運ぶ余裕を持つ。",
       hint: SHIP_GUIDES[variant.base][2], metrics: { ...shipMetrics(ship), "物資容量加算": ship.supplies + variant.supplies, "兵員容量加算": ship.troops + variant.troops },
-      note: "通常船より容量が多い船です。同じ船種の固有効果の上限は、通常船と共有します。売却や喪失後も、取得した来歴は図鑑に残ります。" };
+      note: "通常船と固有効果の上限を共有します。" };
   });
   const ships = Object.entries(SHIP_TYPES).filter(([id]) => id !== "viking_ship" || state.pirateKingStory?.completed === true).map(([id, ship]) => {
     const [category, description, hint] = SHIP_GUIDES[id];
     const variants = (state.fleet?.variants || []).filter(record => VARIANT_SHIPS[record.variantId]?.base === id).length;
     return { id, tab: "ships", name: ship.name, category, categories: id === "carrack" ? ["cargo", "troops"] : [category], tag: CODEX_LABELS[category], known: true, description, hint,
       current: (state.fleet?.counts?.[id] || 0) + variants, recorded: history.ships.includes(id), metrics: shipMetrics(ship),
-      note: "価格・容量・維持費は通常船1隻の値です。保有数には同船種の固有船を含みます。固有効果が上限に達しても、船ごとの容量は増えます。戦闘効果は陸戦でも有効です。" };
+      note: "価格・容量・維持費は通常船1隻の値です。" };
   });
   return [{ id: "sacred", tab: "ships", name: "聖船", category: "sacred", tag: "旅のはじまり", known: true, current: 1, recorded: true,
     description: "潮語りの旅を支える、沈まぬ象徴。人と荷を抱え、航海録のはじまりから共にある。", hint: "通常船を持たないときも、聖船の基本容量で旅を始められます。",
-    metrics: { "物資基本容量": BASE_SUPPLY_CAP, "兵員基本容量": BASE_TROOP_CAP, "船維持費": 0, "売買": "できません" }, note: "通常船とは別の存在です。売却や船の喪失の対象にはならず、維持費もかかりません。" }, ...ships];
+    metrics: { "物資基本容量": BASE_SUPPLY_CAP, "兵員基本容量": BASE_TROOP_CAP, "船維持費": 0, "売買": "できません" }, note: "初めから旅を支える船です。" }, ...ships];
 }
 
 /** @param {object[]} entries 名簿。 @param {string} query 検索語。 @param {string} category 用途。 @returns {object[]} 名前・役割・用途に一致する項目。 */

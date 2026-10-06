@@ -26,20 +26,25 @@ export function rollCrimeReward(settlement, kind, random = Math.random) {
 }
 
 /** 拠点全体で季節1回。名誉家臣・保留イベント・容量不足は何も消費せず拒否する。
- * @param {object} state 状態。 @param {object} settlement 拠点。 @param {string} kind 種別。 @param {number} space 空き容量。 @returns {string} 不可理由。
+ * @param {object} state 状態。 @param {object} settlement 拠点。 @param {string} kind 種別。 @param {number} space 空き容量。 @returns {{id:string,text:string}} 不可理由の識別子と表示文。
  */
-export function theftReason(state, settlement, kind, space) {
+export function theftRestriction(state, settlement, kind, space) {
   const rule = THEFT_TYPES[kind];
-  if (!rule || !settlement?.id || !WANTED_FACTIONS.includes(settlement.factionId)) return "対象がありません。";
-  if (state.honorFactions?.length) return "名誉家臣は犯罪を選べません。先に名誉家臣を辞してください。";
+  if (!rule || !settlement?.id || !WANTED_FACTIONS.includes(settlement.factionId)) return { id: "target", text: "対象がありません。" };
+  if (state.honorFactions?.length) return { id: "honor", text: "名誉家臣は犯罪を選べません。「所属・身分」から辞任できます。" };
   const modes = rule.raid ? [MODE_LABEL.NORMAL, MODE_LABEL.IN_TOWN, MODE_LABEL.IN_VILLAGE] : [MODE_LABEL.IN_TOWN, MODE_LABEL.IN_VILLAGE];
-  if (rule.raid && (settlement.pirateHaven || settlement.factionId === "pirates")) return "拠点襲撃は通常勢力の街・村が対象です。";
-  if (!modes.includes(state.modeLabel) || (!rule.raid && wantedEntryReason(state, settlement, absDay(state)))) return "窃盗には街・村への入場が必要です。";
-  if (state.pendingEncounter?.active || state.eventQueue?.length || state.wanted?.detention) return "進行中の出来事を先に解決してください。";
-  if (rule.battle && !Object.values(state.troops || {}).some(levels => typeof levels === "number" ? levels > 0 : Object.values(levels).some(n => n > 0))) return "守備隊との戦闘には部隊員が必要です。";
-  if (state.wanted?.settlementActions?.[settlement.id]?.[rule.raid ? "raidSeason" : "theftSeason"] === state.year * SEASONS_PER_YEAR + state.season) return `この拠点では今季すでに${rule.raid ? "襲撃" : "窃盗"}を行いました。`;
-  if (Object.values(rule.supplies).reduce((sum, n) => sum + Math.ceil(n * crimeScale(settlement) * 1.2), 0) > space) return "報酬の最大数量を受け取る物資の空き容量が足りません。";
-  return "";
+  if (rule.raid && (settlement.pirateHaven || settlement.factionId === "pirates")) return { id: "raidTarget", text: "拠点襲撃は通常勢力の街・村が対象です。" };
+  if (!modes.includes(state.modeLabel) || (!rule.raid && wantedEntryReason(state, settlement, absDay(state)))) return { id: "entry", text: "窃盗には街・村への入場が必要です。" };
+  if (state.pendingEncounter?.active || state.eventQueue?.length || state.wanted?.detention) return { id: "pending", text: "進行中の出来事を先に解決してください。" };
+  if (rule.battle && !Object.values(state.troops || {}).some(levels => typeof levels === "number" ? levels > 0 : Object.values(levels).some(n => n > 0))) return { id: "troops", text: "守備隊との戦闘には部隊員が必要です。" };
+  if (state.wanted?.settlementActions?.[settlement.id]?.[rule.raid ? "raidSeason" : "theftSeason"] === state.year * SEASONS_PER_YEAR + state.season) return { id: rule.raid ? "usedRaid" : "usedTheft", text: `この拠点では今季すでに${rule.raid ? "襲撃" : "窃盗"}を行いました。` };
+  if (Object.values(rule.supplies).reduce((sum, n) => sum + Math.ceil(n * crimeScale(settlement) * 1.2), 0) > space) return { id: "capacity", text: "報酬を受け取る物資の空き容量が足りません。" };
+  return { id: "", text: "" };
+}
+
+/** @param {object} state 状態。 @param {object} settlement 拠点。 @param {string} kind 種別。 @param {number} space 空き容量。 @returns {string} 従来の実行判定に使う不可理由。 */
+export function theftReason(state, settlement, kind, space) {
+  return theftRestriction(state, settlement, kind, space).text;
 }
 
 /** 再検証後に犯罪・季節枠・固定報酬を一括反映する。関係悪化と保存は呼出元で同じ取引として扱う。

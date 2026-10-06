@@ -30,7 +30,7 @@ export function wireGuideHelp() {
     dialog.querySelector(".modal-bd").scrollTop = 0;
     const question = topic && dialog.querySelector(`#${topic}`);
     if (question) {
-      question.open = true;
+      dialog.querySelectorAll(".guide-question").forEach(item => { item.open = item === question; });
       question.querySelector("summary").focus();
       question.scrollIntoView({ block: "nearest" });
     } else {
@@ -40,10 +40,11 @@ export function wireGuideHelp() {
 
   document.getElementById("helpBtn")?.addEventListener("click", () => openGuide(dialogs[0]));
   document.getElementById("troubleBtn")?.addEventListener("click", () => openGuide(dialogs[1]));
-  document.querySelectorAll("[data-guide-dialog]").forEach(button => {
-    button.addEventListener("click", () => openGuide(
-      dialogs.find(dialog => dialog?.id === button.dataset.guideDialog), button.dataset.guideTopic
-    ));
+  document.addEventListener("click", event => {
+    const button = event.target.closest("[data-guide-dialog]");
+    if (!button) return;
+    event.preventDefault();
+    openGuide(dialogs.find(dialog => dialog?.id === button.dataset.guideDialog), button.dataset.guideTopic);
   });
   dialogs.forEach(dialog => {
     if (!dialog) return;
@@ -52,6 +53,7 @@ export function wireGuideHelp() {
     dialog.addEventListener("keydown", event => {
       if (event.key === "Escape") {
         event.preventDefault();
+        event.stopPropagation();
         closeGuide();
       } else if (event.key === "Tab") {
         const focusable = [...dialog.querySelectorAll("button, summary")].filter(item => item.getClientRects().length);

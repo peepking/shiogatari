@@ -836,7 +836,7 @@ function handleSmuggleAction(action) {
       } else {
         enqueueEvent({
           title: "摘発失敗",
-          body: "摘発に失敗しました。どうしますか？",
+          body: "摘発に失敗しました。襲撃すれば戦利品を狙えますが、戦闘と近隣との関係悪化を覚悟する必要があります。",
           actions: [
             { id: "smug-raid", label: "襲撃する", type: "smuggle_attack", payload: ctx },
             { id: "smug-leave", label: "立ち去る", type: "merchant_leave" },
@@ -890,7 +890,7 @@ function handleRefugeeAction(action) {
         const set = getSettlementById(info.settlementId);
         const q = addRefugeeEscortQuest(set);
         pushLog("難民護送依頼を受注", `目的地: ${set?.name || info.settlementId}`, "-");
-        pushToast("護送開始", "目的地まで護送します。エンカウント率が上がります。", "warn");
+        pushToast("護送開始", "目的地まで護送します。護送中は敵に遭いやすくなります。", "warn");
         if (typeof document !== "undefined") {
           document.dispatchEvent(new CustomEvent("quests-updated", { detail: { questId: q?.id } }));
         }
@@ -1153,10 +1153,14 @@ function nearestSettlementInfo() {
 }
 
 /**
- * 行商人イベントをキューに積む。
- * @param {string} terrain
- * @returns {boolean}
+ * 遭遇文で内部の地形IDを読みやすい名称へ変換する。
+ * @param {string} terrain 地形ID。
+ * @returns {string} 地形の表示名。
  */
+function travelTerrainName(terrain) {
+  return { sea: "海", shoal: "浅瀬", plain: "平原", forest: "森", mountain: "山岳" }[terrain] || "旅先";
+}
+
 /**
  * 行商人イベントをキューに積む。
  * @param {string} terrain
@@ -1168,7 +1172,7 @@ function enqueueMerchantEvent(terrain) {
   const deals = pickDeals();
   enqueueEvent({
     title: "行商人との遭遇",
-    body: `行商人と遭遇しました（地形: ${terrain}）。\nどうしますか？`,
+    body: `${travelTerrainName(terrain)}で行商人と遭遇しました。襲撃すれば戦利品を狙えますが、戦闘になり、手配や近隣との関係悪化を招きます。`,
     actions: [
       { id: "trade", label: "取引する", type: "merchant_trade", payload: { deals } },
       { id: "leave", label: "立ち去る", type: "merchant_leave" },
@@ -1192,7 +1196,7 @@ function enqueueMerchantRescueEvent(terrain) {
   const info = nearestSettlementInfo();
   enqueueEvent({
     title: "行商人救助",
-    body: `襲撃を受けた行商人を発見しました（地形: ${terrain}）。どうしますか？`,
+    body: `${travelTerrainName(terrain)}で襲撃を受けた行商人を発見しました。救助には手強い海賊との戦いが待っていますが、勝てば謝礼と近隣の信頼を得られそうです。弱った行商人を襲えば戦利品を狙えますが、手配や関係悪化を招きます。`,
     actions: [
       {
         id: "help",
@@ -1305,7 +1309,7 @@ function enqueueSmuggleEvent(terrain) {
   const deals = pickDeals(false);
   enqueueEvent({
     title: "密輸船を発見",
-    body: `正規ルートを避ける船団を発見しました（地形: ${terrain}）。\nどうしますか？`,
+    body: `${travelTerrainName(terrain)}で正規ルートを避ける船団を発見しました。威圧して摘発できれば、謝礼と近隣の信頼を得られそうです。襲撃では戦利品を狙えますが、戦闘や近隣との関係悪化を覚悟する必要があります。`,
     actions: [
       { id: "smug-trade", label: "取引する", type: "smuggle_trade", payload: { deals, ...info } },
       { id: "smug-bust", label: "摘発する", type: "smuggle_bust", payload: info || {} },
@@ -1325,13 +1329,14 @@ function enqueueRefugeeEvent(terrain) {
   if (state.refugeeEscort?.active) return false;
   const info = nearestSettlementInfo();
   const foodNeed = Math.max(5, Math.floor(totalSupplies(state.supplies) * 0.05));
+  const foodPay = Math.min(state.supplies?.food || 0, foodNeed);
   enqueueEvent({
     title: "難民旅団",
-    body: `物資不足で漂流する難民旅団に遭遇しました（地形: ${terrain}）。どうしますか？\n食糧支援目安: 食料${foodNeed}消費（所持量に応じて減免）`,
+    body: `${travelTerrainName(terrain)}で物資不足の難民旅団に遭遇しました。食料${foodPay}を分ければ名声と近隣の信頼を得られます。近隣の拠点まで護送することもできますが、道中は敵に狙われやすくなります。襲撃で戦利品を狙えば、戦闘に加えて手配や関係悪化を招きます。`,
     actions: [
       { id: "refugee-leave", label: "立ち去る", type: "merchant_leave" },
       { id: "refugee-feed", label: "食糧を分け与える", type: "refugee_feed" },
-      { id: "refugee-escort", label: "護送依頼受注", type: "refugee_escort", payload: info || {} },
+      { id: "refugee-escort", label: "護送を引き受ける", type: "refugee_escort", payload: info || {} },
       { id: "refugee-raid", label: "襲撃する", type: "refugee_attack" },
     ],
   });
@@ -1350,7 +1355,7 @@ function enqueueCheckpointEvent(settlement = null) {
   const bribeCost = 50;
   enqueueEvent({
     title: "検問強化",
-    body: `臨時検問に遭遇しました。どうしますか？\n賄賂コスト: 資金${bribeCost}`,
+    body: `臨時検問に遭遇しました。正規に応じれば原料を最大2個渡して通過し、近隣の信頼を得られます。強行突破は検問部隊との戦闘になり、手配や関係悪化を招きます。\n賄賂コスト: 資金${bribeCost}`,
     actions: [
       { id: "cp-ok", label: "正規に応じる", type: "checkpoint_ok", payload: info },
       { id: "cp-bribe", label: "賄賂を渡す", type: "checkpoint_bribe", payload: info },
@@ -1368,7 +1373,7 @@ function enqueueOmenEvent() {
   const costHint = Math.max(10, Math.floor((state.faith || 0) * 0.1));
   enqueueEvent({
     title: "災いの兆し",
-    body: `不穏な兆しを感じます。今、祈りますか？\n祈りの消費目安: 信仰${costHint}`,
+    body: `不穏な兆しを感じます。${(state.faith || 0) < 10 ? "今は信仰が足りず祈れません。後日、災いが訪れる恐れがあります。" : "祈れば災いを遠ざけ、船や食料の加護を授かるかもしれません。兆しを無視すると、後日災いが訪れる恐れがあります。"}\n祈りの消費目安: 信仰${costHint}`,
     actions: [
       { id: "omen-pray", label: "海に祈る", type: "omen_pray" },
       { id: "omen-ignore", label: "無視する", type: "omen_ignore" },
@@ -1385,7 +1390,7 @@ function enqueueOmenEvent() {
 function enqueueWreckEvent(terrain) {
   enqueueEvent({
     title: "廃船・漂流物",
-    body: `廃船や漂流物を発見しました（地形: ${terrain}）。どうしますか？`,
+    body: `${travelTerrainName(terrain)}で廃船や漂流物を発見しました。調べれば船や物資を回収できそうですが、海賊の待ち伏せには注意が必要です。`,
     actions: [
       { id: "wreck-probe", label: "調査する", type: "wreck_probe" },
       { id: "wreck-leave", label: "立ち去る", type: "merchant_leave" },
@@ -1405,7 +1410,7 @@ function enqueueTraitorEvent() {
   const intelCost = 80;
   enqueueEvent({
     title: "内通者の接触",
-    body: `匿名の使者が情報を売りたいと言っています。\n情報購入コスト: 資金${intelCost}\nどうしますか？`,
+    body: `匿名の使者が情報を売りたいと言っています。敵勢力の動きをつかめれば、戦況を有利にできそうです。使者を捕らえれば近隣の貴族の信頼を得られます。\n情報購入コスト: 資金${intelCost}`,
     actions: [
       { id: "traitor-buy", label: "情報を買う", type: "traitor_buy" },
       { id: "traitor-ignore", label: "拒否する", type: "traitor_ignore" },

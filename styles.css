@@ -715,6 +715,15 @@ option {
   z-index: 60;
 }
 
+/* 確認内容の項目と補足ガイドを、元の操作を保持したまま読めるようにする。 */
+#confirmModal.confirmation-structured .modal { width: min(580px, 92vw); }
+.confirmation-intro { margin: 0 0 12px; white-space: pre-line; }
+.confirmation-section { margin: 14px 0; padding-top: 12px; border-top: 1px solid var(--line); }
+.confirmation-section h3 { margin: 0 0 8px; font-size: 14px; color: var(--text); }
+.confirmation-section ul { margin: 0; padding-left: 20px; }
+.confirmation-section li { margin: 6px 0; overflow-wrap: anywhere; }
+#helpModal, #troubleModal { z-index: 80; }
+
 .bounty-card [data-bounty-fight] {
   background: #385582;
   border-color: #7aa7ff;
@@ -758,6 +767,19 @@ option {
   justify-content: space-between;
   align-items: center;
   gap: 10px;
+}
+
+.modal .modal-hd > :is(h1, h2, h3, h4, h5, h6, div) {
+  margin: 0;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.modal .modal-hd > button {
+  flex-shrink: 0;
 }
 
 .modal .modal-bd {
@@ -1252,7 +1274,7 @@ option {
 
 .roster-controls {
   display: grid;
-  grid-template-columns: 1fr 48px;
+  grid-template-columns: minmax(0, 1fr) 72px;
   gap: 6px;
   align-items: center;
 }
@@ -1265,10 +1287,15 @@ option {
 
 .roster-row input[type="range"] {
   width: 100%;
+  min-width: 0;
 }
 
+/* 2桁の人数とブラウザ標準の増減ボタンが重ならない幅・余白を確保する。 */
 .roster-row input[type="number"] {
   width: 100%;
+  min-width: 0;
+  padding: 8px;
+  font-variant-numeric: tabular-nums;
 }
 
 .roster-row .btn {
@@ -1373,6 +1400,7 @@ option {
 #faithDetailsModal .modal { background: #111a2d; }
 #faithDetailsModal .modal-hd { flex-shrink: 0; }
 #faithDetailsBody { min-height: 0; }
+#faithDetailsBody > .btn[data-guide-topic] { margin-top: 16px; }
 .faith-current { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 2px 4px 16px; color: var(--muted); }
 .faith-current strong { font-size: 28px; font-variant-numeric: tabular-nums; color: var(--accent2); }
 .faith-benefit-list { display: flex; flex-direction: column; gap: 12px; }
@@ -1572,6 +1600,7 @@ a {
 .outfitting-heading-actions { display: flex; gap: 6px; flex-wrap: wrap; }
 .outfitting-heading-actions [aria-pressed="true"] { background: #293c60; border-color: #6b8aaa; }
 .outfitting-details { overflow-y: auto; scrollbar-gutter: stable; padding: 0 8px; }
+.outfitting-details > .outfitting-metrics + .btn[data-guide-topic] { margin-top: 12px; }
 .fleet-details-body .outfitting-details { overflow: visible; max-height: none; scrollbar-gutter: auto; }
 .outfitting-equipped { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .outfitting-heading { display: flex; flex-wrap: wrap; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
@@ -1592,7 +1621,8 @@ a {
 .ship-owned, .ship-detail-heading { display: flex; align-items: center; gap: 12px; }
 .ship-owned { align-items: flex-start; }
 .ship-owned > div { min-width: 0; }
-.ship-trade-bar { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 10px; padding-top: 12px; flex-shrink: 0; }
+.ship-owned > div > b + .btn[data-asset-codex] { margin-inline-start: 8px; }
+.ship-trade-bar { display: flex; justify-content: space-between; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 0; flex-shrink: 0; }
 .ship-trade-bar > span { font-size: 13px; color: var(--muted); }
 .ship-quantity { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 16px 0; }
 .ship-quantity input { width: 100px; max-width: 100%; }
@@ -1608,6 +1638,14 @@ a {
 .ship-choice span { grid-column: 1 / -1; }
 .outfitting-comparison { min-width: 0; min-height: 0; overflow-y: auto; scrollbar-gutter: stable; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.025); }
 .outfitting-comparison h3 { margin: 0; font-size: 17px; }
+.outfitting-item-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.outfitting-item-heading h3 { flex: 1 1 auto; min-width: 0; line-height: 1.5; overflow-wrap: anywhere; }
+.outfitting-item-heading > .btn[data-asset-codex] { margin: 0; }
+.outfitting-equipment-detail > p { margin: 12px 0 0; overflow-wrap: anywhere; }
+.outfitting-preview { margin-top: 16px; }
+.outfitting-preview > p { margin: 0; }
+.outfitting-preview > .outfitting-metrics, .outfitting-preview > p + p { margin-top: 8px; }
+.outfitting-equipment-detail > #outfittingCommit { margin-top: 12px; }
 .outfitting-notice { font-size: 13px; }
 .outfitting-panel #outfittingCommit { width: 100%; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
 .outfitting-metrics { width: 100%; border-collapse: collapse; }
@@ -1628,6 +1666,7 @@ a {
   .outfitting-details { max-height: max(480px, 65dvh); }
 }
 .national-power-sheet { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 14px; background: rgba(122, 167, 255, .05); }
+.national-power-sheet > .btn[data-guide-topic] { margin-top: 12px; }
 .national-power-container { grid-column: 1 / -1; min-width: 0; }
 .national-power-container:empty { display: none; }
 .national-power-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 8px; }
@@ -1887,6 +1926,10 @@ fieldset.battle-unit-orders {
   white-space: nowrap;
 }
 
+.rod-reward-flavor { font-size: 14px; line-height: 1.8; color: var(--muted); white-space: pre-line; }
+.rod-reward-effect { line-height: 1.7; font-weight: 600; }
+.fleet-disclosure { margin: 14px 0; }
+.fleet-disclosure > summary { padding: 6px 0; font-weight: 600; cursor: pointer; }
 .modal.rod-reward-modal {
   height: auto;
   min-height: 0;
@@ -1896,6 +1939,8 @@ fieldset.battle-unit-orders {
 .bounty-modal { width: min(860px, 96vw); background: #111d30; }
 #bountyBody > * + * { margin-top: 12px; }
 .bounty-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* 現地の一人確認だけ一列にし、街の比較用一覧とは配置を分ける。 */
+.bounty-list.bounty-list-single { grid-template-columns: minmax(0, 1fr); }
 .bounty-card { min-width: 0; padding: 16px; border: 1px solid #34475d; border-radius: 12px; background: #17283a; }
 .bounty-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
 .bounty-heading h3 { margin: 0; font-size: 17px; }

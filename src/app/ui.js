@@ -87,7 +87,7 @@ import {
 } from "../world/map.js";
 import { openEventTrade, wireMarketModals } from "../resources/marketUI.js";
 import { renderAssets, renderFactions, wireFactionPanel, wireMapToggle } from "../ui/panelUI.js";
-import { renderQuestModal, renderQuestUI, renderQuestConditions, renderQuestRewards } from "../quests/questUI.js";
+import { renderQuestModal, renderQuestUI, renderQuestOffer, renderQuestRewards } from "../quests/questUI.js";
 import { renderReportLine, reportLineText } from "../ui/resourceUI.js";
 import { absDay, manhattan } from "../quests/questUtils.js";
 import {
@@ -1611,48 +1611,12 @@ function renderNobleQuestModal(noble, settlement, syncUI) {
     return;
   }
   const now = absDay(state);
-  const typeLabel = (q) => {
-    switch (q.type) {
-      case QUEST_TYPES.NOBLE_SUPPLY:
-        return "加工品調達";
-      case QUEST_TYPES.NOBLE_SCOUT:
-        return "偵察";
-      case QUEST_TYPES.NOBLE_SECURITY:
-        return "治安回復";
-      case QUEST_TYPES.NOBLE_REFUGEE:
-        return "難民受け入れ";
-      case QUEST_TYPES.NOBLE_LOGISTICS:
-        return "兵站調達";
-      case QUEST_TYPES.NOBLE_HUNT:
-        return "敵軍討伐";
-      default:
-        return "依頼";
-    }
-  };
   body.innerHTML = list
     .map((q) => {
       const remainText = modalDeadlineText(q, now);
-      const placeLabel =
-        q.type === QUEST_TYPES.NOBLE_SUPPLY
-          ? `${settlement.name}(${(settlement.coords.x || 0) + 1}, ${(settlement.coords.y || 0) + 1})で納品`
-        : q.type === QUEST_TYPES.NOBLE_LOGISTICS
-          ? `兵站納品: (${(settlement.coords.x || 0) + 1}, ${(settlement.coords.y || 0) + 1})`
-          : q.type === QUEST_TYPES.NOBLE_SCOUT
-            ? `偵察: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-            : q.type === QUEST_TYPES.NOBLE_REFUGEE
-              ? `難民受け入れ: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})→${settlement.name}(${(settlement.coords.x || 0) + 1}, ${(settlement.coords.y || 0) + 1})`
-              : q.type === QUEST_TYPES.NOBLE_SECURITY
-                  ? `治安回復 @${settlement.name}(${(settlement.coords.x || 0) + 1}, ${(settlement.coords.y || 0) + 1})`
-                  : q.type === QUEST_TYPES.NOBLE_HUNT
-                    ? `敵軍討伐: (${(q.target?.x ?? 0) + 1}, ${(q.target?.y ?? 0) + 1})`
-                    : settlement.name;
       return `
         <tr>
-          <td class="ta-left">
-            <div class="tiny">${typeLabel(q)} / ${placeLabel}</div>
-            <b>${q.title}</b>
-            <div class="tiny">${renderQuestConditions(q)}${escapeHtml(q.desc || "")}</div>
-          </td>
+          <td class="ta-left">${renderQuestOffer(q, settlement)}</td>
           <td class="ta-center">${renderQuestRewards(q)}</td>
           <td class="ta-center">${remainText}</td>
           <td class="ta-center">

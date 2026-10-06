@@ -20,7 +20,12 @@ export function appendAmnesty(card, current, refresh) {
   button.onclick = () => {
     const factionId = settlement.factionId, season = `${state.year}:${state.season}`;
     const faction = FACTIONS.find(f => f.id === factionId)?.name || factionId;
-    confirmAction({ title: "恩赦依頼", body: `${settlement.name}へ食料${AMNESTY_CONFIG.food}を${AMNESTY_CONFIG.days}日以内に納めると、${faction}の賞金が最大${AMNESTY_CONFIG.reduction}減ります。資金・名声報酬はありません。同時1件、各勢力で季節1回です。入港拒否中も依頼カードから報告できます。`, onConfirm: () => {
+    confirmAction({ title: "恩赦依頼", body: `${settlement.name}へ食料を納め、手配賞金を減らす依頼です。`, guideTopic: "guide-wanted",
+      sections: [
+        { title: "納入する品と期限", items: [`食料 ${AMNESTY_CONFIG.food}個・受注から${AMNESTY_CONFIG.days}日以内`] },
+        { title: "報酬", items: [`${faction}の賞金を最大${AMNESTY_CONFIG.reduction}減額`, "資金・名声の報酬はありません。拠点の利用禁止は解除されません。"] },
+        { title: "報告方法", items: ["入港を拒否されていても、依頼カードから報告できます。"] }
+      ], onConfirm: () => {
       const here = current();
       if (here?.id !== settlement.id || here.factionId !== factionId || season !== `${state.year}:${state.season}`) { pushToast("再確認してください", "拠点や季節が変わりました。", "warn"); return; }
       const previous = structuredClone({ quests: state.quests, wanted: state.wanted });

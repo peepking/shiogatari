@@ -31,6 +31,11 @@ function openOffice(kind, sync) {
         button.onclick = () => openOffice("identity", sync); body.append(button);
       }
     }
+    const guide = document.createElement("button"); guide.className = "btn ghost";
+    guide.textContent = kind === "identity" ? "所属・身分のガイド" : kind === "crime" ? "犯罪行動のガイド" : "手配のガイド";
+    guide.dataset.guideDialog = "troubleModal";
+    guide.dataset.guideTopic = kind === "identity" ? "guide-factions" : kind === "crime" ? "guide-crime" : "guide-wanted";
+    body.append(guide);
   }
   document.getElementById("locationOfficeClose").onclick = close;
   modal.onclick = event => { if (event.target === modal) close(); };

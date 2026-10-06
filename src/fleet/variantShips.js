@@ -43,5 +43,5 @@ export function normalizeVariants(value) {
 /** @param {string} id 固有船種。 @returns {string} 容量ボーナスの説明。 */
 export function variantBonusText(id) {
   const v = VARIANT_SHIPS[id];
-  return `通常の${SHIP_TYPES[v.base].name}に加えて${[v.supplies ? `物資上限＋${v.supplies}` : "", v.troops ? `部隊上限＋${v.troops}` : ""].filter(Boolean).join(" / ")}`;
+  return `通常の${SHIP_TYPES[v.base].name}に加えて${[v.supplies ? `物資上限＋${v.supplies}` : "", v.troops ? `兵員上限＋${v.troops}` : ""].filter(Boolean).join(" / ")}`;
 }

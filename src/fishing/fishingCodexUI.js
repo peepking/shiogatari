@@ -350,9 +350,9 @@ function renderCodexTools(completion) {
   const notice = document.getElementById("codexFilterNotice");
   if (notice) {
     const reasons = [];
-    if (codexView.searchText.trim()) reasons.push("魚名検索は発見済みの魚が対象です。");
-    if (codexView.filters.categories.size) reasons.push("未発見魚は分類が不明なため、分類指定中は表示されません。");
-    if (codexView.filters.seasons.size && completion.ratio < 0.25) reasons.push("未発見魚の季節は図鑑25%で公開されるため、季節指定中は表示されません。");
+    if (codexView.searchText.trim()) reasons.push("魚名検索は発見済みの魚のみ。");
+    if (codexView.filters.categories.size) reasons.push("分類指定中は未発見魚を除きます。");
+    if (codexView.filters.seasons.size && completion.ratio < 0.25) reasons.push("未発見魚の季節検索は図鑑25%で解放。");
     notice.textContent = reasons.join(" ");
     notice.hidden = reasons.length === 0;
   }

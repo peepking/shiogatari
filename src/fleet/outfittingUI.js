@@ -4,10 +4,10 @@ import { absDay } from "../core/calendar.js";
 import { MODE_LABEL } from "../core/constants.js";
 import { OUTFITTING_CONFIG, OUTFITTING_ITEMS } from "../core/expansionConfig.js";
 import { getCurrentSettlement } from "../app/actions.js";
-import { changeOutfitting, getOutfittingEffects, snapshotOutfitting } from "./outfitting.js";
+import { changeOutfitting, snapshotOutfitting } from "./outfitting.js";
 import { calcSupplyCap, totalSupplies } from "../resources/supplies.js";
 import { calcTroopCap, totalTroops } from "../resources/troops.js";
-import { fleetMetrics, fleetDetails } from "./fleetUI.js";
+import { fleetMetrics, fleetMetricLabel, fleetDetails } from "./fleetUI.js";
 import { renderShipTrade, resetShipTrade } from "./shipyardUI.js";
 import { confirmAction, pushToast, pushLog } from "../ui/dom.js";
 import { saveGameToStorage } from "../core/storage.js";
@@ -30,9 +30,9 @@ function canChange() {
 
 /** @param {object} item 設備定義。 @returns {string} 設定値に連動する効果の説明。 */
 function description(item) {
-  if (item.attack) return `${item.attack.interval}tickごとに${item.attack.allEnemies ? "敵全部隊それぞれ" : "敵1部隊"}へ威力${item.attack.power}の射撃（DEFで軽減）。射程無限。`;
-  const names = { atk: "全兵員ATK", def: "全兵員DEF", meleeAtk: "近接ATK", meleeDef: "近接DEF", rangedAtk: "遠隔ATK", rangedDef: "遠隔DEF", supplyCap: "物資上限", troopCap: "兵員上限", foodReduction: "食料消費", upkeepReduction: "兵員維持費", shipUpkeepReduction: "船維持費", medics: "衛生兵効果", scouts: "斥候効果" };
-  return Object.entries(item.effects).map(([key, n]) => `${names[key]} ${key.endsWith("Reduction") ? "−" : "+"}${n}${["medics", "scouts"].includes(key) ? "人分（最大10人分）" : "%"}`).join(" / ");
+  if (item.attack) return `${item.attack.allEnemies ? "敵全体" : "敵1部隊"}へ支援射撃 / ${item.attack.interval}カウントごと・威力${item.attack.power}`;
+  const names = { atk: "全兵員の攻撃", def: "全兵員の防御", meleeAtk: "近接兵の攻撃", meleeDef: "近接兵の防御", rangedAtk: "射撃兵の攻撃", rangedDef: "射撃兵の防御", supplyCap: "物資上限", troopCap: "兵員上限", foodReduction: "食料消費", upkeepReduction: "部隊維持費", shipUpkeepReduction: "船維持費", medics: "衛生兵効果", scouts: "斥候効果" };
+  return Object.entries(item.effects).map(([key, n]) => `${names[key]} ${key.endsWith("Reduction") ? "−" : "＋"}${n}${["medics", "scouts"].includes(key) ? "人分" : "%"}`).join(" / ");
 }
 
 /** @param {object} equipment 艤装。 @param {boolean} includeUnequipped 比較用に未装備の射撃設備も含めるか。 @returns {object} 比較と実消費が共有する数値。 */
@@ -48,17 +48,12 @@ function projectedEquipment(id) {
   return next;
 }
 
-/** @param {object} equipment 艤装。 @returns {string} 射撃設備の比較表示。 */
-function attackSummary(equipment) {
-  return getOutfittingEffects(equipment, state.fleet).attacks.map(a => `${OUTFITTING_ITEMS[a.id].name}（${a.interval}tickごと・${a.allEnemies ? "敵全体・" : ""}威力${a.power}）`).join(" / ") || "なし";
-}
-
 /** @param {object} next 変更後。 @returns {string} 全所持数と変更後超過量。 */
 function capacityNotice(next) {
   const supplies = totalSupplies(); const troops = totalTroops();
   const supplyCap = calcSupplyCap(state.fleet, next); const troopCap = calcTroopCap(state.fleet, next);
-  const excess = supplies > supplyCap || troops > troopCap;
-  return `物資 ${supplies}/${supplyCap} / 兵員 ${troops}/${troopCap}${excess ? `。物資${Math.max(0, supplies - supplyCap)}・兵員${Math.max(0, troops - troopCap)}が超過します。変更できますが、移動前に売却・破棄・解雇が必要です。` : "（超過なし）"}`;
+  const excess = [["物資", supplies - supplyCap], ["兵員", troops - troopCap]].filter(([, count]) => count > 0);
+  return `装備後の積載：物資 ${supplies}/${supplyCap} / 兵員 ${troops}/${troopCap}${excess.length ? `。${excess.map(([name, count]) => `${name}${count}`).join("・")}が超過します。整理するまで移動できません。` : ""}`;
 }
 
 /**
@@ -72,8 +67,9 @@ function requestChange(action, id, syncUI) {
   const slot = selectedSlot;
   const price = action === "expand" ? OUTFITTING_CONFIG.unlockPrices[state.expansion.outfitting.slots + 1] : OUTFITTING_ITEMS[id]?.price;
   const title = action === "buy" ? `${OUTFITTING_ITEMS[id].name}を購入` : action === "expand" ? "装備枠を拡張" : id ? `${OUTFITTING_ITEMS[id].name}を装備` : "設備を取り外す";
-  const body = action === "equip" ? capacityNotice(projectedEquipment(id)) : `${price}資金を支払います。${action === "buy" ? "購入した設備は保管されます。装備する際は改めて付け替えてください。" : "空の装備枠を1つ増やします。"}`;
-  confirmAction({ title, body, confirmText: "確定", onConfirm: () => {
+  const body = action === "equip" ? `枠${slot + 1}の設備を変更します。` : action === "buy" ? "購入後、選択枠へ装備してください。" : "空の装備枠を1つ増やします。";
+  const sections = [{ title: action === "equip" ? "変更後" : "費用", items: [action === "equip" ? capacityNotice(projectedEquipment(id)) : `${price.toLocaleString()}資金`] }];
+  confirmAction({ title, body, sections, guideTopic: "guide-ships", confirmText: "確定", onConfirm: () => {
     if (!canChange() || before !== JSON.stringify({ funds: state.funds, fleet: state.fleet, equipment: state.expansion.outfitting, troops: state.troops, supplies: state.supplies })) { pushToast("再確認してください", "状況が変わったため、変更内容をもう一度確認してください。", "warn"); return; }
     const funds = state.funds; const equipment = state.expansion.outfitting; const stats = structuredClone(state.voyageStats);
     if (!changeOutfitting(state, action, id, slot)) return;
@@ -99,15 +95,15 @@ function renderOutfitting(syncUI) {
   const next = projectedEquipment(selectedItem);
   const current = metrics(data); const after = metrics(next);
   const support = snapshotOutfitting(state);
-  const supportNotice = item.effects?.medics && support.medics === 10 ? "衛生兵効果は既に上限のため増分なし。" : item.effects?.scouts && support.scouts === 10 ? "斥候効果は既に上限のため増分なし。" : "";
+  const supportNotice = item.effects?.medics && support.medics === OUTFITTING_CONFIG.supportLimit ? "衛生兵効果は上限に達しています。" : item.effects?.scouts && support.scouts === OUTFITTING_CONFIG.supportLimit ? "斥候効果は上限に達しています。" : "";
   const equipped = data.equipped.includes(selectedItem); const owned = data.owned.includes(selectedItem);
-  body.innerHTML = `<p class="tiny">船団共通・陸戦でも有効。購入した設備は保管され、付け替えは無料です。</p>
+  body.innerHTML = `<p class="tiny">購入した設備は保管されます。装備・付け替えは無料です。 <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-ships">艤装の使い方</button></p>
     <div class="outfitting-slot-control"><label for="outfittingSlot">交換する枠</label><div class="outfitting-slot-actions"><select id="outfittingSlot">${data.equipped.map((id, i) => `<option value="${i}" ${i === selectedSlot ? "selected" : ""}>枠${i + 1}: ${id ? escapeHtml(OUTFITTING_ITEMS[id].name) : "空き"}</option>`).join("")}</select><button class="btn" id="outfittingRemove" ${data.equipped[selectedSlot] ? "" : "disabled"}>この枠を空ける</button></div></div>
     <p>${resourceIcon("funds")}所持資金 ${state.funds} / 装備枠 ${data.slots}/${OUTFITTING_CONFIG.maxSlots} ${data.slots < OUTFITTING_CONFIG.maxSlots ? `<button class="btn" id="outfittingExpand" ${state.funds < OUTFITTING_CONFIG.unlockPrices[data.slots + 1] ? "disabled" : ""}>次の枠を開放（${OUTFITTING_CONFIG.unlockPrices[data.slots + 1]}資金）</button>` : ""}</p>
     <div class="outfitting-categories" aria-label="設備の種類">${[["attack", "支援射撃"], ["buff", "兵員の強化"], ["logistics", "兵站・補助"]].map(([id, name]) => `<button class="btn ${id === selectedCategory ? "primary" : "ghost"}" data-category="${id}" aria-pressed="${id === selectedCategory}">${name}</button>`).join("")}</div>
     <div class="outfitting-layout"><div class="outfitting-catalog">${Object.entries(OUTFITTING_ITEMS).filter(([, v]) => v.category === selectedCategory).map(([id, v]) => `<button class="btn outfitting-item ${selectedItem === id ? "primary" : ""}" data-id="${id}" aria-pressed="${selectedItem === id}"><b>${escapeHtml(v.name)}</b><span>${data.equipped.includes(id) ? "装備中" : data.owned.includes(id) ? "保管中" : `${v.price.toLocaleString()}資金`}</span></button>`).join("")}</div>
-    <div class="outfitting-comparison"><h3>${escapeHtml(item.name)}</h3><button class="btn ghost" data-asset-codex="equipment" data-codex-id="${selectedItem}">図鑑で見る</button><p>${description(item)}</p><p class="tiny">枠${selectedSlot + 1}をこの設備に交換した場合${equipped ? "（すでに装備中のため追加装備はできません）" : ""}</p><p class="tiny">${supportNotice}</p>${equipped ? "" : `<p class="tiny">支援射撃: ${attackSummary(data)} → ${attackSummary(next)}</p>`}
-    ${equipped ? `<p class="outfitting-notice">枠${data.equipped.indexOf(selectedItem) + 1}に装備中です。取り外す場合は、上の交換枠でこの枠を選んでください。</p>` : `${comparisonTable(current, after, true)}<p class="tiny">${capacityNotice(next)}</p><button class="btn primary" id="outfittingCommit" ${!owned && state.funds < item.price ? "disabled" : ""}>${owned ? "選択枠に装備" : `${item.price.toLocaleString()}資金で購入・保管`}</button>`}</div></div>`;
+    <div class="outfitting-comparison outfitting-equipment-detail"><div class="outfitting-item-heading"><h3>${escapeHtml(item.name)}</h3><button class="btn ghost" data-asset-codex="equipment" data-codex-id="${selectedItem}">図鑑で見る</button></div><p>${description(item)}</p>${supportNotice ? `<p class="outfitting-notice">${supportNotice}</p>` : ""}
+    ${equipped ? `<p class="outfitting-notice">枠${data.equipped.indexOf(selectedItem) + 1}に装備中です。取り外すには、その枠を選んでください。</p>` : `<div class="outfitting-preview"><p class="tiny">枠${selectedSlot + 1}に装備した場合</p>${comparisonTable(current, after)}</div><p class="outfitting-notice">${capacityNotice(next)}</p><button class="btn primary" id="outfittingCommit" ${!owned && state.funds < item.price ? "disabled" : ""}>${owned ? "選択枠に装備" : `${item.price.toLocaleString()}資金で購入・保管`}</button>`}</div></div>`;
   body.querySelectorAll("[data-category]").forEach(button => { button.onclick = () => { selectedCategory = button.dataset.category; selectedItem = Object.keys(OUTFITTING_ITEMS).find(id => OUTFITTING_ITEMS[id].category === selectedCategory); renderOutfitting(syncUI); }; });
   body.querySelector(".outfitting-catalog").scrollTop = catalogScroll;
   body.querySelector("#outfittingSlot").onchange = e => { selectedSlot = Number(e.target.value); renderOutfitting(syncUI); };
@@ -117,16 +113,33 @@ function renderOutfitting(syncUI) {
   const commit = body.querySelector("#outfittingCommit"); if (commit) commit.onclick = () => requestChange(owned ? "equip" : "buy", selectedItem, syncUI);
 }
 
-/** @param {HTMLElement} body 表示先。 @param {object} data 現在の艤装。 @returns {void} 現在の全数値と各装備の効果を表示する。 */
+/** @param {HTMLElement} body 表示先。 @param {object} data 現在の艤装。 @returns {void} 容量と次回費用を先に示し、内訳の開閉状態を保持する。 */
 function renderOutfittingDetails(body, data) {
-  body.innerHTML = `<div class="outfitting-details"><h3>船団の現在値</h3><p class="tiny">陸戦・海戦共通。能力倍率は地形補正前の値です。</p><table class="outfitting-metrics"><tbody>${Object.entries(metrics(data, false)).map(([label, value]) => `<tr><th>${label}</th><td>${value.toLocaleString()}</td></tr>`).join("")}</tbody></table>${fleetDetails(state)}<h3>支援射撃の実効値</h3><p class="tiny">${attackSummary(data)}</p><h3>装備中の艤装と効果</h3>${data.equipped.map((id, i) => `<div class="outfitting-equipped"><b>枠${i + 1}：${id ? escapeHtml(OUTFITTING_ITEMS[id].name) : "空き"}</b>${id ? `<p>${description(OUTFITTING_ITEMS[id])}</p>` : ""}</div>`).join("")}<p class="tiny">衛生兵・斥候の効果は保有兵員と設備を合わせて最大10人分です。</p></div>`;
+  const opened = new Set([...body.querySelectorAll("details[data-fleet-section]")].filter(element => element.open).map(element => element.dataset.fleetSection));
+  const values = metrics(data, false);
+  const primary = ["supplyCap", "troopCap", "funds", "food"];
+  const costs = ["troopFunds", "shipFunds", "shipUpkeepReduction"];
+  const abilities = ["meleeAtk", "rangedAtk", "meleeDef", "rangedDef", "hp"];
+  const combat = Object.entries(values).filter(([id, value]) => !primary.includes(id) && !costs.includes(id) && value !== (abilities.includes(id) ? 100 : 0));
+  body.innerHTML = `<div class="outfitting-details"><h3>船団の現在値</h3>${metricsTable(primary.map(label => [label, values[label]]))}
+    <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-asset-values">数値の見方</button>
+    <details class="fleet-disclosure" data-fleet-section="costs"><summary>維持費の内訳</summary>${metricsTable(costs.filter(label => values[label] > 0).map(label => [label, values[label]])) || '<p class="tiny">維持費はかかりません。</p>'}</details>
+    <details class="fleet-disclosure" data-fleet-section="combat"><summary>戦闘への効果</summary>${combat.length ? `${metricsTable(combat)}<p class="tiny">表示のない能力倍率は100%、補助効果は0人分です。</p>` : '<p class="tiny">船・艤装・補助兵による追加効果はありません。</p>'}</details>
+    <details class="fleet-disclosure" data-fleet-section="ships"><summary>保有船と固有効果</summary>${fleetDetails(state)}</details>
+    <details class="fleet-disclosure" data-fleet-section="equipment"><summary>装備中の艤装</summary>${data.equipped.map((id, i) => `<div class="outfitting-equipped"><b>枠${i + 1}：${id ? escapeHtml(OUTFITTING_ITEMS[id].name) : "空き"}</b>${id ? `<p>${description(OUTFITTING_ITEMS[id])}</p>` : ""}</div>`).join("")}</details></div>`;
+  body.querySelectorAll("details[data-fleet-section]").forEach(element => { element.open = opened.has(element.dataset.fleetSection); });
 }
 
-/** @param {object} current 現在値。 @param {object} after 変更後。 @param {boolean} changed 変化する項目を表示するか。 @returns {string} 差分を優先して表示する比較表。 */
-function comparisonTable(current, after, changed) {
-  const rows = Object.entries(current).filter(([key, value]) => (value !== after[key]) === changed);
-  if (!rows.length) return "";
-  return `<table class="outfitting-metrics"><thead><tr><th>効果</th><th>現在</th><th>変更後</th></tr></thead><tbody>${rows.map(([key, value]) => `<tr><td>${key}</td><td>${value}</td><td><b>${after[key]}</b></td></tr>`).join("")}</tbody></table>`;
+/** @param {Array} rows 内部識別子と現在値。 @returns {string} 閲覧する項目だけの数値表。 */
+function metricsTable(rows) {
+  return rows.length ? `<table class="outfitting-metrics"><tbody>${rows.map(([id, value]) => `<tr><th>${escapeHtml(fleetMetricLabel(id))}</th><td>${value.toLocaleString()}</td></tr>`).join("")}</tbody></table>` : "";
+}
+
+/** @param {object} current 現在値。 @param {object} after 変更後。 @returns {string} 変化する項目だけの比較表。 */
+function comparisonTable(current, after) {
+  const rows = Object.entries(current).filter(([key, value]) => value !== after[key]);
+  if (!rows.length) return '<p class="tiny">現在の数値は変わりません。</p>';
+  return `<table class="outfitting-metrics"><thead><tr><th>効果</th><th>現在</th><th>変更後</th></tr></thead><tbody>${rows.map(([key, value]) => `<tr><td>${escapeHtml(fleetMetricLabel(key))}</td><td>${value}</td><td><b>${after[key]}</b></td></tr>`).join("")}</tbody></table>`;
 }
 
 /** @param {boolean} open 開閉状態。 @returns {void} 戦闘画面を優先し、地図と艤装画面を切り替える。 */

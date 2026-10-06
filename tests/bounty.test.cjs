@@ -7,7 +7,7 @@ async function main() {
   const fixedMath = Object.create(Math); fixedMath.random = () => 0.5;
   const context = vm.createContext({ structuredClone, Math: fixedMath });
   const modules = new Map();
-  const state = { year: 1000, season: 0, day: 1, funds: 0, honorFactions: [], troops: {} };
+  const state = { year: 1000, season: 0, day: 1, funds: 0, fame: 100, honorFactions: [], troops: {} };
   const favors = {};
   const factions = ["north", "archipelago", "citadel", "pirates"].map(id => ({ id, nobles: [{ id: id + "1" }, { id: id + "2" }] }));
   const stubs = {
@@ -346,12 +346,28 @@ async function main() {
   state.bounties = b.normalizeBounties(JSON.parse(saved));
   const world = await load("bountyWorld.js"); await world.evaluate();
   const shark = state.bounties.active.find(s => s.templateId === "shark");
-  assert.ok(world.namespace.finishBounty(shark.id).length);
+  const summary = world.namespace.finishBounty(shark.id);
+  assert.ok(summary.some(item => item.icon === "fame" && item.text === "賞金首討伐ボーナス 名声 +10"));
+  assert.equal(state.fame, 110);
   assert.equal(state.funds, shark.reward); assert.equal(state.fleet.variants.length, 1);
   assert.equal(state.fleet.variants[0].variantId, "shark");
   assert.equal(state.fleet.variants[0].sourceName, b.bountyName(shark));
   for (const f of factions) for (const n of f.nobles) assert.equal(favors[n.id], f.id === shark.factionId ? -3 : 1);
   assert.equal(world.namespace.finishBounty(shark.id).length, 0); assert.equal(state.fleet.variants.length, 1); assert.equal(state.funds, shark.reward);
+  assert.equal(state.fame, 110, "再通知で追加名声を二重付与しない");
+  // テンプレートのLv3に依存せず、旧保存の編成レベルから追加名声を決める。
+  for (const [level, bonus] of [[1, 0], [2, 5], [3, 10], [4, 15], [5, 20]]) {
+    const veteran = b.normalizeBounties({ active: [{ ...shark, id: 100 + level,
+      formation: shark.formation.map(unit => ({ ...unit, level })) }] }).active[0];
+    state.bounties.active.push(veteran);
+    const fameBefore = state.fame;
+    const rewards = world.namespace.finishBounty(veteran.id);
+    assert.equal(state.fame, fameBefore + bonus, `保存済みLv${level}の討伐ボーナス`);
+    assert.equal(rewards.filter(item => item.icon === "fame").length, bonus ? 1 : 0);
+    assert.equal(world.namespace.finishBounty(veteran.id).length, 0);
+    assert.equal(state.fame, fameBefore + bonus);
+  }
+  assert.equal(b.bountyFameBonus({ formation: [{ level: 2 }, { level: 5 }] }), 20, "混成の旧編成は最高レベルを使う");
   // 公開UIの制限とイベント成立経路も、実際の関数を抽出して検証する。
   const uiSource = await readSource("bountyUI.js");
   const checks = vm.createContext({ state, totalTroops: () => 10 });

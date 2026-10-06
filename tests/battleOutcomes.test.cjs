@@ -22,6 +22,7 @@ async function testDangerousOutcomes(uiSource, voyage, personnel, pursuit) {
   const pureContext = vm.createContext({ structuredClone });
   const rules = (await loadTestModule("dangerousSeaState.js", pureContext)).namespace;
   const bountyRules = (await loadTestModule("dangerousBounty.js", pureContext)).namespace;
+  const normalBountyRules = (await loadTestModule("bounty.js", pureContext)).namespace;
   const bountyConfig = (await loadTestModule("dangerousBountyConfig.js", pureContext)).namespace;
   const explorationRules = (await loadTestModule("dangerousSeaExploration.js", pureContext)).namespace;
   const wreckRules = (await loadTestModule("dangerousWreck.js", pureContext)).namespace;
@@ -73,7 +74,7 @@ async function testDangerousOutcomes(uiSource, voyage, personnel, pursuit) {
     const calls = [];
     /** @param {string} name 呼出名。 @returns {Function} 外部副作用の記録。 */
     const record = name => (...args) => { calls.push({ name, args }); return []; };
-    const context = vm.createContext({ state, structuredClone, ...voyage, ...personnel, ...pursuit, ...rules, ...bountyRules, ...explorationRules, ...wreckRules, ...fleet, ...variants, ...ships,
+    const context = vm.createContext({ state, structuredClone, ...voyage, ...personnel, ...pursuit, ...rules, ...bountyRules, ...normalBountyRules, ...explorationRules, ...wreckRules, ...fleet, ...variants, ...ships,
       DEFS: eventConfig.DANGEROUS_SEA_EVENT_DEFS,
       getDangerousSeaEventById: eventRules.getDangerousSeaEventById,
       Math: Object.assign(Object.create(Math), { random: () => 0.5 }), FACTIONS: lore.FACTIONS, CONFIG: bountyConfig.DANGEROUS_BOUNTY_CONFIG,
@@ -152,6 +153,8 @@ async function testDangerousOutcomes(uiSource, voyage, personnel, pursuit) {
       assert.equal(state.nobleFavor[noble.id], faction.id === "pirates" ? -3 : 1, `${label}: 専用の確定好感度補正のみ適用する`);
     }
     assert.equal(state.funds, outcome === "win" ? 1400 + (route === "exploration" ? 1200 : route === "event" ? 2400 : bountyWon ? bounty.reward : 0) : outcome === "lose" ? 500 : 1000);
+    assert.equal(state.fame, outcome === "win" ? 102 + (bountyWon ? 15 : 0) : outcome === "lose" ? 98 : 100,
+      `${label}: 通常の勝利名声と討伐ボーナスを分け、専用賞金首の勝利時だけ加算する`);
     if (outcome === "escape") {
       assert.equal(state.fame, 100); assert.equal(state.voyageStats.income, 0); assert.equal(state.voyageStats.expenses.other, 0);
     } else {

@@ -38,20 +38,21 @@ export function renderFaithDetails() {
   const body = document.getElementById('faithDetailsBody');
   if (!body) return;
   const selectedSite = body.querySelector('#faithSiteSelect')?.value;
+  const remainderExpanded = body.querySelector('[data-faith-remainder]')?.open;
   const effects = faithEffects(state);
   const percent = value => `${Number((value * 100).toFixed(2))}%`;
   const rows = [];
-  if (fishingRewards(state).unlocked[3]) rows.push(['海を知る者', `魚図鑑100%達成の報酬。海を知る潮語りとして敬意を集め、毎季節の初日に信仰＋${FISHING_REWARDS.faith}を得られます。達成した次の季節から適用され、現在の信仰値には左右されません。`]);
+  if (fishingRewards(state).unlocked[3]) rows.push(['海を知る者', `魚図鑑100%達成の報酬。達成の次季節から、毎季節の初日に信仰＋${FISHING_REWARDS.faith}を得られます。`]);
   if (effects.upkeep > 0) rows.push(['潮盟の取り計らい', `部隊維持費・船維持費 −${percent(effects.upkeep)}`]);
-  if (effects.sale > 0) rows.push(['縁の市', `物資売却額 ＋${percent(effects.sale)}。売値は同じ拠点の買値が上限です。`]);
+  if (effects.sale > 0) rows.push(['縁の市', `物資売却額 ＋${percent(effects.sale)}`]);
   if (effects.rescue > 0) rows.push(['帰り潮の加護', '勝利後の損耗を軽減します。']);
-  if (effects.food > 0) rows.push(['潮待ちの恵み', `次季節の初日に食料${effects.food}個を受け取る見込みです。信仰の変化や空き容量により変わります。`]);
-  if (effects.recruitChance > 0) rows.push(['潮盟の便り', `村・街の季節初回入場時、まれにLv${FAITH_CONFIG.recruitLevel}の兵員${FAITH_CONFIG.recruitCount}人が追加の雇用候補になります。雇用費は通常どおりです。`]);
+  if (effects.food > 0) rows.push(['潮待ちの恵み', `次季節の初日に食料${effects.food}個を受け取る見込みです（空き容量まで）。`]);
+  if (effects.recruitChance > 0) rows.push(['潮盟の便り', `街・村で、まれにLv${FAITH_CONFIG.recruitLevel}の兵員${FAITH_CONFIG.recruitCount}人が追加の雇用候補になります。雇用費は通常どおりです。`]);
   const targets = state.tideAlliance?.targets || [];
   const seasonalFaith = targets.reduce((sum, row) => sum + row.faith, 0) / 10;
   const until = effects.until;
   const deadline = effects.afterglow ? `神歴${Math.floor(until / 4)}年 ${['春','夏','秋','冬'][until % 4]}1日の維持費精算まで` : '';
-  body.innerHTML = `<div class="faith-current"><span>現在の信仰</span><strong>${Math.max(0, Number(state.faith) || 0).toLocaleString()}</strong></div><div class="faith-benefit-list"><section class="faith-benefit-card"><h3>各地の支え</h3><p class="faith-caption">潮盟全体の今季</p><dl class="faith-metrics"><div><dt>恩恵対象</dt><dd>${targets.length}<small>拠点</small></dd></div><div><dt>信仰 / 季節</dt><dd>${seasonalFaith}</dd></div><div><dt>神託報酬</dt><dd>＋${state.tideAlliance?.bonus || 0}<small>%</small></dd></div></dl><p class="tiny">信仰の端数は繰り越されます（現在 ${(state.tideAlliance?.remainder || 0) / 10}）。</p>${siteLocator(selectedSite)}</section>${effects.afterglow ? `<div class="faith-benefit-card"><h3>祈りの余潮</h3><p>交易・維持費の恩恵が${FAITH_CONFIG.afterglow}倍</p><p class="tiny">${deadline}</p></div>` : ''}${rows.map(([name, description]) => `<section class="faith-benefit-card"><h3>${name}</h3><p>${description}</p></section>`).join('') || '<p>現在、適用中の恩恵はありません。</p>'}</div><p class="faith-footnote tiny">信仰値による恩恵は、現在の信仰に応じて変わります。</p>`;
+  body.innerHTML = `<div class="faith-current"><span>現在の信仰</span><strong>${Math.max(0, Number(state.faith) || 0).toLocaleString()}</strong></div><div class="faith-benefit-list"><section class="faith-benefit-card"><h3>各地の支え</h3><p class="faith-caption">潮盟全体の今季</p><dl class="faith-metrics"><div><dt>恩恵対象</dt><dd>${targets.length}<small>拠点</small></dd></div><div><dt>信仰 / 季節</dt><dd>${seasonalFaith}</dd></div><div><dt>神託報酬</dt><dd>＋${state.tideAlliance?.bonus || 0}<small>%</small></dd></div></dl>${siteLocator(selectedSite)}</section>${effects.afterglow ? `<div class="faith-benefit-card"><h3>祈りの余潮</h3><p>交易・維持費の恩恵が${FAITH_CONFIG.afterglow}倍</p><p class="tiny">${deadline}</p></div>` : ''}${rows.map(([name, description]) => `<section class="faith-benefit-card"><h3>${name}</h3><p>${description}</p></section>`).join('') || '<p>現在、適用中の恩恵はありません。</p>'}</div>${state.tideAlliance?.remainder ? `<details class="quest-description" data-faith-remainder ${remainderExpanded ? 'open' : ''}><summary>季節信仰の端数</summary><p>繰り越し ${state.tideAlliance.remainder / 10}</p></details>` : ''}<button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-faith">信仰・潮盟のガイド</button>`;
   body.querySelector('#faithSiteMap').onclick = showSupportedSite;
 }
 

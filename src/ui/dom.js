@@ -331,13 +331,16 @@ let confirmHandler = null;
 
 /**
  * 確認モーダル（またはフォールバックのダイアログ）を表示する。
- * @param {{title:string,body:string,confirmText?:string,cancelText?:string,onConfirm?:Function}} params
+ * 費用・報酬・不利益は項目ごとに分け、補足ガイドを開いても実行内容を保持する。
+ * @param {{title:string,body?:string,sections?:Array<{title:string,items:string[]}>,guideTopic?:string,confirmText?:string,cancelText?:string,onConfirm?:Function}} params 確認内容。
+ * @returns {void}
  */
-export function confirmAction({ title, body, confirmText = "実行", cancelText = "キャンセル", onConfirm }) {
+export function confirmAction({ title, body = "", sections = [], guideTopic, confirmText = "実行", cancelText = "キャンセル", onConfirm }) {
   const modal = elements.confirmModal;
   // 確認モーダルが無い場合は標準ダイアログにフォールバックする。
   if (!modal) {
-    if (window.confirm(`${title}\n${body}`)) onConfirm?.();
+    const sectionText = sections.map(section => `${section.title}\n${section.items.join("\n")}`).join("\n\n");
+    if (window.confirm([title, body, sectionText].filter(Boolean).join("\n\n"))) onConfirm?.();
     return;
   }
   if (!confirmReady) {
@@ -358,7 +361,39 @@ export function confirmAction({ title, body, confirmText = "実行", cancelText 
     });
   }
   if (elements.confirmTitle) elements.confirmTitle.textContent = title || "確認";
-  if (elements.confirmBody) elements.confirmBody.textContent = body || "";
+  modal.classList.toggle("confirmation-structured", sections.length > 0);
+  if (elements.confirmBody) {
+    elements.confirmBody.textContent = "";
+    if (body) {
+      const intro = document.createElement("p");
+      intro.className = "confirmation-intro";
+      intro.textContent = body;
+      elements.confirmBody.append(intro);
+    }
+    for (const section of sections) {
+      const group = document.createElement("section");
+      group.className = "confirmation-section";
+      const heading = document.createElement("h3");
+      heading.textContent = section.title;
+      const list = document.createElement("ul");
+      for (const text of section.items) {
+        const item = document.createElement("li");
+        item.textContent = text;
+        list.append(item);
+      }
+      group.append(heading, list);
+      elements.confirmBody.append(group);
+    }
+    if (guideTopic) {
+      const guide = document.createElement("button");
+      guide.className = "btn ghost";
+      guide.type = "button";
+      guide.dataset.guideDialog = "troubleModal";
+      guide.dataset.guideTopic = guideTopic;
+      guide.textContent = "詳しい説明";
+      elements.confirmBody.append(guide);
+    }
+  }
   if (elements.confirmOk) elements.confirmOk.textContent = confirmText;
   if (elements.confirmCancel) elements.confirmCancel.textContent = cancelText;
   confirmHandler = onConfirm;

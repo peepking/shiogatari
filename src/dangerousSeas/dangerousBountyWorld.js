@@ -7,6 +7,7 @@ import { adjustNobleFavor } from "../factions/faction.js";
 import { addVariantShip } from "../fleet/fleet.js";
 import { VARIANT_SHIPS, variantBonusText } from "../fleet/variantShips.js";
 import { SHIP_TYPES } from "../fleet/shipConfig.js";
+import { bountyFameBonus } from "../bounty/bounty.js";
 import { pushLog } from "../ui/dom.js";
 import { getDangerousSeaPositions } from "./dangerousSeaWorld.js";
 import { dangerousSeaReservedPositions } from "./dangerousSeaReservations.js";
@@ -45,7 +46,7 @@ export function getDangerousBountyAt(position) {
   return state.dangerousSeas?.bounties?.active.find(site => site.position.x === position.x && site.position.y === position.y);
 }
 
-/** 勝利時だけ固定賞金・固有船・専用関係変化を一度確定し、通常海賊戦と物語の進行へ混ぜない。
+/** 勝利時だけ固定賞金・レベル別の追加名声・固有船・専用関係変化を一度確定し、通常海賊戦と物語の進行へ混ぜない。
  * @param {number} id 専用個体ID。 @param {boolean} [won=true] 勝利したか。 @returns {Array} 戦果表示。
  */
 export function finishDangerousBounty(id, won = true) {
@@ -53,13 +54,16 @@ export function finishDangerousBounty(id, won = true) {
   const site = claimDangerousBounty(state.dangerousSeas?.bounties, id, absDay(state));
   if (!site) return [];
   const name = `${site.epithet}${site.name}`, variant = VARIANT_SHIPS[site.templateId];
+  const fameBonus = bountyFameBonus(site);
+  state.fame = (state.fame || 0) + fameBonus;
   receiveFunds(state, site.reward); recordVoyage(state, "bountiesDefeated", 1);
   addVariantShip(state, variant.id, name, absDay(state));
   for (const faction of FACTIONS) {
     for (const noble of faction.nobles || []) adjustNobleFavor(noble.id, faction.id === "pirates" ? CONFIG.ownFavor : CONFIG.otherFavor);
   }
-  pushLog("危険海域の賞金首討伐", `${name} / 賞金 +${site.reward} / ${variant.name}`, "-");
+  pushLog("危険海域の賞金首討伐", `${name} / 賞金 +${site.reward} / 討伐ボーナス 名声 +${fameBonus} / ${variant.name}`, "-");
   return [{ text: `${name} 討伐賞金 +${site.reward}`, icon: "funds" },
+    { text: `賞金首討伐ボーナス 名声 +${fameBonus}`, icon: "fame" },
     { text: `${variant.name}：${SHIP_TYPES[variant.base].name} +1隻（${variantBonusText(variant.id)}）`, icon: "ships" },
     `関係の変化：黒ひげ ${CONFIG.ownFavor} / その他の勢力の貴族全員 +${CONFIG.otherFavor}`];
 }

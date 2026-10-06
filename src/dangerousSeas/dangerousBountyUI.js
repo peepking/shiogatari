@@ -10,6 +10,7 @@ import { SHIP_TYPES } from "../fleet/shipConfig.js";
 import { variantBonusText } from "../fleet/variantShips.js";
 import { getDangerousBountyAt } from "./dangerousBountyWorld.js";
 import { buildDangerousBountyEncounter } from "./dangerousBounty.js";
+import { bountyFameBonus } from "../bounty/bounty.js";
 import { dangerousSeaName } from "./dangerousSeaConfig.js";
 
 /** @param {object} site 専用個体。 @returns {string} 討伐を開始できない理由。 */
@@ -28,10 +29,13 @@ function dangerousBountyCard(site) {
   const here = getDangerousBountyAt(state.position)?.id === site.id;
   return `<article class="bounty-card"><div class="bounty-heading"><h3>${escapeHtml(name)}</h3><strong>${resourceIcon("funds")}${site.reward.toLocaleString()}</strong></div>
     <div class="bounty-affiliation"><img class="resource-icon" src="./image/factions/pirates.svg" alt="">外洋海賊 / ${dangerousSeaName(site.regionId)}</div>
-    <p>${escapeHtml(site.description)}</p><div class="bounty-meta">${site.total}人・${site.formation.length}部隊 / Lv${site.formation[0].level} / (${site.position.x + 1}, ${site.position.y + 1})</div>
-    <details><summary>編成・討伐の影響</summary><p>${Object.entries(troops).map(([id, count]) => `${escapeHtml(TROOP_STATS[id]?.name || id)} ${count}人`).join(" / ")}</p>
-    <p>黒ひげ −3 / その他の勢力の貴族全員 ＋1</p><p>賞金に加えて通常の戦闘報酬を獲得します。</p>
-    <p>${escapeHtml(site.flagship)}：${escapeHtml(SHIP_TYPES[site.ship].name)} 1隻<br>${variantBonusText(site.templateId)}</p></details>
+    <div class="bounty-meta">${site.total}人・${site.formation.length}部隊 / Lv${site.formation[0].level} / (${site.position.x + 1}, ${site.position.y + 1})</div>
+    <p class="bounty-reward">追加報酬：${escapeHtml(site.flagship)}（${escapeHtml(SHIP_TYPES[site.ship].name)}）1隻</p>
+    <p class="bounty-reward">討伐ボーナス：${resourceIcon("fame")}名声 ＋${bountyFameBonus(site)}</p>
+    <p class="bounty-impact">黒ひげの好感度 −3</p>
+    <details><summary>人物・編成・報酬の詳細</summary><p>${escapeHtml(site.description)}</p><p>${Object.entries(troops).map(([id, count]) => `${escapeHtml(TROOP_STATS[id]?.name || id)} ${count}人`).join(" / ")}</p>
+    <p>その他の勢力の貴族全員の好感度 ＋1</p><p>通常の戦闘報酬も獲得します。</p>
+    <p>${variantBonusText(site.templateId)}</p></details>
     ${reason ? `<p class="tiny">${escapeHtml(reason)}</p>` : ""}<div class="row"><button class="btn" data-dangerous-bounty-map="${site.id}">地図で確認</button>
     ${here ? `<button class="btn good" data-dangerous-bounty-fight="${site.id}" ${reason ? "disabled" : ""}>討伐の準備</button>` : ""}</div></article>`;
 }
@@ -60,7 +64,7 @@ export function beginDangerousBounty(id, sync) {
  */
 export function renderDangerousBountyList(container, sync, site = null) {
   const section = document.createElement("section"), active = site ? [site] : state.dangerousSeas?.bounties?.active || [];
-  section.innerHTML = `<h3>危険海域の賞金首</h3><div class="bounty-list">${active.map(dangerousBountyCard).join("") || "<p>現在、活動中の賞金首はいません。</p>"}</div>`;
+  section.innerHTML = `<h3>危険海域の賞金首</h3><div class="bounty-list${site ? " bounty-list-single" : ""}">${active.map(dangerousBountyCard).join("") || "<p>現在、活動中の賞金首はいません。</p>"}</div>`;
   container.append(section);
   const modal = document.getElementById("bountyModal");
   section.querySelectorAll("[data-dangerous-bounty-map]").forEach(button => {

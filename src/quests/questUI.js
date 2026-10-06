@@ -60,11 +60,11 @@ export function renderQuestRewards(q) {
   const resources = [];
   if (q.rewardFragment) resources.push({ id: "chart", label: `${chartLabel(q.rewardFragment)}の断片`, value: "+1（資金の代わり）" });
   else if (q.reward) resources.push({ id: "funds", label: "資金", value: `+${q.reward}` });
-  if (q.rewardFaith) resources.push({ id: "faith", label: q.type?.startsWith("oracle_") ? `信仰（基本${q.rewardFaith}・今季の報告見込み）` : "信仰", value: `+${tideOracleReward(state, q)}` });
+  if (q.rewardFaith) resources.push({ id: "faith", label: q.type?.startsWith("oracle_") ? "信仰（今季の見込み）" : "信仰", value: `+${tideOracleReward(state, q)}` });
   if (q.rewardFame) resources.push({ id: "fame", label: "名声", value: `+${q.rewardFame}` });
   const power = questPowerRewardHtml(q);
   const pirateLabel = pirateRewardLabel(q);
-  return (resources.length ? resourceList(resources) : power ? "" : "報酬は依頼内容を参照") + power + (pirateLabel ? `<div class="tiny">${escapeHtml(pirateLabel)}</div>` : "") + (q.type?.startsWith("oracle_") ? '<div class="tiny">信仰の報告見込みは季節が変わると変動する場合があります。</div>' : '');
+  return (resources.length ? resourceList(resources) : power ? "" : "報酬は依頼内容を参照") + power + (pirateLabel ? `<div class="tiny">${escapeHtml(pirateLabel)}</div>` : "") + (q.type?.startsWith("oracle_") ? '<div class="tiny">季節が変わると報酬も変動します。</div>' : '');
 }
 
 const TYPE_LABEL = {
@@ -132,7 +132,7 @@ function formatItems(items = []) {
  * @returns {string} 場所の説明文
  */
 function buildPlaceLabel(q, ctx) {
-  const { origin, target, supplyInfo, blockadeTarget, blockadeLeft, blockadeEstimate, estText } = ctx;
+  const { origin, target, blockadeTarget, blockadeLeft, blockadeEstimate, estText } = ctx;
   switch (q.type) {
     case QUEST_TYPES.SUPPLY:
       return `${formatSettlement(origin)}で納品`;
@@ -147,16 +147,16 @@ function buildPlaceLabel(q, ctx) {
     case QUEST_TYPES.ORACLE_TROOP:
       return "神託 人身を捧げよ";
     case QUEST_TYPES.ORACLE_HUNT:
-      return "神託 討伐（通常編成）";
+      return `神託 敵を討伐 ${formatCoords(q.target)}`;
     case QUEST_TYPES.ORACLE_ELITE:
-      return "神託 討伐（強編成）";
+      return `神託 精鋭を討伐 ${formatCoords(q.target)}`;
     case QUEST_TYPES.PIRATE_HUNT:
     case QUEST_TYPES.BOUNTY_HUNT:
       return `討伐 ${formatCoords(q.target)}`;
     case QUEST_TYPES.NOBLE_SUPPLY:
       return `${formatSettlement(origin)}で納品`;
     case QUEST_TYPES.NOBLE_LOGISTICS:
-      return `兵站調達: ${formatSettlement(origin)}`;
+      return `${formatSettlement(origin)}で納品`;
     case QUEST_TYPES.NOBLE_SCOUT:
       return `地点偵察 ${formatCoords(q.target)}`;
     case QUEST_TYPES.NOBLE_REFUGEE:
@@ -172,9 +172,9 @@ function buildPlaceLabel(q, ctx) {
     case QUEST_TYPES.WAR_SKIRMISH:
       return `小規模戦闘 ${formatCoords(q.target)}${estText}`;
     case QUEST_TYPES.WAR_SUPPLY:
-      return `${formatSettlement(origin)}で食糧搬入（${supplyInfo || "必要物資不明"}）`;
+      return `${formatSettlement(origin)}で食糧搬入`;
     case QUEST_TYPES.WAR_ESCORT:
-      return `輸送護衛 ${formatCoords(q.target)}から輸送隊を回収`;
+      return `${formatCoords(q.target)}で輸送隊を回収 → ${formatSettlement(origin)}へ護送`;
     case QUEST_TYPES.WAR_TRUCE:
       return `停戦工作 ${formatSettlement(origin)}`;
     case QUEST_TYPES.WAR_BLOCKADE: {
@@ -195,8 +195,9 @@ function buildPlaceLabel(q, ctx) {
  */
 function buildBodyText(q, itemName, supplyInfo) {
   if (q.type === QUEST_TYPES.ORACLE_SUPPLY) return supplyInfo || q.desc || "";
-  if (q.type === QUEST_TYPES.ORACLE_MOVE) return q.desc || "";
+  if (q.type === QUEST_TYPES.ORACLE_MOVE) return "指定地点で完了してください。";
   if (q.type === QUEST_TYPES.ORACLE_TROOP) return `${TROOP_STATS[q.troopType]?.name || q.troopType} x1`;
+  if (q.type === QUEST_TYPES.ORACLE_HUNT || q.type === QUEST_TYPES.ORACLE_ELITE) return "指定地点で敵を討伐し、勝利してください。";
   if (q.type === QUEST_TYPES.WAR_SUPPLY) return supplyInfo || q.desc || "";
   if (q.type === QUEST_TYPES.NOBLE_LOGISTICS || q.type === QUEST_TYPES.WAR_SUPPLY) return supplyInfo || q.desc || "";
   return q.desc || `${itemName} x${q.qty ?? 0}`;
@@ -220,6 +221,52 @@ function buildEstimateText(q) {
     return ` / 推定${q.estimatedTotal}人`;
   }
   return "";
+}
+
+/**
+ * 配達先を先頭に置き、受注前後で共通の配達依頼名を表示する。
+ * @param {object} q 依頼。
+ * @param {object|undefined} target 配達先。
+ * @returns {string} 配達先と依頼の種類。
+ */
+function buildDeliveryTitle(q, target) {
+  if (!target?.name) return q.title || "配達依頼";
+  const label = q.pirateKind === "smuggle" ? "密輸" : q.pirateKind === "courier" ? "運び屋依頼" : "配達";
+  return `${target.name}への${label}`;
+}
+
+/**
+ * 受注前の判断に使う条件・場所・危険を先に示し、依頼本文は展開して読む。
+ * 同じ物資や座標をタイトルと本文で繰り返さず、報酬と期限は呼出側の列で表示する。
+ * @param {object} q 依頼。
+ * @param {object} settlement 受注拠点。
+ * @returns {string} 依頼内容の表示。
+ */
+export function renderQuestOffer(q, settlement) {
+  const origin = getSettlementById(q.originId);
+  const target = getSettlementById(q.targetId);
+  const fight = (q.fights || []).find(entry => !entry.done);
+  const place = q.type === QUEST_TYPES.NOBLE_SECURITY ? `${(q.fights || []).length}地点で敵を討伐` : buildPlaceLabel(q, { origin, target, blockadeTarget: fight?.target || q.target,
+    blockadeLeft: (q.fights || []).filter(entry => !entry.done).length, blockadeEstimate: fight?.estimatedTotal,
+    estText: buildEstimateText(q) });
+  const itemName = ITEM_NAMES[q.itemId] || q.itemId || "物資";
+  const title = q.type === QUEST_TYPES.SUPPLY ? (q.pirateKind ? "海賊の物資納品" : `${itemName}の調達`)
+    : q.type === QUEST_TYPES.DELIVERY ? buildDeliveryTitle(q, target)
+      : q.title || "依頼";
+  const notes = [];
+  if (q.type === QUEST_TYPES.NOBLE_SECURITY) notes.push(...(q.fights || []).map((entry, index) => `${index + 1}戦目 ${formatCoords(entry.target)} / 推定${entry.estimatedTotal}人${entry.strength === "elite" ? "・精鋭" : ""}`));
+  if ([QUEST_TYPES.PIRATE_HUNT, QUEST_TYPES.BOUNTY_HUNT].includes(q.type) && q.estimatedTotal) notes.push(`敵は推定${q.estimatedTotal}人${q.strength === "elite" || q.fixedEnemy?.strength === "elite" ? "・精鋭" : ""}`);
+  if (q.type === QUEST_TYPES.NOBLE_REFUGEE) notes.push("合流後は敵に遭いやすくなります。");
+  if (q.type === QUEST_TYPES.WAR_TRUCE) notes.push("現地で資金を支払い、前線の決着までの時間を稼ぎます。");
+  if (["smuggle", "courier"].includes(q.pirateKind)) notes.push("禁制品は検問で没収される場合があります。");
+  if (q.battleKind === "grand") notes.push("予備隊あり・戦況への影響2倍");
+  const distance = q.type === QUEST_TYPES.DELIVERY && target ? ` / 最短${manhattan(settlement.coords, target.coords)}マス` : "";
+  return `<div class="quest-offer-place">${escapeHtml(place + distance)}</div>
+    <div class="quest-offer-title"><b>${escapeHtml(title)}</b></div>
+    <div class="quest-offer-conditions">${renderQuestConditions(q)}</div>
+    ${notes.length ? `<div class="quest-offer-impact">${notes.map(escapeHtml).join("<br>")}</div>` : ""}
+    ${q.pirateKind ? '<div class="quest-offer-impact">黒ひげの好感度↑ / 対象拠点の支持度・貴族の好感度↓</div>' : ""}
+    ${q.desc ? `<details class="quest-offer-details"><summary>詳しい依頼内容</summary><p>${escapeHtml(q.desc)}</p></details>` : ""}`;
 }
 
 /**
@@ -267,7 +314,7 @@ export function renderQuestUI(syncUI) {
       return `
         <div class="sideBlock mb-8 quest-progress-card quest-${progress.status}">
           <div class="quest-card-meta"><span>${escapeHtml(typeLabel)}</span><span class="quest-deadline ${progress.urgent ? "is-urgent" : ""}">${progress.deadline}</span></div>
-          <h3>${escapeHtml(q.title || itemName || "依頼")}</h3>
+          <h3>${escapeHtml(q.type === QUEST_TYPES.DELIVERY ? buildDeliveryTitle(q, target) : q.title || itemName || "依頼")}</h3>
           <span class="quest-status">${progress.statusText}</span>
           <div class="quest-progress-rows">${progress.rows.map(renderProgressRow).join("")}</div>
           <p class="quest-next">${escapeHtml(progress.next)}</p>
@@ -321,37 +368,10 @@ export function renderQuestModal(settlement, syncUI) {
   const now = absDay(state);
   body.innerHTML = available
     .map((q) => {
-      const origin = getSettlementById(q.originId);
-      const target = getSettlementById(q.targetId);
-      const itemName = SUPPLY_ITEMS.find((i) => i.id === q.itemId)?.name || q.itemId;
-      const supplyInfo = formatItems(q.items || []);
-      const blockadeTarget =
-        (q.fights || []).find((f) => !f.done)?.target || (q.fights || [])[0]?.target || q.target || null;
-      const blockadeLeft = (q.fights || []).filter((f) => !f.done).length;
-      const blockadeEstimate =
-        q.type === QUEST_TYPES.WAR_BLOCKADE && (q.fights || []).find((f) => !f.done)?.estimatedTotal
-          ? (q.fights || []).find((f) => !f.done)?.estimatedTotal
-          : null;
-      const estText = buildEstimateText(q);
-      const typeLabel = q.pirateKind ? "海賊依頼" : TYPE_LABEL[q.type] || "";
-      const placeLabel = buildPlaceLabel(q, {
-        origin,
-        target,
-        supplyInfo,
-        blockadeTarget,
-        blockadeLeft,
-        blockadeEstimate,
-        estText,
-      });
       const deadlineText = modalDeadlineText(q, now);
-      const bodyText = buildBodyText(q, itemName, supplyInfo);
       return `
         <tr>
-          <td>
-            <div class="tiny">${typeLabel} / ${placeLabel}${q.type === QUEST_TYPES.DELIVERY && target ? ` / 最短距離: ${manhattan(settlement.coords, target.coords)}マス` : ""}</div>
-            <div><b>${q.title || itemName}</b></div>
-            <div class="tiny">${renderQuestConditions(q)}${escapeHtml(bodyText)}${q.pirateKind ? '<div class="tiny">達成すると黒ひげとの好感度が上がり、対象拠点の支持度・担当貴族の好感度が下がります。</div>' : ""}</div>
-          </td>
+          <td>${renderQuestOffer(q, settlement)}</td>
           <td class="ta-center">${renderQuestRewards(q)}</td>
           <td class="ta-center">${deadlineText}</td>
           <td class="ta-center"><button class="btn primary quest-accept" data-id="${q.id}" ${q.pirateKind && state.honorFactions?.length ? 'disabled title="名誉家臣は新規受注できません"' : ""}>受注</button></td>

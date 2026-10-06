@@ -43,7 +43,7 @@ export function appendWantedActions(card, refresh) {
   if (pursuitDays) {
     const note = document.createElement("p");
     note.className = "tiny";
-    note.textContent = `手配による再追跡まであと${pursuitDays}日。通常の遭遇・戦争中の遭遇は発生します。`;
+    note.textContent = `賞金稼ぎの再追跡まであと${pursuitDays}日（他の遭遇はあります）。`;
     card.append(note);
   }
   appendSurrender(card, settlement, wantedSettlement, refresh);
@@ -108,7 +108,7 @@ function appendEmergencyFood(card, settlement, refresh) {
   const context = foodContext(settlement);
   const quote = quoteEmergencyFood(state, settlement, context.price, context.space);
   const note = document.createElement("p");
-  note.textContent = `最低限の食料：1個 ${quote.unitPrice}資金（通常買値の1.5倍・切り上げ）。今季残り${quote.remaining}個。`;
+  note.textContent = `食料：1個 ${quote.unitPrice}資金・今季あと${quote.remaining}個まで。`;
   const select = document.createElement("select");
   select.setAttribute("aria-label", "食料の購入数");
   for (let n = 1; n <= quote.max; n++) {

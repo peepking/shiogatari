@@ -506,7 +506,7 @@ export function renderTroopModal(detailEl) {
       <summary class="troop-group-heading"><img src="${troopImage(type)}" alt="" class="troop-icon"><b>${stat.name}</b><span class="troop-group-total">${count.toLocaleString()}<small>人</small></span></summary>
       <div class="troop-group-body"><button class="btn ghost" data-asset-codex="troops" data-codex-id="${type}" aria-label="${stat.name}の図鑑を開く">図鑑で見る</button><p class="tiny">レベル別人数（出撃・控えの合計）</p>
       <div class="troop-level-list">${entries.map(([level, qty]) => `<div class="troop-level-item"><div><b>Lv${Number(level)}</b><strong>${Number(qty).toLocaleString()}人</strong></div><div class="troop-dismiss-field"><span>解雇する人数</span>${quantityControl(`<input type="number" min="0" max="${Number(qty)}" step="1" value="0" data-type="${type}" data-level="${Number(level)}" aria-label="${stat.name} Lv${Number(level)}の解雇人数" class="troop-dismiss">`, false, true)}</div></div>`).join("")}</div>
-      <p class="troop-base-stats tiny">基礎能力（レベル・地形・船団補正前）<br>HP ${stat.hp ?? 0} / ATK ${stat.atk ?? stat.basePower ?? 0} / DEF ${stat.def ?? 0} / SPD ${stat.spd ?? 0} / RNG ${stat.range ?? 1} / MOV ${stat.move ?? 1}<br>維持費 ${stat.upkeep ?? 0}資金／人・季節（軽減前）</p></div>
+      <p class="troop-base-stats tiny">基礎能力（レベル・地形・船団補正前）<br>HP ${stat.hp ?? 0} / 攻撃力 ${stat.atk ?? stat.basePower ?? 0} / 防御力 ${stat.def ?? 0}<br>攻撃間隔 ${stat.spd ?? 0}カウント / 射程 ${stat.range ?? 1}マス / 移動力 ${stat.move ?? 1}マス<br>維持費 ${stat.upkeep ?? 0}資金／人・季節（軽減前）</p></div>
     </details>`;
   }).join("");
   detailEl.innerHTML = `${renderUpkeepForecast(state, TROOP_STATS)}

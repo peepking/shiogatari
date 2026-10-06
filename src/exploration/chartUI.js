@@ -12,6 +12,7 @@ import { snapshotWorld, restoreWorld, focusMapPosition } from "../world/map.js";
 import { saveGameToStorage } from "../core/storage.js";
 import { escapeHtml } from "../core/util.js";
 import { resourceList, resourceIcon } from "../ui/resourceUI.js";
+import { capacityOverflowText } from "../ui/capacityUI.js";
 import { beginDangerousSeaAction, finishDangerousSeaAction, dangerousSeaActionBlocked } from "../dangerousSeas/dangerousSeaHazards.js";
 
 /** @param {object} chart 海図。 @returns {string} 獲得前は数量を明かさず、報酬の種類だけを示す。 */
@@ -108,7 +109,7 @@ export function resumeChartExploration(syncUI) {
     // 断片の完成だけでは数えず、現地探索で報酬を受け取った海図を一度だけ記録する。
     recordVoyage(state, "chartsCompleted", 1);
     data.active = data.active.filter(c => c.id !== chart.id);
-    enqueueEvent({ title: `${CONFIG.rewards[chart.kind].name}を発見`, body: "海図を読み解き、隠された場所を発見しました。上限を超えた物資は詳細画面で整理できます。", resources });
+    enqueueEvent({ title: `${CONFIG.rewards[chart.kind].name}を発見`, body: ["海図を読み解き、隠された場所を発見しました。", capacityOverflowText()].filter(Boolean).join("\n"), resources });
     pushLog("海図の発見", `${chartLabel(chart)} / ${resources.map(r => `${r.label}${r.value}`).join(" / ")}`, "-");
   }
   data.pending = null;
@@ -128,7 +129,8 @@ function beginChartExploration(syncUI) {
   if (!site || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active || state.expansion.exploration.pending || dangerousSeaActionBlocked()) return;
   const chart = state.expansion.charts.active.find(c => c.id === site.chartId);
   confirmAction({ title: site.kind === "rumor" ? "噂の断片を回収" : `${chartLabel(chart)}を探索`,
-    body: "1日使って探索します。探索自体に戦闘はありません。日々の食料消費や維持費は通常どおり発生します。", confirmText: "1日使って探索",
+    body: site.kind === "rumor" ? "噂の場所を調べ、海図の断片を回収します。" : `完成した海図を頼りに、「${CONFIG.rewards[chart.kind].name}」を探します。`,
+    sections: [{ title: "探索の条件", items: ["所要1日", "探索自体の戦闘なし"] }], guideTopic: "guide-exploration", confirmText: "1日使って探索",
     onConfirm: () => {
       if (state.modeLabel !== MODE_LABEL.NORMAL || state.expansion.charts.pending || state.expansion.exploration.pending || state.pendingEncounter?.active || dangerousSeaActionBlocked() || state.position.x !== site.position.x || state.position.y !== site.position.y) return;
       const before = structuredClone(state);

@@ -2,7 +2,7 @@ import { receiveFunds, recordVoyage } from "../core/voyageStats.js";
 import { state } from "../core/state.js";
 import { mapData } from "../world/map.js";
 import { absDay } from "../quests/questUtils.js";
-import { bountySeaPositions, normalizeBounties, tickBounties, claimBounty, bountyName } from "./bounty.js";
+import { bountySeaPositions, normalizeBounties, tickBounties, claimBounty, bountyName, bountyFameBonus } from "./bounty.js";
 import { BOUNTY_CONFIG } from "./bountyConfig.js";
 import { FACTIONS } from "../world/lore.js";
 import { adjustNobleFavor } from "../factions/faction.js";
@@ -37,13 +37,16 @@ export function updateBountyWorld() {
 /** @param {object} position 座標。 @returns {object|undefined} 現地の賞金首。 */
 export function bountyAt(position) { return state.bounties?.active.find(s => s.position.x === position.x && s.position.y === position.y); }
 
-/** 討伐済みにしてから固定報酬と専用の関係変化を一度だけ適用する。 @param {number} id 個体ID。 @returns {Array} 戦果表示。 */
+/** 討伐済みにしてから賞金・レベル別の追加名声と専用の関係変化を一度だけ適用する。 @param {number} id 個体ID。 @returns {Array} 戦果表示。 */
 export function finishBounty(id) {
   const site = claimBounty(state.bounties, id, absDay(state));
   if (!site) return [];
+  const fameBonus = bountyFameBonus(site);
+  state.fame = (state.fame || 0) + fameBonus;
   receiveFunds(state, site.reward);
   recordVoyage(state, "bountiesDefeated", 1);
   const summary = [{ text: `${bountyName(site)} 討伐賞金 +${site.reward}`, icon: "funds" }];
+  if (fameBonus) summary.push({ text: `賞金首討伐ボーナス 名声 +${fameBonus}`, icon: "fame" });
   const variant = VARIANT_SHIPS[site.templateId];
   if (variant) {
     addVariantShip(state, variant.id, bountyName(site), absDay(state));
@@ -54,6 +57,6 @@ export function finishBounty(id) {
     for (const noble of faction.nobles || []) adjustNobleFavor(noble.id, delta);
   }
   summary.push(`関係の変化：所属勢力の貴族全員 ${BOUNTY_CONFIG.ownFavor} / その他の勢力の貴族全員 +${BOUNTY_CONFIG.otherFavor}`);
-  pushLog("賞金首討伐", `${bountyName(site)} / 賞金 +${site.reward}`, "-");
+  pushLog("賞金首討伐", `${bountyName(site)} / 賞金 +${site.reward} / 討伐ボーナス 名声 +${fameBonus}`, "-");
   return summary;
 }

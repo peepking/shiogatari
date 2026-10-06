@@ -187,6 +187,17 @@ main .grid > * { min-width: 0; }
 .quest-offer-table .quest-accept { min-width: 64px; }
 .modal .trade-table .btn, .modal-close { white-space: nowrap; }
 .quest-offer-table .resource-list { gap: 6px 10px; }
+/* 受注時の判断材料は本文から独立させ、背景は必要なときだけ読む。 */
+.quest-offer-intro { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; line-height: 1.7; }
+.quest-offer-title { font-size: 15px; line-height: 1.6; }
+.quest-offer-place { margin: 6px 0; font-size: 12px; line-height: 1.7; color: var(--muted); }
+.quest-offer-conditions { font-size: 13px; }
+.quest-offer-conditions .resource-list { margin: 8px 0; }
+.quest-offer-impact, .bounty-impact { margin: 8px 0; font-size: 13px; line-height: 1.7; color: #ffbd91; }
+.bounty-reward { margin: 8px 0; font-size: 13px; line-height: 1.7; }
+.quest-offer-details { margin-top: 8px; font-size: 12px; line-height: 1.7; }
+.quest-offer-details summary { color: var(--muted); cursor: pointer; }
+.quest-offer-details p { margin: 8px 0; }
 /* スマートフォンでは依頼をカードにまとめ、報酬・期限・受注を横スクロールなしで確認できるようにする。 */
 @media (max-width: 600px) {
   .quest-offer-scroll { overflow-x: visible; }

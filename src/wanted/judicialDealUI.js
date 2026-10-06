@@ -32,7 +32,12 @@ export function appendJudicialDeal(card, current, refresh) {
     if (quote.error) { update(); return; }
     const name = FACTIONS.find(f => f.id === factionId)?.name || factionId;
     const item = CONTRABAND.find(row => row.id === itemId);
-    confirmAction({ title: "司法取引", body: `${item.name}${JUDICIAL_CONFIG.quantity}個を引き渡し、${name}の賞金を${quote.amount}から${quote.remaining}へ減らします。黒ひげの好感度−${JUDICIAL_CONFIG.favorLoss}、海賊の賞金＋${CRIME_REWARDS.judicial_deal}。海賊の最終犯罪日が今日になり、犯罪履歴に残ります。再利用まで${JUDICIAL_CONFIG.cooldownDays}日。拠点の利用禁止期間は変わりません。`, onConfirm: () => {
+    confirmAction({ title: "司法取引", body: `禁制品を引き渡し、${name}の手配賞金を減らします。`, guideTopic: "guide-wanted",
+      sections: [
+        { title: "引き渡す品と効果", items: [`${item.name} ${JUDICIAL_CONFIG.quantity}個`, `${name}の賞金 ${quote.amount} → ${quote.remaining}`] },
+        { title: "海賊との関係", items: [`黒ひげの好感度−${JUDICIAL_CONFIG.favorLoss}`, `海賊の賞金＋${CRIME_REWARDS.judicial_deal}（新たな犯罪として記録）`] },
+        { title: "利用条件", items: [`次の利用まで${JUDICIAL_CONFIG.cooldownDays}日`, "拠点の利用禁止は解除されません。"] }
+      ], onConfirm: () => {
       const here = current();
       const previous = structuredClone({ supplies: state.supplies, wanted: state.wanted, nobleFavor: state.nobleFavor });
       if (here?.id !== place.id || here.factionId !== factionId || !applyJudicialDeal(state, here, itemId, quote.amount)) { pushToast("利用できません", "状態が変わりました。再確認してください。", "warn"); refresh(); return; }

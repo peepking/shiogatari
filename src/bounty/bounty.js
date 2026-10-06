@@ -5,6 +5,14 @@ import { VARIANT_SHIPS } from "../fleet/variantShips.js";
 /** @param {object} site 賞金首。 @returns {string} 保存済み表示名。 */
 export function bountyName(site) { return `${site.epithet}${site.name}`; }
 
+/** 保存済み編成の最高レベルで討伐ボーナスを決める。通常・危険海域で共通とし、Lv1は0、Lv2～5は5刻みで加算する。
+ * @param {object} site 賞金首。 @returns {number} 通常の勝利名声へ追加する名声。
+ */
+export function bountyFameBonus(site) {
+  const level = site.formation.reduce((highest, unit) => Math.max(highest, unit.level), 1);
+  return CONFIG.fameByLevel[level] ?? 0;
+}
+
 /** 重複文字列を除外し、海賊は全地域の全候補から等確率で選ぶ。 @param {string} factionId 所属。 @param {Function} random 乱数。 @returns {string} 名前。 */
 export function rollBountyName(factionId, random = Math.random) {
   const source = factionId === "pirates" ? Object.values(REGIONAL_NAMES).flat() : REGIONAL_NAMES[factionId === "citadel" ? "WEST" : "NORTH"];

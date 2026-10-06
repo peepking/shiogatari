@@ -75,6 +75,7 @@
           <section class="card" aria-label="battle-info" id="battleInfoCard" hidden>
             <div class="bd">
               <div id="battleInfo" class="battle-info"></div>
+              <button class="btn ghost mt-6" type="button" data-guide-dialog="troubleModal" data-guide-topic="guide-battle">戦闘の進め方</button>
               <details id="battleFormationBulkEditor" class="mt-10" hidden>
                 <summary>まとめて陣形を指示</summary>
                 <div class="battle-unit-orders mt-6">
@@ -125,8 +126,9 @@
                     <option value="min7">7人以上で均等に編成</option>
                     <option value="full">10人の部隊のみ編成</option>
                   </select>
-                  <p class="tiny">条件を満たさない兵は待機します。7人以上なら歩兵23人を7・8・8人に分けます。</p>
-                  <p class="tiny" id="rosterOptionsStatus" role="status">設定は自動保存され、次回の初期編成にも使われます。今の編成を変えるには「おまかせ編成」を押してください。</p>
+                  <p class="tiny">条件を満たさない兵は待機します。</p>
+                  <p class="tiny" id="rosterOptionsStatus" role="status">条件は自動保存されます。今の編成には「おまかせ編成」で適用します。</p>
+                  <button class="btn ghost" type="button" data-guide-dialog="troubleModal" data-guide-topic="guide-roster">編成条件の詳しい説明</button>
                 </fieldset>
               </details>
               <p class="tiny">変更を出撃に使うには「編成を反映」を押してください。配置は部隊の開始位置、陣形は部隊ごとの戦い方です。</p>
@@ -658,7 +660,7 @@
         </div>
         <div class="asset-codex-search"><label for="assetCodexSearch">名前・役割で検索<input id="assetCodexSearch" type="search" placeholder="名前や用途を入力" autocomplete="off"></label><label for="assetCodexFilter">種類・用途<select id="assetCodexFilter"></select></label></div>
         <p class="tiny" id="assetCodexCount" role="status"></p>
-        <p class="tiny" id="assetCodexHistoryNote" hidden>記録はこの図鑑の追加時点からです。既存セーブは現在の保有品から補完し、過去に手放した品は復元しません。</p>
+        <p class="tiny" id="assetCodexHistoryNote" hidden>図鑑の記録が始まる前に手放した品は、記録に残っていない場合があります。</p>
       </div>
       <div class="modal-bd asset-codex-body">
         <div class="asset-codex-layout" id="assetCodexLayout" data-detail="false"><div class="asset-codex-list" id="assetCodexList" aria-label="図鑑の一覧"></div><section class="asset-codex-detail" id="assetCodexDetail" aria-label="図鑑の詳細"></section></div>
@@ -766,6 +768,7 @@
           <p>神託は季節に1回です。進行中の神託がある場合は、その神託が達成または失敗するまで次を授かれません。条件は「受注中の依頼」で確認できます。</p>
           <p>「海に祈る」は信仰10以上が必要で、季節に1回だけ使えます。通常の祈りと遭遇時の離脱は同じ季節の1回分を使います。実行前の確認画面で、消費する信仰を確認してください。</p>
           <p>祈りでは日数は進みません。信仰は蓄えている間にも恩恵があるため、現在の効果は画面上部の信仰から確認できます。</p>
+          <p>神託の信仰報酬は、報告する季節の潮盟の恩恵で変わります。依頼には今季の報告見込みを表示します。季節をまたいだら、報告前に見込みを確認してください。</p>
         </details>
         <details class="guide-question" id="guide-trade">
           <summary>物資を売買したい・交易で利益を出したい</summary>
@@ -782,6 +785,7 @@
             <li>「この編成で戦闘開始」を押します。開始後は速度変更や一時停止ができます。</li>
           </ol>
           <p>部隊を選んで「部隊陣形を指示」を開くか、一括指示欄を開くと自動で一時停止します。指示を終えたら「戦闘を再開」を押してください。部隊の詳細を見るだけでは停止しません。</p>
+          <p>陣形の変更までの秒数は戦闘時間です。一時停止中は進まず、戦闘速度を変えると実際の待ち時間も変わります。</p>
           <p>前衛で後衛を守り、兵種の得意な地形を活かすと戦いやすくなります。海兵・海弓兵は水辺、騎兵は平原を得意とします。部隊の状態や能力は盤面か味方部隊一覧から確認できます。</p>
         </details>
         <details class="guide-question" id="guide-morale">
@@ -789,6 +793,12 @@
           <p>部隊は被害や包囲、近くの味方の撃破・敗走で士気を失います。動揺すると攻撃が弱まり、さらに下がると敗走します。HPが残っていても、戦闘可能な部隊がいなくなれば敗北します。</p>
           <p>盾壁は被害と火力を抑え、円陣は士気の維持に向きます。散開は射撃に強い一方で近接に弱く、突撃は火力と被害が増えます。迷ったら「おまかせ」で戦況に応じた陣形を選べます。</p>
           <p>陣形を切り替えた直後は待ち時間があります。指示は予約され、切り替え可能になると反映されます。一時停止しても待ち時間は進みません。現在の陣形・予約・士気は部隊詳細で確認できます。</p>
+        </details>
+        <details class="guide-question" id="guide-roster">
+          <summary>おまかせ編成の条件と兵の分け方</summary>
+          <p>条件は自動保存され、次回の初期編成にも使われます。いま表示している編成を変えるには「おまかせ編成」を押し、出撃に使うには「編成を反映」を押してください。</p>
+          <p>「制限なし」は同じ兵種を10人ずつと端数に分けます。「7人以上」は出撃できる人数を多くしながら均等に分けます。歩兵23人なら7・8・8人、13人なら10人が出撃し3人が待機します。「10人の部隊のみ」は端数の兵を待機に残します。</p>
+          <p>条件に合わず待機した兵も、手動で出撃させられます。斥候と衛生兵を除く設定も、自動で編成するときの条件です。</p>
         </details>
         <details class="guide-question" id="guide-outcomes">
           <summary>戦闘を避けたい・引き分けや敗北はどうなるのか</summary>
@@ -801,24 +811,37 @@
           <summary>船や艤装をどう選ぶか・売るとどうなるのか</summary>
           <p>船は物資・部隊の上限を増やし、一部の船種は船団全体の能力を支えます。交易なら容量、戦闘なら兵員の能力や支援射撃、長旅なら維持費を目安に選べます。購入後の維持費も確認しましょう。</p>
           <p>街や無法港の「造船所」で船取引と艤装変更ができます。艤装は買って保管するだけでは効果がなく、装備枠に付けて使います。同じ設備を複数装備することはできません。船や艤装の戦闘効果は陸戦でも有効です。</p>
+          <p>造船所の定番4種は季節初日に補充され、売った船は買取在庫として売り切れるまで販売されます。艤装の装備枠は最大5枠です。衛生兵・斥候の効果は、保有兵員と設備を合わせてそれぞれ最大10人分です。</p>
           <p>売却や装備変更で容量が減っても、物資・兵員は自動では減りません。上限を超える場合は整理するまで移動できません。確定前の比較で容量・維持費・効果を確認してください。画面上部の船からは、場所を問わず船団詳細を見られます。</p>
+        </details>
+        <details class="guide-question" id="guide-asset-values">
+          <summary>兵・船・艤装の数値の読み方</summary>
+          <p>兵の図鑑は兵種の基礎値を示します。実戦の能力は人数・レベル・地形・船団・陣形で変わります。攻撃間隔は小さいほど頻繁に攻撃し、地形適性は100%が基準で、攻撃力と防御力に関わります。戦闘の「カウント」は進行の単位で、一時停止中は進みません。</p>
+          <p>船の図鑑は1隻ごとの容量・維持費・固有効果を示します。船団全体の効果や軽減後の維持費は、画面上部の船から「船団詳細」で確認できます。船団詳細の能力倍率は地形補正前の値です。通常船と同じ船種の固有船は効果の上限を共有し、上限に達した後も容量は増えます。</p>
+          <p>艤装は装備して初めて効果が出ます。同じ設備は複数装備できず、船団共通で陸戦にも有効です。支援射撃は射程に関係なく届き、表示の威力は設備単体の値です。実際の被害は船団の効果・防御・陣形などで変わります。</p>
+          <p>図鑑の記録は現在の保有品と取得後の履歴です。図鑑導入前の旅では、以前に手放した品の記録は残っていない場合があります。</p>
         </details>
         <details class="guide-question" id="guide-faith">
           <summary>信仰を蓄える意味・潮盟を支援する意味</summary>
           <p>信仰は祈りに使えるほか、蓄えている間も維持費の軽減、売却額の増加、勝利後の損耗軽減などで航海を支えます。現在の信仰に応じて恩恵も変わります。祈りの後には交易・維持費の恩恵を一時的に強める「祈りの余潮」が残ります。</p>
+          <p>信仰による売却額の増加は、同じ拠点の買値までが上限です。</p>
           <p>通常の街・村の「潮盟の拠点」では、資金を寄付したり、部隊員を担い手として送り出したりできます。施設の発展には資金と担い手の両方が必要です。送り出した人は部隊を離れ、呼び戻せません。</p>
           <p>各地の支えは季節の信仰や神託報酬につながり、季節途中の発展は次の季節から反映されます。拠点の「今季の状態」「次季節の見込み」と、画面上部の信仰で確認できます。潮盟への支援は任意です。</p>
+          <p>潮盟の恩恵は、季節初日に発展した上位5拠点から決まります。同じ施設段階では資金・担い手の進捗、完成順などで選ばれます。途中の支援では今季の恩恵は変わらず、次季節の見込みも他拠点の発展で変わることがあります。季節信仰の端数は潮盟全体で繰り越されます。</p>
+          <p>食料の受取見込みは、信仰の変化や物資の空き容量によって変わります。魚図鑑の完成で得る季節信仰は、達成した次の季節から適用され、現在の信仰には左右されません。</p>
+          <p>追加の雇用候補が現れる恩恵は、村・街へその季節に初めて入ったときに抽選されます。雇用には通常の費用がかかります。</p>
         </details>
         <details class="guide-question" id="guide-exploration">
           <summary>探索や海図はどう進めるのか</summary>
           <p>漂流物・難破船・戦場跡を見つけたら、現地で危険度を確認して「探索する」を選びます。探索は1日かかり、敵が現れた場合は勝利しなければ探索報酬を得られません。地点は一定期間で消えるので、準備と期限を考えて向かいましょう。</p>
+          <p>探索でも日付が進み、食料の消費日や季節の維持費は通常どおりです。海図の探索自体には戦闘がありませんが、海域の敵襲や荒波には備えてください。</p>
           <p>海図の断片は依頼・戦闘・探索などから得られます。「受注中の依頼」の末尾で枚数を確認でき、集め終えると発見地点が地図に現れます。「地図で確認」で場所を探し、現地で探索して報酬を受け取ります。</p>
           <p>断片の噂を聞いたり、商人から購入したりできる場合もあります。売られている海図には偽物もあるため、購入は成功が保証されません。進行できる海図の数には上限があります。</p>
         </details>
         <details class="guide-question" id="guide-fishing">
           <summary>釣りを始めたい・魚や図鑑は何に使うのか</summary>
           <p>街・村の「釣り小屋」で粗末な釣り竿を受け取り、餌を用意します。海・浅瀬で釣りを始めると1日が経過し、最大5回まで糸を垂らせます。餌を選び、アタリが来たらゲージがなくなる前に「引く」を押してください。早すぎても遅すぎても失敗します。</p>
-          <p>釣れる魚は海域・季節・水深・餌で変わります。釣果は船倉とは別に保管され、図鑑へ自動登録されます。魚は釣り小屋で売却したり、食料・餌に加工したりできます。</p>
+          <p>釣れる魚は海域・季節・水深・餌で変わります。釣果は船倉とは別に上限なく保管され、図鑑へ自動登録されます。魚は釣り小屋で売却したり、食料・餌に加工したりできます。</p>
           <p>図鑑を埋めると上位の竿や追加の報酬が解放されます。解放状況は図鑑で確認し、竿は釣り小屋で受け取れます。上位の竿ほど、引くまでの猶予が長くなります。</p>
         </details>
         <details class="guide-question" id="guide-dangerous-seas">
@@ -826,7 +849,7 @@
           <p>南西の赤い海・南東の紫の海は危険海域です。斜線のマスは核心です。警戒は滞在で上がり、海域外で連続3日目から下がります。日次の敵襲を解決すると、その後の3日間は再襲撃を受けません。探索・賞金首の戦闘は別です。</p>
           <p>街・村・無法港のマスでは、危険海域の敵襲や荒波を受けません。区域外でも荒波の被害はありません。南西・南東の遠征拠点の無法港で周辺海域の予報を確認し、地図の位置と荒波までの日数を見て、発生日までに港か区域外へ着けるよう退避しましょう。</p>
           <p>斥候や見張り台は、早い予報、安全な潮筋の発見、敵襲の察知を助けます。退避が間に合わない場合は、木材1と繊維1で所持釣果を守れます。</p>
-          <p>釣りでは海域・季節・水深を問わず、餌に合う希少魚や図鑑未登録魚を狙えます。餌と対策材料を用意し、帰るまでの日数を考えて活動してください。</p>
+          <p>釣りでは海域・季節・水深を問わず、餌に合う希少魚や図鑑未登録魚を狙えます。巨大魚の回遊中は、一部の魚が釣れやすくなります。餌と対策材料を用意し、帰るまでの日数を考えて活動してください。</p>
         </details>
         <details class="guide-question" id="guide-wanted">
           <summary>港の施設を使えない・指名手配された</summary>
@@ -834,12 +857,22 @@
           <p>拠点入口の「窓口で交渉」から賠償・投降などの対応を確認できます。入港拒否中でも窓口は利用でき、最低限の食料を買う手段もあります。投降では日数が進むので、依頼期限と維持費の見込みを確認してください。</p>
           <p>手配を解消しても、悪化した支持度・好感度や襲撃後の利用禁止期間は戻りません。受注済み依頼は、元の報告先・条件・期限を満たせば報告を続けられます。</p>
           <p>禁制品や無法港での取引は検問につながる場合があります。無法港での海賊依頼は通常勢力との関係を悪化させます。名誉家臣の間は新しい犯罪行動や海賊依頼の受注が制限されます。</p>
+          <p>名誉家臣を辞めるときは「所属・身分」を開きます。補給・賠償・投降は「窓口で交渉」から行えます。</p>
+          <p>身分偽造や恩赦で減るのは賞金額で、犯罪の履歴・支持度・好感度・拠点の利用禁止は変わりません。司法取引は海賊に対する新たな犯罪として記録され、自然に手配が消えるまでの期間も更新されます。窓口の緊急食料は通常買値の1.5倍で、端数は切り上げます。</p>
+        </details>
+        <details class="guide-question" id="guide-crime">
+          <summary>窃盗・襲撃の回数と不利益</summary>
+          <p>市場・兵糧庫・武器庫の窃盗は、同じ拠点で今季の1回分を共有します。拠点の襲撃は窃盗と別の回数枠です。使った枠は次の季節に再び利用できます。</p>
+          <p>犯罪では対象勢力の手配、拠点の支持度や担当貴族の好感度が悪化します。襲撃は開始時から拠点を利用できなくなり、勝利しても占領はしません。戦闘に敗北・引き分け・逃走しても、発生した手配と使用済みの回数枠は戻りません。具体的な報酬・敵人数・不利益は実行前の確認画面で確認してください。</p>
+          <p>禁制品の検問では、引き渡しは没収、賄賂は失敗しても資金消費、強行突破は戦闘と手配増加につながります。名誉家臣の間は犯罪を選べません。</p>
+          <p>戦利品が容量を超えたときは自動で減りません。物資詳細で破棄するか拠点で売却し、兵員は部隊詳細で解雇して、移動前に整理してください。</p>
         </details>
         <details class="guide-question" id="guide-factions">
           <summary>名声・支持度・好感度・国力は何が違うのか</summary>
           <p>名声は旅で築いた評判です。機会が増える一方で敵も強くなるため、部隊や船団を整えながら活動を広げましょう。</p>
           <p>支持度は各勢力からの評価で、所属拠点での購入価格などに関わります。好感度は貴族個人との関係で、仕官や貴族依頼に関わります。勢力・貴族の詳細で確認できます。</p>
           <p>国家勢力の国力は戦争を続ける余力、戦況は戦争の優勢・劣勢です。仕官すると前線での戦闘や補給などを通じて所属勢力を支えられます。無法港の黒ひげとの関係は海賊依頼の報酬などに関わります。</p>
+          <p>国力の季節回復見込みは、現在の所有拠点から見た基礎予定値です。実際の回復は回復時の上限までで、日々の前線消耗や戦況補正は「回復・消耗の内訳」で確認できます。</p>
         </details>
         <h3 class="guide-group-title">記録と再開</h3>
         <details class="guide-question" id="guide-save">
@@ -1009,6 +1042,7 @@
           <div class="section" id="fishingInventory"></div>
         </details>
         <div class="fishing-tools">
+          <button class="btn ghost" type="button" data-guide-dialog="troubleModal" data-guide-topic="guide-fishing">釣りの進め方</button>
           <button class="btn" id="fishingCodexBtn">図鑑</button>
           <button class="btn" id="fishingBaitBuyBtn">餌購入</button>
           <button class="btn good" id="fishingSellBtn" hidden>魚を売る</button>
@@ -1025,8 +1059,9 @@
     <div class="modal-bd">
       <p>新しい釣り竿を手に入れた！</p>
       <h3 id="rodRewardName" class="mt-6"></h3>
-      <p id="rodRewardContext" class="mt-6" style="font-size: 14px; line-height: 1.8; color: var(--muted); white-space: pre-line;"></p>
-      <p id="rodRewardFlavor" class="mt-6" style="font-size: 14px; line-height: 1.8; color: var(--muted); white-space: pre-line;"></p>
+      <p id="rodRewardContext" class="mt-6 rod-reward-flavor"></p>
+      <p id="rodRewardFlavor" class="mt-6 rod-reward-flavor"></p>
+      <p id="rodRewardEffect" class="rod-reward-effect"></p>
       <div class="row gap-12 mt-12">
         <button class="btn primary" id="rodRewardOk">受け取る</button>
       </div>
@@ -1098,7 +1133,7 @@
         <button class="modal-close" id="questModalClose">閉じる</button>
       </div>
       <div class="modal-bd">
-        <p class="tiny">受注前に条件と期限を確認してください。報告が必要な依頼は「受注中の依頼」の「完了」で報酬を受け取ります。物資は依頼ごとに取り置かれません。</p>
+        <div class="quest-offer-intro"><span>条件・報酬・期限を確認して受注できます。</span><button class="btn ghost" type="button" data-guide-dialog="troubleModal" data-guide-topic="guide-quests">依頼の進め方</button></div>
         <div class="table mt-10 quest-offer-scroll" tabindex="0" role="region" aria-label="依頼受注一覧">
           <table class="trade-table quest-offer-table">
             <thead>
@@ -1123,6 +1158,7 @@
         <button class="modal-close" id="nobleQuestModalClose">閉じる</button>
       </div>
       <div class="modal-bd">
+        <div class="quest-offer-intro"><span>条件・報酬・期限を確認して受注できます。</span><button class="btn ghost" type="button" data-guide-dialog="troubleModal" data-guide-topic="guide-quests">依頼の進め方</button></div>
         <div class="table mt-10 quest-offer-scroll" tabindex="0" role="region" aria-label="貴族依頼一覧">
           <table class="trade-table quest-offer-table">
             <thead>

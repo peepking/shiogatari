@@ -1811,7 +1811,7 @@ export function markNobleRefugeePickup(pos) {
     questId: q.id,
   };
   pushLog("難民受け入れ", `${q.title} / 難民を収容しました。拠点へ戻ります。`, "-");
-  pushToast("難民受け入れ", "難民を収容しました。拠点へ戻ります（エンカウント率上昇）", "warn");
+  pushToast("難民受け入れ", "難民を収容しました。拠点まで護送してください。護送中は敵に遭いやすくなります。", "warn");
 }
 
 /**

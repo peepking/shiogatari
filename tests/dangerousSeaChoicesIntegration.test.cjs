@@ -33,6 +33,8 @@ async function main() {
     insertAdjacentElement(where, value) { this.after(value); }
     /** @param {string} where 挿入位置。 @param {string} value 資源表示。 @returns {void} 資源表示を記録する。 */
     insertAdjacentHTML(where, value) { this.html = (this.html || "") + value; }
+    /** @param {string} name 属性名。 @param {string} value 属性値。 @returns {void} 読み上げの関連付けを保存する。 */
+    setAttribute(name, value) { (this.attributes ||= {})[name] = String(value); }
     /** @param {string} type イベント名。 @param {Function} handler 実画面の処理。 @returns {void} 処理を登録する。 */
     addEventListener(type, handler) { if (!this.listeners.has(type)) this.listeners.set(type, []); this.listeners.get(type).push(handler); }
     /** @param {object} event 発火するイベント。 @returns {void} 親へクリックを伝える。 */

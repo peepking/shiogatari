@@ -9,6 +9,8 @@ import { enqueueEvent } from "../app/events.js";
 import { pushLog } from "../ui/dom.js";
 import { startTravelEncounter } from "../app/actions.js";
 import { splitRosterCounts, rosterOptions } from "../ui/rosterOptions.js";
+import { CRIME_REWARDS } from "../bounty/bountyConfig.js";
+import { FACTIONS } from "../world/lore.js";
 
 /** @returns {object} 保存対象の海賊イベント状態。 */
 export function piracyState() { return state.piracy ||= {lastTrade:null,checkpoint:null,nextId:1}; }
@@ -59,10 +61,11 @@ function showCheckpoint() {
   const check=piracyState().checkpoint;
   if (!check) return;
   const terms=bribeTerms(), count=contrabandCount();
+  const faction=FACTIONS.find(row=>row.id===check.factionId)?.name || "検問側の勢力";
   const actions=[{label:count ? "禁制品を引き渡す" : "警告を受け入れる",type:"pirate_surrender",payload:{id:check.id}}];
   if (!check.bribeFailed && state.funds>=terms.price) actions.push({label:`賄賂 ${terms.price}資金（成功率${Math.round(terms.chance*100)}%）`,type:"pirate_bribe",payload:{id:check.id}});
-  actions.push({label:"強行突破",type:"pirate_force",payload:{id:check.id}});
-  enqueueEvent({title:"禁制品の摘発",body:`${count ? `禁制品${count}個が発見されました。引き渡すと全て没収されます。` : "無法港での取引を追及されました。警告を受け入れると現地貴族の好感度が下がります。"}\n賄賂は失敗しても資金を消費します。${check.bribeFailed ? "\n賄賂は拒絶されました。別の対応を選んでください。" : ""}`,actions});
+  actions.push({label:"強行突破（戦闘・手配増加）",type:"pirate_force",payload:{id:check.id}});
+  enqueueEvent({title:"禁制品の摘発",body:`${count ? `禁制品${count}個が発見されました。引き渡すと全て没収されます。` : "無法港での取引を追及されました。警告を受け入れると現地貴族の好感度が下がります。"}\n賄賂は失敗しても資金を消費します。\n強行突破すると正規軍との戦闘になり、${faction}の賞金が${CRIME_REWARDS.pirate_checkpoint}増えます。${check.bribeFailed ? "\n賄賂は拒絶されました。別の対応を選んでください。" : ""}`,actions});
 }
 
 /** @param {object|null} settlement 入場時の対象。省略時は移動中の近隣拠点。 @returns {boolean} 所持または30日以内の売買記録があれば摘発を50%で抽選する。 */

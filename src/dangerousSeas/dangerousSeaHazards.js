@@ -181,7 +181,7 @@ export function processDangerousSeaHazards() {
       hazard.stage = "warning";
       if (!saveGameToStorage()) { hazard.stage = "ready"; notifyHazardSaveFailure(hazard.id); return false; }
       enqueueEvent({ kind: "dangerous_raid_warning", title: "斥候が船団を察知",
-        body: `強敵船団（推定${hazard.encounter.total}人）が接近しています。活動を続けると翌日の終わりに襲撃されます。回避航路を探すには1日かかります。`,
+        body: `強敵船団（推定${hazard.encounter.total}人）が接近しています。\n活動を続けると明日の終わりに襲撃されます。\n回避航路を1日かけて探せば、追跡を振り切れるかもしれません。失敗すると、そのまま襲撃されます。`,
         actions: [{ label: "活動を続ける", type: "dangerous_raid_continue", payload: { id: hazard.id } },
           { label: "回避航路を探す（1日）", type: "dangerous_raid_evade", payload: { id: hazard.id } }] });
       return true;

@@ -2,7 +2,7 @@ import { state } from "../core/state.js";
 import { MODE_LABEL } from "../core/constants.js";
 import { FACTIONS } from "../world/lore.js";
 import { TROOP_STATS, totalTroops } from "../resources/troops.js";
-import { bountyName } from "./bounty.js";
+import { bountyName, bountyFameBonus } from "./bounty.js";
 import { bountyAt } from "./bountyWorld.js";
 import { focusMapPosition, getTerrainAt } from "../world/map.js";
 import { escapeHtml, SEASONS } from "../core/util.js";
@@ -40,9 +40,12 @@ function bountyCard(s) {
   for (const u of s.formation) troops[u.type] = (troops[u.type] || 0) + u.count;
   const reason = bountyRestriction(s);
   return `<article class="bounty-card"><div class="bounty-heading"><h3>${escapeHtml(bountyName(s))}</h3><strong>${resourceIcon("funds")}${s.reward.toLocaleString()}</strong></div>
-    <div class="bounty-affiliation">${factionLabel(s.factionId)}</div><p>${escapeHtml(s.description)}</p>
+    <div class="bounty-affiliation">${factionLabel(s.factionId)}</div>
     <div class="bounty-meta">${s.total}人・${s.formation.length}部隊 / Lv${s.formation[0].level} / (${s.position.x + 1}, ${s.position.y + 1})</div>
-    <details><summary>編成・討伐の影響</summary><p>${Object.entries(troops).map(([id, n]) => `${escapeHtml(TROOP_STATS[id]?.name || id)} ${n}人`).join(" / ")}</p><p>所属勢力の貴族全員 −3 / その他の勢力の貴族全員 ＋1</p><p>賞金に加えて通常の戦闘報酬を獲得します。</p>${s.ship ? `<p>${escapeHtml(s.flagship)}：${escapeHtml(SHIP_TYPES[s.ship]?.name || "船")} 1隻<br>${variantBonusText(s.templateId)}</p>` : ""}</details>
+    ${s.ship ? `<p class="bounty-reward">追加報酬：${escapeHtml(s.flagship)}（${escapeHtml(SHIP_TYPES[s.ship]?.name || "船")}）1隻</p>` : ""}
+    <p class="bounty-reward">討伐ボーナス：${resourceIcon("fame")}名声 ＋${bountyFameBonus(s)}</p>
+    <p class="bounty-impact">${s.factionId === "pirates" ? "黒ひげ" : "所属勢力の貴族全員"}の好感度 −3</p>
+    <details><summary>人物・編成・報酬の詳細</summary><p>${escapeHtml(s.description)}</p><p>${Object.entries(troops).map(([id, n]) => `${escapeHtml(TROOP_STATS[id]?.name || id)} ${n}人`).join(" / ")}</p><p>その他の勢力の貴族全員の好感度 ＋1</p><p>通常の戦闘報酬も獲得します。</p>${s.ship ? `<p>${variantBonusText(s.templateId)}</p>` : ""}</details>
     ${reason ? `<p class="tiny">${escapeHtml(reason)}</p>` : ""}<div class="row"><button class="btn" data-bounty-map="${s.id}">地図で確認</button>${bountyAt(state.position)?.id === s.id ? `<button class="btn good" data-bounty-fight="${s.id}" ${reason ? "disabled" : ""}>討伐の準備</button>` : ""}</div></article>`;
 }
 
@@ -76,8 +79,7 @@ function openBounties(sync, site = null) {
     const record = state.wanted?.byFaction?.[id];
     return `<p>${factionLabel(id)}：${(record?.amount || 0).toLocaleString()}${record?.amount ? ` / 自然解除まであと${Math.max(0, record.lastCrimeAbs + BOUNTY_CONFIG.lifetime - absDay(state))}日` : " / 手配なし"}</p>`;
   }).join("")}<p class="tiny">各勢力への最後の犯罪から600日で、その勢力の手配だけが解除されます。</p>${wantedCrimesHtml(state.wanted || {})}</article>` : ""}
-    <div class="bounty-list">${list.map(bountyCard).join("") || '<p>現在、活動中の賞金首はいません。</p>'}</div>
-    ${!site && state.bounties?.history.length ? `<details><summary>討伐の記録（直近100件）</summary>${state.bounties.history.map(s => `<p>${escapeHtml(bountyName(s))} / 賞金 ${s.reward.toLocaleString()}${s.flagship ? ` / ${escapeHtml(s.flagship)}` : ""}</p>`).join("")}</details>` : ""}`;
+    <div class="bounty-list${site ? " bounty-list-single" : ""}">${list.map(bountyCard).join("") || '<p>現在、活動中の賞金首はいません。</p>'}</div>`;
   body.querySelectorAll("[data-bounty-map]").forEach(button => { button.onclick = () => {
     const target = state.bounties.active.find(s => s.id === Number(button.dataset.bountyMap));
     if (target) { close(); focusMapPosition(target.position); }
@@ -98,6 +100,11 @@ function openBounties(sync, site = null) {
     document.dispatchEvent(new CustomEvent("auto-move-stop")); sync();
   }; });
   if (!site) renderDangerousBountyList(body, sync);
+  if (!site && state.bounties?.history.length) {
+    const history = document.createElement("details");
+    history.innerHTML = `<summary>討伐の記録（直近100件）</summary>${state.bounties.history.map(s => `<p>${escapeHtml(bountyName(s))} / 賞金 ${s.reward.toLocaleString()}${s.flagship ? ` / ${escapeHtml(s.flagship)}` : ""}</p>`).join("")}`;
+    body.append(history);
+  }
   modal.hidden = false; document.getElementById("bountyCloseBtn").focus();
 }
 

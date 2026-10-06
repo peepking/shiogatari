@@ -2,8 +2,6 @@ import { EXPLORATION_CONFIG as CONFIG, CHART_CONFIG } from "../core/expansionCon
 
 /** 自然探索地点の表示名。 */
 export const EXPLORATION_NAMES = Object.freeze({ drift: "漂流物", battlefield: "戦場跡", wreck: "難破船" });
-/** 危険度ごとの案内。 */
-const DANGER_TEXT = ["安全に探索できそうです", "敵が潜んでいる可能性があります", "敵と遭遇する可能性は半々です", "敵がいる可能性が高い場所です", "探索すると必ず戦闘になります"];
 
 /**
  * 整数の範囲から均等抽選する。
@@ -14,12 +12,12 @@ const DANGER_TEXT = ["安全に探索できそうです", "敵が潜んでいる
 function integer(range, random) { return range[0] + Math.floor(random() * (range[1] - range[0] + 1)); }
 
 /**
- * 既知の危険度を数値付きで説明する。
+ * 既知の戦闘確率を一つの短い表示で知らせる。
  * @param {number} danger 戦闘確率。
  * @returns {string} 案内。
  */
 export function describeDanger(danger) {
-  return `${DANGER_TEXT[CONFIG.dangerLevels.indexOf(danger)] || "危険度不明"}（戦闘確率${danger * 100}%）`;
+  return CONFIG.dangerLevels.includes(danger) ? `戦闘確率${danger * 100}%` : "危険度不明";
 }
 
 /**

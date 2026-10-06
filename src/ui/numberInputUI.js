@@ -1,4 +1,4 @@
-/** 用途ごとの基本桁数。戦闘編成の既存48px欄とデバッグ欄は対象外にする。 */
+/** 用途ごとの基本桁数。戦闘編成の人数欄とデバッグ欄は対象外にする。 */
 const NUMBER_FIELDS = [
   { selector: '.hire-count, .troop-dismiss, [data-tide-type]', digits: 2 },
   { selector: '.trade-quantity, .event-trade-buy, .supply-discard', digits: 4 },

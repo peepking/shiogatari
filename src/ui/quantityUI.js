@@ -13,7 +13,8 @@ export function refreshQuantity(input) {
     button.disabled = input.disabled || (Number(button.dataset.step) < 0 ? value <= Number(input.min) : value >= Number(input.max));
   });
   const output = control.querySelector('output');
-  if (output) output.textContent = value > 0 ? `購入${value}個` : value < 0 ? `売却${-value}個` : '取引なし';
+  const selling = input.closest('[data-direction="sell"]');
+  if (output) output.textContent = value > 0 ? `${selling ? "売却" : "購入"}${value}個` : value < 0 ? `売却${-value}個` : '取引なし';
 }
 
 /** 既存の入力イベントを利用して数量ボタンを配線する。 */

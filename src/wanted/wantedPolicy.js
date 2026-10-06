@@ -10,10 +10,10 @@ export const WANTED_POLICY = Object.freeze({ compensationRate: 1.5, suspension: 
  */
 export function wantedEntryReason(state, settlement, now) {
   const bannedUntil = state.wanted?.settlementActions?.[settlement?.id]?.bannedUntil || 0;
-  if (now < bannedUntil) return `襲撃によりこの拠点はあと${bannedUntil - now}日間利用禁止です。報告は依頼カード、補給・清算は賞金首・港外窓口から行えます。`;
+  if (now < bannedUntil) return `襲撃により、あと${bannedUntil - now}日間入場できません。補給・清算は「窓口で交渉」、報告は依頼カードから行えます。`;
   const record = state.wanted?.byFaction?.[settlement?.factionId];
   return record?.amount >= WANTED_POLICY.entryRestriction && Number.isSafeInteger(record.lastCrimeAbs) && now - record.lastCrimeAbs < BOUNTY_CONFIG.lifetime
-    ? "この勢力の賞金が6,000以上のため入場を拒否されています。賞金首・港外窓口から補給・賠償・投降・辞任ができます。受注済み依頼は依頼カードから報告できます。" : "";
+    ? "手配により入場を拒否されています。補給・清算は「窓口で交渉」、辞任は「所属・身分」、報告は依頼カードから行えます。" : "";
 }
 
 /** 現在の支配勢力だけを参照する。報告・清算は対象外で、無法港の犯罪依頼も残す。
@@ -25,8 +25,8 @@ export function wantedFacilityReason(state, settlement, service, now) {
   const record = state.wanted?.byFaction?.[settlement?.factionId];
   const trade = ["trade", "shipBuy"].includes(service);
   if (!record || record.amount < (trade ? WANTED_POLICY.tradeRestriction : WANTED_POLICY.facilityRestriction) || !Number.isSafeInteger(record.lastCrimeAbs) || now - record.lastCrimeAbs >= BOUNTY_CONFIG.lifetime) return "";
-  if (trade) return "この勢力から重罪人として手配されているため、通常取引・船の購入は利用できません。最低限の食料は窓口で交渉から購入できます。";
-  return "この勢力から指名手配されているため、雇用・貴族面会・新規の通常依頼は利用できません。受注済み依頼は依頼カードから報告できます。";
+  if (trade) return "手配により通常取引・船の購入は利用できません。食料は「窓口で交渉」から購入できます。";
+  return "手配により雇用・貴族面会・新規の通常依頼は利用できません。報告は依頼カードから行えます。";
 }
 
 /** 所属は保持したまま、期限内の自勢力手配による資格停止を判定する。
@@ -35,7 +35,7 @@ export function wantedFacilityReason(state, settlement, service, now) {
 export function honorSuspensionReason(state, factionId, now) {
   const record = state.wanted?.byFaction?.[factionId];
   return state.honorFactions?.includes(factionId) && record?.amount >= WANTED_POLICY.suspension && Number.isSafeInteger(record.lastCrimeAbs) && now - record.lastCrimeAbs < BOUNTY_CONFIG.lifetime
-    ? "自勢力の賞金が1,000以上のため家臣機能は停止中です。手配額を下げると再開します。受注済み依頼の報告・辞任・賠償は可能です。" : "";
+    ? "自勢力からの手配により家臣機能は停止中です。賞金を減らすと再開します。報告・辞任・賠償は可能です。" : "";
 }
 
 /** 明示的な犯罪選択だけを禁止し、救助や通常戦闘・既存依頼報告は含めない。 */
@@ -44,7 +44,7 @@ export const CRIMINAL_ACTIONS = Object.freeze(["merchant_attack", "merchant_resc
 /** @param {object} state 状態。 @param {object} action 行動。 @returns {string} 実行不可の理由。 */
 export function crimeRestriction(state, action) {
   return state.honorFactions?.length && CRIMINAL_ACTIONS.includes(action?.type)
-    ? "名誉家臣は犯罪行動を選べません。拠点の賞金首一覧から、明示的に名誉家臣を辞してください。" : "";
+    ? "名誉家臣は犯罪を選べません。「所属・身分」から辞任できます。" : "";
 }
 
 /** 対象勢力だけを清算する見積もり。履歴・好感度を変更せず、端数は切り上げる。

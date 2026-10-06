@@ -8,6 +8,7 @@ import { buildEnemyFormation, buildDangerousEnemyFormation } from "../app/action
 import { saveGameToStorage } from "../core/storage.js";
 import { confirmAction, pushLog, pushToast } from "../ui/dom.js";
 import { enqueueEvent } from "../app/events.js";
+import { capacityOverflowText } from "../ui/capacityUI.js";
 import { SUPPLY_ITEMS, SUPPLY_TYPES } from "../resources/supplies.js";
 import { addTroops, TROOP_STATS } from "../resources/troops.js";
 import { awardExplorationFragment } from "./chartWorld.js";
@@ -19,6 +20,9 @@ import { dangerousSeaReservedPositions } from "../dangerousSeas/dangerousSeaRese
 import { snapshotOutfitting } from "../fleet/outfitting.js";
 import { createDangerousWreckPending, dangerousWreckPending, settleDangerousWreckStage } from "../dangerousSeas/dangerousWreck.js";
 import { resumeDangerousWreck, pauseDangerousWreckForHazard, renderDangerousWreckChoice, chooseDangerousWreckBranch as chooseWreck } from "../dangerousSeas/dangerousWreckUI.js";
+
+/** 探索先ごとに、回収や救助の見込みを短く示す。 */
+const EXPLORATION_HINTS = Object.freeze({ drift: "漂流する箱には、金品や使える物資が残っているかもしれません。", battlefield: "戦場跡に残された金品や物資を探します。", wreck: "残された積荷や生存者を探します。使える船が見つかることもあります。" });
 
 /**
  * 他の依頼・海図の予約位置を自然探索の候補から除外する。
@@ -158,7 +162,7 @@ export function resumeExploration(syncUI) {
   } else {
     const resources = finishExploration(true);
     state.modeLabel = MODE_LABEL.NORMAL;
-    enqueueEvent({ title: "探索完了", body: "資金と物資を回収しました。積載上限を超えた物資・兵員は整理してください。", resources });
+    enqueueEvent({ title: "探索完了", body: ["資金と物資を回収しました。", capacityOverflowText()].filter(Boolean).join("\n"), resources });
     saveGameToStorage();
   }
   syncUI();
@@ -176,7 +180,10 @@ function beginExploration(syncUI) {
   if (!site || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active || state.expansion.charts.pending || dangerousSeaActionBlocked()) return;
   const staged = site.regionId && site.kind === "wreck";
   confirmAction({ title: `${EXPLORATION_NAMES[site.kind]}を探索`,
-    body: `${staged ? "甲板の探索は1日。続けるなら積荷か救助の一方を選び、さらに1日かかります。" : "探索に1日かかります。"}\n期限まであと${site.expiresAbs - absDay(state)}日。\n${describeDanger(site.danger)}\n敵は賞金首相当。敗北・逃走・引き分けでは、この段階の報酬を受け取れず地点は消えます。`,
+    body: staged ? "甲板の積荷を探します。船倉には、さらに積荷や生存者が残っているかもしれません。" : EXPLORATION_HINTS[site.kind],
+    sections: [{ title: "探索の条件", items: [staged ? "甲板1日 / 船倉の積荷か救助は追加1日" : "所要1日", `期限まであと${site.expiresAbs - absDay(state)}日`, describeDanger(site.danger)] },
+      ...(site.danger > 0 ? [{ title: "戦闘に備えて", items: ["敵は賞金首相当", "敗北・逃走・引き分けでは報酬なし。探索地点も消えます。"] }] : [])],
+    guideTopic: "guide-exploration",
     confirmText: "1日使って探索",
     onConfirm: () => {
       const currentSite = getExplorationAt(state.position);

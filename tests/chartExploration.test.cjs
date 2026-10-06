@@ -20,7 +20,8 @@ async function main() {
     ["./chartWorld.js", mock({ chartLabel: () => "海図", announceFragment: c => events.push(c.fragments) })],
     ["./dom.js", mock({ confirmAction: () => {}, pushToast: () => {}, pushLog: () => {} })],
     ["./events.js", mock({ enqueueEvent: e => events.push(e) })],
-    ["./supplies.js", mock({ SUPPLY_ITEMS: [{ id: "spice", name: "香辛料" }], SUPPLY_TYPES: {} })],
+    ["./supplies.js", mock({ SUPPLY_ITEMS: [{ id: "spice", name: "香辛料" }], SUPPLY_TYPES: {}, formatSupplyDisplay: () => ({ total: Object.values(state.supplies).reduce((sum, qty) => sum + qty, 0), cap: 60 }) })],
+    ["./troops.js", mock({ formatTroopDisplay: () => ({ total: 0, cap: 30 }) })],
     ["./time.js", mock({ advanceDayWithEvents: n => { state.day += n; world.days += n; } })],
     ["./map.js", mock({ snapshotWorld: () => world, restoreWorld: value => { world = value; }, focusMapPosition: () => {} })],
     ["./storage.js", mock({ saveGameToStorage: () => { writes++; if (fail || writes === failAt) return false; saved = structuredClone(state); return true; } })],
@@ -53,11 +54,14 @@ async function main() {
   assert.equal(state.day, 11); assert.equal(world.days, 1); assert.equal(totalShips(state.fleet), 1); assert.equal(state.supplies.spice, 50);
   assert.equal(state.expansion.charts.active.length, 0); assert.equal(saved.expansion.charts.pending, null);
   assert.equal(state.voyageStats.chartsCompleted, 1); assert.equal(saved.voyageStats.chartsCompleted, 1);
+  assert.ok(!events.at(-1).body.includes("上限超過"), "上限内なら整理の注意を出さない");
   resumeChartExploration(() => {}); assert.equal(totalShips(state.fleet), 1); assert.equal(state.day, 11);
   assert.equal(state.voyageStats.chartsCompleted, 1, "結果の再表示で達成数を増やさない");
   seed(true); resumeChartExploration(() => {});
   assert.equal(state.day, 11); assert.equal(totalShips(state.fleet), 2);
   assert.equal(state.voyageStats.chartsCompleted, 2, "日数適用済みの探索も報酬回収時に一度だけ数える");
+  assert.ok(events.at(-1).body.includes("物資40個が上限超過"), "超過した対象と量を結果に知らせる");
+  assert.ok(!events.at(-1).body.includes("兵員"), "超過していない兵員の注意を出さない");
   state.expansion.charts = { active: [{ id: 2, kind: "altar", size: 3, fragments: 2, rumor: { x: 1, y: 1 }, questIds: [] }],
     pending: { chartId: 2, kind: "rumor", dayApplied: false, reward: null } };
   resumeChartExploration(() => {});

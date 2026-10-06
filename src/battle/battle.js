@@ -21,7 +21,7 @@ import { OUTFITTING_ITEMS } from "../core/expansionConfig.js";
 import { planBattleFormation } from "./battleFormation.js";
 import { orderRosterCandidates } from "../ui/rosterPriority.js";
 import { initializeUnitFormation, normalizeFormationOrder, normalizeFormationRoster, queueUnitFormation, unitFormation, DEFAULT_FORMATION_ORDER } from "./battleUnitFormation.js";
-import { formationInfoMarkup, formationOptions, syncUnitFormationPanel, wireUnitFormationPanel, syncBulkFormationPanel, wireBulkFormationPanel } from "./battleUnitFormationUI.js";
+import { formationInfoMarkup, formationDetailMarkup, formationOptions, syncUnitFormationPanel, wireUnitFormationPanel, syncBulkFormationPanel, wireBulkFormationPanel } from "./battleUnitFormationUI.js";
 import { formationOrderRecipients, selectFormationOrderRecipients, applyFormationOrders } from "./battleUnitFormationOrders.js";
 
 const BASE_TICK_MS = BATTLE_RULES.tickMs;
@@ -1027,22 +1027,27 @@ function updateBattleInfo() {
   if (unit.traits?.includes("steadfast")) traits.push(`堅固（士気低下−${Math.round((1 - MORALE_RULES.steadfast) * 100)}%）`);
   if (unit.traits?.includes("antiCavalry")) traits.push(`対騎兵（騎乗への通常ダメージ＋${Math.round((COMBAT_TRAIT_RULES.antiCavalry - 1) * 100)}%）`);
   if (unit.traits?.includes("mounted")) traits.push("騎乗");
-  if (unit.role === "ranged") traits.push(`敵近接隣接時ATK−${Math.round((1 - COMBAT_TRAIT_RULES.rangedEngaged) * 100)}%`);
+  if (unit.role === "ranged") traits.push(`敵近接兵が隣接すると攻撃−${Math.round((1 - COMBAT_TRAIT_RULES.rangedEngaged) * 100)}%`);
   const effDef = fmt(effectiveDef(unit));
   const hpText = `${fmt(unit.hp)}/${fmt(unit.maxHp)}`;
   const side = unit.side === "ally" ? "味方" : "敵";
-  const status =
-    unit.hp <= 0 ? "撃破" : `HP ${hpText} / ATK ${effAtk} / DEF ${effDef} / SPD ${unit.spd}`;
+  const status = unit.hp <= 0 ? "撃破" : `HP ${hpText}`;
   const coords = unit.status === "reserve" ? "未投入" : `(${unit.x + 1}, ${unit.y + 1})`;
+  const expanded = infoEl.querySelector?.("[data-battle-unit-details]")?.open;
   infoEl.innerHTML = `
     <div><b>${side}</b> ${unit.name} x${unit.count ?? MAX_UNIT_COUNT} / Lv${(unit.level ?? 1).toFixed(1)}</div>
     <div>${status}</div>
-    <div>士気 ${Math.round(unit.morale ?? 100)} / ${unit.status === "reserve" ? "未投入" : unit.status === "routing" ? "敗走中" : unit.status === "escaped" ? "退出済み" : unit.shaken ? "動揺" : "平静"}・圧力 ${(unit.pressure || 0).toFixed(1)}</div>
-    <div>射程 ${unit.range} / 移動 ${unit.move}</div>
-    ${formationInfoMarkup(unit, battleState)}
+    <div>士気 ${Math.round(unit.morale ?? 100)} / ${unit.status === "reserve" ? "未投入" : unit.status === "routing" ? "敗走中" : unit.status === "escaped" ? "退出済み" : unit.shaken ? "動揺" : "平静"}</div>
+    ${formationInfoMarkup(unit, battleState, BASE_TICK_MS)}
+    <details class="quest-description" data-battle-unit-details ${expanded ? "open" : ""}><summary>能力・陣形の効果</summary>
+    <div>攻撃 ${effAtk} / 防御 ${effDef} / 攻撃間隔 ${unit.spd}カウント</div>
+    <div>射程 ${unit.range}マス / 移動力 ${unit.move}マス</div>
+    ${formationDetailMarkup(unit, battleState)}
+    <div>周囲の敵から受ける圧力 ${(unit.pressure || 0).toFixed(1)}</div>
     ${traits.length ? `<div>特性 ${traits.join("・")}</div>` : ""}
     <div>座標 ${coords}</div>
     <div>地形 ${terrName} (補正 x${Math.round(terrRate * 100) / 100})</div>
+    </details>
   `;
 }
 

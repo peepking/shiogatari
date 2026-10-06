@@ -196,6 +196,7 @@ async function main() {
   assert.equal(hazards.processDangerousSeaHazards(), true);
   assert.equal(state.dangerousSeas.pendingHazard.stage, "warning");
   assert.equal(queue.at(-1).kind, "dangerous_raid_warning"); assert.equal(state.pendingEncounter.active, false, "察知時は戦闘へ直行しない");
+  assert.match(queue.at(-1).body, /失敗.*襲撃/, "本文で回避できる保証はなく、失敗時の危険を示す");
   const continueAction = { type: "dangerous_raid_continue", payload: { id: 31 } };
   canSave = false; assert.equal(hazards.handleDangerousRaidAction(continueAction), false);
   assert.equal(state.dangerousSeas.pendingHazard.stage, "warning", "保存失敗は未選択へ戻す");

@@ -204,6 +204,7 @@ function showRodRewardModal(rodId, rodName, onConfirm) {
   const nameEl = document.getElementById("rodRewardName");
   const contextEl = document.getElementById("rodRewardContext");
   const flavorEl = document.getElementById("rodRewardFlavor");
+  const effectEl = document.getElementById("rodRewardEffect");
   const okBtn = document.getElementById("rodRewardOk");
   if (!backdrop || !modal || !nameEl || !contextEl || !flavorEl || !okBtn) {
     onConfirm?.();
@@ -213,6 +214,7 @@ function showRodRewardModal(rodId, rodName, onConfirm) {
   const rodDef = ROD_DEFS[rodId];
   contextEl.textContent = rodDef?.context || "";
   flavorEl.textContent = rodDef?.flavor || "";
+  if (effectEl) effectEl.textContent = state.expansion.fishing.rodId ? "魚が掛かった後、引き上げるまでの猶予が長くなります。" : "海・浅瀬で釣りができるようになります。";
   backdrop.hidden = false;
   const handler = () => {
     okBtn.removeEventListener("click", handler);
@@ -355,7 +357,9 @@ function beginFishing() {
   const mode = state.modeLabel;
   confirmAction({
     title: "釣りを始める",
-    body: `1日使って最大${FISHING_CONFIG.castsPerSession}回釣ります。食料消費や維持費は通常どおり発生します。`,
+    body: `最大${FISHING_CONFIG.castsPerSession}回釣れます。`,
+    sections: [{ title: "所要日数", items: ["1日（食料・維持費は通常どおり）"] }],
+    guideTopic: "guide-fishing",
     confirmText: "1日使って釣る",
     cancelText: "キャンセル",
     onConfirm: () => {
@@ -689,13 +693,13 @@ function inventoryHtml() {
       const feedInfo = s.feedType ? ` / 餌:${BAIT_DEFS[s.feedType]?.name || s.feedType}+${s.dressFood}` : "";
       return `<div class="fishing-row">
         <span class="pill">${escapeHtml(s.name)} x${qty}</span>
-        <span class="tiny">売値${fishSalePrice(state, s)} / 捌いて食料+${s.dressFood}${feedInfo}</span>
+        <span class="tiny">1匹あたり：売値${fishSalePrice(state, s)}資金 / 食料+${s.dressFood}${feedInfo}</span>
         <button class="btn" data-dress="${id}" ${busy ? "disabled" : ""}>全部捌く</button>
         <button class="btn" data-process="${id}" ${busy ? "disabled" : ""}>餌に加工</button>
       </div>`;
     })
     .join("");
-  return `<div class="tiny">釣果インベントリ（上限なし）</div>
+  return `<div class="tiny">釣果</div>
     <div class="tiny mt-6">餌所持: ${baitList || "なし"}</div>
     ${rows || `<div class="tiny">まだ釣果はありません。</div>`}`;
 }
@@ -711,8 +715,8 @@ function envText() {
   if (env.dangerousSea) {
     const name = dangerousSeaName(env.dangerousSea.regionId);
     const level = env.dangerousSea.level === "core" ? "核心" : "外縁";
-    const migration = migrationFishIds(state, env.dangerousSea.regionId, absDay(state)).length ? " 巨大魚の回遊中。魚影の一部が釣れやすくなっています。" : "";
-    return `${name}・${level} / 海域・季節・水深を問わず釣れます。餌の相性は必要です。${migration}`;
+    const migration = migrationFishIds(state, env.dangerousSea.regionId, absDay(state)).length ? " 巨大魚の回遊中。一部の魚が釣れやすくなっています。" : "";
+    return `${name}・${level} / 海域・季節・水深にかかわらず釣れます。餌の相性は必要です。${migration}`;
   }
   return `${FISH_REGIONS[env.regionId] || "?"} / 水深: ${depthName} / ${SEASONS[env.season]}`;
 }

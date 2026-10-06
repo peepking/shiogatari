@@ -29,7 +29,11 @@ export function appendForgery(card, current, refresh) {
     const id = select.value, quote = quoteForgery(state, current(), id);
     if (quote.error || !quote.affordable) { update(); return; }
     const name = FACTIONS.find(f => f.id === id)?.name || id;
-    confirmAction({ title: "身分偽造", body: `${quote.cost.toLocaleString()}資金を支払い、${name}の賞金を${quote.amount.toLocaleString()}から${quote.remaining.toLocaleString()}に減らします。失敗はありません。次の利用まで${FORGERY_CONFIG.cooldownDays}日。犯罪履歴・好感度・拠点の利用禁止期間は変わりません。`, onConfirm: () => {
+    confirmAction({ title: "身分偽造", body: `${name}からの手配賞金を減らします。`, guideTopic: "guide-wanted",
+      sections: [
+        { title: "費用と効果", items: [`費用 ${quote.cost.toLocaleString()}資金`, `賞金 ${quote.amount.toLocaleString()} → ${quote.remaining.toLocaleString()}（必ず成功）`] },
+        { title: "利用条件", items: [`次の利用まで${FORGERY_CONFIG.cooldownDays}日`, "拠点の利用禁止は解除されません。"] }
+      ], onConfirm: () => {
       const previous = structuredClone({ funds: state.funds, wanted: state.wanted });
       if (current()?.id !== port.id || !applyForgery(state, current(), id, quote.amount, quote.cost)) { pushToast("利用できません", "状態が変わりました。再確認してください。", "warn"); refresh(); return; }
       if (!saveGameToStorage()) { Object.assign(state, previous); pushToast("保存できません", "支払いと賞金の変更を取り消しました。", "warn"); }

@@ -31,8 +31,8 @@ async function main() {
     "events.js": { enqueueEvent: event => state.eventQueue.push(event) },
     "outfitting.js": { snapshotOutfitting: () => ({ scouts }) },
     "troops.js": { TROOP_STATS: { marine: { name: "海兵" }, scout: { name: "斥候" }, medic: { name: "衛生兵" } },
-      addTroops: (id, level, qty) => { state.troops[id] ||= {}; state.troops[id][level] = (state.troops[id][level] || 0) + qty; } },
-    "supplies.js": { SUPPLY_ITEMS: [{ id: "wood", name: "木材" }, { id: "fiber", name: "繊維" }] },
+      addTroops: (id, level, qty) => { state.troops[id] ||= {}; state.troops[id][level] = (state.troops[id][level] || 0) + qty; }, formatTroopDisplay: () => ({ total: Object.values(state.troops).flatMap(Object.values).reduce((sum, qty) => sum + qty, 0), cap: 30 }) },
+    "supplies.js": { SUPPLY_ITEMS: [{ id: "wood", name: "木材" }, { id: "fiber", name: "繊維" }], formatSupplyDisplay: () => ({ total: Object.values(state.supplies).reduce((sum, qty) => sum + qty, 0), cap: 60 }) },
     "time.js": { advanceDayWithEvents: (count, options) => {
       days += count; state.day += count;
       if (newHazard) state.dangerousSeas.pendingHazard = { kind: newHazard, stage: "action_running" };
@@ -196,10 +196,24 @@ async function main() {
   ui.finishDangerousSeaEventEncounter(plain(state.pendingEncounter), false); assert.equal(state.funds, 0);
   assert.equal(state.dangerousSeas.events.pending.complete, true);
 
+  // 正体が未確認の間は同じ見込みを示し、斥候が確認した後だけ救助・戦闘・積荷を区別する。
+  let unknownLightBody = null;
+  for (const [variant, outcome] of [[0.1, /仲間/], [0.4, /戦闘/], [0.9, /積荷/]]) {
+    event = prepare("fog_light", "sw", variant); open(event);
+    const body = state.eventQueue[0].body;
+    assert.ok(/遭難者/.test(body) && /罠/.test(body), "本文で正体を断定せず、救助と待ち伏せの可能性を示す");
+    if (unknownLightBody === null) unknownLightBody = body;
+    else assert.equal(body, unknownLightBody, "固定済みの正体を未確認の本文から漏らさない");
+    event.hintTier = 10; state.eventQueue = []; ui.processDangerousSeaEvent();
+    assert.match(state.eventQueue[0].body, outcome, "本文で斥候が確認した結果に沿って選択の見込みを示す");
+  }
+
   // 鐘は海域内の同じ地点を三日かけて段階的に調べ、最後にだけ報酬を受け取る。
   event = prepare("seabed_bell", "se");
   for (const [index, choice] of ["listen", "descend", "answer"].entries()) {
-    open(event); assert.equal(choose(event.id, choice), true);
+    open(event);
+    assert.match(state.eventQueue[0].body, index < 2 ? /調査/ : /品/, "本文で調査継続と最後の回収を段階に合わせて示す");
+    assert.equal(choose(event.id, choice), true);
     assert.equal(state.day, index + 2); assert.equal(state.funds, index === 2 ? 2200 : 0);
     assert.equal(choose(event.id, "ack"), true);
     if (index < 2) { event = state.dangerousSeas.events.active.se; assert.equal(event.progress, index + 1); }

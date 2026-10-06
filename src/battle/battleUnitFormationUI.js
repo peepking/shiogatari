@@ -12,18 +12,26 @@ export function formationOptions(order) {
     .map(([id, name]) => `<option value="${id}"${id === normalizeFormationOrder(order) ? " selected" : ""}>${name}</option>`).join("");
 }
 
-/** @param {object} unit 部隊。 @param {object} state 戦闘状態。 @returns {string} 指示と補正の説明。 */
-export function formationInfoMarkup(unit, state) {
+/** @param {object} unit 部隊。 @param {object} state 戦闘状態。 @param {number} stepMs 進行ごとの戦闘時間。 @returns {string} 指示と切り替え待ちの説明。 */
+export function formationInfoMarkup(unit, state, stepMs) {
   const waiting = unit.status === "reserve";
   const auto = unit.formationOrder === "auto";
   const current = (waiting || !state.started) && auto ? (waiting ? "登場時に判断" : "戦闘開始時に判断") : unitFormation(unit).name;
+  const remaining = Math.max(1, (unit.formationChangeAt || 1) - state.tick) * stepMs / 1000;
   const pending = unit.pendingFormationOrder != null
-    ? `${formationOrderName(unit.pendingFormationOrder)}を予約：tick ${Math.max(state.tick + 1, unit.formationChangeAt || 1)}から`
+    ? `${formationOrderName(unit.pendingFormationOrder)}へ変更待ち（戦闘時間であと${remaining}秒）`
     : waiting ? "登場時に適用" : state.started && state.tick + 1 < unit.formationChangeAt
-      ? `切り替え可能：tick ${unit.formationChangeAt}から` : "切り替え待ちなし";
+      ? `次の変更まで、戦闘時間であと${remaining}秒` : "切り替え待ちなし";
   return `<div>指示 ${formationOrderName(unit.formationOrder)} / 現在の陣形 ${current}</div>`
-    + `<div>${(waiting || !state.started) && auto ? "攻防補正は陣形の判断時に確定します" : unitFormationDescription(unit)}</div><div>${pending}</div>`
-    + (auto && unit.formationReason ? `<div>判断理由：${unit.formationReason}</div>` : "");
+    + `<div>${pending}</div>`;
+}
+
+/** @param {object} unit 部隊。 @param {object} state 戦闘状態。 @returns {string} 任意で読む陣形の効果と方針。 */
+export function formationDetailMarkup(unit, state) {
+  const auto = unit.formationOrder === "auto";
+  const policies = { line: "基本の陣形で戦う", shieldWall: "防御を優先", circle: "士気を守る", spread: "敵の射撃に備える", charge: "攻勢を優先" };
+  return `<div>${(unit.status === "reserve" || !state.started) && auto ? "おまかせの効果は戦闘に参加するときに決まります。" : unitFormationDescription(unit)}</div>`
+    + (auto && unit.formationReason ? `<div>おまかせの方針：${policies[unit.formationId] || policies.line}</div>` : "");
 }
 
 /**
@@ -47,8 +55,8 @@ export function syncUnitFormationPanel(state, unit) {
   order.value = normalizeFormationOrder(unit?.pendingFormationOrder ?? unit?.formationOrder);
   const note = document.getElementById("battleUnitFormationNote");
   if (note) note.textContent = disabled ? "この部隊への指示は終了しています。"
-    : state.started ? "指示は次の切り替え可能な時点で適用します。複数部隊へ指示した後、再開してください。"
-      : "部隊ごとに設定できます。おまかせは戦闘開始時に判断します。";
+    : state.started ? "指示した後は「再開」を押してください。"
+      : "おまかせは、敵や部隊の状態に合わせて陣形を選びます。";
 }
 
 /** @param {object} callbacks 停止・部隊選択・指示変更の接続。 @returns {void} */
@@ -97,8 +105,8 @@ export function syncBulkFormationPanel(prefix, items, { started, disabled, nameF
   if (disabled && feedback) feedback.textContent = "";
   note.textContent = disabled ? "この画面からの指示は終了しています。"
     : `${selected.length}部隊（前衛${selected.length - reserve}・予備隊${reserve}）が対象です。`
-      + (started ? "盤上の部隊は各自の切り替え可能な時点で適用します。指示後に再開してください。"
-        : "前衛と予備隊の両方が対象です。対象と陣形を選んで指示してください。");
+      + (started ? "指示した後は「再開」を押してください。"
+        : "対象と陣形を選び、指示してください。");
 }
 
 /** @param {string} prefix 要素ID接頭辞。 @param {object} callbacks 停止・同期・一括指示。 @returns {void} */

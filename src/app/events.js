@@ -11,7 +11,7 @@ import { handleDangerousSeaEventAction } from "../dangerousSeas/dangerousSeaEven
 
 /**
  * イベントキューにイベントを追加し、未表示なら即座に表示する。
- * @param {{title?:string,body?:string,resources?:Array,kind?:string,actions?:Array<{id?:string,label?:string,type?:string,payload?:any}>}} evt
+ * @param {{title?:string,body?:string,resources?:Array,kind?:string,actions?:Array<{id?:string,label?:string,hint?:string,type?:string,payload?:any}>}} evt
  */
 export function enqueueEvent(evt) {
   ensureQueue();
@@ -85,15 +85,16 @@ function ensureQueue() {
 
 /**
  * イベントのアクション配列を安全な形に正規化する。
- * @param {Array<{id?:string,label?:string,type?:string,payload?:any}>|undefined} actions 元のアクション配列
+ * @param {Array<{id?:string,label?:string,hint?:string,type?:string,payload?:any}>|undefined} actions 元のアクション配列
  * @param {number} baseId 連番生成のベースID
- * @returns {Array<{id:string,label:string,type:string,payload:any}>} 正規化したアクション配列
+ * @returns {Array<{id:string,label:string,hint:string,type:string,payload:any}>} 正規化したアクション配列
  */
 function normalizeActions(actions, baseId) {
   const list = Array.isArray(actions) && actions.length ? actions : [{ label: "閉じる", type: "close" }];
   return list.map((a, idx) => ({
     id: a.id || `${baseId}-${idx}`,
     label: a.label || "閉じる",
+    hint: typeof a.hint === "string" ? a.hint.trim() : "",
     type: a.type || "close",
     payload: a.payload ?? null,
   }));
@@ -212,7 +213,10 @@ export function showNextEvent() {
   }
   if (elements.eventModalTitle) elements.eventModalTitle.textContent = ev.title || "イベント";
   if (elements.eventModalBody) {
-    elements.eventModalBody.textContent = ev.body || "";
+    // 旧保存に残る選択説明も本文へまとめ、再描画では重複させない。
+    const descriptions = (ev.actions || []).filter(act => typeof act.hint === "string" && act.hint.trim())
+      .map(act => `${act.label || "選択"}：${act.hint.trim()}`);
+    elements.eventModalBody.textContent = [ev.body, ...descriptions].filter(Boolean).join("\n\n");
     if (Array.isArray(ev.resources) && ev.resources.length) {
       elements.eventModalBody.insertAdjacentHTML("beforeend", resourceList(ev.resources));
     }

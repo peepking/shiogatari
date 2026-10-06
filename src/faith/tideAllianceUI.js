@@ -35,7 +35,7 @@ function closeTide(restore = true) {
 /** 累計と次段階の両条件を、支援確認にも共通の文章で示す。 */
 function progressText(site) {
   const next = TIDE_STAGES[tideStage(site) + 1];
-  return next ? `次は${next.name}。資金 ${site?.funds || 0} / ${next.funds}、担い手 ${site?.people || 0} / ${next.people}人` : '神殿に到達しています。追加の支援は記録されますが、順位・恩恵は増えません。';
+  return next ? `次は${next.name}。資金 ${site?.funds || 0} / ${next.funds}、担い手 ${site?.people || 0} / ${next.people}人` : '発展は神殿までです。';
 }
 /** 拠点の固定寄与を読みやすい文にする。 */
 function contribution(row) {
@@ -52,9 +52,17 @@ function confirmSupport(panel, syncUI) {
   const before = beforeRows.find(row => row.id === id), after = afterRows.find(row => row.id === id);
   const totals = [beforeRows, afterRows].map(rows => ({faith:rows.reduce((sum,row) => sum+row.faith,0),bonus:rows.reduce((sum,row) => sum+row.bonus,0)}));
   const unchanged = totals[0].faith === totals[1].faith && totals[0].bonus === totals[1].bonus;
-  const names = troops.filter(row => row.count).map(row => `${TROOP_STATS[row.type]?.name || row.type} Lv${row.level}：${row.count}人`).join('\n');
+  const names = troops.filter(row => row.count).map(row => `${TROOP_STATS[row.type]?.name || row.type} Lv${row.level}：${row.count}人`);
   confirmAction({ title:'潮盟への支援', confirmText:'支援を確定する',
-    body:`資金 ${funds.toLocaleString()}（残り ${proposal.funds.toLocaleString()}）\n${names ? `${names}\n担い手は恒久的に部隊を離れ、呼び戻せません。\n` : ''}\n支援後：${TIDE_STAGES[proposal.stage].name}\n${progressText(proposal.tideAlliance.sites[id])}\n\n次季節の見込み：${contribution(before)} → ${contribution(after)}\n潮盟全体：${contribution(totals[0])} → ${contribution(totals[1])}${unchanged ? '\n今回の支援では、潮盟全体の数値上の恩恵は増えません。' : ''}\n今季の恩恵は変わりません。次季節の対象は他拠点の発展で変わる場合があります。`,
+    body:`${settlements.find(row => row.id === id)?.name}の潮盟を支援します。`, guideTopic:'guide-faith',
+    sections: [
+      { title:'支援するもの', items:[...(funds ? [`資金 ${funds.toLocaleString()}（残り ${proposal.funds.toLocaleString()}）`] : []), ...names,
+        ...(names.length ? ['担い手は部隊を離れ、呼び戻せません。'] : [])] },
+      { title:'支援後の拠点', items:[TIDE_STAGES[proposal.stage].name, progressText(proposal.tideAlliance.sites[id])] },
+      { title:'次季節の恩恵', items:[`この拠点：${contribution(before)} → ${contribution(after)}`,
+        unchanged ? '今回の支援では、潮盟全体の恩恵は増えません。' : `潮盟全体：${contribution(totals[0])} → ${contribution(totals[1])}`,
+        '今季の恩恵は変わりません。'] }
+    ],
     onConfirm: () => {
       if (selected !== id || !canSupport() || fingerprint !== JSON.stringify([state.funds, state.troops, state.tideAlliance])) {
         pushToast('状況が変わりました', '現在の資金・人員で支援をやり直してください。'); return;
@@ -115,6 +123,7 @@ export function renderTideControl(syncUI) {
     <blockquote class="tide-conversation">${scene.conversation.map(line => `<p>${line}</p>`).join('')}<p class="tide-reaction">${scene.reaction}</p></blockquote>
     <div class="tide-overview"><section class="tide-progress"><h4>${nextStage ? `${nextStage.name}への支え` : 'この地に根づいた支え'}</h4>${nextStage ? `<label>資金 <b>${(site?.funds || 0).toLocaleString()} / ${nextStage.funds.toLocaleString()}</b><progress max="${nextStage.funds}" value="${Math.min(site?.funds || 0, nextStage.funds)}"></progress></label><label>担い手 <b>${site?.people || 0} / ${nextStage.people}人</b><progress max="${nextStage.people}" value="${Math.min(site?.people || 0, nextStage.people)}"></progress></label><p class="tiny">資金と担い手の両方が必要です。</p>` : `<p>神殿に到達しました。</p><p class="tiny">累計資金 ${(site?.funds || 0).toLocaleString()}・担い手 ${site?.people || 0}人</p><p class="tiny">これからの支援も記録に残りますが、恩恵は増えません。</p>`}</section><section class="tide-season ${target ? 'is-active' : ''}"><h4>今季の状態</h4><p>${target ? 'この地の支えが、旅へ届いている' : 'この地の営みが続いている'}</p><p class="tiny">${contribution(target)}</p><div class="tide-next-season"><h4>次季節の見込み</h4><p>${contribution(next)}</p></div></section></div>
     <div class="tide-actions"><button class="btn good" id="tideDonate" ${canSupport() ? '' : 'disabled'}>資金を寄付する</button><button class="btn" id="tidePeople" ${canSupport() ? '' : 'disabled'}>潮盟の担い手として送り出す</button></div>
+    <button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-faith">潮盟のガイド</button>
     ${!canSupport() ? '<p class="tiny">支援するには、この街・村に入ってください。</p>' : ''}${supportHTML()}
 `;
   panel.querySelector('#tideClose').onclick = () => closeTide();

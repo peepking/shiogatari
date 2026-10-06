@@ -24,8 +24,8 @@ export function questPowerRewardHtml(q) {
   return plan.length ? resourceList(nationalPowerResources(plan)) : "";
 }
 
-/** @param {string} factionId 国家。 @returns {string} 回復・消耗・戦況補正を示す勢力シート。 */
-export function nationalPowerSheet(factionId) {
+/** @param {string} factionId 国家。 @param {boolean} expanded 数値内訳の展開状態。 @returns {string} 国力と戦争への影響を先に示す勢力シート。 */
+export function nationalPowerSheet(factionId, expanded = false) {
   if (!isNationalPowerFaction(factionId)) return "";
   const power = getNationalPower(state.nationalPower, factionId);
   const owned = settlements.filter(s => s.factionId === factionId);
@@ -33,10 +33,15 @@ export function nationalPowerSheet(factionId) {
   const towns = owned.filter(s => s.kind === "town").length;
   const { attacks, defenses } = nationalPowerFrontCounts(state, settlements, nationalPowerAtWar)[factionId];
   const wars = FACTIONS.filter(f => isNationalPowerFaction(f.id) && f.id !== factionId && nationalPowerAtWar(factionId, f.id));
-  return `<section class="national-power-sheet" aria-label="国力"><div class="national-power-heading"><b>国力</b><span><strong>${number(power)}</strong> / ${number(CONFIG.max)}</span></div><progress max="${CONFIG.max}" value="${power}" aria-label="国力 ${number(power)} / ${CONFIG.max}"></progress><p class="tiny">戦争を続けるための余力。戦況とは別に蓄積します。</p><dl class="national-power-metrics"><div><dt>次季節の回復</dt><dd>＋${number(nationalPowerRecovery(settlements, factionId))}</dd></div><div><dt>所有拠点</dt><dd>街${towns}・村${villages}</dd></div><div><dt>前線の消耗／日</dt><dd>−${number(nationalPowerDailyCost(attacks, defenses), 3)}</dd></div><div><dt>参加中の前線</dt><dd>攻撃${attacks}・防衛${defenses}</dd></div>${wars.map(f => {
+  const recovery = nationalPowerRecovery(settlements, factionId);
+  const outlook = wars.map(f => {
+    const bias = nationalPowerWarBias(state.nationalPower, factionId, f.id);
+    return `<div><dt>対${escapeHtml(f.name)}</dt><dd>国力差で${bias > 0 ? "有利" : bias < 0 ? "不利" : "互角"}</dd></div>`;
+  }).join("");
+  return `<section class="national-power-sheet" aria-label="国力"><div class="national-power-heading"><b>国力</b><span><strong>${number(power)}</strong> / ${number(CONFIG.max)}</span></div><progress max="${CONFIG.max}" value="${power}" aria-label="国力 ${number(power)} / ${CONFIG.max}"></progress><p class="tiny">戦争を続けるための余力</p><dl class="national-power-metrics"><div><dt>次季節の回復見込み</dt><dd>＋${number(recovery)}（上限まで）</dd></div>${outlook}</dl><details class="quest-description" data-national-power-details ${expanded ? "open" : ""}><summary>回復・消耗の内訳</summary><dl class="national-power-metrics"><div><dt>所有拠点</dt><dd>街${towns}・村${villages}</dd></div><div><dt>前線の消耗／日</dt><dd>−${number(nationalPowerDailyCost(attacks, defenses), 3)}</dd></div><div><dt>参加中の前線</dt><dd>攻撃${attacks}・防衛${defenses}</dd></div>${wars.map(f => {
     const bias = nationalPowerWarBias(state.nationalPower, factionId, f.id);
     return `<div><dt>対${escapeHtml(f.name)}<small>戦況補正／日</small></dt><dd>${bias >= 0 ? "+" : ""}${number(bias, 4)}</dd></div>`;
-  }).join("")}</dl><p class="tiny">回復は所有拠点に基づく予定量です。実際の回復は国力の上限までとなります。</p></section>`;
+  }).join("")}</dl></details><button class="btn ghost" data-guide-dialog="troubleModal" data-guide-topic="guide-factions">国力のしくみ</button></section>`;
 }
 
 /** @param {Function} getContext 謁見相手。 @returns {string|null} 名誉家臣資格がある謁見中の国家。 */
@@ -51,7 +56,10 @@ function donationFaction(getContext) {
 export function renderNationalPowerControls(getContext) {
   const button = document.getElementById("nationalPowerDonate");
   if (button) button.hidden = !donationFaction(getContext);
-  document.querySelectorAll("[data-national-power]").forEach(el => { el.innerHTML = nationalPowerSheet(el.dataset.nationalPower); });
+  document.querySelectorAll("[data-national-power]").forEach(el => {
+    const expanded = el.querySelector?.("[data-national-power-details]")?.open;
+    el.innerHTML = nationalPowerSheet(el.dataset.nationalPower, expanded);
+  });
 }
 
 /**

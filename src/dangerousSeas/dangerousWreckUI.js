@@ -5,6 +5,7 @@ import { snapshotWorld, restoreWorld } from "../world/map.js";
 import { advanceDayWithEvents } from "../app/time.js";
 import { elements, pushToast } from "../ui/dom.js";
 import { enqueueEvent } from "../app/events.js";
+import { capacityOverflowText } from "../ui/capacityUI.js";
 import { beginDangerousSeaAction, finishDangerousSeaAction } from "./dangerousSeaHazards.js";
 import { dangerousWreckPending, chooseDangerousWreckStage, closeDangerousWreck, dangerousWreckHints } from "./dangerousWreck.js";
 
@@ -67,7 +68,7 @@ export function resumeDangerousWreck(sync, finish) {
     const resources = finish(true);
     if (!saveGameToStorage()) { Object.assign(state, before); saveFailure(); sync?.(); return false; }
     enqueueEvent({ title: pending.wreck.stage === "choice" ? "甲板の探索完了" : "船倉の探索完了",
-      body: dangerousWreckPending(state.dangerousSeas) ? "甲板の積荷を回収。引き上げるか、追加1日で積荷または生存者を探せます。" : "探索を終えました。積載上限を超えた積荷・兵員は整理してください。", resources });
+      body: [dangerousWreckPending(state.dangerousSeas) ? "甲板の積荷を回収。引き上げるか、追加1日で積荷または生存者を探せます。" : "探索を終えました。", capacityOverflowText()].filter(Boolean).join("\n"), resources });
   }
   sync?.(); return true;
 }

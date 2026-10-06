@@ -5,7 +5,7 @@ const { readSource } = require("./helpers/source.cjs");
 /** @returns {Promise<void>} 専用枠・固定敵・報酬・予約・保存復帰を実モジュールで検証する。 */
 async function main() {
   const fixedMath = Object.create(Math); fixedMath.random = () => 0;
-  const state = { year: 1000, season: 0, day: 1, funds: 0, position: { x: 0, y: 45 }, honorFactions: [], pendingEncounter: { active: false },
+  const state = { year: 1000, season: 0, day: 1, funds: 0, fame: 100, position: { x: 0, y: 45 }, honorFactions: [], pendingEncounter: { active: false },
     modeLabel: "通常", troops: { infantry: { 1: 10 } }, dangerousSeas: {}, expansion: {}, wanted: {} };
   const favors = {}, document = { dispatchEvent() {} };
   const context = vm.createContext({ structuredClone, Math: fixedMath, document, CustomEvent: class CustomEvent {} });
@@ -76,11 +76,24 @@ async function main() {
   const site = data.active[0]; state.position = { ...site.position };
   assert.equal(world.getDangerousBountyAt(state.position).id, site.id);
   assert.equal(world.finishDangerousBounty(site.id, false).length, 0); assert.equal(data.active.length, 4);
-  assert.equal(world.finishDangerousBounty(site.id, true).length, 3);
+  assert.equal(state.fame, 100, "非勝利では討伐ボーナスを付与しない");
+  const summary = world.finishDangerousBounty(site.id, true);
+  assert.equal(summary.length, 4);
+  assert.ok(summary.some(item => item.icon === "fame" && item.text === "賞金首討伐ボーナス 名声 +15"));
+  assert.equal(state.fame, 115);
   assert.equal(state.funds, site.reward); assert.equal(state.fleet.variants.length, 1);
   assert.equal(state.voyageStats.bountiesDefeated, 1); assert.equal(state.voyageStats.variantsAcquired, 1);
   assert.equal(favors.pirates_noble, -3); assert.equal(favors.north_noble, 1);
   assert.equal(world.finishDangerousBounty(site.id, true).length, 0); assert.equal(state.funds, site.reward);
+  assert.equal(state.fame, 115, "再通知で追加名声を二重付与しない");
+  const veteranData = core.normalizeDangerousBounties({ active: [{ ...site, id: 100,
+    formation: site.formation.map(unit => ({ ...unit, level: 5 })) }] });
+  state.dangerousSeas.bounties = veteranData;
+  assert.equal(world.finishDangerousBounty(100, true).length, 4);
+  assert.equal(state.fame, 135, "旧保存のLv5編成には＋20を付与する");
+  assert.equal(world.finishDangerousBounty(100, true).length, 0);
+  assert.equal(state.fame, 135);
+  state.dangerousSeas.bounties = data;
   assert.ok(data.defeatedTemplateIds.includes(site.templateId));
   core.tickDangerousBounties(data, positions, 120002, 4000, new Set(), null, () => 0);
   assert.equal(data.active.length, 3, "同じ季節に討伐枠を再補充しない");

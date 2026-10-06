@@ -9,6 +9,7 @@ import { addTroops, TROOP_STATS } from "../resources/troops.js";
 import { SUPPLY_ITEMS } from "../resources/supplies.js";
 import { elements, pushToast, pushLog } from "../ui/dom.js";
 import { enqueueEvent } from "../app/events.js";
+import { capacityOverflowText } from "../ui/capacityUI.js";
 import { advanceDayWithEvents } from "../app/time.js";
 import { beginDangerousSeaAction, finishDangerousSeaAction, dangerousSeaActionBlocked } from "./dangerousSeaHazards.js";
 import { dangerousSeaAt } from "./dangerousSeaWorld.js";
@@ -42,6 +43,18 @@ function hintText(event) {
   if (event.hintTier >= 10) return { rescue: "斥候が救難信号と乗員を確認しました。", trap: "斥候が灯火の陰に潜む海賊船を確認しました。", empty: "斥候の報告では無人船です。" }[event.variant];
   if (event.hintTier >= 5) return event.variant === "trap" ? "灯火の周囲に、不自然に揃った帆影があります。" : "待ち伏せの帆影は見当たりません。";
   return event.hintTier >= 1 ? "船の灯火を発見。救難か罠かは不明です。" : "霧の中に灯火が見えます。正体は不明です。";
+}
+
+/** 斥候の確認範囲と調査段階に合わせて、選択の先にある見込みを示す。正体が未確認の灯火は断定しない。
+ * @param {object} event 地点。 @param {string} choice 選択。 @returns {string} 短い手掛かり。
+ */
+function choiceOutlook(event, choice) {
+  if (event.kind === "fog_light") {
+    if (event.hintTier >= 10) return { rescue: "近づけば遭難者を救い、船団の仲間として迎えられます。", trap: "近づけば戦闘になります。退ければ積荷を回収できます。", empty: "船に残された積荷を回収できそうです。" }[event.variant];
+    return "近づけば遭難者や積荷が見つかるかもしれません。灯火が罠なら戦闘になります。";
+  }
+  if (event.kind === "seabed_bell") return { listen: "音の出どころを探ります。調査はこの先も続きます。", descend: "聖堂に残る手掛かりを探ります。回収には、もう一段階の調査が必要です。", answer: "鐘の主へ応えます。海底に残された品が手に入るかもしれません。" }[choice];
+  return "";
 }
 
 /** 固定報酬を既存イベントの資源表示へ変換する。 @param {object|null} reward 報酬。 @returns {object[]} 表示資源。 */
@@ -95,15 +108,15 @@ export function processDangerousSeaEvent() {
     || (elements.battleResultModal && !elements.battleResultModal.hidden) || (elements.battleBlock && !elements.battleBlock.hidden)) return false;
   const def = DEFS[event.kind];
   if (progress.stage === "result") {
-    enqueueEvent({ kind: "dangerous_event", title: def.name, body: `${progress.resultText}${progress.accident ? " 事故で回収資金・物資が半減しました。" : ""}\n積載上限を超えた物資・兵員は整理してください。`,
+    enqueueEvent({ kind: "dangerous_event", title: def.name, body: [`${progress.resultText}${progress.accident ? " 事故で回収資金・物資が半減しました。" : ""}`, capacityOverflowText()].filter(Boolean).join("\n"),
       resources: progress.applied ? rewardResources(progress.reward) : [], actions: [{ label: progress.complete ? "航海を再開" : "手掛かりを記録して戻る", type: "dangerous_event_choice", payload: { eventId: event.id, choice: "ack" } }] });
     return true;
   }
   const choices = event.kind === "seabed_bell" ? [["listen", "descend", "answer"][event.progress]] : Object.keys(def.choices);
-  const body = event.kind === "sinking_treasure" ? "積荷か乗員、片方だけを運び出せます。\n積荷: 資金3000・香辛料4・織物3 / 救助: 資金300・海兵4人・斥候2人。"
+  const body = event.kind === "sinking_treasure" ? "積荷か乗員、片方だけを運び出せます。\n積荷：資金3000・香辛料4・織物3\n救助：資金300・海兵4人・斥候2人"
     : event.kind === "seabed_bell" ? `海底から鐘の音が響きます。調査 ${event.progress + 1}/3（各1日）。`
       : hintText(event);
-  enqueueEvent({ kind: "dangerous_event", title: def.name, body: `${body}\n期限まであと${Math.max(0, event.expiresAbs - absDay(state))}日。事故で回収資金・物資が半減する恐れがあります。`,
+  enqueueEvent({ kind: "dangerous_event", title: def.name, body: [body, choiceOutlook(event, choices[0]), `期限まであと${Math.max(0, event.expiresAbs - absDay(state))}日 / 事故で回収資金・物資が半減する恐れあり`].filter(Boolean).join("\n"),
     actions: [...choices.map(choice => ({ label: `${def.choices[choice]}（1日）`, type: "dangerous_event_choice", payload: { eventId: event.id, choice } })),
       { label: "参加を見送る", type: "dangerous_event_choice", payload: { eventId: event.id, choice: "leave" } }] });
   return true;
@@ -251,7 +264,7 @@ export function renderDangerousSeaEventControl(syncUI) {
   for (const site of known.values()) {
     if (info.childNodes.length) info.append(document.createElement("br"));
     const line = document.createElement("span");
-    line.textContent = `${DEFS[site.kind].name} (${site.position.x + 1}, ${site.position.y + 1}) / あと${Math.max(0, site.expiresAbs - absDay(state))}日 / ${site.kind === "fish_migration" ? "この海域で一部の巨大魚が釣れやすくなっています。" : hintText(site)}`;
+    line.textContent = `${DEFS[site.kind].name} (${site.position.x + 1}, ${site.position.y + 1}) / あと${Math.max(0, site.expiresAbs - absDay(state))}日 / ${site.kind === "fish_migration" ? "この海域で一部の巨大魚が釣れやすい" : hintText(site)}`;
     info.append(line);
   }
 }

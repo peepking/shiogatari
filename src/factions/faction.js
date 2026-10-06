@@ -159,7 +159,7 @@ export function maybeQueueHonorInvite(absDay) {
       state.honorInviteLog[f.id] = absDay;
       enqueueEvent({
         title: "名誉家臣の要請",
-        body: `${f.name} の ${best.n.name} から名誉家臣の打診が届きました。受け入れますか？`,
+        body: `${f.name} の ${best.n.name} から名誉家臣の打診が届きました。\n受け入れると${f.name}に所属し、名誉家臣になります。犯罪や無法港の依頼は選べなくなります。`,
         actions: [
           { label: "受け入れる", type: "honor_accept", payload: { factionId: f.id, nobleId: best.n.id } },
           { label: "断る", type: "honor_decline", payload: { factionId: f.id, nobleId: best.n.id } },
@@ -809,7 +809,7 @@ function queueFrontActionRequest(_entry, front) {
   }[kind];
   enqueueEvent({
     title: "前線要請",
-    body: `${setName} で「${kindLabel}」を実施してほしいと要請が届きました。受けますか？`,
+    body: `${setName} で「${kindLabel}」の要請が届きました。\n受けると依頼を受注し、目的地で達成すれば戦況が有利になります。`,
     actions: [
       {
         id: "accept-front",
@@ -858,7 +858,7 @@ function queueTruceRequest(entry, front, absDay) {
   const scoreDelta = 6;
   enqueueEvent({
     title: "停戦工作の打診",
-    body: `${setName} ${setPos} で停戦工作の相談が来ています。資金${costFunds}を支払い時間を稼ぎますか？`,
+    body: `${setName} ${setPos} で停戦工作の相談が来ています。\n依頼を受け、現地で資金${costFunds}を渡すと、敵の攻勢を遅らせられます。`,
     actions: [
       {
         id: "truce-accept",

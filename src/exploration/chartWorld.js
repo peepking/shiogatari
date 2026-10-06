@@ -104,9 +104,9 @@ export function reserveQuestFragment(quest) {
  */
 export function announceFragment(chart, source) {
   const completed = chart.fragments === chart.size;
-  const message = `${source}で${chartLabel(chart)}の断片を入手しました。取得 ${chart.fragments}/${chart.size}枚。`;
-  const first = chart.fragments === 1 ? ` この海図には「${CONFIG.rewards[chart.kind].name}」への道が記されています。依頼欄の海図から期待報酬を確認できます。` : "";
-  const destination = completed ? ` 海図が完成しました。発見地点は (${chart.destination.x + 1}, ${chart.destination.y + 1}) です。` : "";
+  const message = `${source}で「${CONFIG.rewards[chart.kind].name}」への道を記した海図の断片を入手しました（${chart.fragments}/${chart.size}枚）。`;
+  const first = chart.fragments === 1 ? `\n断片を${chart.size}枚集めると海図が完成し、目的地が分かります。依頼欄の海図から進捗や報酬を確認できます。` : "";
+  const destination = completed ? `\n海図が完成しました。発見地点 (${chart.destination.x + 1}, ${chart.destination.y + 1}) に向かい、現地で探索できます。` : "";
   enqueueEvent({ title: completed ? "海図完成" : "海図の断片を入手", body: message + first + destination });
   pushLog(completed ? "海図完成" : "海図の断片", message + destination, "-");
 }
@@ -229,6 +229,6 @@ export function rollChartRumor(settlement) {
   const position = choosePosition(settlement.coords, offer.kind, true);
   if (!position) { syncChartReservations(); return; }
   chart.rumor = position;
-  enqueueEvent({ title: "海図の断片の噂", body: `${chartLabel(chart)}の断片が (${position.x + 1}, ${position.y + 1}) にあると聞きました。現地で1日使って回収できます。探索自体の戦闘はなく、期限もありません。依頼欄の「噂の手掛かり」から場所を確認できます。` });
+  enqueueEvent({ title: "海図の断片の噂", body: `「${CONFIG.rewards[chart.kind].name}」への道を記した海図の断片が、(${position.x + 1}, ${position.y + 1}) にあるという噂を聞きました。\n現地で「噂の断片を回収」を選ぶと、1日使って回収できます。期限はなく、探索自体で戦闘は起きません。\n断片を${chart.size}枚集めると海図が完成し、目的地が分かります。噂の場所は、依頼欄の海図から地図で確認できます。` });
   pushLog("海図の噂", `${chartLabel(chart)} / (${position.x + 1}, ${position.y + 1})`, "-");
 }

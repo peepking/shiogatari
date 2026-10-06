@@ -45,7 +45,11 @@ export function appendSurrender(card, settlement, current, refresh) {
   if (!quote) return;
   const button = document.createElement("button");
   button.className = "btn"; button.textContent = "投降して手配を解除";
-  button.onclick = () => confirmAction({ title: "投降・投獄", body: `禁制品をすべて没収し、${quote.days}日間投獄されます。釈放予定：神歴${quote.year}年 ${SEASONS[quote.season]} ${quote.day}日。維持費支払いは${quote.upkeepCount}回です。食料消費・依頼期限・世界情勢も進みます。終了後、この勢力の賞金だけが全額解除されます。`, onConfirm: () => {
+  button.onclick = () => confirmAction({ title: "投降・投獄", body: "投降して刑期を終えると、投降先の勢力からの手配賞金が全額解除されます。", guideTopic: "guide-wanted",
+    sections: [
+      { title: "失うもの", items: ["禁制品をすべて没収", `${quote.days}日間の投獄（釈放予定：神歴${quote.year}年 ${SEASONS[quote.season]} ${quote.day}日）`] },
+      { title: "投獄中の注意", items: [`維持費の支払い ${quote.upkeepCount}回`, "食料消費・依頼期限・世界情勢も進みます。", "投降による解除は、投降先の勢力の賞金だけが対象です。"] }
+    ], onConfirm: () => {
     const updated = quoteDetention(state, settlement.factionId);
     if (current()?.id !== settlement.id || current()?.factionId !== settlement.factionId || state.eventQueue?.length || state.wanted?.detention || updated?.amount !== quote.amount || updated?.end !== quote.end) {
       pushToast("投降できません", "未解決のイベントを済ませ、現在の手配を確認してください。", "warn"); return;
