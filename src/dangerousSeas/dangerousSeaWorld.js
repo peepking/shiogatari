@@ -23,6 +23,14 @@ export function dangerousSeaAt(position) {
 }
 
 /**
+ * 危険海域内の無法港にも周囲と同じ水面を描く。危険判定は従来の索引だけを参照する。
+ * @param {{x:number,y:number}} position 座標。 @returns {object|null} 港を含む描画用の海域属性。
+ */
+export function dangerousSeaMapAt(position) {
+  return position ? dangerousSeaGeometry().mapByPosition.get(`${position.x},${position.y}`) || null : null;
+}
+
+/**
  * 円中心の選択に使った実港だけを遠征港とする。補正で港が円外にあっても対応は維持する。
  * @param {{x:number,y:number}} position 座標。 @returns {string|null} 対応する海域ID。
  */

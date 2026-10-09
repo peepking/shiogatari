@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>地図の描画確認 — 潮語り航海録</title>
+  <link rel="stylesheet" href="./mapArtPreview.css">
+</head>
+<body>
+  <main>
+    <header><h1>地図の描画確認</h1><p>ゲームと同じ画像・描画処理による確認用の地図と地点一覧</p></header>
+    <section class="coast-preview" aria-labelledby="coastTitle">
+      <h2 id="coastTitle">海岸の角・1マスの島</h2>
+      <p>入り組んだ海岸を4方向で確認。孤島は村・街・平原・森・山を、海・浅瀬・両方が接する水面で比較します。各地図の右側は1マス14pxの簡易表示です。</p>
+      <h3>内側の角と外側の角</h3>
+      <div class="preview-scroll"><canvas id="previewCoastCorners" width="1080" height="234" aria-label="L字の陸地を4方向に回転した海岸と各簡易表示"></canvas></div>
+      <h3>孤島の背景と周囲の水面</h3>
+      <div class="preview-scroll"><canvas id="previewIslandWater" width="1080" height="552" aria-label="村、街、平原、森、山の1マス島を海、浅瀬、混在水域で比較した15種類の詳細と簡易表示"></canvas></div>
+      <h3>水上の無法港と甲板</h3>
+      <div class="preview-scroll"><canvas id="previewWaterStructures" width="1080" height="234" aria-label="海と浅瀬に浮かぶ無法港、海と混在水域に接するL字甲板の詳細と簡易表示"></canvas></div>
+    </section>
+    <section class="sea-preview" aria-labelledby="roughSeaTitle">
+      <h2 id="roughSeaTitle">危険海域の海の表情</h2>
+      <p>通常の海から外縁、核心へと続く水面。無法港のマスにも荒海をつなぎ、地点や現在地が波の中でも見分けられるか確認します。</p>
+      <div class="rough-sea-layout">
+        <article>
+          <h3>南西・嵐の船墓場</h3>
+          <p>うねる波、砕ける白波と飛沫。奥へ進むほど強まる嵐の海。</p>
+          <canvas id="previewSouthwestSea" width="448" height="448" aria-label="南西の危険海域、無法港の背景も外縁の荒海につながる詳細表示"></canvas>
+          <div class="rough-sea-mini"><canvas id="previewSouthwestSeaMini" width="98" height="98" aria-label="南西の危険海域の14px簡易表示"></canvas><p>全体マップの簡易表示<br>1マス14px</p></div>
+        </article>
+        <article>
+          <h3>南東・霧の深淵</h3>
+          <p>暗い水面を覆う霧と、重なる大きなうねり。核心ほど深く荒れる海。</p>
+          <canvas id="previewSoutheastSea" width="448" height="448" aria-label="南東の危険海域、無法港の背景も外縁の荒海につながる詳細表示"></canvas>
+          <div class="rough-sea-mini"><canvas id="previewSoutheastSeaMini" width="98" height="98" aria-label="南東の危険海域の14px簡易表示"></canvas><p>全体マップの簡易表示<br>1マス14px</p></div>
+        </article>
+      </div>
+    </section>
+    <section class="preview-section battle-preview" aria-labelledby="battleSeaTitle">
+      <h2 id="battleSeaTitle">海戦マップの浅瀬・海の境界</h2>
+      <p>戦闘と同じ描画処理で17×17マスを表示。両舷の甲板と入り組んだ浅瀬を配置し、水深の違いが自然につながるか確認します。</p>
+      <div class="preview-scroll"><canvas id="previewBattleSea" width="544" height="544" aria-label="甲板を左右に置いた17×17マスの海戦地形、なめらかにつながる浅瀬と海"></canvas></div>
+    </section>
+    <div class="preview-layout">
+      <section aria-label="地図の例"><canvas id="previewMap" width="720" height="720" aria-label="拡大地図の描画例"></canvas><canvas id="previewTerrain" width="720" height="112" aria-label="六種類の地形"></canvas></section>
+      <section aria-label="地点の図柄"><h2>マップアイコン</h2><canvas id="previewSymbols" width="480" height="800" aria-label="地点と現在地の二十種類の図柄"></canvas></section>
+    </div>
+    <section class="preview-section" aria-labelledby="overviewTitle">
+      <h2 id="overviewTitle">全体マップの簡易表示</h2>
+      <p>ゲームと同じ描画関数で50×50マスを表示。1マス14px、地点13pxの実寸です。すべての地点・依頼ピンと、海上・陸上の現在地を配置しています。</p>
+      <div class="preview-scroll"><canvas id="previewOverview" width="700" height="700" aria-label="全種類の地点を配置した50×50マスの全体地図"></canvas></div>
+    </section>
+    <section class="preview-section" aria-labelledby="coverageTitle">
+      <h2 id="coverageTitle">全種類・全縮尺の比較</h2>
+      <p>地形・拠点・現在地・探索地点・海図・賞金首・物語・出来事・依頼ピンを網羅。右の4倍表示は、13pxの簡易描画をそのまま拡大しています。</p>
+      <div class="preview-scroll"><canvas id="previewCoverage" width="1120" height="1236" aria-label="全三十種類の詳細表示、13pxの簡易表示、簡易表示の4倍拡大"></canvas></div>
+    </section>
+  </main>
+  <script type="module" src="./mapArtPreview.js"></script>
+</body>
+</html>

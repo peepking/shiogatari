@@ -11,7 +11,7 @@ import { elements, pushLog, pushToast } from "../ui/dom.js";
 import { getTerrainAt } from "../world/map.js";
 import { state } from "../core/state.js";
 import { updateBattleLayout } from "../ui/layout.js";
-import { drawMapTile } from "../world/mapArt.js";
+import { drawBattleTerrain } from "./battleTerrainArt.js";
 import { rosterOptions, canAutoDeploy, splitRosterCounts } from "../ui/rosterOptions.js";
 import { saveGameToStorage } from "../core/storage.js";
 import { TROOP_STATS } from "../resources/troops.js";
@@ -1102,12 +1102,7 @@ function renderBattle() {
   const cell = drawSize / size;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, drawSize, drawSize);
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      const terrainKey = battleState.grid[y]?.[x];
-      drawMapTile(ctx, { terrain: terrainKey, building: "none" }, x * cell, y * cell, cell, true, null, (x + y) % 2);
-    }
-  }
+  drawBattleTerrain(ctx, battleState.grid, cell, renderBattle, size);
   ctx.strokeStyle = "rgba(255, 255, 255, 0.08)";
   ctx.lineWidth = Math.max(1, Math.floor(cell * 0.06));
   for (let i = 0; i <= size; i++) {

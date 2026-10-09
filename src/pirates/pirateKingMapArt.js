@@ -1,8 +1,11 @@
+import { drawIllustratedSite } from "../world/mapSymbolArt.js";
+
 /** 五列強は赤い旗、海賊王は金の冠を描き、通常賞金首の手配書と区別する。
  * @param {CanvasRenderingContext2D} ctx 描画先。 @param {object} site 対象。
- * @param {number} x 左。 @param {number} y 上。 @param {number} size 幅。 @returns {void}
+ * @param {number} x 左。 @param {number} y 上。 @param {number} size 幅。 @param {boolean} [detailed] 詳細表示か。 @returns {void}
  */
-export function drawPirateStorySite(ctx, site, x, y, size) {
+export function drawPirateStorySite(ctx, site, x, y, size, detailed = size > 20) {
+  if (drawIllustratedSite(ctx, site.id === "olav" ? "pirateKing" : "pirateLord", x, y, size, detailed)) return;
   ctx.save(); ctx.translate(x, y); ctx.scale(size / 32, size / 32);
   ctx.fillStyle = "#2a2028"; ctx.strokeStyle = "#edc79b"; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(16, 16, 13, 0, Math.PI * 2); ctx.fill(); ctx.stroke();

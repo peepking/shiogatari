@@ -1,3 +1,4 @@
+/* eslint-env node */
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
 const { loadTestModule } = require("./helpers/module.cjs");
@@ -52,6 +53,42 @@ function expectedCenter(target, regionId) {
 /** @param {object[][]} map 地図。 @param {number} x 左。 @param {number} y 上。 @param {number} size 一辺。 @returns {void} 連結した海域を作る。 */
 function seaSquare(map, x, y, size) {
   for (let dy = 0; dy < size; dy++) for (let dx = 0; dx < size; dx++) map[y + dy][x + dx].terrain = "sea";
+}
+
+/**
+ * 無法港だけを描画用の海域へ含め、危険・配置の索引と母海域の条件を維持する。
+ * @param {Function} build 区域の計算関数。 @returns {void}
+ */
+function verifyHarborSurfaces(build) {
+  for (const terrain of ["sea", "shoal"]) {
+    const map = makeMap(), ports = [port(4, 45), port(45, 45)];
+    placePorts(map, ports);
+    for (const haven of ports) map[haven.coords.y][haven.coords.x].terrain = terrain;
+    const before = JSON.stringify(map), result = build(map, ports);
+    for (const [regionId, haven] of [["sw", ports[0]], ["se", ports[1]]]) {
+      const key = `${haven.coords.x},${haven.coords.y}`;
+      assert.equal(result.mapByPosition.get(key)?.regionId, regionId, `${terrain}の無法港も対応海域の水面にする`);
+      assert.equal(result.mapByPosition.get(key)?.level, "outer", "無法港の水面は核心にしない");
+      assert.equal(result.byPosition.has(key), false, "港の危険判定を描画の変更で増やさない");
+      assert.equal(result.positions[regionId].length, 96, "出来事の配置候補へ港を加えない");
+    }
+    for (const [key, sea] of result.byPosition) assert.deepEqual(result.mapByPosition.get(key), sea, "既存の危険な海の描画属性は変えない");
+    assert.equal(result.mapByPosition.size, result.byPosition.size + 2, "描画索引に追加するのは円内の無法港だけ");
+    assert.equal(JSON.stringify(map), before, "無法港の水面変更で保存地形を書き換えない");
+  }
+  const map = makeMap(), ports = [port(4, 45), port(45, 45)];
+  placePorts(map, [...ports, port(3, 45, { pirateHaven: false, kind: "town" }), port(2, 45), port(4, 38), port(0, 49)]);
+  map[45][2].terrain = "plain";
+  map[49][1].terrain = "shoal";
+  const result = build(map, ports);
+  for (const key of ["3,45", "2,45", "4,38", "1,49"]) {
+    assert.equal(result.mapByPosition.has(key), false, "通常の拠点・陸上港・円外港・通常浅瀬を危険海面にしない");
+  }
+  assert.equal(result.mapByPosition.get("0,49")?.regionId, "sw", "選択された遠征港以外も、円内の水上無法港なら同じ海面にする");
+  assert.equal(result.mapByPosition.get("0,49")?.level, "outer");
+  const isolated = makeMap("plain"), isolatedPort = port(0, 49);
+  seaSquare(isolated, 20, 20, 10); isolated[49][0].terrain = "sea"; placePorts(isolated, [isolatedPort]);
+  assert.equal(build(isolated, [isolatedPort]).mapByPosition.has("0,49"), false, "母海域から切れた孤立港には危険海面を描かない");
 }
 
 /** @returns {Promise<void>} 円境界・左右対称・中心補正・港選択・核心・母海域の従来条件を検証する。 */
@@ -144,7 +181,8 @@ async function main() {
   assert.equal(build(tied).positions.sw.length, 9); assert.equal(build(tied).positions.se.length, 0, "同面積なら上から左の海域を使う");
   const separated = makeMap("plain"); seaSquare(separated, 20, 20, 10); separated[49][0].terrain = "sea";
   assert.equal(build(separated).byPosition.has("0,49"), false, "角の孤立した内海を対象にしない");
-  console.log("dangerousSeaGeometry: 半径六・標準九十六マス・左右対称・百港補正・核心距離・地形母海域の検証成功");
+  verifyHarborSurfaces(build);
+  console.log("dangerousSeaGeometry: 半径六・標準九十六マス・左右対称・百港補正・核心距離・地形母海域・無法港の描画専用海面の検証成功");
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

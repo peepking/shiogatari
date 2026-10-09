@@ -97,24 +97,29 @@ function dangerousSeaCenter(regionId, ranges, settlements) {
 /**
  * 地形を書き換えず、港付近を中心とする半径6の円内の海タイルに外縁・核心の共通属性を作る。
  * 核心は角側5×5かつ全補給拠点から距離5以上とし、入港制限・勢力関係は距離判定へ使わない。
+ * 描画用の索引には円内の無法港も外縁として含め、港の安全判定と配置候補には加えない。
  * @param {Array} map 地図。
  * @param {Array} settlements 街・村・無法港。
- * @returns {{byPosition:Map,positions:object}} 座標索引と海域別の候補。
+ * @returns {{byPosition:Map,mapByPosition:Map,positions:object}} 危険判定・描画用の座標索引と海域別の候補。
  */
 export function buildDangerousSeaGeometry(map, settlements = []) {
-  const mother = largestDangerousSea(map), byPosition = new Map(), positions = { sw: [], se: [] };
+  const mother = largestDangerousSea(map), byPosition = new Map(), mapByPosition = new Map(), positions = { sw: [], se: [] };
   const supplyPositions = settlements.filter(settlement => settlement?.coords && (settlement.kind === "town" || settlement.kind === "village" || settlement.pirateHaven)).map(settlement => settlement.coords);
   for (const [regionId, ranges] of Object.entries(REGIONS)) {
     const center = dangerousSeaCenter(regionId, ranges, settlements);
     for (let y = center.y - DANGEROUS_SEA_RADIUS; y <= center.y + DANGEROUS_SEA_RADIUS; y++) for (let x = center.x - DANGEROUS_SEA_RADIUS; x <= center.x + DANGEROUS_SEA_RADIUS; x++) {
       const position = { x, y }, cell = map[y]?.[x], key = `${x},${y}`;
       if (squaredDangerousDistance(position, center) > DANGEROUS_SEA_RADIUS ** 2) continue;
+      if (cell?.settlement?.pirateHaven && ["sea", "shoal"].includes(cell.terrain) && mother.has(key)) {
+        mapByPosition.set(key, { regionId, level: "outer" });
+      }
       if (!cell || cell.terrain !== "sea" || !mother.has(key) || cell.settlement || (cell.building && cell.building !== "none")) continue;
       const core = inDangerousRange(position, ranges.core) && supplyPositions.every(point => Math.abs(point.x - x) + Math.abs(point.y - y) >= 5);
       const level = core ? "core" : "outer";
-      byPosition.set(key, { regionId, level });
+      const sea = { regionId, level };
+      byPosition.set(key, sea); mapByPosition.set(key, sea);
       positions[regionId].push({ ...position, level });
     }
   }
-  return { byPosition, positions };
+  return { byPosition, mapByPosition, positions };
 }

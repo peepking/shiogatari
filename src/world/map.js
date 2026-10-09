@@ -7,6 +7,7 @@ import { drawPirateStorySite } from "../pirates/pirateKingMapArt.js";
 import { elements } from "../ui/dom.js";
 import { mapViewport } from "./mapViewport.js";
 import { drawMapTile, drawMapPlayer, drawExplorationSite, drawChartSite } from "./mapArt.js";
+import { drawIllustratedPin } from "./mapSymbolArt.js";
 import { visibleChartSites } from "../exploration/charts.js";
 import { CHART_CONFIG } from "../core/expansionConfig.js";
 import { EXPLORATION_NAMES, describeDanger } from "../exploration/exploration.js";
@@ -15,7 +16,7 @@ import { FRONT_DURATION_DAYS } from "../core/constants.js";
 import { QUEST_TYPES } from "../quests/quests.js";
 import { absDay } from "../quests/questUtils.js";
 import { state } from "../core/state.js";
-import { dangerousSeaAt } from "../dangerousSeas/dangerousSeaWorld.js";
+import { dangerousSeaAt, dangerousSeaMapAt } from "../dangerousSeas/dangerousSeaWorld.js";
 import { dangerousSeaName } from "../dangerousSeas/dangerousSeaConfig.js";
 import { drawDangerousSeaTile } from "../dangerousSeas/dangerousSeaMapArt.js";
 import { visibleDangerousSeaEvents } from "../dangerousSeas/dangerousSeaEventWorld.js";
@@ -645,7 +646,7 @@ function pinsAt(x, y) {
 }
 
 /**
- * ピンをキャンバスに描画する。防衛盾は左を攻撃色、右を防衛色で塗り分け、マス内に収める。
+ * ピンを右上寄りに描き、地点と現在地の輪郭を残す。防衛盾は左を攻撃色、右を防衛色で塗り分ける。
  * @param {CanvasRenderingContext2D} ctx 描画コンテキスト
  * @param {object} pin ピン情報
  * @param {number} pad キャンバスパディング
@@ -655,13 +656,17 @@ function pinsAt(x, y) {
  */
 function drawPin(ctx, pin, pad, cellSize, startX, startY) {
   const detailed = cellSize > MAP_CELL;
-  const cx = pad + (pin.x - startX) * cellSize + cellSize * (detailed ? 0.81 : 0.5);
-  const cy = pad + (pin.y - startY) * cellSize + cellSize * (detailed ? 0.2 : 0.5);
+  const cx = pad + (pin.x - startX) * cellSize + cellSize * (detailed ? 0.81 : 0.65);
+  const cy = pad + (pin.y - startY) * cellSize + cellSize * (detailed ? 0.2 : 0.35);
   const r = Math.max(3, cellSize * (detailed ? 0.1 : 0.24));
+  if (typeof drawIllustratedPin === "function" && drawIllustratedPin(ctx, pin, cx, cy, r, detailed)) return;
   ctx.save();
   ctx.fillStyle = pin.color;
-  ctx.strokeStyle = "#ffffffaa";
-  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = "#f4e4bc";
+  ctx.lineWidth = detailed ? 1.2 : 1;
+  ctx.shadowColor = "#071725";
+  ctx.shadowBlur = detailed ? 2 : 1;
+  ctx.shadowOffsetY = 0.6;
   if (pin.shape === "dot") {
     const size = Math.max(1.0, r * (detailed ? 0.65 : 0.30));
     ctx.beginPath();
@@ -694,7 +699,7 @@ function drawPin(ctx, pin, pad, cellSize, startX, startY) {
       ctx.fillRect(cx, cy - h * 0.4, w * 0.6, h);
       ctx.restore();
     }
-    ctx.strokeStyle = "#10192c";
+    ctx.strokeStyle = "#eddfba";
     ctx.stroke();
   } else if (pin.shape === "star") {
     ctx.beginPath();
@@ -790,6 +795,16 @@ function refreshSettlementDemandIfNeeded() {
 }
 
 /**
+ * 地形の上・拠点の下に危険海域の水面を描き、港のアイコンを波に埋もれさせない。
+ * @param {CanvasRenderingContext2D} ctx 地形の縮尺へ変換済みの描画先。
+ * @param {number} units 地形描画の基準幅。 @param {object} options 海域・世界座標・再描画。
+ * @returns {void}
+ */
+function drawMapSeaSurface(ctx, units, options) {
+  drawDangerousSeaTile(ctx, options.sea, 0, 0, units, options);
+}
+
+/**
  * 現在のマップ表示を描画する。
  */
 export function renderMap() {
@@ -816,8 +831,10 @@ export function renderMap() {
       const cell = mapData[gy][gx];
       const factionId = cell.settlement?.factionId || cell.factionId;
       const factionColor = FACTIONS.find(faction => faction.id === factionId)?.color;
-      drawMapTile(ctx, cell, pad + x * cellSize, pad + y * cellSize, cellSize - 1, isZoom, factionColor, (gx + gy) % 2);
-      drawDangerousSeaTile(ctx, dangerousSeaAt({ x: gx, y: gy }), pad + x * cellSize, pad + y * cellSize, cellSize - 1);
+      drawMapTile(ctx, cell, pad + x * cellSize, pad + y * cellSize, cellSize, isZoom, factionColor, (gx * 7 + gy * 11) % 3 === 0 ? 1 : 0, {
+        gx, gy, grid: mapData, onReady: renderMap, detailed: isZoom,
+        sea: dangerousSeaMapAt({ x: gx, y: gy }), seaAt: dangerousSeaMapAt, drawSurface: drawMapSeaSurface,
+      });
     }
   }
 
@@ -834,19 +851,19 @@ export function renderMap() {
   for (const event of seaEvents) {
     const { x, y } = event.position;
     if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
-    drawDangerousSeaEvent(ctx, event, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1);
+    drawDangerousSeaEvent(ctx, event, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1, isZoom);
   }
   const storySites = state.pirateKingStory?.active ? [state.pirateKingStory.active] : [];
   for (const site of storySites) {
     const { x, y } = site.position;
     if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
-    drawPirateStorySite(ctx, site, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1);
+    drawPirateStorySite(ctx, site, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1, isZoom);
   }
   const bountySites = [...(state.bounties?.active || []), ...(state.dangerousSeas?.bounties.active || [])];
   for (const site of bountySites) {
     const { x, y } = site.position;
     if (x < startX || y < startY || x >= startX + cells || y >= startY + cells) continue;
-    drawBountySite(ctx, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1);
+    drawBountySite(ctx, pad + (x - startX) * cellSize, pad + (y - startY) * cellSize, cellSize - 1, isZoom);
   }
   for (const site of chartSites) {
     const { x, y } = site.position;
@@ -873,11 +890,9 @@ export function renderMap() {
   }
 
   // 現在地の地形に合わせて帆船または人物を描き、枠を最後に重ねる。
-  if (isZoom) {
-    drawMapPlayer(ctx, { ...mapData[state.position.y][state.position.x], exploration: [...explorationSites, ...bountySites, ...chartSites, ...storySites, ...seaEvents].some(s => s.position.x === state.position.x && s.position.y === state.position.y) },
-      pad + (state.position.x - startX) * cellSize,
-      pad + (state.position.y - startY) * cellSize, cellSize - 1);
-  }
+  drawMapPlayer(ctx, { ...mapData[state.position.y][state.position.x], exploration: pinsAt(state.position.x, state.position.y).length > 0 || [...explorationSites, ...bountySites, ...chartSites, ...storySites, ...seaEvents].some(s => s.position.x === state.position.x && s.position.y === state.position.y) },
+    pad + (state.position.x - startX) * cellSize,
+    pad + (state.position.y - startY) * cellSize, cellSize - 1, isZoom);
   ctx.strokeStyle = "#e8efff";
   ctx.lineWidth = 2;
   ctx.strokeRect(

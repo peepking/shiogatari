@@ -1,3 +1,6 @@
+import { drawIllustratedTile } from "./mapTerrainArt.js";
+import { drawIllustratedPlayer, drawIllustratedSite } from "./mapSymbolArt.js";
+
 const TERRAIN_COLORS = {
   sea: "#124674", shoal: "#207f92", plain: "#7c9b5a", forest: "#42663e", mountain: "#64736b", deck: "#80664a",
 };
@@ -122,8 +125,7 @@ function drawSettlement(ctx, building, factionColor) {
 }
 
 /**
- * 既存の地形・拠点データを正方形タイルとして描画する。
- * 拡大時のみ模様と建物を描き、全体表示では街を四角、村を丸に簡略化する。
+ * 既存の地形・拠点を画像と連続した海岸で描く。読み込み中と失敗時には図形で代替する。
  * @param {CanvasRenderingContext2D} ctx
  * @param {object} cell
  * @param {number} x
@@ -132,9 +134,11 @@ function drawSettlement(ctx, building, factionColor) {
  * @param {boolean} detailed
  * @param {string} factionColor
  * @param {number} variant
+ * @param {object} [options] 世界座標・周辺地形・再描画・拠点の下へ重ねる水面。
  * @returns {void}
  */
-export function drawMapTile(ctx, cell, x, y, size, detailed, factionColor, variant) {
+export function drawMapTile(ctx, cell, x, y, size, detailed, factionColor, variant, options) {
+  if (drawIllustratedTile(ctx, cell, x, y, size, detailed, factionColor, variant, options)) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.scale(size / 32, size / 32);
@@ -142,10 +146,11 @@ export function drawMapTile(ctx, cell, x, y, size, detailed, factionColor, varia
   ctx.fillStyle = TERRAIN_COLORS[cell.terrain] || TERRAIN_COLORS.sea;
   ctx.fillRect(0, 0, 32, 32);
   const settlement = cell.building === "town" || cell.building === "village";
+  if (detailed && !settlement) drawTerrainPattern(ctx, cell.terrain, variant);
+  options?.drawSurface?.(ctx, 32, { ...options, detailed });
   if (detailed) {
-    if (!settlement) drawTerrainPattern(ctx, cell.terrain, variant);
-    else if (cell.settlement?.pirateHaven) drawPirateHarbor(ctx);
-    else drawSettlement(ctx, cell.building, factionColor);
+    if (settlement && cell.settlement?.pirateHaven) drawPirateHarbor(ctx);
+    else if (settlement) drawSettlement(ctx, cell.building, factionColor);
     ctx.lineWidth = 0.45;
     ctx.strokeStyle = "#b9d5d533";
     ctx.strokeRect(0.3, 0.3, 31.4, 31.4);
@@ -189,9 +194,11 @@ function drawPirateHarbor(ctx) {
  * @param {number} x
  * @param {number} y
  * @param {number} size
+ * @param {boolean} [detailed] 詳細表示か。
  * @returns {void}
  */
-export function drawMapPlayer(ctx, cell, x, y, size) {
+export function drawMapPlayer(ctx, cell, x, y, size, detailed = size > 20) {
+  if (drawIllustratedPlayer(ctx, cell, x, y, size, detailed)) return;
   ctx.save(); ctx.translate(x,y); ctx.scale(size/32,size/32);
   if (cell.exploration) { ctx.translate(-1, 17); ctx.scale(0.48, 0.48); }
   ctx.lineWidth = 0.9;
@@ -230,6 +237,7 @@ export function drawMapPlayer(ctx, cell, x, y, size) {
  * @returns {void}
  */
 export function drawExplorationSite(ctx, kind, x, y, size, detailed) {
+  if (drawIllustratedSite(ctx, kind === "wreck" || kind === "battlefield" ? kind : "crate", x, y, size, detailed)) return;
   ctx.save(); ctx.translate(x, y); ctx.scale(size / 32, size / 32);
   ctx.lineWidth = detailed ? 1 : 2;
   if (!detailed) {
@@ -261,6 +269,7 @@ export function drawExplorationSite(ctx, kind, x, y, size, detailed) {
  * @param {boolean} detailed 拡大表示か。 @returns {void}
  */
 export function drawChartSite(ctx, kind, x, y, size, detailed) {
+  if (drawIllustratedSite(ctx, ["rumor", "altar", "inlet"].includes(kind) ? kind : "treasure", x, y, size, detailed)) return;
   ctx.save(); ctx.translate(x + size / 2, y + size / 2); ctx.scale(size / 64, size / 64);
   ctx.lineWidth = detailed ? 2 : 4; ctx.strokeStyle = "#394439";
   ctx.shadowColor = "#0b182b"; ctx.shadowBlur = detailed ? 3 : 1;

@@ -1,0 +1,37 @@
+/* ゲームのUIを変更せず、描画だけを並べて確認するための独立したページ。 */
+:root { color-scheme: dark; font-family: system-ui, sans-serif; color: #eee3c6; background: #0e162a; }
+body { margin: 0; }
+main { max-width: 1240px; margin: 0 auto; padding: 24px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 32px; margin-bottom: 24px; }
+h1 { margin: 0; font-size: 30px; letter-spacing: .04em; }
+header p { margin: 0; color: #aabdd0; font-size: 14px; }
+h2 { margin: 0 0 16px; padding-left: 20px; font-size: 25px; }
+.preview-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 28px; }
+section { min-width: 0; }
+canvas { display: block; width: 100%; height: auto; }
+#previewMap { border: 1px solid #526679; box-sizing: border-box; }
+#previewTerrain { margin-top: 14px; }
+.preview-section { margin-top: 36px; }
+.preview-section h2 { padding-left: 0; margin-bottom: 10px; }
+.preview-section p { margin: 0 0 18px; color: #aabdd0; font-size: 14px; line-height: 1.7; }
+.preview-scroll { overflow-x: auto; padding-bottom: 12px; }
+#previewOverview { width: 700px; height: 700px; border: 1px solid #526679; }
+#previewCoverage { width: 1120px; height: 1236px; }
+.sea-preview h2 { padding-left: 0; margin-bottom: 10px; }
+.sea-preview > p, .rough-sea-layout p { margin: 0 0 18px; color: #aabdd0; font-size: 14px; line-height: 1.7; }
+.rough-sea-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.rough-sea-layout article { min-width: 0; padding: 20px; background: #162439; border: 1px solid #34465b; border-radius: 10px; }
+.rough-sea-layout h3 { margin: 0 0 10px; font-size: 21px; }
+.rough-sea-layout canvas { border: 1px solid #526679; box-sizing: border-box; }
+.rough-sea-mini { display: flex; gap: 18px; align-items: center; margin-top: 18px; }
+.rough-sea-mini canvas { width: 98px; height: 98px; flex-shrink: 0; }
+.rough-sea-mini p { margin: 0; }
+.coast-preview { margin-bottom: 36px; }
+.coast-preview h2 { padding-left: 0; margin-bottom: 10px; }
+.coast-preview h3 { margin: 20px 0 10px; font-size: 19px; }
+.coast-preview p { margin: 0 0 18px; color: #aabdd0; font-size: 14px; line-height: 1.7; }
+#previewCoastCorners, #previewWaterStructures { width: 1080px; height: 234px; }
+#previewIslandWater { width: 1080px; height: 552px; }
+.battle-preview { margin-bottom: 36px; }
+#previewBattleSea { width: 544px; height: 544px; border: 1px solid #526679; }
+@media (max-width: 760px) { main { padding: 16px; } .preview-layout, .rough-sea-layout { grid-template-columns: 1fr; } }

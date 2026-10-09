@@ -1,8 +1,52 @@
 const { readSource } = require("./helpers/source.cjs");
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
+
+/** @returns {Promise<void>} 戦闘描画へ周辺地形を渡し、再描画や甲板の変更を正しく反映するか検証する。 */
+async function checkBattleTerrain() {
+  const calls = [];
+  const mapArt = new vm.SyntheticModule(["drawMapTile"], function () {
+    this.setExport("drawMapTile", (...args) => calls.push(args));
+  });
+  const terrainArt = new vm.SourceTextModule(await readSource("battleTerrainArt.js"));
+  await terrainArt.link(() => mapArt); await terrainArt.evaluate();
+  const grid = [["shoal", "sea"], ["deck", "sea"]];
+  const original = JSON.stringify(grid);
+  const ctx = { setTransform() {}, clearRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {} };
+  const context = vm.createContext({
+    elements: { battleCanvas: { width: 80 } }, battleState: { size: 2, grid, ctx, units: [] },
+    resizeBattleCanvas() {}, isBattleOnBoard() {}, drawBattleTerrain: terrainArt.namespace.drawBattleTerrain,
+  });
+  const source = await readSource("battle.js"), start = source.indexOf("function renderBattle(");
+  vm.runInContext(source.slice(start, source.indexOf("\n}", start) + 2), context);
+  vm.runInContext("renderBattle()", context);
+  assert.equal(calls.length, 4);
+  const rendered = calls[0][8].grid, row = rendered[0], sea = rendered[0][1];
+  assert.equal(calls[0][1], rendered[0][0]);
+  assert.equal(rendered[0][0].terrain, "shoal");
+  assert.equal(rendered[0][1].terrain, "sea", "浅瀬から隣接する海を参照できる");
+  assert.equal(rendered[1][0].terrain, "deck");
+  assert.equal(rendered[1][1], sea, "同じ地形の描画用マスを共有する");
+  assert.ok(Object.isFrozen(sea));
+  calls.forEach((call, index) => {
+    const x = index % 2, y = Math.floor(index / 2), options = call[8];
+    assert.equal(call[2], x * 40); assert.equal(call[3], y * 40);
+    assert.equal(options.gx, x); assert.equal(options.gy, y);
+    assert.equal(options.grid, rendered); assert.equal(typeof options.onReady, "function");
+  });
+  assert.equal(JSON.stringify(grid), original, "描画で戦闘判定用の地形を変更しない");
+  calls.length = 0; vm.runInContext("renderBattle()", context);
+  assert.equal(calls[0][8].grid, rendered); assert.equal(rendered[0], row);
+  assert.equal(calls[1][1], sea, "再描画で地形オブジェクトを作り直さない");
+  grid[0][0] = "sea"; grid[1] = ["forest", "shoal"];
+  calls.length = 0; vm.runInContext("renderBattle()", context);
+  assert.equal(calls[0][1], sea, "同じ戦場配列の地形変更を反映する");
+  assert.equal(rendered[1][0].terrain, "forest"); assert.equal(rendered[1][1].terrain, "shoal");
+}
+
 /** @returns {Promise<void>} 全サイズの配置と、拡大・スクロール時の選択位置を検証する。 */
 async function main() {
+  await checkBattleTerrain();
   const geometry = new vm.SourceTextModule(await readSource("battleGeometry.js"));
   const formation = new vm.SourceTextModule(await readSource("battleFormation.js"));
   await geometry.link(() => {}); await geometry.evaluate(); await formation.link(() => {}); await formation.evaluate();
