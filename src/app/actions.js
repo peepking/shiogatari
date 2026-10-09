@@ -529,6 +529,7 @@ export function getCurrentSettlement() {
 
 /**
  * 移動時のランダムイベントを判定し、発火する。
+ * 災いの兆しは現在信仰50以上の場合のみ1%で抽選し、共通の優先順とクールダウンに従う。
  * @returns {boolean} イベントが発生したか
  */
 export function rollTravelEvents() {
@@ -580,7 +581,7 @@ export function rollTravelEvents() {
       }
     }
   }
-  if (Math.random() < OMEN_EVENT_RATE) {
+  if ((state.faith || 0) >= 50 && Math.random() < OMEN_EVENT_RATE) {
     const queued = enqueueOmenEvent();
     if (queued) {
       state.travelEventCooldown = TRAVEL_EVENT_COOLDOWN_DAYS;
