@@ -2,7 +2,7 @@ import { drawIllustratedTile } from "./mapTerrainArt.js";
 import { drawIllustratedPlayer, drawIllustratedSite } from "./mapSymbolArt.js";
 
 const TERRAIN_COLORS = {
-  sea: "#124674", shoal: "#207f92", plain: "#7c9b5a", forest: "#42663e", mountain: "#64736b", deck: "#80664a",
+  sea: "#245876", shoal: "#4b9eaa", plain: "#80925b", forest: "#526e48", mountain: "#7f9291", deck: "#96653e",
 };
 
 /**

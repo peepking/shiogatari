@@ -14,7 +14,7 @@ function makeContext() {
     /** @returns {number} 保存状態の残数。 */
     get depth() { return stack.length; },
     /** @returns {void} 次のマスへ持ち越してはいけない描画状態を保存する。 */
-    save() { stack.push({ globalAlpha: this.globalAlpha, globalCompositeOperation: this.globalCompositeOperation }); operations.push(["save"]); },
+    save() { stack.push({ globalAlpha: this.globalAlpha, globalCompositeOperation: this.globalCompositeOperation, imageSmoothingEnabled: this.imageSmoothingEnabled }); operations.push(["save"]); },
     /** @returns {void} 保存状態を復元する。 */
     restore() { assert.ok(stack.length > 0); Object.assign(this, stack.pop()); operations.push(["restore"]); },
     /** @param {number[]} args 平行移動量。 @returns {void} 描画位置を記録する。 */
@@ -29,6 +29,8 @@ function makeContext() {
     beginPath() { points = []; },
     /** @param {number[]} args 開始点。 @returns {void} 曲線の開始を記録する。 */
     moveTo(...args) { points.push(args); },
+    /** @param {number[]} args 終点。 @returns {void} 白波の階段状の輪郭を記録する。 */
+    lineTo(...args) { points.push(args); },
     /** @param {number[]} args 制御点と終点。 @returns {void} 潮流の曲線を記録する。 */
     bezierCurveTo(...args) { points.push(args); },
     /** @returns {void} 波の色と形を記録する。 */
@@ -36,7 +38,7 @@ function makeContext() {
     /** @param {number[]} args 矩形。 @returns {void} 下地と合成の塗りを記録する。 */
     fillRect(...args) { operations.push(["fillRect", this.globalCompositeOperation, this.fillStyle, ...args]); },
     /** @param {Array} args 原画と描画範囲。 @returns {void} 画像の参照と合成方法を記録する。 */
-    drawImage(...args) { calls.push(args); operations.push(["drawImage", this.globalCompositeOperation, this.globalAlpha]); },
+    drawImage(...args) { calls.push(args); operations.push(["drawImage", this.globalCompositeOperation, this.globalAlpha, this.imageSmoothingEnabled]); },
     /** @param {number} width 幅。 @param {number} height 高さ。 @returns {object} 透過マスクの画素。 */
     createImageData(width, height) { return { data: new Uint8ClampedArray(width * height * 4) }; },
     /** @param {object} pixels 画素。 @returns {void} マスクの実際の透過値を保持する。 */
@@ -73,16 +75,23 @@ function makeDocument() {
   };
 }
 
-/** @returns {Promise<object>} 実装の三モジュールと、読み込み結果を操作できる画像環境。 */
+/** @returns {Promise<object>} 実装モジュールと、読み込み結果を操作できる画像環境。 */
 async function loadArt() {
   const images = [], document = makeDocument();
   class MockImage {
     /** @returns {void} 新しい画像要求を記録する。 */
     constructor() { images.push(this); this.naturalWidth = 1774; this.naturalHeight = 887; }
+    /** @param {string} value 原画のURL。 @returns {void} 追加した人物原画の実寸を設定する。 */
+    set src(value) {
+      this.source = value;
+      if (value.endsWith("/party-norse-pixel.png")) this.naturalWidth = this.naturalHeight = 1254;
+    }
+    /** @returns {string} 読み込み先のURL。 */
+    get src() { return this.source; }
   }
   const context = vm.createContext({ Image: MockImage, URL, document });
   const modules = new Map();
-  for (const [file, directory] of [["mapAssets.js", "world"], ["dangerousSeaSurface.js", "dangerousSeas"], ["dangerousSeaMapArt.js", "dangerousSeas"]]) {
+  for (const [file, directory] of [["mapSpriteBounds.js", "world"], ["mapAssets.js", "world"], ["dangerousSeaSurface.js", "dangerousSeas"], ["dangerousSeaMapArt.js", "dangerousSeas"]]) {
     modules.set(file, new vm.SourceTextModule(readSource(file), {
       context,
       /** @param {object} meta モジュールの場所。 @returns {void} ブラウザと同じ画像相対パスを使う。 */
@@ -128,6 +137,46 @@ function verifyRegionalMasks() {
   assert.equal(JSON.stringify([core, fringe, coreNeighbors, fringeNeighbors]), before, "描画は海域と隣接条件を変更しない");
 }
 
+/** @param {object} art 描画環境。 @returns {void} 世界端は荒海を維持し、世界内の通常海との境界だけを薄める。 */
+function verifyWorldEdges(art) {
+  /** @param {object} layer 合成済み海面。 @param {number} x 横。 @param {number} y 縦。 @returns {number} 境界マスクの透過値。 */
+  const alpha = (layer, x, y) => layer.painter.calls.at(-1)[0].painter.pixels[(y * 64 + x) * 4 + 3];
+  for (const [width, height] of [[50, 50], [7, 11]]) {
+    const cell = Object.freeze({ terrain: "sea", building: "none" });
+    const grid = Object.freeze(Array.from({ length: height }, () => Object.freeze(Array(width).fill(cell))));
+    for (const regionId of ["sw", "se"]) for (const level of ["core", "outer"]) {
+      const sea = Object.freeze({ regionId, level }), gx = regionId === "sw" ? 0 : width - 1, gy = height - 1;
+      const edge = regionId === "sw" ? 0 : 63, inner = 63 - edge, expected = Math.round((level === "core" ? 0.92 : 0.58) * 255);
+      const before = JSON.stringify([grid, sea]);
+      /** @param {{x:number,y:number}} point 隣接座標。 @returns {object|null} 世界内だけ海域を返す。 */
+      const seaAt = point => point.x >= 0 && point.x < width && point.y >= 0 && point.y < height ? sea : null;
+      for (const size of [14, 700 / 19, 700 / 9]) {
+        const options = { gx, gy, seaAt }, plain = drawTile(art, sea, size, options).layer;
+        const continued = drawTile(art, sea, size, { ...options, grid }).layer;
+        for (let i = 0; i < 64; i++) {
+          assert.equal(alpha(continued, edge, i), expected, `${regionId}/${level}/${size}: 世界の左右端まで荒海の濃さを保つ`);
+          assert.equal(alpha(continued, i, 63), expected, `${regionId}/${level}/${size}: 世界の下端と角まで荒海の濃さを保つ`);
+        }
+        assert.equal(alpha(plain, edge, 32), 0, "世界範囲を指定しない既存の境界描画を維持する");
+        assert.notEqual(continued, plain, "世界端の接続と通常海への境界を同じ描画面に混ぜない");
+        assert.equal(drawTile(art, sea, size, { ...options, grid }).layer, continued, "同じ世界端の海面は再利用する");
+        for (const neighbor of [null, Object.freeze({ regionId: regionId === "sw" ? "se" : "sw", level })]) {
+          /** @param {{x:number,y:number}} point 隣接座標。 @returns {object|null} 世界内の一辺を通常海または別海域にする。 */
+          const boundaryAt = point => point.y === gy && point.x === gx + (regionId === "sw" ? 1 : -1) ? neighbor : seaAt(point);
+          const boundary = drawTile(art, sea, size, { ...options, grid, seaAt: boundaryAt }).layer;
+          assert.equal(alpha(boundary, inner, 32), 0, "世界内の通常海・別海域には荒海を漏らさない");
+          assert.equal(alpha(boundary, edge, 63), expected, "世界内の境界があっても世界外に面する角を薄めない");
+        }
+        const expanded = Array.from({ length: height + 1 }, () => Array(width + 1).fill(cell));
+        const internal = drawTile(art, sea, size, { ...options, grid: expanded }).layer;
+        assert.equal(alpha(internal, 32, 63), 0, "同じ座標でも実マップ内になった辺は通常海へなじませる");
+        assert.notEqual(internal, continued, "実マップの範囲が違う接続を混同しない");
+      }
+      assert.equal(JSON.stringify([grid, sea]), before, "境界の補正で地形と危険海域の属性を変更しない");
+    }
+  }
+}
+
 /** @param {object} art 読み込み済みの描画環境。 @returns {void} 地域・濃さ・縮尺・隣接条件による合成を確認する。 */
 function verifyTiles(art) {
   for (const regionId of ["sw", "se"]) for (const level of ["fringe", "core"]) {
@@ -144,7 +193,9 @@ function verifyTiles(art) {
       if (size === 14) {
         assert.ok(layer.painter.strokes.length > 0, "全体地図では専用の波形を残す");
         const base = layer.painter.operations.find(operation => operation[0] === "fillRect");
-        assert.equal(base[2], regionId === "sw" ? "#244638" : "#303857", "簡易表示でも南西の緑灰と南東の紫藍を区別する");
+        assert.equal(base[2], regionId === "sw" ? "#30564c" : "#354765", "簡易表示でも南西の緑灰と南東の藍を区別する");
+        assert.ok(layer.painter.strokes.some(stroke => stroke.color === (regionId === "sw" ? "#c3d6c6" : "#8caeba")), "白波を原画と同じ落ち着いた色で表す");
+        assert.ok(layer.painter.strokes.every(stroke => stroke.points.every(point => point.length === 2)), "白波は短い直線を組み合わせた輪郭を使う");
       } else assert.equal(layer.painter.strokes.length, 0, "詳細地図では原画の連続した荒海を使う");
     }
   }
@@ -161,10 +212,10 @@ function verifyTiles(art) {
   assert.equal(a.calls[0][0], b.calls[0][0], "同じ地域の繰り返し面を再利用する");
   assert.deepEqual(a.calls[0].slice(1), b.calls[0].slice(1), "海面模様を世界座標の四マス周期で揃える");
   assert.notEqual(a.calls[0][0], alternate.calls[0][0], "二地域の原画を分けて保持する");
-  const stormTint = a.calls[0][0].painter.operations.filter(operation => operation[0] === "fillRect" && operation[1] === "color");
-  assert.deepEqual(stormTint, [["fillRect", "color", "#47745b", 0, 0, 512, 512]], "南西の色合いだけを一度変換して白波の明暗を保つ");
-  assert.equal(a.calls[0][0].painter.globalCompositeOperation, "source-over", "色合成を次の描画へ持ち越さない");
-  assert.equal(alternate.calls[0][0].painter.operations.some(operation => operation[0] === "fillRect" && operation[1] === "color"), false, "南東の原画には南西の緑灰を混ぜない");
+  assert.equal(a.calls[0][0].painter.operations.some(operation => operation[0] === "fillRect" && operation[1] === "color"), false, "南西も描き直した原画の色面をそのまま使う");
+  assert.equal(alternate.calls[0][0].painter.operations.some(operation => operation[0] === "fillRect" && operation[1] === "color"), false, "南東の原画へ別地域の色を混ぜない");
+  assert.equal(a.operations.find(operation => operation[0] === "drawImage")[3], false, "原画の粒を補間でにじませない");
+  assert.equal(a.imageSmoothingEnabled, undefined, "画像補間の指定を呼び出し元へ持ち越さない");
   const cutouts = art.document.canvases.flatMap(canvas => canvas.painter.calls).filter(call => call[0] === art.images[0]);
   assert.deepEqual(cutouts.map(call => call.slice(1, 5)).sort((left, right) => left[0] - right[0]), [[0, 0, 887, 887], [887, 0, 887, 887]], "実寸の左右二面を一度ずつ切り出す");
 }
@@ -188,8 +239,8 @@ async function main() {
   assert.ok(pending.layer.painter.strokes.length > 0, "画像待機中も荒波を描く");
   for (let i = 0; i < 5; i++) art.surface.prepareDangerousSeaSurface(onReady);
   assert.equal(art.images.length, 1, "荒海だけを一枚遅延要求する");
-  assert.match(art.images[0].src, /\/image\/map\/dangerous-seas\.png$/);
-  assert.equal(art.assets.mapAssetsReady(), false, "通常三枚の要求や完了を荒海に連動させない");
+  assert.match(art.images[0].src, /\/image\/map\/dangerous-seas-pixel\.png$/);
+  assert.equal(art.assets.mapAssetsReady(), false, "通常四枚の要求や完了を荒海に連動させない");
   assert.equal(readyCount, 0);
   art.images[0].onload();
   assert.equal(readyCount, 1, "同じ再描画を一度だけ呼ぶ");
@@ -200,10 +251,15 @@ async function main() {
   assert.notEqual(ready.layer, pending.layer, "画像完了後は待機中の代替を置き換える");
   assert.equal(ready.layer.painter.strokes.length, 0);
   verifyTiles(art);
+  verifyWorldEdges(art);
   art.assets.prepareMapAssets();
-  assert.equal(art.images.length, 4, "通常の三枚は別の操作で要求する");
-  assert.deepEqual(art.images.slice(1).map(image => path.basename(new URL(image.src).pathname)).sort(), ["events.png", "sprites.png", "terrain.png"]);
-  for (const image of art.images.slice(1)) image.onload();
+  assert.equal(art.images.length, 5, "通常の四枚は別の操作で要求する");
+  assert.deepEqual(art.images.slice(1).map(image => path.basename(new URL(image.src).pathname)).sort(), ["events-pixel.png", "party-norse-pixel.png", "sprites-pixel.png", "terrain-pixel.png"]);
+  const party = art.images.find(image => image.src.endsWith("/party-norse-pixel.png"));
+  assert.equal(party.naturalWidth, 1254); assert.equal(party.naturalHeight, 1254);
+  for (const image of art.images.slice(1).filter(image => image !== party)) image.onload();
+  assert.equal(art.assets.mapAssetsReady(), false, "人物を含む四枚が揃うまで通常素材へ切り替えない");
+  party.onload();
   assert.equal(art.assets.mapAssetsReady(), true);
   assert.equal(drawTile(art, sea, 700 / 19).layer, ready.layer, "通常素材の完了は荒海の再合成を起こさない");
   const failed = await loadArt();

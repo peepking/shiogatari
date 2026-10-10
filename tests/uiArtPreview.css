@@ -1,0 +1,34 @@
+/* 本番の図柄を、小さい表示と拡大表示で確認する独立ページ。 */
+.ui-art-preview { width: min(1200px, 100%); margin: 0 auto; padding: 28px 24px; }
+.ui-art-preview h1 { font-size: 28px; color: #ddcb9e; }
+.ui-art-preview h2 { font-size: 20px; margin: 28px 0 14px; color: #ddcb9e; }
+.ui-art-intro { color: #aabdd0; font-size: 14px; line-height: 1.8; margin-bottom: 24px; }
+.ui-art-context { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 32px; margin-bottom: 32px; }
+.ui-art-resource-context { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 24px; }
+.ui-art-resource-context > div { display: flex; align-items: center; gap: 12px; padding: 18px 12px; background: #162439; border: 1px solid #52667970; border-radius: 8px; }
+.ui-art-resource-context img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; }
+.ui-art-resource-context span { color: #aabdd0; font-size: 12px; }
+.ui-art-resource-context b { display: block; color: #e3ecf7; font-size: 24px; margin-top: 4px; }
+.ui-art-contraband-context { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.ui-art-contraband-context span { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.ui-art-contraband-context img { width: 32px; height: 32px; object-fit: contain; image-rendering: pixelated; }
+.ui-art-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.ui-art-card { margin: 0; min-width: 0; padding: 14px 12px 10px; border: 1px solid #52667970; background: #162439; border-radius: 8px; }
+.ui-art-samples { display: flex; align-items: center; justify-content: center; gap: 16px; min-height: 80px; }
+.ui-art-sample { display: grid; justify-items: center; align-content: center; gap: 8px; }
+.ui-art-sample small { font-size: 10px; color: #aabdd0; }
+.ui-art-sample img { width: 48px; height: 48px; object-fit: contain; image-rendering: pixelated; }
+.ui-art-sample.is-small img { width: 20px; height: 20px; }
+.ui-art-sample .ship-icon { width: 64px; height: 64px; }
+.ui-art-sample.is-small .ship-icon { width: 32px; height: 32px; }
+.ui-art-sample .tide-icon { width: 64px; height: 64px; }
+.ui-art-sample.is-small .tide-icon { width: 32px; height: 32px; }
+.ui-art-sample .codex-silhouette { width: 64px; height: 43px; }
+.ui-art-sample.is-small .codex-silhouette { width: 32px; height: 22px; }
+.ui-art-card figcaption { color: #ddcb9e; font-size: 12px; text-align: center; margin-top: 12px; }
+.ui-art-date { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; }
+.ui-art-date .game-date-icon { background: #283b3d; flex-shrink: 0; }
+.ui-art-date .game-date-main { gap: 6px; }
+#uiArtStatus { margin-top: 24px; color: #aabdd0; font-size: 13px; }
+@media (max-width: 900px) { .ui-art-context { grid-template-columns: 1fr; } .ui-art-resource-context { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .ui-art-preview { padding: 20px 16px; } .ui-art-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .ui-art-samples { gap: 12px; } .ui-art-seasons { grid-template-columns: 1fr; } }

@@ -1,5 +1,5 @@
-/* ゲームのUIを変更せず、描画だけを並べて確認するための独立したページ。 */
-:root { color-scheme: dark; font-family: system-ui, sans-serif; color: #eee3c6; background: #0e162a; }
+/* ゲームと同じ描画を既存ユニットと並べて確認するための独立したページ。 */
+:root { color-scheme: dark; font-family: system-ui, sans-serif; color: #ddcb9e; background: #0e162a; }
 body { margin: 0; }
 main { max-width: 1240px; margin: 0 auto; padding: 24px; }
 header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px 32px; margin-bottom: 24px; }
@@ -34,4 +34,16 @@ canvas { display: block; width: 100%; height: auto; }
 #previewIslandWater { width: 1080px; height: 552px; }
 .battle-preview { margin-bottom: 36px; }
 #previewBattleSea { width: 544px; height: 544px; border: 1px solid #526679; }
+.unit-preview { margin-bottom: 36px; }
+.unit-preview h2 { padding-left: 0; margin-bottom: 10px; }
+.unit-preview p { margin: 0 0 18px; color: #aabdd0; font-size: 14px; line-height: 1.7; }
+#previewUnitStyle { width: 1080px; height: 440px; }
+.party-preview { margin-bottom: 36px; }
+.party-preview h2 { padding-left: 0; margin-bottom: 10px; }
+.party-preview p { margin: 0 0 18px; color: #aabdd0; font-size: 14px; line-height: 1.7; }
+#previewLandParty { width: 1080px; height: 250px; }
+.native-preview { margin-bottom: 36px; }
+.native-preview h2 { padding-left: 0; margin-bottom: 10px; }
+.native-preview p { margin: 0 0 18px; color: #aabdd0; font-size: 14px; line-height: 1.7; }
+#previewNativeSprites { width: auto; height: auto; }
 @media (max-width: 760px) { main { padding: 16px; } .preview-layout, .rough-sea-layout { grid-template-columns: 1fr; } }

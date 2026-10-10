@@ -48,7 +48,7 @@ async function main() {
   const nodes = { exploreBtn: button, exploreInfo: info };
   /** @returns {object} 選択行を表示する最小画面要素。 */
   function element() {
-    return { children: [],
+    return { children: [], dataset: {},
       /** @param {object} node 子要素。 @returns {void} 子を追加する。 */
       append(node) { this.children.push(node); },
       /** @param {string} value 表示内容。 @returns {void} 古い選択肢を消す。 */

@@ -7,6 +7,9 @@ import { calcSupplyCap } from "../resources/supplies.js";
 import { calcTroopCap, TROOP_STATS } from "../resources/troops.js";
 import { getUpkeepForecast } from "../resources/upkeep.js";
 import { faithEffects } from "../faith/faith.js";
+import { shipIcon } from "./shipArt.js";
+
+export { shipIcon };
 
 const METRIC_NAMES = { supplyCap: "物資上限", troopCap: "兵員上限", funds: "次回維持費", troopFunds: "部隊維持費", shipFunds: "船維持費",
   shipUpkeepReduction: "船維持費軽減（%）", food: "次回食料消費", medics: "衛生兵効果（人分）", scouts: "斥候効果（人分）",
@@ -20,14 +23,6 @@ export function fleetMetricLabel(id) {
   return attack && Object.hasOwn(ATTACK_NAMES, attack[1]) ? `${ATTACK_NAMES[attack[1]]}${attack[2] === "Interval" ? "間隔（カウント）" : "威力"}` : id;
 }
 
-/** @param {string} id 船種。 @returns {string} 既存の線画に合わせた船種別の帆装アイコン。 */
-export function shipIcon(id) {
-  const index = id === "fishing_boat" ? 0 : id === "viking_ship" ? 2 : Object.keys(SHIP_TYPES).indexOf(id);
-  const masts = index >= 5 ? [21, 35, 47] : index === 2 ? [31] : [26, 42];
-  const sails = masts.map((x, i) => `<path d="M${x} ${12 + i * 4}v31"/><path d="M${x - 2} ${14 + i * 4}l-10 20h10Z" fill="currentColor" fill-opacity=".2"/>${index !== 0 && index !== 4 ? `<path d="M${x + 2} ${15 + i * 4}q12 7 10 18h-10Z" fill="currentColor" fill-opacity=".12"/>` : ""}`).join("");
-  const oars = [2, 4, 6].includes(index) ? '<path d="m20 45-6 9m14-9-6 9m14-9-6 9m14-9-6 9m14-9-6 9"/>' : "";
-  return `<svg class="ship-icon" viewBox="0 0 64 64" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${sails}<path d="M7 40q25 9 50-2l-8 13H18Z" fill="currentColor" fill-opacity=".15"/>${index >= 5 ? '<path d="M44 40v-7h10v6M10 42v-6h9v8"/>' : ""}${oars}<path d="M6 58q6-4 13 0t13 0t13 0t13 0"/></svg>`;
-}
 
 /** @param {string} id 船種。 @returns {string} 船種設定から作る固有効果の説明。 */
 export function shipEffectText(id) {

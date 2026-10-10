@@ -1,0 +1,179 @@
+{
+  "atlas": "image/ui/atlases/resources.png",
+  "columns": 4,
+  "rows": 5,
+  "icons": [
+    {
+      "cell": 0,
+      "output": "image/ui/ship.svg",
+      "bounds": [
+        18,
+        30,
+        264,
+        298
+      ]
+    },
+    {
+      "cell": 1,
+      "output": "image/ui/troops.svg",
+      "isolate": true,
+      "bounds": [
+        282,
+        81,
+        317,
+        240
+      ]
+    },
+    {
+      "cell": 2,
+      "output": "image/ui/faith.svg",
+      "isolate": true,
+      "bounds": [
+        589,
+        65,
+        253,
+        260
+      ]
+    },
+    {
+      "cell": 3,
+      "output": "image/ui/supplies.svg",
+      "bounds": [
+        857,
+        78,
+        249,
+        247
+      ]
+    },
+    {
+      "cell": 4,
+      "output": "image/ui/funds.svg",
+      "bounds": [
+        26,
+        352,
+        247,
+        222
+      ]
+    },
+    {
+      "cell": 5,
+      "output": "image/ui/fame.svg",
+      "bounds": [
+        333,
+        331,
+        208,
+        248
+      ]
+    },
+    {
+      "cell": 6,
+      "output": "image/ui/food.svg",
+      "bounds": [
+        579,
+        355,
+        269,
+        221
+      ]
+    },
+    {
+      "cell": 7,
+      "output": "image/ui/wood.svg",
+      "bounds": [
+        865,
+        355,
+        242,
+        219
+      ]
+    },
+    {
+      "cell": 8,
+      "output": "image/ui/stone.svg",
+      "bounds": [
+        16,
+        596,
+        270,
+        218
+      ]
+    },
+    {
+      "cell": 9,
+      "output": "image/ui/iron.svg",
+      "bounds": [
+        301,
+        609,
+        267,
+        216
+      ]
+    },
+    {
+      "cell": 10,
+      "output": "image/ui/fiber.svg",
+      "bounds": [
+        574,
+        587,
+        274,
+        247
+      ]
+    },
+    {
+      "cell": 11,
+      "output": "image/ui/salt.svg",
+      "bounds": [
+        866,
+        612,
+        235,
+        205
+      ]
+    },
+    {
+      "cell": 12,
+      "output": "image/ui/arms.svg",
+      "bounds": [
+        19,
+        830,
+        264,
+        260
+      ]
+    },
+    {
+      "cell": 13,
+      "output": "image/ui/textile.svg",
+      "bounds": [
+        290,
+        866,
+        287,
+        227
+      ]
+    },
+    {
+      "cell": 14,
+      "output": "image/ui/brew.svg",
+      "bounds": [
+        589,
+        842,
+        242,
+        245
+      ]
+    },
+    {
+      "cell": 15,
+      "output": "image/ui/leather.svg",
+      "bounds": [
+        858,
+        837,
+        245,
+        253
+      ]
+    },
+    {
+      "cell": 16,
+      "output": "image/ui/chart.svg",
+      "bounds": [
+        27,
+        1109,
+        262,
+        257
+      ]
+    }
+  ]
+}

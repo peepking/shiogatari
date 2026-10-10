@@ -1,6 +1,6 @@
 import { SEASONS, formatGameTime } from "./util.js";
 
-const SEASON_ICONS = ["✿", "☀", "❧", "❄"];
+const SEASON_ICONS = ["spring", "summer", "autumn", "winter"];
 
 /**
  * 年を補助情報、季節と日を主情報としてヘッダに表示する。
@@ -12,13 +12,13 @@ const SEASON_ICONS = ["✿", "☀", "❧", "❄"];
 export function renderGameTime(element, date) {
   if (!element) return;
   if (!element.querySelector(".game-date-year")) {
-    element.innerHTML = '<span class="game-date-icon" aria-hidden="true"></span><span class="game-date-content" aria-hidden="true"><span class="game-date-year"></span><span class="game-date-main"><span class="game-date-season"></span><span class="game-date-divider"></span><span><b class="game-date-day"></b><span class="game-date-unit">日</span></span></span></span>';
+    element.innerHTML = '<span class="game-date-icon" aria-hidden="true"><img alt=""></span><span class="game-date-content" aria-hidden="true"><span class="game-date-year"></span><span class="game-date-main"><span class="game-date-season"></span><span class="game-date-divider"></span><span><b class="game-date-day"></b><span class="game-date-unit">日</span></span></span></span>';
     element.setAttribute("role", "img");
   }
   const season = Number.isInteger(date.season) && SEASONS[date.season] ? date.season : 0;
   element.dataset.season = String(season);
   element.setAttribute("aria-label", formatGameTime(date));
-  element.querySelector(".game-date-icon").textContent = SEASON_ICONS[season];
+  element.querySelector(".game-date-icon img").src = `./image/ui/season-${SEASON_ICONS[season]}.svg?v=20261010-maritime-ui`;
   element.querySelector(".game-date-year").textContent = `神歴 ${date.year}年`;
   element.querySelector(".game-date-season").textContent = SEASONS[season];
   element.querySelector(".game-date-day").textContent = String(date.day);

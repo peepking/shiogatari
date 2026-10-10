@@ -15,7 +15,7 @@ async function loadArt() {
     /** @returns {void} 実際の画像と同じ切り出し寸法を保持する。 */
     constructor() {
       images.push(this);
-      [this.naturalWidth, this.naturalHeight] = [[1024, 1536], [1536, 1024], [2172, 724]][images.length - 1];
+      [this.naturalWidth, this.naturalHeight] = [[1024, 1536], [1536, 1024], [2172, 724], [1254, 1254]][images.length - 1];
     }
   }
   const context = vm.createContext({ Image: MockImage, URL });
@@ -25,7 +25,7 @@ async function loadArt() {
     initializeImportMeta(meta) { meta.url = pathToFileURL(path.resolve(__dirname, "../src/world/mapAssets.js")).href; },
   });
   const modules = new Map([["mapAssets.js", assets]]);
-  for (const file of ["mapOverviewArt.js", "mapCoastArt.js", "mapWaterArt.js", "mapTerrainArt.js", "mapSymbolArt.js", "mapArt.js", "bountyMapArt.js", "pirateKingMapArt.js", "dangerousSeaEventConfig.js", "dangerousSeaEventMapArt.js", "mapViewport.js"]) {
+  for (const file of ["mapSpriteBounds.js", "mapOverviewArt.js", "mapCoastArt.js", "mapWaterArt.js", "mapTerrainArt.js", "mapSymbolArt.js", "mapArt.js", "bountyMapArt.js", "pirateKingMapArt.js", "dangerousSeaEventConfig.js", "dangerousSeaEventMapArt.js", "mapViewport.js"]) {
     modules.set(file, new vm.SourceTextModule(readSource(file), { context }));
   }
   for (const module of modules.values()) {
@@ -44,18 +44,21 @@ async function loadArt() {
 
 /** @returns {object} 保存復元・画像の切り出し・海岸の線を記録する描画先。 */
 function makeContext() {
-  const calls = [], strokes = [], shapes = [];
+  const calls = [], strokes = [], shapes = [], rasterStates = [], savedStates = [];
   let depth = 0, points = [];
   /** @returns {void} 検証対象外の描画操作を受け取る。 */
   const noop = () => {};
   return {
-    calls, strokes, shapes, globalAlpha: 1, globalCompositeOperation: "source-over",
+    calls, strokes, shapes, rasterStates, globalAlpha: 1, globalCompositeOperation: "source-over", imageSmoothingEnabled: true,
     /** @returns {number} 保存状態の残数。 */
     get depth() { return depth; },
     /** @returns {void} 描画状態を保存する。 */
-    save() { depth++; },
+    save() {
+      depth++;
+      savedStates.push({ globalAlpha: this.globalAlpha, globalCompositeOperation: this.globalCompositeOperation, imageSmoothingEnabled: this.imageSmoothingEnabled });
+    },
     /** @returns {void} 描画状態を復元する。 */
-    restore() { assert.ok(depth > 0); depth--; },
+    restore() { assert.ok(depth > 0); depth--; Object.assign(this, savedStates.pop()); },
     translate: noop, scale: noop, rect: noop, clip: noop, closePath: noop, ellipse: noop, setTransform: noop, clearRect: noop,
     /** @param {number[]} args 矩形。 @returns {void} 地形の塗りを記録する。 */
     fillRect(...args) { shapes.push(["fillRect", this.fillStyle, ...args]); },
@@ -76,7 +79,7 @@ function makeContext() {
     /** @returns {void} 輪郭と線の色を記録する。 */
     stroke() { strokes.push({ color: this.strokeStyle, points: [...points] }); shapes.push(["stroke", this.strokeStyle, [...points]]); },
     /** @param {Array} args 切り出しと描画位置。 @returns {void} 画像描画を記録する。 */
-    drawImage(...args) { calls.push(args); },
+    drawImage(...args) { calls.push(args); rasterStates.push([this.imageSmoothingEnabled, this.globalCompositeOperation, this.globalAlpha]); },
     /** @returns {object} 描画環境に依存しないグラデーション。 */
     createLinearGradient() { return { addColorStop: noop }; },
   };
@@ -205,8 +208,8 @@ function verifyIslandBackgrounds(art) {
     } else {
       assert.equal(ctx.calls.length, 0, `${label}: 簡易表示は画像を使わない`);
       assert.equal(ctx.shapes[0][0], "fillRect", `${label}: 最初に背景の水面を塗る`);
-      assert.equal(ctx.shapes[0][1], "#1b526d", `${label}: 背景の基底を海色にする`);
-      assert.equal(ctx.shapes.some(shape => shape[0] === "fillRect" && shape[1] === "#438d99"), surrounding === "shoal", `${label}: 浅瀬は周囲に実在するときだけ重ねる`);
+      assert.equal(ctx.shapes[0][1], "#245876", `${label}: 背景の基底を海色にする`);
+      assert.equal(ctx.shapes.some(shape => shape[0] === "fillRect" && shape[1] === "#4b9eaa"), surrounding === "shoal", `${label}: 浅瀬は周囲に実在するときだけ重ねる`);
     }
     assert.equal(ctx.depth, 0, `${label}: 描画状態を復元する`);
   }
@@ -238,7 +241,11 @@ function verifyOverviewCoverage(art, phase) {
       assertOutline(`${cell.settlement ? "pirateHarbor" : cell.building}/${size}`, ctx => art.map.drawMapTile(ctx, cell, 0, 0, size, false, "#aabbcc", 0));
     }
     for (const kind of SITE_KINDS) {
-      assertOutline(`${kind}/${size}`, ctx => art.symbols.drawIllustratedSite(ctx, kind, 0, 0, size, false));
+      const site = assertOutline(`${kind}/${size}`, ctx => art.symbols.drawIllustratedSite(ctx, kind, 0, 0, size, false));
+      if (kind === "battlefield") {
+        assert.ok(site.shapes.some(shape => shape[0] === "fill" && shape[1] === "#b65349"), `${phase}: ${size}pxの戦場跡にも赤い旗を残す`);
+        assert.ok(site.shapes.some(shape => shape[0] === "fill" && shape[1] === "#986a43"), `${phase}: ${size}pxの戦場跡に残された木の丸盾を描く`);
+      }
     }
     for (const terrain of ["sea", "plain"]) {
       for (const crowded of [false, true]) {
@@ -300,7 +307,7 @@ function verifyHarborSurface(art, phase) {
       assert.equal(ctx.calls.slice(hook.images).filter(call => call[0] === art.images[0]).length, 1, `${label}: 危険海面の上に港の画像を残す`);
     } else {
       assert.ok(hook.shapes > 0, `${label}: 背景の海色の後に危険海面を描く`);
-      const harborColor = detailed ? "#98724f" : "#b59162";
+      const harborColor = detailed ? "#98724f" : "#a08357";
       assert.ok(ctx.shapes.findIndex(shape => shape[0] === "fill" && shape[1] === harborColor) >= hook.shapes, `${label}: 危険海面の上に港の輪郭を残す`);
     }
     assert.equal(ctx.depth, 0, `${label}: 海面と港の描画状態を復元する`);
@@ -372,11 +379,68 @@ function verifyRenderMap(art) {
     assert.equal(x, 0); assert.equal(y, 0); assert.equal(units, 128);
     assert.equal(options.gx, position.x); assert.equal(options.gy, position.y);
     assert.equal(options.detailed, mode !== "full", `${mode}の縮尺を危険海面にも明示する`);
+    assert.equal(options.grid, mapData, `${mode}の危険海面へ地図端を判定する実マップを渡す`);
     assert.equal(options.seaAt, seaAt, `${mode}の港と隣接海の接続に描画用の索引を使う`);
     assert.equal(options.onReady, context.renderMap, `${mode}で海面画像の読込み後にも再描画する`);
     assert.equal(ctx.depth, 0, `${mode}の描画状態を復元する`);
     if (mode === "full") assert.equal(ctx.calls.length, imageCount, "50×50の全体地図は画像の縮小を使わない");
   }
+}
+
+/**
+ * 図柄と地形の小さな描画面を縮尺間で再利用し、補間設定を後続の描画へ持ち越さない。
+ * @param {object} art 読み込み済みの描画モジュール。
+ * @returns {void}
+ */
+function verifyRasterCaches(art) {
+  const surfaces = [];
+  art.context.document = {
+    /** @returns {object} 原画を一度だけ切り出した小さな描画面を記録する。 */
+    createElement() {
+      const painter = makeContext();
+      const surface = {
+        width: 0, height: 0, painter,
+        /** @returns {object} 描画状態を記録する。 */
+        getContext() { return painter; },
+      };
+      surfaces.push(surface);
+      return surface;
+    },
+  };
+  const target = makeContext();
+  for (const kind of ["ship", "storm", "party"]) {
+    const count = surfaces.length;
+    let cached;
+    for (const [index, size] of [14, 700 / 19, 700 / 9].entries()) {
+      target.imageSmoothingEnabled = index !== 1;
+      const originalSmoothing = target.imageSmoothingEnabled;
+      assert.equal(art.assets.drawMapSprite(target, kind, 10, 20, size), true);
+      const [surface, x, y, width, height] = target.calls.at(-1);
+      if (index === 0) cached = surface;
+      assert.equal(surface, cached, `${kind}: 三縮尺とも同じ図柄の描画面を再利用する`);
+      assert.equal(surfaces.length, count + 1, `${kind}: 移動や拡大で図柄の切り出しを増やさない`);
+      assert.equal(Math.max(surface.width, surface.height), 40, `${kind}: 図柄を共通の画素密度に整理する`);
+      assert.equal(surface.painter.calls.length, 1, `${kind}: 原画は初回だけ切り出す`);
+      assert.equal(surface.painter.rasterStates[0][0], false, `${kind}: 切り出しで輪郭をぼかさない`);
+      assert.equal(surface.painter.calls[0][0], art.images[kind === "party" ? 3 : kind === "storm" ? 2 : 0], `${kind}: 対応する原画を使う`);
+      assert.ok(x >= 10 && y >= 20 && x + width <= 10 + size && y + height <= 20 + size, `${kind}: 描画面をマス内に収める`);
+      assert.equal(target.rasterStates.at(-1)[0], false, `${kind}: 再拡大でも輪郭をぼかさない`);
+      assert.equal(target.imageSmoothingEnabled, originalSmoothing, `${kind}: 呼出元の補間設定を復元する`);
+      assert.equal(target.depth, 0, `${kind}: 描画状態を復元する`);
+    }
+  }
+  const count = surfaces.length;
+  art.assets.drawTerrainTexture(target, "sea", 5, 6);
+  const terrain = target.calls.at(-1), created = surfaces.length;
+  assert.equal(terrain[0].width, 512); assert.equal(terrain[0].height, 512);
+  assert.ok(surfaces.slice(count).some(surface => surface.width === 128 && surface.height === 128), "海の模様を少ない色面で継ぎ目合成する");
+  assert.equal(terrain[0].painter.rasterStates.at(-1)[0], false, "合成した色面を拡大するとき輪郭をぼかさない");
+  art.assets.drawTerrainTexture(target, "sea", 9, 10);
+  assert.deepEqual(target.calls.at(-1), terrain, "四マス先でも同じ海面模様の座標を使う");
+  assert.equal(surfaces.length, created, "地形の繰り返し面も移動ごとに作り直さない");
+  assert.equal(target.rasterStates.at(-1)[0], false, "海面の再拡大で色面をぼかさない");
+  assert.equal(target.imageSmoothingEnabled, true, "地形描画も呼出元の補間設定を復元する");
+  assert.equal(target.depth, 0);
 }
 
 /** @returns {Promise<void>} 画像待機・失敗時の代替・全縮尺・海岸境界・重複地点を検証する。 */
@@ -386,10 +450,11 @@ async function main() {
   /** @returns {void} 読み込み完了の再描画回数を記録する。 */
   const onReady = () => { readyCount++; };
   for (let i = 0; i < 10; i++) art.assets.prepareMapAssets(onReady);
-  assert.equal(art.images.length, 3, "同じ地図の再描画で画像を追加要求しない");
-  assert.match(art.images[0].src, /\/image\/map\/sprites\.png$/);
-  assert.match(art.images[1].src, /\/image\/map\/terrain\.png$/);
-  assert.match(art.images[2].src, /\/image\/map\/events\.png$/);
+  assert.equal(art.images.length, 4, "同じ地図の再描画で画像を追加要求しない");
+  assert.match(art.images[0].src, /\/image\/map\/sprites-pixel\.png\?v=20261011-map-sprite-redraw$/);
+  assert.match(art.images[1].src, /\/image\/map\/terrain-pixel\.png$/);
+  assert.match(art.images[2].src, /\/image\/map\/events-pixel\.png\?v=20261011-map-sprite-redraw$/);
+  assert.match(art.images[3].src, /\/image\/map\/party-norse-pixel\.png$/);
   const ctx = makeContext();
   verifyOverviewCoverage(art, "未読込み");
   verifyHarborSurface(art, "未読込み");
@@ -402,6 +467,11 @@ async function main() {
   assert.equal(art.assets.mapAssetsReady(), false);
   assert.equal(art.assets.drawMapSprite(ctx, "storm", 0, 0, 32), false);
   art.images[2].onload();
+  assert.equal(readyCount, 0, "既存三枚が揃っても北欧の一行の画像を待つ");
+  assert.equal(art.assets.mapAssetsReady(), false);
+  assert.equal(art.assets.drawMapSprite(ctx, "party", 0, 0, 32), false);
+  verifyOverviewCoverage(art, "一行画像の読込み待ち");
+  art.images[3].onload();
   assert.equal(readyCount, 1, "全画像が揃ったときに一度だけ再描画する");
   assert.equal(art.assets.mapAssetsReady(), true);
   verifyOverviewCoverage(art, "読込み完了");
@@ -414,7 +484,7 @@ async function main() {
       assert.ok(sx >= 0 && sy >= 0 && sx + sw <= image.naturalWidth && sy + sh <= image.naturalHeight, "切り出しは各原画の内側に収める");
       assert.ok(dx >= 10 && dy >= 20 && dx + dw <= 10 + size && dy + dh <= 20 + size, "図柄は三縮尺ともマスの内側に収める");
       assert.ok(Math.abs(dw / dh - sw / sh) < 0.00001, "図柄の縦横比を変えない");
-      assert.equal(image, art.images[["storm", "lantern", "sinkingShip"].includes(kind) ? 2 : 0], `${kind}を対応する原画から切り出す`);
+      assert.equal(image, art.images[kind === "party" ? 3 : ["storm", "lantern", "sinkingShip"].includes(kind) ? 2 : 0], `${kind}を対応する原画から切り出す`);
       rectangles.add([image.src, sx, sy, sw, sh].join(","));
       const detailed = makeContext();
       assert.equal(art.symbols.drawIllustratedSite(detailed, kind, 0, 0, size, true), true);
@@ -457,6 +527,7 @@ async function main() {
   assert.ok(ctx.calls.at(-1)[7] > 32 && ctx.calls.at(-1)[7] <= 44, "現在地が複数の地点と重なっても縮小は一度だけにする");
   assert.equal(ctx.depth, 0);
   verifyRenderMap(art);
+  verifyRasterCaches(art);
   const stamps = [], fills = [], composites = [];
   art.context.document = {
     /** @returns {object} ピンの画像合成と攻守配色を記録する。 */
@@ -466,8 +537,13 @@ async function main() {
       stamp.fillRect = (...args) => { fills.push([stamp.fillStyle, stamp.globalCompositeOperation, stamp.globalAlpha, ...args]); };
       /** @param {Array} args 原画と範囲。 @returns {void} 盾の明暗を戻す合成方法を記録する。 */
       stamp.drawImage = (...args) => { stamp.calls.push(args); composites.push([stamp.globalCompositeOperation, stamp.globalAlpha]); };
-      stamps.push(stamp);
-      return { getContext: () => stamp };
+      const surface = {
+        width: 0, height: 0, painter: stamp,
+        /** @returns {object} ピンまたは原画の描画先を返す。 */
+        getContext() { return stamp; },
+      };
+      stamps.push(surface);
+      return surface;
     },
   };
   for (const size of [700 / 19, 700 / 9]) {
@@ -476,11 +552,14 @@ async function main() {
     const [, x, y, width, height] = ctx.calls.at(-1);
     assert.ok(x > 0 && y > 0 && x + width < size && y + height < size, "画像の防衛盾を二つの詳細縮尺ともマス内に収める");
   }
-  assert.equal(stamps.length, 1, "同じ攻守配色のピンは合成済み画像を使う");
+  assert.equal(stamps.filter(surface => surface.width === 64 && surface.height === 64).length, 1, "同じ攻守配色のピンは合成済み画像を使う");
+  assert.equal(stamps.filter(surface => Math.max(surface.width, surface.height) === 40).length, 1, "盾の原画も一度だけ切り出し、明暗を戻すときに再利用する");
   assert.deepEqual(fills, [["#aa0000", "source-atop", 1, 0, 0, 64, 64], ["#0000aa", "source-atop", 1, 32, 0, 32, 64]], "防衛色は攻撃色を混ぜず、右半分だけに不透明で塗る");
-  assert.deepEqual(composites, [["source-over", 1], ["luminosity", 0.45]], "原画の色を戻さず、無彩色の明暗だけを戻す");
+  assert.deepEqual(composites, [["source-over", 1], ["source-over", 1], ["luminosity", 0.45]], "原画を切り出した後、配色に原画の色を混ぜず無彩色の明暗だけを戻す");
+  assert.equal(ctx.rasterStates.at(-1)[0], false, "配色済みピンの拡大でも輪郭をぼかさない");
+  assert.equal(ctx.imageSmoothingEnabled, true, "ピン描画後も呼出元の補間設定を復元する");
   verifyWaterMasks();
-  for (let failedIndex = 0; failedIndex < 3; failedIndex++) {
+  for (let failedIndex = 0; failedIndex < 4; failedIndex++) {
     const failed = await loadArt();
     let failedCount = 0;
     failed.assets.prepareMapAssets(() => { failedCount++; });
@@ -489,14 +568,16 @@ async function main() {
     remaining[0].onload();
     assert.equal(failedCount, 0, "一枚の失敗後も残る画像の結果を待つ");
     remaining[1].onload();
+    assert.equal(failedCount, 0, "一枚の失敗後も三枚目の結果まで待つ");
+    remaining[2].onload();
     assert.equal(failedCount, 1);
     assert.equal(failed.assets.mapAssetsReady(), false);
     failed.assets.prepareMapAssets(onReady);
-    assert.equal(failed.images.length, 3, "失敗時に画像要求のループを作らない");
+    assert.equal(failed.images.length, 4, "失敗時に画像要求のループを作らない");
     assert.equal(failed.terrain.drawIllustratedTile(ctx, land, 0, 0, 64, true, null, 0), false, "読み込み失敗時は従来描画へ戻せる");
     verifyOverviewCoverage(failed, `画像${failedIndex + 1}の失敗`);
     verifyHarborSurface(failed, `画像${failedIndex + 1}の失敗`);
   }
-  console.log("地図画像三枚の一括切替・27図柄・全種類の13px簡易表示・3縮尺・全体地図の現在地・四方向の入り江接続・孤島の水深背景・共有辺の透過画素・画像失敗の代替・無法港の危険海面と描画順: 全項目成功");
+  console.log("地図画像四枚の一括切替・北欧の一行専用画像・27図柄・全種類の13px簡易表示・3縮尺・全体地図の現在地・四方向の入り江接続・孤島の水深背景・共有辺の透過画素・画像失敗の代替・無法港の危険海面と描画順・図柄と地形の描画面再利用・補間設定の復元: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

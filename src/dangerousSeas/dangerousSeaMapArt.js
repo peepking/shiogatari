@@ -43,41 +43,49 @@ function regionalMask(sea, neighbors) {
  */
 function drawRegionalWaves(ctx, sea, gx, gy, detailed) {
   const storm = sea.regionId === "sw", core = sea.level === "core";
-  ctx.fillStyle = storm ? "#244638" : "#303857"; ctx.fillRect(0, 0, 128, 128);
+  ctx.fillStyle = storm ? "#30564c" : "#354765"; ctx.fillRect(0, 0, 128, 128);
   const shift = ((((gx % 4) + 4) % 4) * 11 + (((gy % 4) + 4) % 4) * 7) % 18;
-  ctx.lineCap = "round";
+  ctx.lineCap = "butt"; ctx.lineJoin = "miter";
   for (const row of detailed ? [30, 66, 102] : [43, 91]) {
     ctx.beginPath();
     if (storm) {
-      ctx.moveTo(7, row + shift + 10); ctx.bezierCurveTo(32, row + shift + 7, 52, row + shift - 23, 79, row + shift - 18);
-      ctx.bezierCurveTo(95, row + shift - 16, 102, row + shift - 28, 123, row + shift - 28);
+      ctx.moveTo(8, row + shift + 8); ctx.lineTo(30, row + shift + 8); ctx.lineTo(30, row + shift);
+      ctx.lineTo(52, row + shift); ctx.lineTo(52, row + shift - 8); ctx.lineTo(78, row + shift - 8);
+      ctx.moveTo(90, row + shift - 16); ctx.lineTo(106, row + shift - 16); ctx.lineTo(106, row + shift - 24); ctx.lineTo(122, row + shift - 24);
     } else {
-      ctx.moveTo(9, row + shift); ctx.bezierCurveTo(27, row - 27, 95, row - 22, 107, row + shift - 3);
-      ctx.bezierCurveTo(119, row + 15, 58, row + 20, 48, row + shift + 5);
+      ctx.moveTo(10, row + shift); ctx.lineTo(10, row + shift - 12); ctx.lineTo(34, row + shift - 12);
+      ctx.lineTo(34, row + shift - 20); ctx.lineTo(82, row + shift - 20); ctx.lineTo(82, row + shift - 12);
+      ctx.lineTo(106, row + shift - 12); ctx.lineTo(106, row + shift + 4); ctx.lineTo(84, row + shift + 4);
+      ctx.lineTo(84, row + shift + 12); ctx.lineTo(58, row + shift + 12);
     }
-    ctx.strokeStyle = storm ? "#0a211780" : "#141e3f80"; ctx.lineWidth = detailed ? 9 : 12; ctx.stroke();
-    ctx.strokeStyle = storm ? "#ceddcb" : "#8fbacb"; ctx.lineWidth = detailed ? (core ? 3 : 2) : 6; ctx.stroke();
+    ctx.strokeStyle = storm ? "#173a3380" : "#1f2d4a80"; ctx.lineWidth = detailed ? 9 : 12; ctx.stroke();
+    ctx.strokeStyle = storm ? "#c3d6c6" : "#8caeba"; ctx.lineWidth = detailed ? (core ? 4 : 3) : 6; ctx.stroke();
   }
   if (!storm && detailed) {
-    ctx.lineWidth = 12; ctx.strokeStyle = "#b6c3df30";
-    ctx.beginPath(); ctx.moveTo(-12, 35); ctx.bezierCurveTo(35, 6, 65, 55, 140, 24); ctx.stroke();
+    ctx.fillStyle = "#8caeba30";
+    ctx.fillRect(0, 20, 34, 12); ctx.fillRect(34, 28, 42, 12); ctx.fillRect(76, 20, 52, 12);
   }
 }
 
 /**
  * 南西の荒波と南東の霧の潮流を、周囲の通常海面へなじませて描く。
  * 詳細表示は四マスにまたがる原画、全体表示は専用の波形を使い、地点は後段に残す。
+ * 世界の外側は現在の海域が続くものとして扱い、地図端では通常海へ減衰させない。
  * @param {CanvasRenderingContext2D} ctx 描画先。 @param {object|null} sea 海域属性。
  * @param {number} x 左端。 @param {number} y 上端。 @param {number} size マス幅。
  * @param {object} [options] 世界座標・海域検索・再描画・詳細表示の指定。 @returns {void}
  */
 export function drawDangerousSeaTile(ctx, sea, x, y, size, options = {}) {
   if (!sea || !["sw", "se"].includes(sea.regionId)) return;
-  const { gx = 0, gy = 0, seaAt, onReady, detailed = size > 14 } = options;
+  const { gx = 0, gy = 0, grid, seaAt, onReady, detailed = size > 14 } = options;
   prepareDangerousSeaSurface(onReady);
-  const neighbors = SIDES.map(([dx, dy]) => seaAt ? seaAt({ x: gx + dx, y: gy + dy }) : sea);
+  const neighbors = SIDES.map(([dx, dy]) => {
+    const position = { x: gx + dx, y: gy + dy };
+    if (grid && (position.y < 0 || position.y >= grid.length || position.x < 0 || position.x >= grid[position.y].length)) return sea;
+    return seaAt ? seaAt(position) : sea;
+  });
   const key = `${sea.regionId}:${sea.level}:${neighbors.map(neighbor => neighbor ? `${neighbor.regionId}${neighbor.level}` : "-").join(":")}:${gx % 4}:${gy % 4}:${detailed}`;
-  ctx.save(); ctx.translate(x, y); ctx.scale(size / 128, size / 128);
+  ctx.save(); ctx.translate(x, y); ctx.scale(size / 128, size / 128); ctx.imageSmoothingEnabled = false;
   ctx.beginPath(); ctx.rect(0, 0, 128, 128); ctx.clip();
   if (typeof document === "undefined") {
     ctx.globalAlpha = sea.level === "core" ? 0.92 : 0.58;

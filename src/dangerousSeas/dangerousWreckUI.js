@@ -104,6 +104,7 @@ export function renderDangerousWreckChoice(button, sync, finish) {
   choices.innerHTML = "";
   for (const [id, text] of [["leave", "甲板の積荷を持って引き上げ"], ["cargo", "船倉の積荷を回収（追加1日）"], ["rescue", "生存者を救助（追加1日）"]]) {
     const option = document.createElement("button"); option.className = "btn"; option.textContent = text;
+    option.dataset.wreckChoice = id;
     option.onclick = () => chooseDangerousWreckBranch(id, sync, finish); choices.append(option);
   }
   const hints = document.createElement("p"); hints.className = "tiny"; hints.textContent = `積荷か救助、どちらか一方を選べます。\n${dangerousWreckHints(pending)}`; choices.append(hints);

@@ -1,0 +1,231 @@
+{
+  "atlas": "image/ui/atlases/ships-tides.png",
+  "columns": 4,
+  "rows": 4,
+  "icons": [
+    {
+      "cell": 0,
+      "output": "image/ui/ship-caravel.png",
+      "bounds": [
+        20,
+        0,
+        297,
+        275
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 1,
+      "output": "image/ui/ship-knarr.png",
+      "bounds": [
+        379,
+        1,
+        295,
+        272
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 2,
+      "output": "image/ui/ship-longship.png",
+      "bounds": [
+        750,
+        12,
+        320,
+        263
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 3,
+      "output": "image/ui/ship-cog.png",
+      "bounds": [
+        1138,
+        0,
+        293,
+        275
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 4,
+      "output": "image/ui/ship-galley.png",
+      "bounds": [
+        12,
+        303,
+        350,
+        245
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 5,
+      "output": "image/ui/ship-carrack.png",
+      "bounds": [
+        364,
+        276,
+        344,
+        277
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 6,
+      "output": "image/ui/ship-galleass.png",
+      "bounds": [
+        726,
+        293,
+        364,
+        258
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 7,
+      "output": "image/ui/ship-galleon.png",
+      "bounds": [
+        1113,
+        276,
+        327,
+        279
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 8,
+      "output": "image/ui/ship-fluyt.png",
+      "bounds": [
+        27,
+        550,
+        313,
+        260
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 9,
+      "output": "image/ui/ship-fishing_boat.png",
+      "bounds": [
+        392,
+        569,
+        276,
+        241
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 10,
+      "output": "image/ui/ship-viking_ship.png",
+      "bounds": [
+        742,
+        553,
+        332,
+        253
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 11,
+      "output": "image/ui/tide-stage-0.png",
+      "bounds": [
+        1107,
+        554,
+        335,
+        240
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 12,
+      "output": "image/ui/tide-stage-1.png",
+      "bounds": [
+        41,
+        811,
+        284,
+        267
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 13,
+      "output": "image/ui/tide-stage-2.png",
+      "bounds": [
+        370,
+        825,
+        308,
+        253
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 14,
+      "output": "image/ui/tide-stage-3.png",
+      "bounds": [
+        711,
+        806,
+        374,
+        272
+      ],
+      "size": [
+        128,
+        128
+      ]
+    },
+    {
+      "cell": 15,
+      "output": "image/ui/tide-stage-4.png",
+      "bounds": [
+        1100,
+        793,
+        343,
+        287
+      ],
+      "size": [
+        128,
+        128
+      ]
+    }
+  ]
+}

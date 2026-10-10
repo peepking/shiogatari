@@ -31,7 +31,7 @@ export function bountyRestriction(site) {
 /** @param {string} id 勢力ID。 @returns {string} 勢力名と装飾アイコン。 */
 function factionLabel(id) {
   const f = FACTIONS.find(f => f.id === id);
-  return `<img class="resource-icon" src="./image/factions/${id}.svg" alt="">${escapeHtml(f?.name || id)}`;
+  return `<img class="resource-icon" src="${f?.sigil || `./image/factions/${id}.svg?v=20261011-heraldry`}" alt="">${escapeHtml(f?.name || id)}`;
 }
 
 /** @param {object} s 個体。 @returns {string} 一覧カード。 */

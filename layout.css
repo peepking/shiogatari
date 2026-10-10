@@ -6,6 +6,10 @@
 #gameTime[data-season="2"] { --season-color: #f5bc94; --season-bg: #3c2c29; }
 #gameTime[data-season="3"] { --season-color: #b7deff; --season-bg: #20344d; }
 .game-date-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 10px; color: var(--season-color); background: var(--season-bg); font-size: 24px; line-height: 1; }
+.game-date-icon img { display: block; width: 26px; height: 26px; object-fit: contain; }
+/* 地図と同じ粒度の図柄を、資産・結果・所属・人物・施設の各表示で鮮明に保つ。 */
+.game-date-icon img, .asset-thumb img, .resource-icon, .asset-codex-symbol, .faction-flag img, .noble-card img, .location-faction img, .location-audience img { image-rendering: pixelated; }
+.ship-icon, .tide-icon { shape-rendering: crispEdges; image-rendering: pixelated; }
 .game-date-content { display: flex; flex-direction: column; gap: 2px; }
 .game-date-year { font-size: 10px; font-weight: 500; letter-spacing: 0.06em; line-height: 1.2; color: #aebdd2; }
 .game-date-main { display: flex; align-items: center; gap: 9px; line-height: 1; }
@@ -79,55 +83,66 @@ main .grid > * { min-width: 0; }
 .location-action-group h3 span { font-size: 10px; letter-spacing: 0; font-weight: 400; color: var(--muted); }
 .location-action-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
 .location-actions .btn { display: flex; align-items: center; justify-content: flex-start; gap: 9px; width: 100%; min-width: 0; min-height: 48px; padding: 11px 10px; border: 1px solid #afc8e21c; border-radius: 10px; background: #b7cce609; color: #e3ecf7; font-size: 12px; font-weight: 600; line-height: 1.5; text-align: left; white-space: normal; transition: background .15s, border-color .15s; }
-.location-actions .btn::before { content: ""; width: 23px; height: 23px; flex: 0 0 23px; background: var(--action-icon, url('./image/ui/chart.svg')) center / contain no-repeat; opacity: .85; }
+.location-actions .btn::before { content: ""; width: 23px; height: 23px; flex: 0 0 23px; background: var(--action-icon, url('./image/ui/action-explore.svg?v=20261010-maritime-ui')) center / contain no-repeat; image-rendering: pixelated; }
 .location-actions .btn:hover:not(:disabled) { background: #87cbb21a; border-color: #87cbb26b; }
 .location-actions .btn:active:not(:disabled) { background: #87cbb22b; }
 .location-actions .btn:focus-visible { outline: 2px solid var(--accent2); outline-offset: 3px; }
 .location-actions .btn:disabled { opacity: .42; cursor: not-allowed; }
 .location-action-note { margin: 8px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
 .location-action-exit { display: grid; gap: 7px; padding-top: 12px; border-top: 1px solid var(--line); }
-.location-action-exit .btn { justify-content: center; min-height: 44px; background: transparent; color: #b4c8dd; --action-icon: url('./image/ui/action-exit.svg'); }
+.location-action-exit .btn { justify-content: center; min-height: 44px; background: transparent; color: #b4c8dd; --action-icon: url('./image/ui/action-exit.svg?v=20261010-maritime-ui'); }
 .location-action-grid #exploreInfo,
 .location-action-grid #dangerousSeaEventInfo { grid-column: 1 / -1; }
 /* 難破船の選択は全列を使って縦に並べ、長い斥候情報でボタンが押し潰されるのを防ぐ。 */
 .location-action-grid #dangerousWreckChoices { display: grid; grid-column: 1 / -1; grid-template-columns: minmax(0, 1fr); min-width: 0; gap: 7px; }
 .location-action-grid #dangerousWreckChoices .tiny { margin: 4px 0 0; overflow-wrap: anywhere; }
-#tradeBtn { --action-icon: url('./image/ui/supplies.svg'); }
-#outfittingOpenBtn { --action-icon: url('./image/ui/ship.svg'); }
-#hireBtn { --action-icon: url('./image/ui/troops.svg'); }
-#fishBtn, #fishingHutBtn { --action-icon: url('./image/ui/action-fish.svg'); }
-#questOpenBtn { --action-icon: url('./image/ui/action-quest.svg'); }
-#bountyOpenBtn, #bountyVisitBtn, #oracleBattleBtn { --action-icon: url('./image/ui/arms.svg'); }
-#audienceBtn { --action-icon: url('./image/ui/fame.svg'); }
-#identityOpenBtn { --action-icon: url('./image/ui/fame.svg'); }
-#locationOfficeBtn { --action-icon: url('./image/ui/action-quest.svg'); }
-#locationCrimeBtn { --action-icon: url('./image/ui/arms.svg'); }
+#tradeBtn { --action-icon: url('./image/ui/action-trade.svg?v=20261010-maritime-ui'); }
+#outfittingOpenBtn { --action-icon: url('./image/ui/action-shipyard.svg?v=20261010-maritime-ui'); }
+#hireBtn { --action-icon: url('./image/ui/troops.svg?v=20261010-maritime-ui'); }
+#fishBtn { --action-icon: url('./image/ui/action-fish.svg?v=20261010-maritime-ui'); }
+#fishBtn[data-icon="codex"] { --action-icon: url('./image/ui/action-fish-codex.svg?v=20261010-maritime-ui'); }
+#fishingHutBtn { --action-icon: url('./image/ui/action-fishing-hut.svg?v=20261010-maritime-ui'); }
+#questOpenBtn { --action-icon: url('./image/ui/action-quest.svg?v=20261010-maritime-ui'); }
+#bountyOpenBtn, #bountyVisitBtn, #dangerousBountyVisitBtn { --action-icon: url('./image/ui/action-bounty.svg?v=20261011-map-shared-ui'); }
+#pirateStoryVisitBtn { --action-icon: url('./image/factions/pirates.svg?v=20261010-maritime-ui'); }
+#oracleBattleBtn { --action-icon: url('./image/ui/arms.svg?v=20261010-maritime-ui'); }
+#audienceBtn { --action-icon: url('./image/ui/action-audience.svg?v=20261010-maritime-ui'); }
+#identityOpenBtn { --action-icon: url('./image/ui/identity.svg?v=20261010-maritime-ui'); }
+#locationOfficeBtn { --action-icon: url('./image/ui/action-office.svg?v=20261010-maritime-ui'); }
+#locationCrimeBtn { --action-icon: url('./image/ui/action-crime.svg?v=20261010-maritime-ui'); }
+#finalVoyageBtn { --action-icon: url('./image/ui/action-final-voyage.svg?v=20261010-maritime-ui'); }
+#exploreBtn, #chartExploreBtn { --action-icon: url('./image/ui/action-explore.svg?v=20261010-maritime-ui'); }
+#dangerousSeaEventBtn { --action-icon: url('./image/ui/action-sea-event.svg?v=20261010-maritime-ui'); }
+#dangerousWreckChoices .btn { --action-icon: url('./image/ui/action-trade.svg?v=20261010-maritime-ui'); }
+#dangerousWreckChoices [data-wreck-choice="rescue"] { --action-icon: url('./image/ui/action-rescue.svg?v=20261010-maritime-ui'); }
+#dangerousWreckChoices [data-wreck-choice="leave"] { --action-icon: url('./image/ui/action-exit.svg?v=20261010-maritime-ui'); }
 .location-actions #oracleBattleBtn, .location-actions #bountyVisitBtn {
   background: #385582; border-color: #7aa7ff; color: #fff;
 }
 .location-actions #oracleBattleBtn:hover:not(:disabled), .location-actions #bountyVisitBtn:hover:not(:disabled) {
   background: #486b9d; border-color: #a8c5ff;
 }
-#tideOpen, #oracleBtn, #modePrayBtn { --action-icon: url('./image/ui/faith.svg'); }
-#modeWaitBtn { --action-icon: url('./image/ui/action-wait.svg'); }
+#tideOpen, #oracleBtn, #modePrayBtn { --action-icon: url('./image/ui/faith.svg?v=20261010-maritime-ui'); }
+#modeWaitBtn { --action-icon: url('./image/ui/action-wait.svg?v=20261010-maritime-ui'); }
 .command-actions { padding-top: 15px; border-top: 1px solid var(--line); gap: 9px; }
 #audienceRow { margin-top: 16px; }
-#nationalPowerDonate, #audienceBribeBtn { --action-icon: url('./image/ui/funds.svg'); }
-#audienceHonorBtn { --action-icon: url('./image/ui/fame.svg'); }
-#audienceRequestBtn { --action-icon: url('./image/ui/action-quest.svg'); }
-#audienceResignBtn { --action-icon: url('./image/ui/action-exit.svg'); }
+#nationalPowerDonate, #audienceBribeBtn { --action-icon: url('./image/ui/funds.svg?v=20261011-wheat-coins'); }
+#audienceHonorBtn { --action-icon: url('./image/ui/identity.svg?v=20261010-maritime-ui'); }
+#audienceRequestBtn { --action-icon: url('./image/ui/action-quest.svg?v=20261010-maritime-ui'); }
+#audienceResignBtn { --action-icon: url('./image/ui/action-exit.svg?v=20261010-maritime-ui'); }
 .command-actions #audienceResignBtn { background: #ad626210; border-color: #c5797947; color: #e0bcbc; }
 .command-actions #audienceResignBtn:hover:not(:disabled) { background: #ad62622b; border-color: #c57979; }
 .command-actions-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 11px; letter-spacing: .08em; color: #b6c9dd; font-weight: 600; }
 .command-actions-title span { font-size: 10px; letter-spacing: 0; font-weight: 400; color: var(--muted); }
 #battlePrepInfo { justify-self: start; max-width: 100%; box-sizing: border-box; white-space: normal; line-height: 1.6; border: 0; border-left: 2px solid #b6c9dd55; border-radius: 0; background: transparent; padding: 4px 9px; color: #b6c9dd; }
-#battlePrepFightBtn, #warAttackRaidBtn, #warSkirmishBtn { --action-icon: url('./image/ui/arms.svg'); }
-#battlePrepRunBtn { --action-icon: url('./image/ui/action-exit.svg'); }
-#battlePrepPrayBtn { --action-icon: url('./image/ui/faith.svg'); }
-#battlePrepSurrenderBtn { --action-icon: url('./image/ui/action-surrender.svg'); }
-#warDefendRaidBtn, #warEscortBtn { --action-icon: url('./image/ui/action-shield.svg'); }
-#warSupplyFoodBtn { --action-icon: url('./image/ui/food.svg'); }
-#warBlockBtn { --action-icon: url('./image/ui/action-blockade.svg'); }
+#battlePrepFightBtn, #warAttackRaidBtn, #warSkirmishBtn { --action-icon: url('./image/ui/arms.svg?v=20261010-maritime-ui'); }
+#warGrandBtn { --action-icon: url('./image/ui/action-grand-battle.svg?v=20261010-maritime-ui'); }
+#battlePrepRunBtn { --action-icon: url('./image/ui/action-exit.svg?v=20261010-maritime-ui'); }
+#battlePrepPrayBtn { --action-icon: url('./image/ui/faith.svg?v=20261010-maritime-ui'); }
+#battlePrepSurrenderBtn { --action-icon: url('./image/ui/action-surrender.svg?v=20261010-maritime-ui'); }
+#warDefendRaidBtn, #warEscortBtn { --action-icon: url('./image/ui/action-shield.svg?v=20261010-maritime-ui'); }
+#warSupplyFoodBtn { --action-icon: url('./image/ui/food.svg?v=20261011-wheat-coins'); }
+#warBlockBtn { --action-icon: url('./image/ui/action-blockade.svg?v=20261010-maritime-ui'); }
 .command-actions #battlePrepFightBtn { background: #2c426b; border-color: #698dc16b; }
 .command-actions #battlePrepPrayBtn { background: #23403f; border-color: #78beae4d; }
 .command-actions #battlePrepSurrenderBtn { background: #ad626210; border-color: #c5797947; color: #e0bcbc; }

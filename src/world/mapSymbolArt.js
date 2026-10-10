@@ -36,7 +36,8 @@ export function drawIllustratedPin(ctx, pin, cx, cy, radius, detailed = true) {
     if (pinImages.size >= 48) pinImages.clear();
     pinImages.set(key, image);
   }
-  ctx.save(); ctx.shadowColor = "#071725"; ctx.shadowBlur = 1.5;
+  ctx.save(); ctx.shadowColor = "#07172580"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 1;
+  ctx.imageSmoothingEnabled = false;
   ctx.drawImage(image, cx - size / 2, cy - size / 2, size, size);
   ctx.restore();
   return true;
@@ -55,7 +56,7 @@ export function drawIllustratedPin(ctx, pin, cx, cy, radius, detailed = true) {
 export function drawIllustratedSite(ctx, kind, x, y, size, detailed = size > 20) {
   if (!detailed) return drawOverviewSymbol(ctx, kind, x, y, size);
   ctx.save();
-  ctx.shadowColor = "#071725"; ctx.shadowBlur = size < 20 ? 2 : 1.5;
+  ctx.shadowColor = "#07172580"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 1;
   const drawn = drawMapSprite(ctx, kind, x, y, size);
   ctx.restore();
   return drawn || drawOverviewSymbol(ctx, kind, x, y, size);

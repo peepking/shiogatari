@@ -1,0 +1,42 @@
+{
+  "boundsOutput": "image/map/redraw/packed-bounds.json",
+  "atlases": [
+    {
+      "output": "image/map/sprites-pixel.png", "width": 1024, "height": 1536, "columns": 4, "rows": 6, "maxSize": 224,
+      "icons": [
+        { "kind": "town", "source": "image/map/redraw/town-walled.png", "cell": [0, 0, 1254, 1254] },
+        { "kind": "village", "source": "image/map/redraw/maritime-atlas.png", "bounds": [559, 158, 435, 330] },
+        { "kind": "pirateHarbor", "source": "image/map/redraw/maritime-atlas.png", "bounds": [1065, 96, 426, 390] },
+        { "kind": "ship", "source": "image/map/redraw/maritime-atlas.png", "bounds": [53, 512, 425, 421] },
+        { "kind": "party", "source": "image/map/party-norse-pixel.png", "bounds": [111, 251, 1047, 889] },
+        { "kind": "inlet", "source": "image/map/redraw/sites-atlas.png", "cell": [1024, 0, 512, 512] },
+        { "kind": "shield", "source": "image/map/redraw/sites-atlas.png", "cell": [512, 512, 512, 512] },
+        { "kind": "wreck", "source": "image/map/redraw/maritime-atlas.png", "bounds": [548, 561, 442, 371] },
+        { "kind": "crate", "source": "image/map/redraw/sprites-before-redraw.png", "bounds": [32, 608, 215, 142], "preserve": true },
+        { "kind": "battlefield", "source": "image/map/redraw/battlefield.png", "cell": [0, 0, 1254, 1254] },
+        { "kind": "rumor", "source": "image/map/redraw/sites-atlas.png", "cell": [0, 0, 512, 512] },
+        { "kind": "altar", "source": "image/map/redraw/sites-atlas.png", "cell": [512, 0, 512, 512] },
+        { "kind": "treasure", "source": "image/map/redraw/sprites-before-redraw.png", "bounds": [47, 819, 187, 156], "preserve": true },
+        { "kind": "bounty", "source": "image/map/redraw/sprites-before-redraw.png", "bounds": [303, 780, 176, 207], "preserve": true },
+        { "kind": "pirateLord", "source": "image/map/redraw/sprites-before-redraw.png", "bounds": [556, 795, 195, 197], "preserve": true },
+        { "kind": "pirateKing", "source": "image/map/redraw/sprites-before-redraw.png", "bounds": [801, 779, 184, 219], "preserve": true },
+        { "kind": "fish", "source": "image/map/redraw/sprites-before-redraw.png", "bounds": [39, 1047, 190, 195], "preserve": true },
+        { "kind": "bell", "source": "image/map/redraw/sites-atlas.png", "cell": [0, 512, 512, 512] },
+        { "kind": "event", "source": "image/map/redraw/sprites-before-redraw.png", "bounds": [558, 1047, 173, 177], "preserve": true },
+        { "kind": "star", "source": "image/map/redraw/sprites-before-redraw.png", "bounds": [792, 1033, 194, 192], "preserve": true },
+        { "kind": "forest", "source": "image/map/redraw/landscape-atlas.png", "bounds": [48, 69, 553, 528] },
+        { "kind": "mountain", "source": "image/map/redraw/landscape-atlas.png", "bounds": [636, 139, 589, 458] },
+        { "kind": "forestAlt", "source": "image/map/redraw/landscape-atlas.png", "bounds": [48, 648, 543, 500] },
+        { "kind": "mountainAlt", "source": "image/map/redraw/landscape-atlas.png", "bounds": [631, 780, 594, 334] }
+      ]
+    },
+    {
+      "output": "image/map/events-pixel.png", "width": 2172, "height": 724, "columns": 3, "rows": 1, "maxSize": 648,
+      "icons": [
+        { "kind": "storm", "source": "image/map/redraw/events-before-redraw.png", "bounds": [94, 244, 570, 431], "preserve": true },
+        { "kind": "lantern", "source": "image/map/redraw/sites-atlas.png", "cell": [1024, 512, 512, 512] },
+        { "kind": "sinkingShip", "source": "image/map/redraw/maritime-atlas.png", "bounds": [1055, 541, 434, 396] }
+      ]
+    }
+  ]
+}

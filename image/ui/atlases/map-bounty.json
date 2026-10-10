@@ -1,0 +1,16 @@
+{
+  "atlas": "image/map/redraw/sprites-before-redraw.png",
+  "columns": 1,
+  "rows": 1,
+  "icons": [
+    {
+      "cell": 0,
+      "output": "image/ui/action-bounty.svg",
+      "bounds": [303, 780, 176, 207],
+      "size": [176, 207],
+      "padding": 0,
+      "preserve": true,
+      "viewBox": [24, 24]
+    }
+  ]
+}

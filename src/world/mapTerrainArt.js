@@ -4,7 +4,7 @@ import { drawCoast, drawInletCoast, groundOutline, inletCornerOutline } from "./
 import { drawOverviewWaterSurface, drawWaterSurface } from "./mapWaterArt.js";
 
 const WATER = new Set(["sea", "shoal"]);
-const OVERVIEW_COLORS = { sea: "#1b526d", shoal: "#438d99", plain: "#8a9b67", forest: "#526f4f", mountain: "#7a8980", deck: "#9c8057" };
+const OVERVIEW_COLORS = { sea: "#245876", shoal: "#4b9eaa", plain: "#80925b", forest: "#526e48", mountain: "#7f9291", deck: "#96653e" };
 
 /** @param {object} cell マス。 @returns {boolean} 海か浅瀬か。 */
 function isWater(cell) {
@@ -166,9 +166,9 @@ export function drawIllustratedTile(ctx, cell, x, y, size, detailed, factionColo
     ctx.strokeRect(0, 0, 128, 128);
   }
   if (settlement) {
-    ctx.shadowColor = "#071a2bb0"; ctx.shadowBlur = detailed ? 2 : 5;
+    ctx.shadowColor = "#071a2b80"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 1;
     drawMapSprite(ctx, cell.settlement?.pirateHaven ? "pirateHarbor" : cell.building, -3, -3, 134);
-    ctx.shadowBlur = 0;
+    ctx.shadowOffsetY = 0;
     if (!cell.settlement?.pirateHaven) drawFactionFlag(ctx, factionColor, !detailed);
   }
   ctx.restore();

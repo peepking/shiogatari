@@ -1,0 +1,67 @@
+{
+  "atlas": "image/ui/studies/representative-v2.png",
+  "columns": 4,
+  "rows": 2,
+  "icons": [
+    {
+      "cell": 0,
+      "output": "image/ui/spice.svg",
+      "bounds": [
+        32,
+        21,
+        396,
+        389
+      ]
+    },
+    {
+      "cell": 1,
+      "output": "image/ui/identity.svg",
+      "bounds": [
+        943,
+        25,
+        350,
+        407
+      ]
+    },
+    {
+      "cell": 2,
+      "output": "image/ui/illegal-drug.svg",
+      "bounds": [
+        21,
+        462,
+        407,
+        387
+      ]
+    },
+    {
+      "cell": 3,
+      "output": "image/ui/illicit-brew.svg",
+      "bounds": [
+        480,
+        447,
+        384,
+        410
+      ]
+    },
+    {
+      "cell": 4,
+      "output": "image/ui/stolen-craft.svg",
+      "bounds": [
+        943,
+        457,
+        330,
+        400
+      ]
+    },
+    {
+      "cell": 5,
+      "output": "image/ui/stolen-arms.svg",
+      "bounds": [
+        1325,
+        447,
+        424,
+        415
+      ]
+    }
+  ]
+}

@@ -4,11 +4,27 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>地図の描画確認 — 潮語り航海録</title>
-  <link rel="stylesheet" href="./mapArtPreview.css">
+  <link rel="stylesheet" href="./mapArtPreview.css?v=20261010-native-sprites-v2">
 </head>
 <body>
   <main>
     <header><h1>地図の描画確認</h1><p>ゲームと同じ画像・描画処理による確認用の地図と地点一覧</p></header>
+    <section class="native-preview" aria-labelledby="nativeSpriteTitle">
+      <h2 id="nativeSpriteTitle">図柄の原寸確認</h2>
+      <p>全27種を本番の描画で比較します。32・41・64pxは地形を含む1マスの実寸。40pxは切り出し後の図柄の長辺で、その4倍表示から色面や陰影を確認できます。全体地図の13pxと、その4倍も併記しています。</p>
+      <p>「維持」は今回そのまま使う9種、「一行」は既存の北欧風の一行です。図柄の40px欄には地形や影を重ねていません。</p>
+      <div class="preview-scroll"><canvas id="previewNativeSprites" width="360" height="8680" aria-label="全27種類のマップ図柄を32px、41px、64pxの実マス、長辺40pxの図柄と4倍拡大、全体13pxと4倍拡大で比較"></canvas></div>
+    </section>
+    <section class="party-preview" aria-labelledby="partyStyleTitle">
+      <h2 id="partyStyleTitle">中世北欧の一行</h2>
+      <p>陸上の現在地を平原・森・村で比較します。村では建物と重なる一行を小さく表示。全体地図の実寸と拡大も、ゲームと同じ描画です。</p>
+      <div class="preview-scroll"><canvas id="previewLandParty" width="1080" height="250" aria-label="中世北欧の一行を平原、森、村の32pxと64px、全体地図の13px実寸と4倍、図柄の4倍拡大で比較"></canvas></div>
+    </section>
+    <section class="unit-preview" aria-labelledby="unitStyleTitle">
+      <h2 id="unitStyleTitle">既存ユニットと地図の画風</h2>
+      <p>色面と陰影を整理した地形・建物に、変更していないユニット画像を重ねた比較です。右は戦闘と同じ1マス32px、左は地形と建物を見比べる確認用の配置です。</p>
+      <div class="preview-scroll"><canvas id="previewUnitStyle" width="1080" height="440" aria-label="新しい地形と建物に既存の歩兵、槍兵、弓兵、盾兵、海兵を重ねた地図と32pxの海戦マップ"></canvas></div>
+    </section>
     <section class="coast-preview" aria-labelledby="coastTitle">
       <h2 id="coastTitle">海岸の角・1マスの島</h2>
       <p>入り組んだ海岸を4方向で確認。孤島は村・街・平原・森・山を、海・浅瀬・両方が接する水面で比較します。各地図の右側は1マス14pxの簡易表示です。</p>
@@ -21,7 +37,7 @@
     </section>
     <section class="sea-preview" aria-labelledby="roughSeaTitle">
       <h2 id="roughSeaTitle">危険海域の海の表情</h2>
-      <p>通常の海から外縁、核心へと続く水面。無法港のマスにも荒海をつなぎ、地点や現在地が波の中でも見分けられるか確認します。</p>
+      <p>通常の海から外縁、核心へと続く水面。無法港の背景に加え、南西の左・下端と南東の右・下端まで荒海が途切れず続くことを、詳細・簡易の両表示で確認します。</p>
       <div class="rough-sea-layout">
         <article>
           <h3>南西・嵐の船墓場</h3>
@@ -57,6 +73,6 @@
       <div class="preview-scroll"><canvas id="previewCoverage" width="1120" height="1236" aria-label="全三十種類の詳細表示、13pxの簡易表示、簡易表示の4倍拡大"></canvas></div>
     </section>
   </main>
-  <script type="module" src="./mapArtPreview.js"></script>
+  <script type="module" src="./mapArtPreview.js?v=20261011-world-edge"></script>
 </body>
 </html>

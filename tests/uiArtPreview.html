@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <base href="../">
+  <title>UIアイコンの描画確認 — 潮語り航海録</title>
+  <link rel="stylesheet" href="styles.css?v=20261011-map-shared-ui">
+  <link rel="stylesheet" href="layout.css?v=20261011-wheat-coins">
+  <link rel="stylesheet" href="tests/uiArtPreview.css?v=20261011-map-shared-ui">
+</head>
+<body>
+  <main class="ui-art-preview">
+    <h1>UIアイコンの描画確認</h1>
+    <p class="ui-art-intro">木・鉄・羊毛・真鍮の素材感でそろえた、中世北欧の旅の道具。信仰は海の波、部隊員は3人組。全77種をゲームと同じ素材と描画で比較します。</p>
+    <section aria-labelledby="uiContextTitle">
+      <h2 id="uiContextTitle">ボタン・資源欄での見え方</h2>
+      <div class="ui-art-context">
+        <div class="location-actions is-settlement">
+          <div class="location-action-group"><h3>施設<span>旅の支度</span></h3><div class="location-action-grid">
+            <button type="button" class="btn" id="tradeBtn">物資取引</button><button type="button" class="btn" id="outfittingOpenBtn">造船所</button>
+            <button type="button" class="btn" id="hireBtn">部隊員雇用</button><button type="button" class="btn" id="fishingHutBtn">釣り小屋</button>
+          </div></div>
+          <div class="location-action-group"><h3>依頼・交流<span>人々を訪ねる</span></h3><div class="location-action-grid">
+            <button type="button" class="btn" id="questOpenBtn">依頼受注</button><button type="button" class="btn" id="bountyOpenBtn">賞金首</button>
+            <button type="button" class="btn" id="locationOfficeBtn">窓口で交渉</button><button type="button" class="btn" id="locationCrimeBtn">裏の行動</button>
+          </div></div>
+          <div class="location-action-group journey-action-group"><h3>旅の行動<span>潮と向き合う</span></h3><div class="location-action-grid">
+            <button type="button" class="btn" id="identityOpenBtn">所属・身分</button><button type="button" class="btn" id="fishBtn" data-icon="codex">魚図鑑</button>
+            <button type="button" class="btn" id="oracleBtn">神託を授かる</button><button type="button" class="btn" id="modePrayBtn">海に祈る</button>
+            <button type="button" class="btn" id="modeWaitBtn">1日待機</button><button type="button" class="btn" id="finalVoyageBtn">最終航海</button>
+          </div></div>
+        </div>
+        <div>
+          <div class="ui-art-resource-context">
+            <div><img src="image/ui/ship.svg?v=20261010-maritime-ui" alt=""><span>船<b>3</b></span></div>
+            <div><img src="image/ui/troops.svg?v=20261010-maritime-ui" alt=""><span>部隊<b>30</b></span></div>
+            <div><img src="image/ui/faith.svg?v=20261010-maritime-ui" alt=""><span>信仰<b>500</b></span></div>
+            <div><img src="image/ui/supplies.svg?v=20261010-maritime-ui" alt=""><span>物資<b>36</b></span></div>
+            <div><img src="image/ui/funds.svg?v=20261011-wheat-coins" alt=""><span>資金<b>2,000</b></span></div>
+            <div><img src="image/ui/fame.svg?v=20261010-maritime-ui" alt=""><span>名声<b>10</b></span></div>
+          </div>
+          <p class="ui-art-intro">禁制品にも、それぞれ専用の図柄を用意しました。</p>
+          <div class="ui-art-contraband-context">
+            <span><img src="image/ui/illegal-drug.svg?v=20261010-maritime-ui" alt="">違法薬物</span>
+            <span><img src="image/ui/illicit-brew.svg?v=20261010-maritime-ui" alt="">密造酒</span>
+            <span><img src="image/ui/stolen-craft.svg?v=20261010-maritime-ui" alt="">盗品工芸品</span>
+            <span><img src="image/ui/stolen-arms.svg?v=20261010-maritime-ui" alt="">盗品武具</span>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section aria-labelledby="uiResourcesTitle"><h2 id="uiResourcesTitle">資源・物資・行動</h2><div id="uiResources" class="ui-art-grid"></div></section>
+    <section aria-labelledby="uiSeasonsTitle"><h2 id="uiSeasonsTitle">四季</h2><div id="uiSeasons" class="ui-art-grid ui-art-seasons"></div></section>
+    <section aria-labelledby="uiFactionTitle"><h2 id="uiFactionTitle">勢力の紋章・貴族</h2><div id="uiFactions" class="ui-art-grid"></div></section>
+    <section aria-labelledby="uiShipsTitle"><h2 id="uiShipsTitle">船種</h2><div id="uiShips" class="ui-art-grid"></div></section>
+    <section aria-labelledby="uiTidesTitle"><h2 id="uiTidesTitle">信仰施設</h2><div id="uiTides" class="ui-art-grid"></div></section>
+    <section aria-labelledby="uiFishTitle"><h2 id="uiFishTitle">魚図鑑</h2><div id="uiFish" class="ui-art-grid"></div></section>
+    <p id="uiArtStatus" role="status">素材を確認中…</p>
+  </main>
+  <script type="module" src="tests/uiArtPreview.js?v=20261011-wheat-coins"></script>
+</body>
+</html>

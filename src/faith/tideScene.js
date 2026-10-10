@@ -21,14 +21,11 @@ export function tideSceneText(site) {
     conversation:conversations[(site?.visits || 0)%conversations.length], reaction:reactions[site?.reaction] || '海の匂いを含んだ風が、静かな集いの場を通り抜ける。' };
 }
 
-/** 施設の発展段階を、小さな輪郭アイコンで描き分ける。 */
+/**
+ * 海の波紋章を共通に、布の集いから石造神殿へ育つ施設を描き分ける。
+ * @param {object} site 潮の縁の拠点。
+ * @returns {string} 装飾用SVG。
+ */
 export function tideStageIcon(site) {
-  const shapes = [
-    '<path d="M18 69V46L48 25L78 46V69M14 46L48 19L82 46M27 73H40M56 73H69"/><path d="M44 66Q40 58 48 49Q56 58 52 66Z" fill="#d8c68e"/>',
-    '<path d="M22 78V40L48 18L74 40V78M16 42L48 13L80 42M39 78V55H57V78M18 81H78"/><path d="M45 37H51"/>',
-    '<path d="M17 79H79M23 71H73V79H23ZM29 50H67V71H29ZM23 43H73V50H23ZM39 43V32M57 43V32M33 32H63M48 32V18"/><path d="M43 20Q43 10 48 8Q55 15 53 20"/>',
-    '<path d="M16 78H80M23 74V39H73V74M16 39L48 17L80 39M32 43V70M64 43V70M42 74V54H54V74M12 78V51H23M73 51H84V78"/>',
-    '<path d="M10 82H86M15 75H81V82H15ZM22 75V38H74V75M15 38L48 20L81 38M30 44V68M66 44V68M42 75V53H54V75M37 24V15H59V24M31 15L48 5L65 15M10 68V49H22M74 49H86V68"/>',
-  ];
-  return `<svg class="tide-icon" viewBox="0 0 96 96" aria-hidden="true" fill="none" stroke="#d8c68e" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">${shapes[tideStage(site)]}</svg>`;
+  return `<svg class="tide-icon" viewBox="0 0 96 96" aria-hidden="true" focusable="false"><image href="./image/ui/tide-stage-${tideStage(site)}.png?v=20261010-maritime-ui" width="96" height="96" preserveAspectRatio="xMidYMid meet"/></svg>`;
 }

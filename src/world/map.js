@@ -878,7 +878,7 @@ export function renderMap() {
       sel.y >= startY &&
       sel.y < startY + cells
     ) {
-      ctx.strokeStyle = "#ffd27a";
+      ctx.strokeStyle = "#d3ae65";
       ctx.lineWidth = 2;
       ctx.strokeRect(
         pad + (sel.x - startX) * cellSize + 1,
@@ -893,7 +893,7 @@ export function renderMap() {
   drawMapPlayer(ctx, { ...mapData[state.position.y][state.position.x], exploration: pinsAt(state.position.x, state.position.y).length > 0 || [...explorationSites, ...bountySites, ...chartSites, ...storySites, ...seaEvents].some(s => s.position.x === state.position.x && s.position.y === state.position.y) },
     pad + (state.position.x - startX) * cellSize,
     pad + (state.position.y - startY) * cellSize, cellSize - 1, isZoom);
-  ctx.strokeStyle = "#e8efff";
+  ctx.strokeStyle = "#f0e3bb";
   ctx.lineWidth = 2;
   ctx.strokeRect(
     pad + (state.position.x - startX) * cellSize,

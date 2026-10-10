@@ -49,11 +49,11 @@ export const FACTIONS = [
     name: "北海連合",
     tagline: "航路を抑える海商連合",
     color: "#7aa7ff",
-    sigil: "./image/factions/north.svg",
+    sigil: "./image/factions/north.svg?v=20261011-heraldry",
     attitude: "neutral",
     nobles: [
-      { id: "north_wave", name: "波間伯", title: "港湾の守り手", img: "./image/nobles/north-warden.svg" },
-      { id: "north_tide", name: "潮路伯", title: "関税と航路の監督", img: "./image/nobles/north-jarl.svg" },
+      { id: "north_wave", name: "波間伯", title: "港湾の守り手", img: "./image/nobles/north-warden.svg?v=20261010-maritime-ui" },
+      { id: "north_tide", name: "潮路伯", title: "関税と航路の監督", img: "./image/nobles/north-jarl.svg?v=20261010-maritime-ui" },
     ],
   },
   {
@@ -61,11 +61,11 @@ export const FACTIONS = [
     name: "群島同盟",
     tagline: "島嶼の緩いつながりと航路の共有",
     color: "#7dffb2",
-    sigil: "./image/factions/archipelago.svg",
+    sigil: "./image/factions/archipelago.svg?v=20261011-heraldry",
     attitude: "neutral",
     nobles: [
-      { id: "arch_reef", name: "礁の旗主", title: "外洋見張り", img: "./image/nobles/archipelago-druzhina.svg" },
-      { id: "arch_atoll", name: "環礁執政", title: "島間の調停役", img: "./image/nobles/archipelago-prince.svg" },
+      { id: "arch_reef", name: "礁の旗主", title: "外洋見張り", img: "./image/nobles/archipelago-druzhina.svg?v=20261010-maritime-ui" },
+      { id: "arch_atoll", name: "環礁執政", title: "島間の調停役", img: "./image/nobles/archipelago-prince.svg?v=20261010-maritime-ui" },
     ],
   },
   {
@@ -73,13 +73,13 @@ export const FACTIONS = [
     name: "湾岸城塞群",
     tagline: "本土港を守る城塞群",
     color: "#ffd27a",
-    sigil: "./image/factions/citadel.svg",
+    sigil: "./image/factions/citadel.svg?v=20261011-heraldry",
     attitude: "neutral",
     nobles: [
-      { id: "citadel_cape", name: "岬の代官", title: "港湾徴発の長", img: "./image/nobles/citadel-steward.svg" },
-      { id: "citadel_fort", name: "砦の守備卿", title: "船団入港の判定役", img: "./image/nobles/citadel-knight.svg" },
-      { id: "citadel_wall", name: "海壁の監督", title: "外郭城壁の監督官", img: "./image/nobles/citadel-knight.svg" },
-      { id: "citadel_beacon", name: "烽火の管主", title: "烽火台の管制役", img: "./image/nobles/citadel-steward.svg" },
+      { id: "citadel_cape", name: "岬の代官", title: "港湾徴発の長", img: "./image/nobles/citadel-steward.svg?v=20261010-maritime-ui" },
+      { id: "citadel_fort", name: "砦の守備卿", title: "船団入港の判定役", img: "./image/nobles/citadel-knight.svg?v=20261010-maritime-ui" },
+      { id: "citadel_wall", name: "海壁の監督", title: "外郭城壁の監督官", img: "./image/nobles/citadel-knight.svg?v=20261010-maritime-ui" },
+      { id: "citadel_beacon", name: "烽火の管主", title: "烽火台の管制役", img: "./image/nobles/citadel-steward.svg?v=20261010-maritime-ui" },
     ],
   },
   {
@@ -87,9 +87,9 @@ export const FACTIONS = [
     name: "外洋海賊",
     tagline: "旗なき襲撃者たち",
     color: "#ff7a7a",
-    sigil: "./image/factions/pirates.svg",
+    sigil: "./image/factions/pirates.svg?v=20261010-maritime-ui",
     attitude: "hostile",
-    nobles: [{ id: "pirate_blackbeard", name: "黒ひげ", title: "無法港の顔役", img: "./image/factions/pirates.svg" }],
+    nobles: [{ id: "pirate_blackbeard", name: "黒ひげ", title: "無法港の顔役", img: "./image/factions/pirates.svg?v=20261010-maritime-ui" }],
   },
 ];
 

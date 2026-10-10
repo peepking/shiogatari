@@ -28,7 +28,7 @@ function dangerousBountyCard(site) {
   const reason = dangerousBountyRestriction(site), name = `${site.epithet}${site.name}`;
   const here = getDangerousBountyAt(state.position)?.id === site.id;
   return `<article class="bounty-card"><div class="bounty-heading"><h3>${escapeHtml(name)}</h3><strong>${resourceIcon("funds")}${site.reward.toLocaleString()}</strong></div>
-    <div class="bounty-affiliation"><img class="resource-icon" src="./image/factions/pirates.svg" alt="">外洋海賊 / ${dangerousSeaName(site.regionId)}</div>
+    <div class="bounty-affiliation"><img class="resource-icon" src="./image/factions/pirates.svg?v=20261010-maritime-ui" alt="">外洋海賊 / ${dangerousSeaName(site.regionId)}</div>
     <div class="bounty-meta">${site.total}人・${site.formation.length}部隊 / Lv${site.formation[0].level} / (${site.position.x + 1}, ${site.position.y + 1})</div>
     <p class="bounty-reward">追加報酬：${escapeHtml(site.flagship)}（${escapeHtml(SHIP_TYPES[site.ship].name)}）1隻</p>
     <p class="bounty-reward">討伐ボーナス：${resourceIcon("fame")}名声 ＋${bountyFameBonus(site)}</p>

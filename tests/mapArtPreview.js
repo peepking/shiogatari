@@ -1,11 +1,12 @@
-import { drawMapTile, drawMapPlayer, drawExplorationSite, drawChartSite } from "../src/world/mapArt.js";
-import { mapAssetsReady } from "../src/world/mapAssets.js";
-import { drawIllustratedSite, drawIllustratedPin } from "../src/world/mapSymbolArt.js";
-import { drawBountySite } from "../src/bounty/bountyMapArt.js";
-import { drawDangerousSeaTile } from "../src/dangerousSeas/dangerousSeaMapArt.js";
-import { drawDangerousSeaEvent } from "../src/dangerousSeas/dangerousSeaEventMapArt.js";
-import { drawPirateStorySite } from "../src/pirates/pirateKingMapArt.js";
-import { drawBattleTerrain } from "../src/battle/battleTerrainArt.js";
+import { drawMapTile, drawMapPlayer, drawExplorationSite, drawChartSite } from "../src/world/mapArt.js?v=20261010-native-sprites-v2";
+import { mapAssetsReady, drawMapSprite } from "../src/world/mapAssets.js";
+import { drawIllustratedSite, drawIllustratedPin } from "../src/world/mapSymbolArt.js?v=20261010-native-sprites-v2";
+import { drawOverviewSymbol } from "../src/world/mapOverviewArt.js?v=20261010-native-sprites-v2";
+import { drawBountySite } from "../src/bounty/bountyMapArt.js?v=20261010-native-sprites-v2";
+import { drawDangerousSeaTile } from "../src/dangerousSeas/dangerousSeaMapArt.js?v=20261011-world-edge";
+import { drawDangerousSeaEvent } from "../src/dangerousSeas/dangerousSeaEventMapArt.js?v=20261010-native-sprites-v2";
+import { drawPirateStorySite } from "../src/pirates/pirateKingMapArt.js?v=20261010-native-sprites-v2";
+import { drawBattleTerrain } from "../src/battle/battleTerrainArt.js?v=20261010-native-sprites-v2";
 
 const terrainKeys = { s: "sea", h: "shoal", p: "plain", f: "forest", m: "mountain" };
 const rows = ["ffmmphsss", "fmmpphsss", "fmpphhsss", "ffpphssss", "ppphhssss", "pphhsssss", "phhssshph", "hhsssshpf", "sssssshhh"];
@@ -20,6 +21,18 @@ const symbols = [
   ["bounty", "賞金首"], ["pirateLord", "五列強"], ["pirateKing", "海賊王"], ["fish", "魚群"],
   ["bell", "海底の鐘"], ["event", "出来事"], ["star", "依頼ピン"], ["shield", "防衛ピン"],
 ];
+const nativeSprites = [
+  ["forest", "広葉樹の森"], ["mountain", "岩山"], ["ship", "帆船"], ["battlefield", "戦場跡"],
+  ["town", "街"], ["village", "村"], ["pirateHarbor", "無法港"],
+  ["party", "陸の一行"], ["inlet", "入り江"], ["shield", "防衛ピン"], ["wreck", "難破船"],
+  ["crate", "漂流物"], ["rumor", "海図"], ["altar", "祭壇"],
+  ["treasure", "宝箱"], ["bounty", "賞金首"], ["pirateLord", "五列強"], ["pirateKing", "海賊王"],
+  ["fish", "魚群"], ["bell", "海底の鐘"], ["event", "出来事"], ["star", "依頼ピン"],
+  ["forestAlt", "針葉樹の森"], ["mountainAlt", "緑の山"],
+  ["storm", "嵐の置き土産"], ["lantern", "霧中の灯火"], ["sinkingShip", "沈みかけた宝船"],
+];
+const maintainedSprites = new Set(["crate", "treasure", "bounty", "pirateLord", "pirateKing", "fish", "event", "star", "storm"]);
+let nativeSpriteColumns = 1;
 const coverage = [
   { type: "terrain", kind: "sea", label: "深海" },
   { type: "terrain", kind: "shoal", label: "浅瀬" },
@@ -52,6 +65,219 @@ const coverage = [
   { type: "pin", kind: "triangle", label: "移動ピン" },
   { type: "pin", kind: "dot", label: "配達ピン" },
 ];
+
+const landPartySamples = [
+  { cell: { terrain: "plain", building: "none" }, label: "平原" },
+  { cell: { terrain: "forest", building: "none" }, label: "森" },
+  { cell: { terrain: "plain", building: "village" }, label: "村" },
+];
+
+/**
+ * 図柄を実際の地形に重ね、地形・地点・現在地の公開描画を小さなマスでも通す。
+ * ピンは本番の詳細地図と同じ半径を使い、地形の二種類目は同じ座標の選択値で指定する。
+ * @param {CanvasRenderingContext2D} ctx 描画先。
+ * @param {string} kind 図柄。
+ * @param {number} x 左端。
+ * @param {number} y 上端。
+ * @param {number} size マス幅。
+ * @param {boolean} [crowded=false] 地点と重なる現在地として縮小するか。
+ * @returns {void}
+ */
+function drawNativeMapSample(ctx, kind, x, y, size, crowded = false) {
+  const terrain = kind.startsWith("forest") ? "forest" : kind.startsWith("mountain") ? "mountain" : ["party", "town", "village", "battlefield"].includes(kind) ? "plain" : "sea";
+  const cell = { terrain, building: ["town", "village"].includes(kind) ? kind : "none" };
+  if (crowded) cell.exploration = true;
+  if (kind === "pirateHarbor") { cell.building = "town"; cell.settlement = { pirateHaven: true }; }
+  drawMapTile(ctx, cell, x, y, size, true, "#75b9d7", kind.endsWith("Alt") ? 1 : 0, { gx: 1, gy: 1, onReady: renderPreview });
+  if (kind === "party" || kind === "ship") drawMapPlayer(ctx, cell, x, y, size, true);
+  else if (["wreck", "crate", "battlefield"].includes(kind)) drawExplorationSite(ctx, kind, x, y, size, true);
+  else if (["rumor", "altar", "inlet", "treasure"].includes(kind)) drawChartSite(ctx, kind, x, y, size, true);
+  else if (kind === "bounty") drawBountySite(ctx, x, y, size, true);
+  else if (kind === "pirateLord" || kind === "pirateKing") drawPirateStorySite(ctx, { id: kind === "pirateKing" ? "olav" : "lord" }, x, y, size, true);
+  else if (["star", "shield"].includes(kind)) drawIllustratedPin(ctx, { shape: kind, color: "#d8b76e", defenderColor: "#75b9d7" }, x + size * 0.81, y + size * 0.2, Math.max(3, size * 0.1), true);
+  else if (["fish", "bell", "storm", "lantern", "sinkingShip"].includes(kind)) {
+    const event = { fish: "fish_migration", bell: "seabed_bell", storm: "storm_aftermath", lantern: "fog_light", sinkingShip: "sinking_treasure" };
+    drawDangerousSeaEvent(ctx, { kind: event[kind] }, x, y, size, true);
+  } else if (kind === "event") drawIllustratedSite(ctx, kind, x, y, size, true);
+}
+
+/**
+ * 全27種の実寸を並べ、40画素の図柄と13画素の簡易図柄を補間せず四倍にする。
+ * 本番の九割内接を逆算して長辺を40画素に揃え、キャッシュの画素密度そのものを比較する。
+ * @returns {void}
+ */
+function renderNativeSprites() {
+  if (!mapAssetsReady()) return;
+  const canvas = document.getElementById("previewNativeSprites"), ctx = canvas.getContext("2d");
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const sprite = document.createElement("canvas"); sprite.width = 40; sprite.height = 40;
+  const miniature = document.createElement("canvas"); miniature.width = 13; miniature.height = 13;
+  for (const [index, [kind, label]] of nativeSprites.entries()) {
+    const x = index % nativeSpriteColumns * 374, y = Math.floor(index / nativeSpriteColumns) * 322;
+    ctx.fillStyle = "#162439"; ctx.fillRect(x, y, 360, 308);
+    ctx.fillStyle = "#ddcb9e"; ctx.font = "16px system-ui"; ctx.textAlign = "left";
+    ctx.fillText(label, x + 12, y + 24);
+    ctx.fillStyle = "#aabdd0"; ctx.font = "12px system-ui";
+    const status = maintainedSprites.has(kind) ? "維持" : kind === "party" ? "一行" : ["storm", "lantern", "sinkingShip"].includes(kind) ? "出来事" : "更新";
+    ctx.textAlign = "right"; ctx.fillText(status, x + 346, y + 24); ctx.textAlign = "center";
+    for (const [size, left] of [[32, 12], [41, 65], [64, 127]]) {
+      ctx.fillText(`${size}px`, x + left + size / 2, y + 48);
+      drawNativeMapSample(ctx, kind, x + left, y + 61 + (64 - size) / 2, size);
+    }
+    ctx.fillStyle = "#aabdd0"; ctx.fillText("図柄40px", x + 237, y + 48);
+    ctx.fillText("全体13px", x + 314, y + 48);
+    const painter = sprite.getContext("2d"); painter.clearRect(0, 0, 40, 40);
+    const box = 40 / 0.9, offset = (40 - box) / 2;
+    drawMapSprite(painter, kind, offset, offset, box);
+    const miniPainter = miniature.getContext("2d"); miniPainter.clearRect(0, 0, 13, 13);
+    drawOverviewSymbol(miniPainter, kind, 0, 0, 13);
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite, x + 217, y + 73); ctx.drawImage(miniature, x + 308, y + 86);
+    ctx.drawImage(sprite, x + 12, y + 142, 160, 160); ctx.drawImage(miniature, x + 238, y + 177, 52, 52);
+    ctx.restore(); ctx.fillStyle = "#aabdd0";
+    ctx.fillText("40pxの4倍", x + 92, y + 136);
+    ctx.fillText("13pxの4倍", x + 261, y + 250);
+    if (kind === "ship") {
+      ctx.fillText("地点と重なる船・約18px", x + 265, y + 267);
+      drawNativeMapSample(ctx, kind, x + 246, y + 270, 37, true);
+    }
+  }
+}
+
+/**
+ * 親の表示幅に収まる一〜三列へ並べ直し、各カードと図柄の画素寸法は変えない。
+ * 高さだけの変更は再描画せず、監視による描画ループを防ぐ。
+ * @returns {void}
+ */
+function resizeNativeSprites() {
+  const canvas = document.getElementById("previewNativeSprites");
+  const columns = Math.max(1, Math.min(3, Math.floor((canvas.parentElement.clientWidth + 14) / 374)));
+  const width = columns * 374 - 14, height = Math.ceil(nativeSprites.length / columns) * 322 - 14;
+  if (columns === nativeSpriteColumns && canvas.width === width && canvas.height === height) return;
+  nativeSpriteColumns = columns; canvas.width = width; canvas.height = height;
+  renderNativeSprites();
+}
+
+/**
+ * 陸地の現在地を本番の地形と重ね、拠点と同居したときの縮小も確認する。
+ * @param {CanvasRenderingContext2D} ctx 描画先。
+ * @param {object} cell 地形と建物。
+ * @param {number} x 左端。
+ * @param {number} y 上端。
+ * @param {number} size マス幅。
+ * @param {boolean} detailed 詳細表示か。
+ * @returns {void}
+ */
+function drawLandPartySample(ctx, cell, x, y, size, detailed) {
+  drawMapTile(ctx, cell, x, y, size, detailed, "#75b9d7", 0, { gx: 1, gy: 1, onReady: renderPreview });
+  drawMapPlayer(ctx, cell, x, y, size, detailed);
+}
+
+/** @returns {void} 中世北欧の一行を二つの実寸と全体表示、図柄単独の拡大で比較する。 */
+function renderLandParty() {
+  const ctx = document.getElementById("previewLandParty").getContext("2d");
+  ctx.clearRect(0, 0, 1080, 250);
+  ctx.fillStyle = "#162439"; ctx.fillRect(0, 0, 1080, 250);
+  ctx.fillStyle = "#ddcb9e"; ctx.font = "16px system-ui";
+  ctx.fillText("1マス32px", 12, 24);
+  ctx.fillText("1マス64px", 188, 24);
+  ctx.fillText("全体地図・13px", 456, 24);
+  ctx.fillText("図柄・40pxの4倍拡大", 782, 24);
+  ctx.fillStyle = "#aabdd0"; ctx.font = "12px system-ui";
+  ctx.fillText("実寸", 470, 47); ctx.fillText("4倍", 534, 47);
+  const miniature = document.createElement("canvas"); miniature.width = 13; miniature.height = 13;
+  const painter = miniature.getContext("2d");
+  for (const [index, { cell, label }] of landPartySamples.entries()) {
+    drawLandPartySample(ctx, cell, 12 + index * 48, 98, 32, true);
+    drawLandPartySample(ctx, cell, 188 + index * 78, 82, 64, true);
+    ctx.fillStyle = "#aabdd0"; ctx.font = "14px system-ui";
+    ctx.fillText(label, 12 + index * 48, 168);
+    ctx.fillText(label, 206 + index * 78, 168);
+    painter.clearRect(0, 0, 13, 13);
+    drawLandPartySample(painter, cell, 0, 0, 13, false);
+    const y = 57 + index * 62;
+    ctx.drawImage(miniature, 477, y + 19);
+    ctx.save(); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(miniature, 524, y, 52, 52); ctx.restore();
+    ctx.fillStyle = "#aabdd0"; ctx.fillText(label, 590, y + 31);
+  }
+  const sprite = document.createElement("canvas"); sprite.width = 40; sprite.height = 40;
+  drawMapPlayer(sprite.getContext("2d"), landPartySamples[0].cell, 0, 0, 40, true);
+  ctx.save(); ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(sprite, 800, 62, 160, 160); ctx.restore();
+  ctx.fillStyle = "#aabdd0"; ctx.font = "13px system-ui";
+  ctx.fillText("村では一行を左下へ縮小", 12, 215);
+}
+
+/**
+ * ゲーム既存のユニット画像を加工せず読み、地図画像と揃ってから比較を再描画する。
+ * @param {string} name ユニット画像名。
+ * @returns {HTMLImageElement} 読み込み中または読み込み済みの画像。
+ */
+function loadPreviewUnit(name) {
+  const img = new Image();
+  img.onload = renderPreview;
+  img.src = `../image/troops/${name}.gif`;
+  return img;
+}
+
+const previewUnits = ["infantry", "p_spear", "archer", "shield", "marine", "medic"].map(loadPreviewUnit);
+const unitWorldRows = ["sshhsss", "shpphss", "hpppfhs", "hpfmphs", "shpphss", "sshhsss", "sssssss"];
+const unitWorld = unitWorldRows.map(row => [...row].map(key => ({ terrain: terrainKeys[key], building: "none" })));
+unitWorld[1][2].building = "village";
+unitWorld[3][2] = { terrain: "plain", building: "town" };
+const unitBattleGrid = Array.from({ length: 11 }, (_, y) => Array.from({ length: 11 }, (_, x) => (
+  x < 2 || x > 8 ? "deck" : (x * 7 + y * 3) % 9 < 3 ? "sea" : "shoal"
+)));
+
+/**
+ * 本番の兵士と同じマス幅に対する比率で既存画像を置き、地図側との描き込みを比較する。
+ * @param {CanvasRenderingContext2D} ctx 描画先。
+ * @param {HTMLImageElement} img 既存ユニット。
+ * @param {number} x マスの左。
+ * @param {number} y マスの上。
+ * @param {number} size マス幅。
+ * @param {boolean} [enemy=false] 左右反転するか。
+ * @returns {void}
+ */
+function drawPreviewUnit(ctx, img, x, y, size, enemy = false) {
+  if (!img.complete || !img.naturalWidth) return;
+  const width = size * 0.9, height = Math.min(size * 0.9, width * img.naturalHeight / img.naturalWidth);
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.translate(x + size / 2, y + size / 2);
+  if (enemy) ctx.scale(-1, 1);
+  ctx.drawImage(img, -width / 2, -height / 2, width, height);
+  ctx.restore();
+}
+
+/** @returns {void} 詳細地図と32pxの海戦地形へ既存のユニットを重ねて画風を確認する。 */
+function renderUnitStyle() {
+  const ctx = document.getElementById("previewUnitStyle").getContext("2d");
+  ctx.clearRect(0, 0, 1080, 440);
+  ctx.fillStyle = "#ddcb9e"; ctx.font = "16px system-ui";
+  ctx.fillText("地形・拠点と既存ユニット", 12, 22);
+  ctx.fillText("海戦マップ・1マス32px", 430, 22);
+  drawCoastSample(ctx, unitWorld, 12, 38, 48);
+  for (const [index, x, y] of [[0, 3, 2], [1, 4, 3], [2, 2, 4], [4, 3, 4]]) {
+    drawPreviewUnit(ctx, previewUnits[index], 12 + x * 48, 38 + y * 48, 48);
+  }
+  ctx.save(); ctx.translate(430, 38);
+  drawBattleTerrain(ctx, unitBattleGrid, 32, renderPreview);
+  for (let index = 0; index < previewUnits.length; index++) {
+    drawPreviewUnit(ctx, previewUnits[index], (index % 2) * 32, (1 + Math.floor(index / 2) * 3) * 32, 32);
+    drawPreviewUnit(ctx, previewUnits[index], (9 + index % 2) * 32, (1 + Math.floor(index / 2) * 3) * 32, 32, true);
+  }
+  ctx.restore();
+  ctx.fillStyle = "#aabdd0"; ctx.font = "14px system-ui";
+  ctx.fillText("元のユニット画像", 822, 64);
+  for (const [index, img] of previewUnits.entries()) {
+    drawPreviewUnit(ctx, img, 826 + index % 3 * 72, 84 + Math.floor(index / 3) * 92, 64);
+  }
+  ctx.fillText("ユニット画像は変更なし", 822, 294);
+  ctx.fillText("海岸と水深のつながりは", 822, 320);
+  ctx.fillText("本番の描画処理を使用", 822, 344);
+}
 
 /**
  * 三つの島を持つ確認用の50×50地形を座標から固定生成する。
@@ -225,9 +451,9 @@ function previewSeaAt(regionId, { x, y }) {
   return { regionId, level: x + y > 6 ? "core" : "outer" };
 }
 
-/** @param {{x:number,y:number}} position マス座標。 @returns {object|null} 南西の海域属性。 */
+/** @param {{x:number,y:number}} position マス座標。 @returns {object|null} 左端・下端へ続く南西の海域属性。 */
 function southwestSeaAt(position) {
-  return previewSeaAt("sw", position);
+  return previewSeaAt("sw", { x: 6 - position.x, y: position.y });
 }
 
 /** @param {{x:number,y:number}} position マス座標。 @returns {object|null} 南東の海域属性。 */
@@ -376,6 +602,9 @@ function renderCoverage() {
 
 /** @returns {void} 実際の描画関数で地形・海岸・現在地・地点を確認する。 */
 function renderPreview() {
+  renderNativeSprites();
+  renderLandParty();
+  renderUnitStyle();
   renderCoastChanges();
   renderSeaChanges();
   const ctx = document.getElementById("previewMap").getContext("2d");
@@ -412,4 +641,7 @@ function renderPreview() {
   }
 }
 
+const nativeSpriteObserver = new ResizeObserver(resizeNativeSprites);
+nativeSpriteObserver.observe(document.getElementById("previewNativeSprites").parentElement);
+resizeNativeSprites();
 renderPreview();

@@ -21,13 +21,16 @@ async function main() {
   const module = await load("./resourceUI.js");
   await module.evaluate();
   const { resourceIcon, resourceToken, resourceList, renderReportLine, reportLineText } = module.namespace;
-  for (const id of ["food", "wood", "stone", "iron", "fiber", "salt", "spice", "arms", "textile", "brew", "leather", "funds", "fame", "faith", "ships", "troops", "chart"]) {
+  for (const id of ["food", "wood", "stone", "iron", "fiber", "salt", "spice", "arms", "textile", "brew", "leather", "funds", "fame", "faith", "ships", "troops", "chart", "illegal_drug", "illicit_brew", "stolen_arms", "stolen_craft"]) {
     const html = resourceIcon(id);
     const src = html.match(/src="([^"]+)"/)[1];
-    await fs.access(path.join(__dirname, "..", src));
+    await fs.access(path.join(__dirname, "..", src.split("?")[0]));
     assert.ok(html.includes('alt=""'));
   }
   assert.equal(resourceIcon("../../secret"), "");
+  for (const [id, base] of [["illegal_drug", "spice"], ["illicit_brew", "brew"], ["stolen_arms", "arms"], ["stolen_craft", "supplies"]]) {
+    assert.notEqual(resourceIcon(id), resourceIcon(base), "禁制品は通常品と異なる専用図柄を使う");
+  }
   assert.equal(resourceIcon("__proto__"), "");
   const malicious = resourceToken({ id: "funds", label: '<img src=x onerror="alert(1)">', value: "<script>" });
   assert.ok(!malicious.includes("<script>"));

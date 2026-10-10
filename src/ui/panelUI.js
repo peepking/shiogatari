@@ -51,12 +51,12 @@ export function renderAssets() {
   const troopDisplay = formatTroopDisplay();
   const supplyDisplay = formatSupplyDisplay();
   const defs = [
-    { key: "ships", card: "ships", sub: "聖船+", valueText: String(totalShips(state.fleet)), img: "./image/ui/ship.svg" },
-    { key: "troops", card: "companions", sub: "", valueHtml: troopDisplay.html, img: "./image/ui/troops.svg" },
-    { key: "faith", card: "faith", sub: "", valueText: String(state.faith), img: "./image/ui/faith.svg" },
-    { key: "supplies", card: "supplies", sub: "上限", valueHtml: supplyDisplay.html, img: "./image/ui/supplies.svg" },
-    { key: "funds", card: "funds", sub: "", valueText: String(state.funds), img: "./image/ui/funds.svg" },
-    { key: "fame", card: "fame", sub: "", valueText: String(state.fame), img: "./image/ui/fame.svg" },
+    { key: "ships", card: "ships", sub: "聖船+", valueText: String(totalShips(state.fleet)), img: "./image/ui/ship.svg?v=20261010-maritime-ui" },
+    { key: "troops", card: "companions", sub: "", valueHtml: troopDisplay.html, img: "./image/ui/troops.svg?v=20261010-maritime-ui" },
+    { key: "faith", card: "faith", sub: "", valueText: String(state.faith), img: "./image/ui/faith.svg?v=20261010-maritime-ui" },
+    { key: "supplies", card: "supplies", sub: "上限", valueHtml: supplyDisplay.html, img: "./image/ui/supplies.svg?v=20261010-maritime-ui" },
+    { key: "funds", card: "funds", sub: "", valueText: String(state.funds), img: "./image/ui/funds.svg?v=20261011-wheat-coins" },
+    { key: "fame", card: "fame", sub: "", valueText: String(state.fame), img: "./image/ui/fame.svg?v=20261010-maritime-ui" },
   ];
   defs.forEach((d) => {
     const cardKey = d.card || d.key;

@@ -1,0 +1,10 @@
+{
+  "atlas": "image/ui/atlases/faction-crests.png",
+  "columns": 3,
+  "rows": 1,
+  "icons": [
+    { "cell": 0, "output": "image/factions/north.svg", "bounds": [64, 8, 598, 689], "viewBox": [64, 64], "size": [128, 128] },
+    { "cell": 1, "output": "image/factions/archipelago.svg", "bounds": [787, 8, 599, 689], "viewBox": [64, 64], "size": [128, 128] },
+    { "cell": 2, "output": "image/factions/citadel.svg", "bounds": [1511, 8, 598, 689], "viewBox": [64, 64], "size": [128, 128] }
+  ]
+}

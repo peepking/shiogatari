@@ -2,8 +2,8 @@ import { PIRATE_IMAGES, troopImage } from "../pirates/pirateConfig.js";
 import { escapeHtml } from "../core/util.js";
 
 const ICONS = {
-  illegal_drug: "spice", illicit_brew: "brew", stolen_arms: "arms", stolen_craft: "supplies",
-  nationalPower: "fame",
+  illegal_drug: "illegal-drug", illicit_brew: "illicit-brew", stolen_arms: "stolen-arms", stolen_craft: "stolen-craft",
+  nationalPower: "identity",
   chart: "chart",
   ships: "ship", funds: "funds", faith: "faith", fame: "fame", supplies: "supplies", troops: "troops",
   food: "food", wood: "wood", stone: "stone", iron: "iron", fiber: "fiber", salt: "salt",
@@ -17,7 +17,7 @@ const TROOP_IDS = ["infantry", "halberd", "medic", "marine", "archer", "scout", 
  * @returns {string}
  */
 export function resourceIcon(id) {
-  const src = Object.hasOwn(ICONS, id) ? `./image/ui/${ICONS[id]}.svg`
+  const src = Object.hasOwn(ICONS, id) ? `./image/ui/${ICONS[id]}.svg?v=20261011-wheat-coins`
     : (TROOP_IDS.includes(id) || Object.hasOwn(PIRATE_IMAGES, id)) ? `./${troopImage(id)}` : null;
   return src ? `<img class="resource-icon" src="${src}" alt="" aria-hidden="true">` : "";
 }

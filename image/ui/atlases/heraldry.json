@@ -1,0 +1,18 @@
+{
+  "atlas": "image/ui/atlases/heraldry.png",
+  "columns": 4,
+  "rows": 4,
+  "icons": [
+    { "cell": 3, "output": "image/factions/pirates.svg", "bounds": [962, 40, 292, 314], "viewBox": [64, 64], "size": [128, 128] },
+    { "cell": 4, "output": "image/nobles/north-warden.svg", "bounds": [0, 353, 318, 296], "viewBox": [64, 72], "size": [128, 144] },
+    { "cell": 5, "output": "image/nobles/north-jarl.svg", "bounds": [318, 357, 315, 291], "viewBox": [64, 72], "size": [128, 144] },
+    { "cell": 6, "output": "image/nobles/archipelago-druzhina.svg", "bounds": [631, 357, 318, 292], "viewBox": [64, 72], "size": [128, 144] },
+    { "cell": 7, "output": "image/nobles/archipelago-prince.svg", "bounds": [950, 351, 310, 298], "viewBox": [64, 72], "size": [128, 144] },
+    { "cell": 8, "output": "image/nobles/citadel-steward.svg", "bounds": [0, 650, 319, 286], "viewBox": [64, 72], "size": [128, 144] },
+    { "cell": 9, "output": "image/nobles/citadel-knight.svg", "bounds": [318, 648, 315, 289], "viewBox": [64, 72], "size": [128, 144] },
+    { "cell": 10, "output": "image/ui/season-spring.svg", "bounds": [635, 658, 314, 285], "viewBox": [24, 24], "size": [128, 128] },
+    { "cell": 11, "output": "image/ui/season-summer.svg", "bounds": [950, 651, 310, 294], "viewBox": [24, 24], "size": [128, 128] },
+    { "cell": 12, "output": "image/ui/season-autumn.svg", "bounds": [20, 940, 301, 280], "viewBox": [24, 24], "size": [128, 128] },
+    { "cell": 13, "output": "image/ui/season-winter.svg", "bounds": [340, 937, 275, 288], "viewBox": [24, 24], "size": [128, 128] }
+  ]
+}

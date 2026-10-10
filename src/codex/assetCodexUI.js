@@ -17,10 +17,10 @@ function modal() { return document.getElementById("assetCodexModal"); }
 /** @param {*} value 表示値。 @returns {string} 安全な数値・文言。 */
 function display(value) { return escapeHtml(typeof value === "number" ? value.toLocaleString() : value); }
 
-/** @param {object} entry 図鑑項目。 @returns {string} 既存の絵や船の線画を使う見出し画像。 */
+/** @param {object} entry 図鑑項目。 @returns {string} 兵種の絵と用途に応じた図柄を使う見出し画像。 */
 function entryImage(entry) {
   if (entry.tab === "troops") return `<img class="asset-codex-portrait" src="${troopImage(entry.id)}" alt="">`;
-  if (entry.tab === "equipment") return '<img class="asset-codex-symbol" src="./image/ui/ship.svg" alt="">';
+  if (entry.tab === "equipment") return '<img class="asset-codex-symbol" src="./image/ui/action-shipyard.svg?v=20261010-maritime-ui" alt="">';
   if (!entry.known) return '<span class="asset-codex-unknown" aria-hidden="true">?</span>';
   return shipIcon(entry.id === "sacred" ? "caravel" : entry.base || entry.id);
 }

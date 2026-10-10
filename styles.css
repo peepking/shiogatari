@@ -1113,7 +1113,31 @@ option {
   gap: 8px;
   margin-bottom: 6px;
   font-size: 12px;
-  color: rgba(232, 239, 255, 0.82);
+  color: #cbbd9d;
+}
+
+/* 地図の枠と操作に紙と真鍮の色を添え、既存の操作配置を保つ。 */
+#mapBlock .map-header .btn {
+  color: #e1d7bc;
+  border-color: #71684f;
+  border-radius: 4px;
+  background: #1c2b3b;
+  box-shadow: inset 0 1px #d6c59a18, inset 0 -1px #080f1780;
+}
+
+#mapBlock .map-header .btn:hover {
+  color: #f0e3bb;
+  border-color: #b39a63;
+  background: #293b49;
+}
+
+#mapBlock .map-header .btn:focus-visible {
+  outline-color: #d3ae65;
+}
+
+#mapPosLabel {
+  color: #f0e3bb;
+  font-variant-numeric: tabular-nums;
 }
 
 #mapCanvas {
@@ -1121,10 +1145,10 @@ option {
   margin: 0 auto;
   max-width: 100%;
   height: auto;
-  border-radius: 8px;
-  display: block;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: #0b1020;
+  border-radius: 4px;
+  border: 1px solid #7d7358;
+  background: #162631;
+  box-shadow: 0 0 0 1px #0a141f, 0 2px 5px #00000035;
 }
 
 #battleCanvas {
@@ -1140,7 +1164,7 @@ option {
 
 #mapInfo {
   font-size: 11px;
-  color: rgba(232, 239, 255, 0.75);
+  color: #bfc4bd;
   margin-top: 6px;
   min-height: 14px;
   display: flex;
@@ -1780,7 +1804,7 @@ input[type="number"].number-compact { width: calc(var(--number-text-width, 3ch) 
 .codex-category { color: var(--codex-accent); font-size: 10px; }
 .codex-card-main { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; align-items: center; }
 .codex-silhouette { display: block; width: 100%; color: var(--codex-accent, #82c9c5); }
-.codex-fish-eye { fill: #142034; }
+.codex-fish-eye { fill: #283b3d; }
 .codex-card-name { display: block; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
 .codex-card-record { display: block; font-size: 10px; color: #a2b7c3; margin-top: 7px; }
 .codex-card-record b { color: #d6e7ed; font-size: 19px; font-weight: 500; font-variant-numeric: tabular-nums; }

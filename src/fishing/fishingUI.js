@@ -188,6 +188,7 @@ export function renderFishingControl(syncUI) {
   }
   button.hidden = false;
   button.textContent = label;
+  button.dataset.icon = action === openCodexModal ? "codex" : "fish";
   button.onclick = action;
 }
 
