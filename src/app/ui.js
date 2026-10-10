@@ -1019,8 +1019,10 @@ function processBattleOutcome(resultCode, meta) {
     let delta = isWin ? 8 : resultCode === BATTLE_RESULT.LOSE ? -6 : 0;
     if (!pending.dangerousRegionId && !pending.storyId && !pending.theftKind && pending.bountyId == null && !questId && !questType && enemyFactionId !== "pirates") {
       delta = isWin ? 3 : resultCode === BATTLE_RESULT.LOSE ? -2 : 0;
-      if (delta > 0) summary.push("戦況がわずかに有利に傾いた");
-      if (delta < 0) summary.push("戦況がわずかに不利に傾いた");
+      if (state.honorFactions?.includes(playerFactionId)) {
+        if (delta > 0) summary.push("戦況がわずかに有利に傾いた");
+        if (delta < 0) summary.push("戦況がわずかに不利に傾いた");
+      }
     }
     if (!pending.dangerousRegionId && !pending.storyId && !pending.theftKind && pending.bountyId == null && delta !== 0) addWarScore(playerFactionId, enemyFactionId, delta, absDay(state), 0, 0);
 
