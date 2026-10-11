@@ -388,14 +388,14 @@ function verifyRenderMap(art) {
 }
 
 /**
- * 図柄と地形の小さな描画面を縮尺間で再利用し、補間設定を後続の描画へ持ち越さない。
+ * 全図柄を原寸で保持して縮尺間で再利用し、補間設定を後続の描画へ持ち越さない。
  * @param {object} art 読み込み済みの描画モジュール。
  * @returns {void}
  */
 function verifyRasterCaches(art) {
   const surfaces = [];
   art.context.document = {
-    /** @returns {object} 原画を一度だけ切り出した小さな描画面を記録する。 */
+    /** @returns {object} 原画を一度だけ切り出した描画面を記録する。 */
     createElement() {
       const painter = makeContext();
       const surface = {
@@ -408,27 +408,33 @@ function verifyRasterCaches(art) {
     },
   };
   const target = makeContext();
-  for (const kind of ["ship", "storm", "party"]) {
+  for (const kind of SPRITE_KINDS) {
     const count = surfaces.length;
     let cached;
-    for (const [index, size] of [14, 700 / 19, 700 / 9].entries()) {
+    for (const [index, size] of [700 / 19, 700 / 9, 700 / 19, 160].entries()) {
       target.imageSmoothingEnabled = index !== 1;
       const originalSmoothing = target.imageSmoothingEnabled;
       assert.equal(art.assets.drawMapSprite(target, kind, 10, 20, size), true);
       const [surface, x, y, width, height] = target.calls.at(-1);
       if (index === 0) cached = surface;
-      assert.equal(surface, cached, `${kind}: 三縮尺とも同じ図柄の描画面を再利用する`);
+      assert.equal(surface, cached, `${kind}: 周辺・拡大・周辺への復帰でも原寸の描画面を再利用する`);
       assert.equal(surfaces.length, count + 1, `${kind}: 移動や拡大で図柄の切り出しを増やさない`);
-      assert.equal(Math.max(surface.width, surface.height), 40, `${kind}: 図柄を共通の画素密度に整理する`);
       assert.equal(surface.painter.calls.length, 1, `${kind}: 原画は初回だけ切り出す`);
+      const [image, sx, sy, sourceWidth, sourceHeight, dx, dy, cropWidth, cropHeight] = surface.painter.calls[0];
+      assert.equal(surface.width, sourceWidth, `${kind}: 横方向の細部を中間縮小で間引かない`);
+      assert.equal(surface.height, sourceHeight, `${kind}: 縦方向の細部を中間縮小で間引かない`);
+      assert.deepEqual([dx, dy, cropWidth, cropHeight], [0, 0, sourceWidth, sourceHeight], `${kind}: 原寸のまま切り出す`);
+      assert.ok(sx >= 0 && sy >= 0 && sx + sourceWidth <= image.naturalWidth && sy + sourceHeight <= image.naturalHeight, `${kind}: 原画の範囲を守る`);
       assert.equal(surface.painter.rasterStates[0][0], false, `${kind}: 切り出しで輪郭をぼかさない`);
-      assert.equal(surface.painter.calls[0][0], art.images[kind === "party" ? 3 : kind === "storm" ? 2 : 0], `${kind}: 対応する原画を使う`);
+      assert.equal(image, art.images[kind === "party" ? 3 : ["storm", "lantern", "sinkingShip"].includes(kind) ? 2 : 0], `${kind}: 対応する原画を使う`);
       assert.ok(x >= 10 && y >= 20 && x + width <= 10 + size && y + height <= 20 + size, `${kind}: 描画面をマス内に収める`);
+      assert.ok(Math.abs(width / height - sourceWidth / sourceHeight) < 0.00001, `${kind}: 最終描画でも縦横比を保つ`);
       assert.equal(target.rasterStates.at(-1)[0], false, `${kind}: 再拡大でも輪郭をぼかさない`);
       assert.equal(target.imageSmoothingEnabled, originalSmoothing, `${kind}: 呼出元の補間設定を復元する`);
       assert.equal(target.depth, 0, `${kind}: 描画状態を復元する`);
     }
   }
+  assert.equal(art.assets.mapSpriteSurface("unknown"), null, "未対応の図柄の描画面は作らない");
   const count = surfaces.length;
   art.assets.drawTerrainTexture(target, "sea", 5, 6);
   const terrain = target.calls.at(-1), created = surfaces.length;
@@ -546,16 +552,21 @@ async function main() {
       return surface;
     },
   };
-  for (const size of [700 / 19, 700 / 9]) {
+  for (const size of [700 / 19, 700 / 9, 700 / 19]) {
     const radius = Math.max(3, size * 0.1);
     art.symbols.drawIllustratedPin(ctx, { shape: "shield", color: "#aa0000", defenderColor: "#0000aa" }, size * 0.81, size * 0.2, radius, true);
     const [, x, y, width, height] = ctx.calls.at(-1);
     assert.ok(x > 0 && y > 0 && x + width < size && y + height < size, "画像の防衛盾を二つの詳細縮尺ともマス内に収める");
+    assert.ok(Math.abs(width / height - 175 / 224) < 0.00001, "防衛盾の原寸の縦横比を維持する");
   }
-  assert.equal(stamps.filter(surface => surface.width === 64 && surface.height === 64).length, 1, "同じ攻守配色のピンは合成済み画像を使う");
-  assert.equal(stamps.filter(surface => Math.max(surface.width, surface.height) === 40).length, 1, "盾の原画も一度だけ切り出し、明暗を戻すときに再利用する");
-  assert.deepEqual(fills, [["#aa0000", "source-atop", 1, 0, 0, 64, 64], ["#0000aa", "source-atop", 1, 32, 0, 32, 64]], "防衛色は攻撃色を混ぜず、右半分だけに不透明で塗る");
-  assert.deepEqual(composites, [["source-over", 1], ["source-over", 1], ["luminosity", 0.45]], "原画を切り出した後、配色に原画の色を混ぜず無彩色の明暗だけを戻す");
+  assert.equal(stamps.length, 1, "同じ攻守配色のピンは縮尺が変わっても合成済み画像を使う");
+  assert.deepEqual([stamps[0].width, stamps[0].height], [175, 224], "色替えも原寸のまま行い、細部を間引かない");
+  assert.equal(stamps[0].painter.calls[0][0], art.assets.mapSpriteSurface("shield"), "明暗と輪郭には共通の原寸図柄を使う");
+  assert.deepEqual(fills, [["#aa0000", "source-atop", 1, 0, 0, 175, 224], ["#0000aa", "source-atop", 1, 87.5, 0, 87.5, 224]], "防衛色は攻撃色を混ぜず、右半分だけに不透明で塗る");
+  assert.deepEqual(composites, [["source-over", 1], ["luminosity", 0.45]], "配色に原画の色を混ぜず無彩色の明暗だけを戻す");
+  art.symbols.drawIllustratedPin(ctx, { shape: "star", color: "#d8b76e" }, 100, 100, 37, true);
+  assert.deepEqual([stamps[1].width, stamps[1].height], [194, 192], "依頼の星も原寸で色替えする");
+  assert.equal(stamps[1].painter.calls[0][0], art.assets.mapSpriteSurface("star"), "星の色替えにも共通の原寸図柄を使う");
   assert.equal(ctx.rasterStates.at(-1)[0], false, "配色済みピンの拡大でも輪郭をぼかさない");
   assert.equal(ctx.imageSmoothingEnabled, true, "ピン描画後も呼出元の補間設定を復元する");
   verifyWaterMasks();

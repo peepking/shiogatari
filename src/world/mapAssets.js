@@ -52,7 +52,8 @@ export function prepareMapAssets(onReady) {
 /**
  * 図柄の実測範囲だけを切り出し、縦横比を保って指定マスの中央に収める。
  * 余白を揃えるため長辺をマス幅の九割とし、図柄が変わっても隣のマスへはみ出さない。
- * 図柄は長辺40画素で再利用し、拡大時の補間を止めてユニットと近い粒度を保つ。
+ * 原寸の切り出しを再利用し、各縮尺の実際の描画サイズへ一度だけ縮小する。
+ * 拡大前に細部を間引かず、補間を止めて原画のドットの輪郭を保つ。
  * @param {CanvasRenderingContext2D} ctx 描画先。
  * @param {string} kind 図柄。
  * @param {number} x 左端。
@@ -71,20 +72,36 @@ export function drawMapSprite(ctx, kind, x, y, size) {
   const drawWidth = width * factor, drawHeight = height * factor;
   const [atlasWidth, atlasHeight] = party ? PIXEL_PARTY_ATLAS_SIZE : event ? PIXEL_EVENT_ATLAS_SIZE : PIXEL_SPRITE_ATLAS_SIZE;
   const scaleX = image.naturalWidth / atlasWidth, scaleY = image.naturalHeight / atlasHeight;
-  let surface = spriteSurfaces.get(kind);
-  if (!surface && typeof document !== "undefined") {
-    surface = makeSurface(Math.max(1, Math.round(width / Math.max(width, height) * 40)), Math.max(1, Math.round(height / Math.max(width, height) * 40)));
-    const painter = surface.getContext("2d");
-    painter.imageSmoothingEnabled = false;
-    painter.drawImage(image, left * scaleX, top * scaleY, width * scaleX, height * scaleY, 0, 0, surface.width, surface.height);
-    spriteSurfaces.set(kind, surface);
-  }
+  const surface = mapSpriteSurface(kind);
   ctx.save(); ctx.imageSmoothingEnabled = false;
   if (surface) ctx.drawImage(surface, x + (size - drawWidth) / 2, y + (size - drawHeight) / 2, drawWidth, drawHeight);
   else ctx.drawImage(image, left * scaleX, top * scaleY, width * scaleX, height * scaleY,
     x + (size - drawWidth) / 2, y + (size - drawHeight) / 2, drawWidth, drawHeight);
   ctx.restore();
   return true;
+}
+
+/**
+ * 図柄の輪郭を原寸で一度だけ切り出し、表示倍率や色替えによる細部の欠落を防ぐ。
+ * 呼出元ではこの共有面を書き換えず、表示サイズへの縮小や複製だけに使用する。
+ * @param {string} kind 図柄。
+ * @returns {HTMLCanvasElement|null} 原寸の図柄。画像待機・未対応・描画面を作れない場合はnull。
+ */
+export function mapSpriteSurface(kind) {
+  if (!mapAssetsReady() || typeof document === "undefined") return null;
+  const event = EVENT_SPRITES[kind], party = kind === "party";
+  const bounds = party ? PIXEL_PARTY_SPRITE : event || SPRITES[kind];
+  if (!bounds) return null;
+  if (spriteSurfaces.has(kind)) return spriteSurfaces.get(kind);
+  const image = assets[party ? "party" : event ? "events" : "sprites"].image;
+  const [atlasWidth, atlasHeight] = party ? PIXEL_PARTY_ATLAS_SIZE : event ? PIXEL_EVENT_ATLAS_SIZE : PIXEL_SPRITE_ATLAS_SIZE;
+  const [left, top, width, height] = bounds;
+  const scaleX = image.naturalWidth / atlasWidth, scaleY = image.naturalHeight / atlasHeight;
+  const surface = makeSurface(Math.max(1, Math.round(width * scaleX)), Math.max(1, Math.round(height * scaleY)));
+  const painter = surface.getContext("2d"); painter.imageSmoothingEnabled = false;
+  painter.drawImage(image, left * scaleX, top * scaleY, width * scaleX, height * scaleY, 0, 0, surface.width, surface.height);
+  spriteSurfaces.set(kind, surface);
+  return surface;
 }
 
 /** @param {number} width 幅。 @param {number} height 高さ。 @returns {HTMLCanvasElement} 素材を合成する描画面。 */

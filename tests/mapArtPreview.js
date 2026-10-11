@@ -102,15 +102,15 @@ function drawNativeMapSample(ctx, kind, x, y, size, crowded = false) {
 }
 
 /**
- * 全27種の実寸を並べ、40画素の図柄と13画素の簡易図柄を補間せず四倍にする。
- * 本番の九割内接を逆算して長辺を40画素に揃え、キャッシュの画素密度そのものを比較する。
+ * 全27種を原画から各実寸へ描き、拡大表示と13画素の簡易図柄も比較する。
+ * 37・78画素のマスは本番の周辺・拡大表示と同じ端数を含む寸法を使う。
  * @returns {void}
  */
 function renderNativeSprites() {
   if (!mapAssetsReady()) return;
   const canvas = document.getElementById("previewNativeSprites"), ctx = canvas.getContext("2d");
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const sprite = document.createElement("canvas"); sprite.width = 40; sprite.height = 40;
+  const sprite = document.createElement("canvas"); sprite.width = 78; sprite.height = 78;
   const miniature = document.createElement("canvas"); miniature.width = 13; miniature.height = 13;
   for (const [index, [kind, label]] of nativeSprites.entries()) {
     const x = index % nativeSpriteColumns * 374, y = Math.floor(index / nativeSpriteColumns) * 322;
@@ -120,22 +120,22 @@ function renderNativeSprites() {
     ctx.fillStyle = "#aabdd0"; ctx.font = "12px system-ui";
     const status = maintainedSprites.has(kind) ? "維持" : kind === "party" ? "一行" : ["storm", "lantern", "sinkingShip"].includes(kind) ? "出来事" : "更新";
     ctx.textAlign = "right"; ctx.fillText(status, x + 346, y + 24); ctx.textAlign = "center";
-    for (const [size, left] of [[32, 12], [41, 65], [64, 127]]) {
-      ctx.fillText(`${size}px`, x + left + size / 2, y + 48);
+    for (const [size, left] of [[32, 12], [700 / 19, 65], [700 / 9, 127]]) {
+      ctx.fillText(`${Math.round(size)}px`, x + left + size / 2, y + 48);
       drawNativeMapSample(ctx, kind, x + left, y + 61 + (64 - size) / 2, size);
     }
-    ctx.fillStyle = "#aabdd0"; ctx.fillText("図柄40px", x + 237, y + 48);
+    ctx.fillStyle = "#aabdd0"; ctx.fillText("図柄78px", x + 256, y + 48);
     ctx.fillText("全体13px", x + 314, y + 48);
-    const painter = sprite.getContext("2d"); painter.clearRect(0, 0, 40, 40);
-    const box = 40 / 0.9, offset = (40 - box) / 2;
+    const painter = sprite.getContext("2d"); painter.clearRect(0, 0, 78, 78);
+    const box = 78 / 0.9, offset = (78 - box) / 2;
     drawMapSprite(painter, kind, offset, offset, box);
     const miniPainter = miniature.getContext("2d"); miniPainter.clearRect(0, 0, 13, 13);
     drawOverviewSymbol(miniPainter, kind, 0, 0, 13);
     ctx.save(); ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(sprite, x + 217, y + 73); ctx.drawImage(miniature, x + 308, y + 86);
-    ctx.drawImage(sprite, x + 12, y + 142, 160, 160); ctx.drawImage(miniature, x + 238, y + 177, 52, 52);
+    ctx.drawImage(sprite, x + 217, y + 54); ctx.drawImage(miniature, x + 308, y + 86);
+    ctx.drawImage(sprite, x + 12, y + 146, 156, 156); ctx.drawImage(miniature, x + 238, y + 177, 52, 52);
     ctx.restore(); ctx.fillStyle = "#aabdd0";
-    ctx.fillText("40pxの4倍", x + 92, y + 136);
+    ctx.fillText("78pxの2倍", x + 90, y + 140);
     ctx.fillText("13pxの4倍", x + 261, y + 250);
     if (kind === "ship") {
       ctx.fillText("地点と重なる船・約18px", x + 265, y + 267);

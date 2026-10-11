@@ -1,4 +1,4 @@
-import { drawMapSprite } from "./mapAssets.js";
+import { drawMapSprite, mapSpriteSurface } from "./mapAssets.js";
 import { drawOverviewSymbol } from "./mapOverviewArt.js";
 
 const pinImages = new Map();
@@ -6,7 +6,7 @@ const pinImages = new Map();
 /**
  * 星と防衛盾を依頼色・攻守色で塗り直し、原画から明暗だけを戻す。
  * 右半分の防衛色には左半分の攻撃色を混ぜず、縮尺間でも所属色を一致させる。
- * 色ごとの小さな画像を再利用し、毎マスの描画で作り直さない。
+ * 原寸の複製を色ごとに再利用し、表示サイズへの縮小は最後の描画だけで行う。
  * @param {CanvasRenderingContext2D} ctx 描画先。
  * @param {object} pin 種類と色。
  * @param {number} cx 中央の横座標。
@@ -23,22 +23,27 @@ export function drawIllustratedPin(ctx, pin, cx, cy, radius, detailed = true) {
   const key = `${pin.shape}:${pin.color}:${pin.defenderColor || ""}`;
   let image = pinImages.get(key);
   if (!image) {
-    image = document.createElement("canvas"); image.width = 64; image.height = 64;
+    const original = mapSpriteSurface(pin.shape);
+    if (!original) return drawOverviewSymbol(ctx, pin.shape, cx - size / 2, cy - size / 2, size, pin);
+    image = document.createElement("canvas"); image.width = original.width; image.height = original.height;
     const stamp = image.getContext("2d");
-    if (!drawMapSprite(stamp, pin.shape, 0, 0, 64)) return drawOverviewSymbol(ctx, pin.shape, cx - size / 2, cy - size / 2, size, pin);
+    stamp.imageSmoothingEnabled = false;
+    stamp.drawImage(original, 0, 0);
     stamp.globalCompositeOperation = "source-atop"; stamp.globalAlpha = 1;
-    stamp.fillStyle = pin.color; stamp.fillRect(0, 0, 64, 64);
+    stamp.fillStyle = pin.color; stamp.fillRect(0, 0, image.width, image.height);
     if (pin.shape === "shield" && pin.defenderColor) {
-      stamp.fillStyle = pin.defenderColor; stamp.fillRect(32, 0, 32, 64);
+      stamp.fillStyle = pin.defenderColor; stamp.fillRect(image.width / 2, 0, image.width / 2, image.height);
     }
     stamp.globalCompositeOperation = "luminosity"; stamp.globalAlpha = 0.45;
-    drawMapSprite(stamp, pin.shape, 0, 0, 64);
+    stamp.drawImage(original, 0, 0);
     if (pinImages.size >= 48) pinImages.clear();
     pinImages.set(key, image);
   }
   ctx.save(); ctx.shadowColor = "#07172580"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 1;
   ctx.imageSmoothingEnabled = false;
-  ctx.drawImage(image, cx - size / 2, cy - size / 2, size, size);
+  const factor = size * 0.9 / Math.max(image.width, image.height);
+  const width = image.width * factor, height = image.height * factor;
+  ctx.drawImage(image, cx - width / 2, cy - height / 2, width, height);
   ctx.restore();
   return true;
 }

@@ -11,9 +11,9 @@
     <header><h1>地図の描画確認</h1><p>ゲームと同じ画像・描画処理による確認用の地図と地点一覧</p></header>
     <section class="native-preview" aria-labelledby="nativeSpriteTitle">
       <h2 id="nativeSpriteTitle">図柄の原寸確認</h2>
-      <p>全27種を本番の描画で比較します。32・41・64pxは地形を含む1マスの実寸。40pxは切り出し後の図柄の長辺で、その4倍表示から色面や陰影を確認できます。全体地図の13pxと、その4倍も併記しています。</p>
-      <p>「維持」は今回そのまま使う9種、「一行」は既存の北欧風の一行です。図柄の40px欄には地形や影を重ねていません。</p>
-      <div class="preview-scroll"><canvas id="previewNativeSprites" width="360" height="8680" aria-label="全27種類のマップ図柄を32px、41px、64pxの実マス、長辺40pxの図柄と4倍拡大、全体13pxと4倍拡大で比較"></canvas></div>
+      <p>全27種を原画から各サイズへ直接描画します。32pxに加え、周辺表示の約37px・拡大表示の約78pxを本番と同じマス寸法で比較。図柄単独の78pxと2倍表示、全体地図の13pxと4倍表示も併記しています。</p>
+      <p>「維持」は画像を変更していない9種、「一行」は既存の北欧風の一行です。図柄単独の欄には地形や影を重ねていません。</p>
+      <div class="preview-scroll"><canvas id="previewNativeSprites" width="360" height="8680" aria-label="全27種類のマップ図柄を32px、周辺37px、拡大78pxの実マス、長辺78pxの図柄と2倍拡大、全体13pxと4倍拡大で比較"></canvas></div>
     </section>
     <section class="party-preview" aria-labelledby="partyStyleTitle">
       <h2 id="partyStyleTitle">中世北欧の一行</h2>
@@ -73,6 +73,6 @@
       <div class="preview-scroll"><canvas id="previewCoverage" width="1120" height="1236" aria-label="全三十種類の詳細表示、13pxの簡易表示、簡易表示の4倍拡大"></canvas></div>
     </section>
   </main>
-  <script type="module" src="./mapArtPreview.js?v=20261011-world-edge"></script>
+  <script type="module" src="./mapArtPreview.js?v=20261011-native-resolution"></script>
 </body>
 </html>
