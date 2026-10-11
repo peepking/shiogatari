@@ -4,7 +4,7 @@
 
 - built-in `image_gen` を使用した新規生成。既存の図柄をなぞった編集ではない。
 - 原画: `C:/Users/peepk/.codex/generated_images/01a1255b-3ed4-73a2-8557-01f884f84b68/exec-ae51db5d-333a-4c5d-ae17-dbd1eb8a1edb.png`
-- 保存先: `image/map/redraw/maritime-atlas.png`
+- 保存先: `artwork/map/redraw/maritime-atlas.png`
 - 原画寸法: 1536 × 1024、RGBA、背景透過。
 - 3列2段の配置。図柄の切り出しは色や形を変更せず、実測範囲と最近傍法で縮小する。
 - 本番の切り出し指定: `pack.json`。`scripts/packMapSprites.cjs` で再配置できる。街は別の最終原画を採用し、このアトラスからは村・無法港・帆船・難破船・沈没船の5種を使用する。

@@ -4,10 +4,10 @@
 
 ## 保存した素材
 
-- 船11種と潮の施設5段階の元アトラス: `image/ui/atlases/ships-tides.png`
+- 船11種と潮の施設5段階の元アトラス: `artwork/ui/atlases/ships-tides.png`
 - 船の表示素材: `image/ui/ship-{caravel,knarr,longship,cog,galley,carrack,galleass,galleon,fluyt,fishing_boat,viking_ship}.png`
 - 潮の施設: `image/ui/tide-stage-{0,1,2,3,4}.png`
-- 再切り出しの範囲とサイズ: `image/ui/atlases/ships-tides.json`
+- 再切り出しの範囲とサイズ: `artwork/ui/atlases/ships-tides.json`
 - 切り出し: `scripts/extractUIAtlas.cjs`。生成された図柄は描き換えず、透過で離れた各図柄を指定範囲で切り出す。船・施設は128×128。
 - キャッシュ更新番号: `20261010-maritime-ui`
 
@@ -19,7 +19,7 @@
 
 ## 参照画像
 
-- `image/ui/studies/representative-v2.png`: 承認されたUIの画風・素材感・輪郭の参照。炎と単独の部隊員は採用しない。
+- `artwork/ui/studies/representative-v2.png`: 承認されたUIの画風・素材感・輪郭の参照。炎と単独の部隊員は採用しない。
 - `image/map/sprites-pixel.png`: 既存のマップの木・石・布・金属の色とピクセル粒度の参照。マップ自体は変更しない。
 
 ## 生成元

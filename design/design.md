@@ -42,7 +42,7 @@
 - `src/resources/marketUI.js`: 物資取引・イベント取引用モーダルの描画と計算、確認処理。船取引は `src/fleet/shipyardUI.js` の造船所へ統合。
 - `src/resources/hireUI.js`: 雇用モーダルの描画・入力・確定処理。
 - `src/ui/panelUI.js`: 資産表示、勢力/貴族パネル描画、マップ表示切替のバインド。
-- UIアイコンは承認された見本に合わせ、中世北欧・西洋の木・鉄・羊毛・真鍮の素材感で統一する。`image/ui/` の資源18種・専用禁制品4種・行動20種・所属盾1種・四季4種、`image/factions/` の紋章4種、`image/nobles/` の人物6種をピクセル絵で用意する。信仰はミント色の海の波、部隊員は3人組、香辛料は唐辛子。船11種は `src/fleet/shipArt.js`、波紋章を持つ信仰施設5段階は `src/faith/tideScene.js`、魚図鑑4種は `src/fishing/fishingCodexArt.js` で共用する。マップと兵種GIFは変更せず、資源名・数量・所属色・未発見情報・操作は保持する。`tests/uiArtPreview.html` で全77種類の実寸と拡大を確認できる。制作記録は `image/ui/README.md`。
+- UIアイコンは承認された見本に合わせ、中世北欧・西洋の木・鉄・羊毛・真鍮の素材感で統一する。`image/ui/` の資源18種・専用禁制品4種・行動20種・所属盾1種・四季4種、`image/factions/` の紋章4種、`image/nobles/` の人物6種をピクセル絵で用意する。信仰はミント色の海の波、部隊員は3人組、香辛料は唐辛子。船11種は `src/fleet/shipArt.js`、波紋章を持つ信仰施設5段階は `src/faith/tideScene.js`、魚図鑑4種は `src/fishing/fishingCodexArt.js` で共用する。マップと兵種GIFは変更せず、資源名・数量・所属色・未発見情報・操作は保持する。`tests/uiArtPreview.html` で全77種類の実寸と拡大を確認できる。制作記録は `artwork/ui/README.md`。
 - `src/quests/questUI.js`: 依頼一覧カードと依頼モーダルの描画/更新、折りたたみ状態の保持。
 - `src/quests/questProgress.js`: 次の行動と地図確認先を同じ進捗から算出。複数戦闘は未完了の先頭地点、合流型護送は合流後に帰還拠点を返す。期限切れ・地点のない条件・全戦闘完了時は不要な確認ボタンを表示しない。
 - `src/factions/faction.js`: 勢力状態（関係・支持度・戦況スコア・前線）の管理、好感度/名誉家臣処理、日次/週次のドリフトとイベント投入。

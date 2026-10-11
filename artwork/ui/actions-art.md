@@ -7,16 +7,16 @@
 ## ファイルと生成方法
 
 - 生成方法: 組み込み画像生成ツール。透明背景を指定。
-- スタイル参照: `image/ui/studies/representative-v2.png`。
+- スタイル参照: `artwork/ui/studies/representative-v2.png`。
 - 元の生成ファイル: `C:/Users/peepk/.codex/generated_images/01a12542-c817-7310-904e-4b5e59234d2d/exec-489208ef-3730-43b3-abb8-f45713a384a6.png`。
-- 保存先: `image/ui/atlases/actions.png`。1402×1122px、RGBA、5列×4行。
-- 切り出し記録: `image/ui/atlases/actions.json`。
+- 保存先: `artwork/ui/atlases/actions.png`。1402×1122px、RGBA、5列×4行。
+- 切り出し記録: `artwork/ui/atlases/actions.json`。
 - 共通切り出し: `scripts/extractUIAtlas.cjs`。図柄の描き替えをせず、範囲の切り出し・余白の整理・最近傍での縮小を行い、128pxの透過PNGをSVGへ埋め込む。
 - 生成時のセル位置にずれがあるため、記録には実測した切り出し範囲を明示。最終航海の星も同じ範囲に含める。
 
 ## 2026年10月11日の賞金首の共用
 
-ユーザー指定により、賞金首のUIはマップと同じ手配書へ統一した。保存した変更前のマップアトラス `image/map/redraw/sprites-before-redraw.png` の `[303, 780, 176, 207]` を切り出し、画素を変更せず `image/ui/action-bounty.svg` へ埋め込む。街の一覧・通常海域の現地確認・危険海域の現地確認に共用する。再切り出しは `node scripts/extractUIAtlas.cjs image/ui/atlases/map-bounty.json`。元の行動アトラスは他19種の再生成用に保持し、未採用のセル7は切り出し設定から除いた。
+ユーザー指定により、賞金首のUIはマップと同じ手配書へ統一した。保存した変更前のマップアトラス `artwork/map/redraw/sprites-before-redraw.png` の `[303, 780, 176, 207]` を切り出し、画素を変更せず `image/ui/action-bounty.svg` へ埋め込む。街の一覧・通常海域の現地確認・危険海域の現地確認に共用する。再切り出しは `node scripts/extractUIAtlas.cjs artwork/ui/atlases/map-bounty.json`。元の行動アトラスは他19種の再生成用に保持し、未採用のセル7は切り出し設定から除いた。
 
 ## モチーフと割り当て
 

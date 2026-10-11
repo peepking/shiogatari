@@ -9,7 +9,7 @@
 - 並び: 上段は唐辛子、雇用する戦士、所属の紋章盾、ミント色の信仰の灯火。下段は違法薬物、密造酒、盗品工芸品、盗品武具。
 - 画像生成スキルの組み込みツールで作成。参照画像は承認済みの `image/map/sprites-pixel.png` と `image/map/party-norse-pixel.png`。画風だけを参照し、マップは編集していない。
 - 元画像: `C:/Users/peepk/.codex/generated_images/01a121ec-ab48-7871-944a-f4403a99fc5a/exec-e169606f-bd55-462c-8096-080db7065b68.png`
-- 画像は加工せず透過を保持したまま複製。採用図柄の切り出し範囲は `image/ui/atlases/approved-samples.json` に記録する。
+- 画像は加工せず透過を保持したまま複製。採用図柄の切り出し範囲は `artwork/ui/atlases/approved-samples.json` に記録する。
 
 ## 使用したプロンプト
 

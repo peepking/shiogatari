@@ -3,9 +3,9 @@
 今回の地形オブジェクト4種は、既存の輪郭をなぞらず、新規の透過画像として制作した。制作モードは built-in `image_gen` で、CLI・APIキーは使用していない。
 
 - 生成元: `C:/Users/peepk/.codex/generated_images/01a1255a-ff49-7d21-8c48-c38a80d1edac/exec-ebb9e1d7-c75b-4ffd-a0f0-faebcc613f50.png`
-- 保存先: `image/map/redraw/landscape-atlas.png`
+- 保存先: `artwork/map/redraw/landscape-atlas.png`
 - 画像: 1254 × 1254 px、透過RGBA、2列 × 2行
-- 画風参照: `image/ui/atlases/resources.png`。構造・対象の参照には使わず、画素のまとまりと素材の陰影だけを参照した。
+- 画風参照: `artwork/ui/atlases/resources.png`。構造・対象の参照には使わず、画素のまとまりと素材の陰影だけを参照した。
 - 本番の `sprites-pixel.png` およびマップ描画処理は、この制作作業では変更していない。
 
 ## 切り出し位置

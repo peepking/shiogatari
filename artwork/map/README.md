@@ -18,7 +18,7 @@
 - [海図・祭壇・入り江・鐘・盾・灯火](redraw/sites-art.md)
 - [戦場跡](redraw/battlefield-art.md)
 
-`redraw/pack.json` から `node scripts/packMapSprites.cjs image/map/redraw/pack.json` で本番の二枚を再配置できる。制作時のみSharpが必要で、ゲーム実行時の追加依存はない。配置結果は `redraw/packed-bounds.json` と `src/world/mapSpriteBounds.js` に記録した。`redraw/*-before-redraw.png` は維持図柄を再現するための元画像で、本番では読み込まない。
+`redraw/pack.json` から `node scripts/packMapSprites.cjs artwork/map/redraw/pack.json` で本番の二枚を再配置できる。制作時のみSharpが必要で、ゲーム実行時の追加依存はない。配置結果は `redraw/packed-bounds.json` と `src/world/mapSpriteBounds.js` に記録した。`redraw/*-before-redraw.png` は維持図柄を再現するための元画像で、本番では読み込まない。
 
 確認ページの先頭に全27図柄の実寸欄を追加した。実マス32px・周辺約37px・拡大約78px、長辺78pxの図柄と2倍表示、全体13pxと4倍を本番と同じ処理で比較できる。
 

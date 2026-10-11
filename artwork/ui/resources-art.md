@@ -2,10 +2,10 @@
 
 2026年10月10日。画像生成スキルの組み込みツールで、承認された見本を画風の参照として制作。
 
-- 新しい17図柄: `image/ui/atlases/resources.png`。部隊は3人組、信仰はミントグリーンの海の波の紋章。
+- 新しい17図柄: `artwork/ui/atlases/resources.png`。部隊は3人組、信仰はミントグリーンの海の波の紋章。
 - 元画像: `C:/Users/peepk/.codex/generated_images/01a121ec-ab48-7871-944a-f4403a99fc5a/exec-6d3aba4a-9b14-4aaa-b23d-bbba5930ce56.png`
-- 承認済みの唐辛子・所属盾・禁制品4種は `image/ui/studies/representative-v2.png` を採用。そのプロンプトは `studies/README.md` に保存。
-- 切り出し指定: `image/ui/atlases/resources.json`、`approved-samples.json`。`scripts/extractUIAtlas.cjs` で128px透過PNGをSVGに埋め込み、既存の呼び出し形式を維持する。生成後の色は描き換えない。部隊と信仰は隣の図柄の混入だけを最大連結成分の選択で除き、元のRGBAを保持する。
+- 承認済みの唐辛子・所属盾・禁制品4種は `artwork/ui/studies/representative-v2.png` を採用。そのプロンプトは `studies/README.md` に保存。
+- 切り出し指定: `artwork/ui/atlases/resources.json`、`approved-samples.json`。`scripts/extractUIAtlas.cjs` で128px透過PNGをSVGに埋め込み、既存の呼び出し形式を維持する。生成後の色は描き換えない。部隊と信仰は隣の図柄の混入だけを最大連結成分の選択で除き、元のRGBAを保持する。
 - マップ・兵種GIFは変更していない。
 
 ## 使用したプロンプト
@@ -30,7 +30,7 @@ Output: genuinely transparent alpha PNG. No checkerboard, no opaque black backgr
 
 ユーザー指定により、食料を小麦の穂3本だけの束へ変更し、資金は同じ規格の金貨4枚へ作り直した。画像生成スキルの組み込みツールを使用し、修正前の資源アトラスは画風の参照だけに使った。
 
-- 保存先: `image/ui/food.svg`、`image/ui/funds.svg`。既存の資源アトラス `image/ui/atlases/resources.png` 内の該当2枠も差し替えた。
+- 保存先: `image/ui/food.svg`、`image/ui/funds.svg`。既存の資源アトラス `artwork/ui/atlases/resources.png` 内の該当2枠も差し替えた。
 - 食料の生成元: `C:/Users/peepk/.codex/generated_images/01a121ec-ab48-7871-944a-f4403a99fc5a/exec-f23c6a30-6a5d-469b-be2d-944b76fa8492.png`
 - 資金の生成元: `C:/Users/peepk/.codex/generated_images/01a121ec-ab48-7871-944a-f4403a99fc5a/exec-b1767c5a-3a03-46a5-962b-bbebdfb69d9d.png`
 - 生成した各図柄を透過のまま切り詰め、既存の枠に最近傍で収めた。範囲は資金 `[26,352,247,222]`、食料 `[579,355,269,221]`。その他15種のRGBA画素を保持した。再切り出しは既存の `resources.json` をそのまま使う。

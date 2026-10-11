@@ -1,5 +1,5 @@
 {
-  "atlas": "image/ui/atlases/ships-tides.png",
+  "atlas": "artwork/ui/atlases/ships-tides.png",
   "columns": 4,
   "rows": 4,
   "icons": [

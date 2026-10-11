@@ -4,6 +4,8 @@
 
 JavaScriptは `src/` の機能別フォルダへ配置する。各フォルダの責務とテストの読み込み方法は [JavaScriptの配置](../src/README.md) を参照する。
 
+ゲームで使う画像は `image/`、画像の原画・切り出し設定・制作記録は `artwork/` に分ける。再加工の手順は [地図素材](../artwork/map/README.md) と [UI素材](../artwork/ui/README.md) を参照する。
+
 ## 仕様の参照先
 
 | 対象 | 担当文書 |
