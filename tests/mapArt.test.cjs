@@ -439,7 +439,8 @@ function verifyRasterCaches(art) {
   art.assets.drawTerrainTexture(target, "sea", 5, 6);
   const terrain = target.calls.at(-1), created = surfaces.length;
   assert.equal(terrain[0].width, 512); assert.equal(terrain[0].height, 512);
-  assert.ok(surfaces.slice(count).some(surface => surface.width === 128 && surface.height === 128), "海の模様を少ない色面で継ぎ目合成する");
+  assert.ok(surfaces.slice(count).filter(surface => surface.width === 512 && surface.height === 512).length >= 2, "海の模様を原寸のまま継ぎ目合成する");
+  assert.equal(surfaces.slice(count).some(surface => surface.width === 128 && surface.height === 128), false, "地形に固定128pxの中間縮小を挟まない");
   assert.equal(terrain[0].painter.rasterStates.at(-1)[0], false, "合成した色面を拡大するとき輪郭をぼかさない");
   art.assets.drawTerrainTexture(target, "sea", 9, 10);
   assert.deepEqual(target.calls.at(-1), terrain, "四マス先でも同じ海面模様の座標を使う");
@@ -458,7 +459,7 @@ async function main() {
   for (let i = 0; i < 10; i++) art.assets.prepareMapAssets(onReady);
   assert.equal(art.images.length, 4, "同じ地図の再描画で画像を追加要求しない");
   assert.match(art.images[0].src, /\/image\/map\/sprites-pixel\.png\?v=20261011-map-sprite-redraw$/);
-  assert.match(art.images[1].src, /\/image\/map\/terrain-pixel\.png$/);
+  assert.match(art.images[1].src, /\/image\/map\/terrain-pixel\.png\?v=20261014-calm-water$/);
   assert.match(art.images[2].src, /\/image\/map\/events-pixel\.png\?v=20261011-map-sprite-redraw$/);
   assert.match(art.images[3].src, /\/image\/map\/party-norse-pixel\.png$/);
   const ctx = makeContext();

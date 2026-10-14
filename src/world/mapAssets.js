@@ -3,7 +3,7 @@ import { PIXEL_SPRITES, PIXEL_EVENT_SPRITES, PIXEL_SPRITE_ATLAS_SIZE, PIXEL_EVEN
 /** 地図専用の画像。UIの画像とは分け、四枚が揃ってから同時に切り替える。 */
 const assets = {
   sprites: { file: "sprites-pixel.png?v=20261011-map-sprite-redraw", image: null, status: "idle" },
-  terrain: { file: "terrain-pixel.png", image: null, status: "idle" },
+  terrain: { file: "terrain-pixel.png?v=20261014-calm-water", image: null, status: "idle" },
   events: { file: "events-pixel.png?v=20261011-map-sprite-redraw", image: null, status: "idle" },
   party: { file: "party-norse-pixel.png", image: null, status: "idle" },
 };
@@ -113,39 +113,39 @@ function makeSurface(width, height) {
 /**
  * 模様の両端を薄く重ねて、繰り返しの境界に直線が出るのを防ぐ。
  * 左右を先に合わせ、その結果を上下で合わせるため四隅の色も連続する。
- * 一マス32画素の色面で継ぎ目を合わせ、拡大時は補間せず輪郭を保つ。
- * 海岸の曲線や水深マスクにはこの縮小を適用せず、接続の滑らかさを残す。
+ * 原画の画素寸法で継ぎ目を合わせ、各表示サイズへ描くまで細部を縮小しない。
+ * 継ぎ目の重なり幅は各辺の八分の一とし、海岸の曲線や水深マスクは変更しない。
  * @param {HTMLImageElement} image 原画。 @param {number} column 列。 @param {number} row 行。
  * @param {number} columns 列数。 @param {number} rows 行数。
  * @returns {HTMLCanvasElement|null} 繰り返し用の描画面。
  */
 export function makeRepeatingMapTexture(image, column, row, columns, rows) {
   if (typeof document === "undefined") return null;
-  const original = makeSurface(128, 128), surface = makeSurface(128, 128);
-  original.getContext("2d").drawImage(image, column * image.naturalWidth / columns, row * image.naturalHeight / rows,
-    image.naturalWidth / columns, image.naturalHeight / rows, 0, 0, 128, 128);
-  const target = surface.getContext("2d"); target.drawImage(original, 0, 0);
+  const width = Math.round(image.naturalWidth / columns), height = Math.round(image.naturalHeight / rows);
+  const overlapX = Math.max(1, Math.round(width / 8)), overlapY = Math.max(1, Math.round(height / 8));
+  const original = makeSurface(width, height), surface = makeSurface(width, height);
+  const source = original.getContext("2d"); source.imageSmoothingEnabled = false;
+  source.drawImage(image, column * image.naturalWidth / columns, row * image.naturalHeight / rows,
+    image.naturalWidth / columns, image.naturalHeight / rows, 0, 0, width, height);
+  const target = surface.getContext("2d"); target.imageSmoothingEnabled = false; target.drawImage(original, 0, 0);
   for (const vertical of [false, true]) {
     if (vertical) original.getContext("2d").drawImage(surface, 0, 0);
     for (const end of [false, true]) {
-      const strip = makeSurface(vertical ? 128 : 16, vertical ? 16 : 128);
-      const painter = strip.getContext("2d");
+      const strip = makeSurface(vertical ? width : overlapX, vertical ? overlapY : height);
+      const painter = strip.getContext("2d"); painter.imageSmoothingEnabled = false;
       painter.save(); painter.scale(vertical ? 1 : -1, vertical ? -1 : 1);
-      painter.drawImage(original, vertical ? 0 : end ? 0 : 112, vertical ? end ? 0 : 112 : 0,
-        strip.width, strip.height, vertical ? 0 : -16, vertical ? -16 : 0, strip.width, strip.height);
+      painter.drawImage(original, vertical ? 0 : end ? 0 : width - overlapX, vertical ? end ? 0 : height - overlapY : 0,
+        strip.width, strip.height, vertical ? 0 : -overlapX, vertical ? -overlapY : 0, strip.width, strip.height);
       painter.restore();
-      const fade = painter.createLinearGradient(0, 0, vertical ? 0 : 16, vertical ? 16 : 0);
+      const fade = painter.createLinearGradient(0, 0, vertical ? 0 : overlapX, vertical ? overlapY : 0);
       fade.addColorStop(0, end ? "#ffffff00" : "#ffffff80");
       fade.addColorStop(1, end ? "#ffffff80" : "#ffffff00");
       painter.globalCompositeOperation = "destination-in"; painter.fillStyle = fade;
       painter.fillRect(0, 0, strip.width, strip.height);
-      target.drawImage(strip, vertical ? 0 : end ? 112 : 0, vertical ? end ? 112 : 0 : 0);
+      target.drawImage(strip, vertical ? 0 : end ? width - overlapX : 0, vertical ? end ? height - overlapY : 0 : 0);
     }
   }
-  const enlarged = makeSurface(512, 512), painter = enlarged.getContext("2d");
-  painter.imageSmoothingEnabled = false;
-  painter.drawImage(surface, 0, 0, 512, 512);
-  return enlarged;
+  return surface;
 }
 
 /** @param {string} terrain 地形。 @returns {HTMLCanvasElement|null} 六種類の地形の繰り返し面を再利用する。 */

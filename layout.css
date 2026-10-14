@@ -90,7 +90,7 @@ main .grid > * { min-width: 0; }
 .location-actions .btn:disabled { opacity: .42; cursor: not-allowed; }
 .location-action-note { margin: 8px 0 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
 .location-action-exit { display: grid; gap: 7px; padding-top: 12px; border-top: 1px solid var(--line); }
-.location-action-exit .btn { justify-content: center; min-height: 44px; background: transparent; color: #b4c8dd; --action-icon: url('./image/ui/action-exit.svg?v=20261010-maritime-ui'); }
+.location-action-exit .btn { justify-content: center; min-height: 44px; background: transparent; color: #b4c8dd; --action-icon: url('./image/ui/action-exit.svg?v=20261014-exit-door-aligned'); }
 .location-action-grid #exploreInfo,
 .location-action-grid #dangerousSeaEventInfo { grid-column: 1 / -1; }
 /* 難破船の選択は全列を使って縦に並べ、長い斥候情報でボタンが押し潰されるのを防ぐ。 */
@@ -115,7 +115,7 @@ main .grid > * { min-width: 0; }
 #dangerousSeaEventBtn { --action-icon: url('./image/ui/action-sea-event.svg?v=20261010-maritime-ui'); }
 #dangerousWreckChoices .btn { --action-icon: url('./image/ui/action-trade.svg?v=20261010-maritime-ui'); }
 #dangerousWreckChoices [data-wreck-choice="rescue"] { --action-icon: url('./image/ui/action-rescue.svg?v=20261010-maritime-ui'); }
-#dangerousWreckChoices [data-wreck-choice="leave"] { --action-icon: url('./image/ui/action-exit.svg?v=20261010-maritime-ui'); }
+#dangerousWreckChoices [data-wreck-choice="leave"] { --action-icon: url('./image/ui/action-exit.svg?v=20261014-exit-door-aligned'); }
 .location-actions #oracleBattleBtn, .location-actions #bountyVisitBtn {
   background: #385582; border-color: #7aa7ff; color: #fff;
 }
@@ -129,7 +129,7 @@ main .grid > * { min-width: 0; }
 #nationalPowerDonate, #audienceBribeBtn { --action-icon: url('./image/ui/funds.svg?v=20261011-wheat-coins'); }
 #audienceHonorBtn { --action-icon: url('./image/ui/identity.svg?v=20261010-maritime-ui'); }
 #audienceRequestBtn { --action-icon: url('./image/ui/action-quest.svg?v=20261010-maritime-ui'); }
-#audienceResignBtn { --action-icon: url('./image/ui/action-exit.svg?v=20261010-maritime-ui'); }
+#audienceResignBtn { --action-icon: url('./image/ui/action-exit.svg?v=20261014-exit-door-aligned'); }
 .command-actions #audienceResignBtn { background: #ad626210; border-color: #c5797947; color: #e0bcbc; }
 .command-actions #audienceResignBtn:hover:not(:disabled) { background: #ad62622b; border-color: #c57979; }
 .command-actions-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; font-size: 11px; letter-spacing: .08em; color: #b6c9dd; font-weight: 600; }
@@ -137,7 +137,7 @@ main .grid > * { min-width: 0; }
 #battlePrepInfo { justify-self: start; max-width: 100%; box-sizing: border-box; white-space: normal; line-height: 1.6; border: 0; border-left: 2px solid #b6c9dd55; border-radius: 0; background: transparent; padding: 4px 9px; color: #b6c9dd; }
 #battlePrepFightBtn, #warAttackRaidBtn, #warSkirmishBtn { --action-icon: url('./image/ui/arms.svg?v=20261010-maritime-ui'); }
 #warGrandBtn { --action-icon: url('./image/ui/action-grand-battle.svg?v=20261010-maritime-ui'); }
-#battlePrepRunBtn { --action-icon: url('./image/ui/action-exit.svg?v=20261010-maritime-ui'); }
+#battlePrepRunBtn { --action-icon: url('./image/ui/action-exit.svg?v=20261014-exit-door-aligned'); }
 #battlePrepPrayBtn { --action-icon: url('./image/ui/faith.svg?v=20261010-maritime-ui'); }
 #battlePrepSurrenderBtn { --action-icon: url('./image/ui/action-surrender.svg?v=20261010-maritime-ui'); }
 #warDefendRaidBtn, #warEscortBtn { --action-icon: url('./image/ui/action-shield.svg?v=20261010-maritime-ui'); }

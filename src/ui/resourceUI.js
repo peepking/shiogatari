@@ -17,7 +17,8 @@ const TROOP_IDS = ["infantry", "halberd", "medic", "marine", "archer", "scout", 
  * @returns {string}
  */
 export function resourceIcon(id) {
-  const src = Object.hasOwn(ICONS, id) ? `./image/ui/${ICONS[id]}.svg?v=20261011-wheat-coins`
+  const version = id === "textile" ? "20261014-textile-blue" : "20261011-wheat-coins";
+  const src = Object.hasOwn(ICONS, id) ? `./image/ui/${ICONS[id]}.svg?v=${version}`
     : (TROOP_IDS.includes(id) || Object.hasOwn(PIRATE_IMAGES, id)) ? `./${troopImage(id)}` : null;
   return src ? `<img class="resource-icon" src="${src}" alt="" aria-hidden="true">` : "";
 }

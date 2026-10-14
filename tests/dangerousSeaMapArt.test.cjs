@@ -212,6 +212,10 @@ function verifyTiles(art) {
   assert.equal(a.calls[0][0], b.calls[0][0], "同じ地域の繰り返し面を再利用する");
   assert.deepEqual(a.calls[0].slice(1), b.calls[0].slice(1), "海面模様を世界座標の四マス周期で揃える");
   assert.notEqual(a.calls[0][0], alternate.calls[0][0], "二地域の原画を分けて保持する");
+  for (const ctx of [a, alternate]) {
+    assert.equal(ctx.calls[0][0].width, 887, "荒海も原画の横解像度を保持する");
+    assert.equal(ctx.calls[0][0].height, 887, "荒海も原画の縦解像度を保持する");
+  }
   assert.equal(a.calls[0][0].painter.operations.some(operation => operation[0] === "fillRect" && operation[1] === "color"), false, "南西も描き直した原画の色面をそのまま使う");
   assert.equal(alternate.calls[0][0].painter.operations.some(operation => operation[0] === "fillRect" && operation[1] === "color"), false, "南東の原画へ別地域の色を混ぜない");
   assert.equal(a.operations.find(operation => operation[0] === "drawImage")[3], false, "原画の粒を補間でにじませない");

@@ -1,4 +1,4 @@
-import { shipIcon } from "../src/fleet/shipArt.js?v=20261010-maritime-ui";
+import { shipIcon } from "../src/fleet/shipArt.js?v=20261014-fishing-net";
 import { SHIP_TYPES } from "../src/fleet/shipConfig.js";
 import { tideStageIcon } from "../src/faith/tideScene.js?v=20261010-maritime-ui";
 import { TIDE_STAGES } from "../src/faith/tideAlliance.js";
@@ -38,7 +38,11 @@ function addSample(target, label, html, smallSize = 20, largeSize = 48) {
 
 /** @returns {void} 資源・行動・四季・勢力・人物・船・施設・魚図鑑を漏れなく並べる。 */
 function renderPreview() {
-  for (const [file, label] of resources) addSample("uiResources", label, `<img src="./image/ui/${file}.svg?v=20261011-wheat-coins" alt="">`);
+  for (const [file, label] of resources) {
+    const version = file === "textile" ? "20261014-textile-blue"
+      : file === "action-exit" ? "20261014-exit-door-aligned" : "20261011-wheat-coins";
+    addSample("uiResources", label, `<img src="./image/ui/${file}.svg?v=${version}" alt="">`);
+  }
   for (let season = 0; season < SEASONS.length; season++) {
     const card = document.createElement("figure"); card.className = "ui-art-card";
     const date = document.createElement("div"); date.className = "ui-art-date";

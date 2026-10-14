@@ -133,15 +133,16 @@
       "cell": 9,
       "output": "image/ui/ship-fishing_boat.png",
       "bounds": [
-        392,
-        569,
-        276,
-        241
+        466,
+        625,
+        128,
+        128
       ],
       "size": [
         128,
         128
-      ]
+      ],
+      "preserve": true
     },
     {
       "cell": 10,

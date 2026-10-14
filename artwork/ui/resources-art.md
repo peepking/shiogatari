@@ -8,6 +8,8 @@
 - 切り出し指定: `artwork/ui/atlases/resources.json`、`approved-samples.json`。`scripts/extractUIAtlas.cjs` で128px透過PNGをSVGに埋め込み、既存の呼び出し形式を維持する。生成後の色は描き換えない。部隊と信仰は隣の図柄の混入だけを最大連結成分の選択で除き、元のRGBAを保持する。
 - マップ・兵種GIFは変更していない。
 
+2026年10月14日、承認済みの青一色の織物へ差し替えた。組み込み画像生成で、ユーザー指定の `exec-41be030b-1a70-4b34-9c6f-952e7475c0d1.png` を対象に「形・折り目を保ち、白い縁取りだけを周囲の青へなじませる」と指示した。採用生成元は `C:/Users/peepk/.codex/generated_images/01a121ec-ab48-7871-944a-f4403a99fc5a/exec-b932aa6b-a5e8-4c76-aee8-90387de0b724.png`。承認された128px画像を `image/ui/textile.svg` とアトラスの織物範囲へ保存し、再切り出しでは画素を保持する。織物だけのキャッシュ更新番号は `20261014-textile-blue`。
+
 ## 使用したプロンプト
 
 ```text

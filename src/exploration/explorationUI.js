@@ -13,7 +13,7 @@ import { SUPPLY_ITEMS, SUPPLY_TYPES } from "../resources/supplies.js";
 import { addTroops, TROOP_STATS } from "../resources/troops.js";
 import { awardExplorationFragment } from "./chartWorld.js";
 import { initializeExploration, tickExploration, describeDanger, rollExplorationReward, consumeExploration, EXPLORATION_NAMES } from "./exploration.js";
-import { getDangerousSeaPositions } from "../dangerousSeas/dangerousSeaWorld.js";
+import { dangerousSeaAt, getDangerousSeaPositions } from "../dangerousSeas/dangerousSeaWorld.js";
 import { rollDangerousExplorationReward, consumeDangerousExploration } from "../dangerousSeas/dangerousSeaExploration.js";
 import { beginDangerousSeaAction, finishDangerousSeaAction, dangerousSeaActionBlocked } from "../dangerousSeas/dangerousSeaHazards.js";
 import { dangerousSeaReservedPositions } from "../dangerousSeas/dangerousSeaReservations.js";
@@ -171,6 +171,8 @@ export function resumeExploration(syncUI) {
 /**
  * 現在地点の探索を確認し、固定結果を保存してから1日進める。
  * 確認中に地点やモードが変わっていれば実行しない。
+ * 難破船と危険海域内は強敵を優先し、それ以外の戦場跡・漂流物は通常編成にする。
+ * 戦闘の発生率は地点の固定値を使い、編成と報酬は開始時に一度だけ抽選する。
  * @param {Function} syncUI 表示同期。
  * @returns {void}
  */
@@ -179,10 +181,11 @@ function beginExploration(syncUI) {
   const site = getExplorationAt(state.position);
   if (!site || state.modeLabel !== MODE_LABEL.NORMAL || state.pendingEncounter?.active || state.expansion.charts.pending || dangerousSeaActionBlocked()) return;
   const staged = site.regionId && site.kind === "wreck";
+  const strong = site.kind === "wreck" || !!site.regionId || !!dangerousSeaAt(site.position);
   confirmAction({ title: `${EXPLORATION_NAMES[site.kind]}を探索`,
     body: staged ? "甲板の積荷を探します。船倉には、さらに積荷や生存者が残っているかもしれません。" : EXPLORATION_HINTS[site.kind],
     sections: [{ title: "探索の条件", items: [staged ? "甲板1日 / 船倉の積荷か救助は追加1日" : "所要1日", `期限まであと${site.expiresAbs - absDay(state)}日`, describeDanger(site.danger)] },
-      ...(site.danger > 0 ? [{ title: "戦闘に備えて", items: ["敵は賞金首相当", "敗北・逃走・引き分けでは報酬なし。探索地点も消えます。"] }] : [])],
+      ...(site.danger > 0 ? [{ title: "戦闘に備えて", items: [strong ? "敵は賞金首相当" : "敵は通常編成", "敗北・逃走・引き分けでは報酬なし。探索地点も消えます。"] }] : [])],
     guideTopic: "guide-exploration",
     confirmText: "1日使って探索",
     onConfirm: () => {
@@ -193,7 +196,7 @@ function beginExploration(syncUI) {
       const fight = site.danger === 1 || (site.danger > 0 && Math.random() < site.danger);
       let encounter = null;
       if (fight) {
-        const enemy = site.regionId ? buildDangerousEnemyFormation(site.position, site.level) : buildEnemyFormation("elite", "pirates");
+        const enemy = site.regionId ? buildDangerousEnemyFormation(site.position, site.level) : buildEnemyFormation(strong ? "elite" : "normal", "pirates");
         encounter = { active: true, enemyFormation: enemy.formation, enemyTotal: enemy.total, strength: enemy.strength,
           enemyFactionId: "pirates", terrain: mapData[site.position.y][site.position.x].terrain, eventTag: site.regionId ? "dangerous_exploration" : "natural_exploration",
           ...(site.regionId ? { dangerousExplorationId: site.id, dangerousRegionId: site.regionId } : { explorationId: site.id }) };

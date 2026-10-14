@@ -139,11 +139,12 @@
       "cell": 13,
       "output": "image/ui/textile.svg",
       "bounds": [
-        290,
-        866,
-        287,
-        227
-      ]
+        369,
+        915,
+        128,
+        128
+      ],
+      "preserve": true
     },
     {
       "cell": 14,

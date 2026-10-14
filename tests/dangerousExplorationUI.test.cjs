@@ -28,7 +28,7 @@ async function main() {
     "./state.js": { state }, "./constants.js": { MODE_LABEL: { NORMAL: "normal", PREP: "prep", BATTLE: "battle" } },
     "./map.js": { mapData, snapshotWorld: () => ({}), restoreWorld: () => true }, "./questUtils.js": { absDay: () => state.day },
     "./time.js": { advanceDayWithEvents: () => { calls.day++; state.day++; if (hazardOnDay) state.dangerousSeas.pendingHazard = { id: 99, kind: "wave", stage: "action_running" }; if (failAfterDay) saveFails = true; return 1; } },
-    "./actions.js": { buildEnemyFormation: () => { calls.normalEnemy++; return enemy(); }, buildDangerousEnemyFormation: () => { calls.dangerousEnemy++; return enemy(); } },
+    "./actions.js": { buildEnemyFormation: strength => { calls.normalEnemy++; calls.strength = strength; return { ...enemy(), strength }; }, buildDangerousEnemyFormation: () => { calls.dangerousEnemy++; return enemy(); } },
     "./storage.js": { saveGameToStorage: () => { saveCalls++; return !saveFails && saveCalls !== failSaveAt; } },
     "./dom.js": { elements: {}, confirmAction: options => { confirmation = options; }, pushLog: () => {}, pushToast: () => {} },
     "./events.js": { enqueueEvent: () => {} }, "./supplies.js": { SUPPLY_ITEMS: [{ id: "brew", name: "酒", type: "processed" }], SUPPLY_TYPES: { processed: "processed" }, formatSupplyDisplay: () => ({ total: Object.values(state.supplies).reduce((sum, qty) => sum + qty, 0), cap: 60 }) },
@@ -36,8 +36,9 @@ async function main() {
     "./chartWorld.js": { awardExplorationFragment: () => { calls.fragment = (calls.fragment || 0) + 1; } },
     "./outfitting.js": { snapshotOutfitting: () => ({ scouts: scoutCount }) },
     "./exploration.js": { initializeExploration: (data, map, day, blocked) => { reserved = blocked; }, tickExploration: () => {}, describeDanger: chance => `${chance * 100}%`,
-      rollExplorationReward: normalReward, consumeExploration: consumeNormal, EXPLORATION_NAMES: { wreck: "難破船", drift: "漂流物" } },
-    "./dangerousSeaWorld.js": { getDangerousSeaPositions: id => id === "se" ? [{ x: 49, y: 49, level: "core" }] : [] },
+      rollExplorationReward: normalReward, consumeExploration: consumeNormal, EXPLORATION_NAMES: { wreck: "難破船", drift: "漂流物", battlefield: "戦場跡" } },
+    "./dangerousSeaWorld.js": { dangerousSeaAt: position => position.x === 49 && position.y === 49 ? { regionId: "se", level: "core" } : null,
+      getDangerousSeaPositions: id => id === "se" ? [{ x: 49, y: 49, level: "core" }] : [] },
     "./dangerousSeaHazards.js": {
       dangerousSeaActionBlocked: () => !!(state.dangerousSeas.action || state.dangerousSeas.explorationPending || state.dangerousSeas.pendingHazard),
       beginDangerousSeaAction: kind => { if (state.dangerousSeas.action) return false; state.dangerousSeas.action = { kind }; return 1; },
@@ -237,6 +238,31 @@ async function main() {
   assert.equal(state.troops.infantry, legacyTroops + 5);
   assert.equal(calls.troopLevels.at(-1), 1, "旧救助兵の練度を変更しない");
   assert.equal(state.dangerousSeas.explorationPending, null);
+  for (const [kind, position, regionId, strength] of [
+    ["battlefield", { x: 1, y: 1 }, null, "normal"],
+    ["drift", { x: 1, y: 1 }, null, "normal"],
+    ["wreck", { x: 1, y: 1 }, null, "elite"],
+    ["drift", { x: 49, y: 49 }, null, "elite"],
+    ["drift", { x: 49, y: 49 }, "se", "elite"],
+  ]) {
+    state.pendingEncounter = null; state.modeLabel = "normal"; state.position = position;
+    const site = { id: 50, kind, position, danger: 1, expiresAbs: 200, ...(regionId ? { regionId, level: "core", profile: "danger_core" } : {}) };
+    state.expansion.exploration.sites = regionId ? [] : [site];
+    state.dangerousSeas.regions.se.sites = regionId ? [site] : [];
+    const beforeNormal = calls.normalEnemy, beforeDangerous = calls.dangerousEnemy;
+    renderExplorationControl(() => {}); button.onclick();
+    assert.equal(confirmation.sections[1].items[0], strength === "elite" ? "敵は賞金首相当" : "敵は通常編成");
+    confirmation.onConfirm();
+    assert.equal(state.pendingEncounter.strength, strength, `${kind}: 地点種別と危険海域から敵の強さを選ぶ`);
+    assert.equal(calls.normalEnemy - beforeNormal, regionId ? 0 : 1);
+    assert.equal(calls.dangerousEnemy - beforeDangerous, regionId ? 1 : 0);
+    if (!regionId) assert.equal(calls.strength, strength);
+    const fixedEnemy = JSON.stringify(state.pendingEncounter), day = state.day;
+    state.pendingEncounter = null; resumeExploration(() => {});
+    assert.equal(JSON.stringify(state.pendingEncounter), fixedEnemy, "再開しても編成を変更しない");
+    assert.equal(state.day, day, "再開で日数を重複消費しない");
+    finishExploration(false);
+  }
   console.log("危険難破船の甲板/積荷選択・危険割込み/保存再開・二重回収防止・旧地点維持: 全項目成功");
 }
 

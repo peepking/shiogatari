@@ -18,6 +18,23 @@
 
 ユーザー指定により、賞金首のUIはマップと同じ手配書へ統一した。保存した変更前のマップアトラス `artwork/map/redraw/sprites-before-redraw.png` の `[303, 780, 176, 207]` を切り出し、画素を変更せず `image/ui/action-bounty.svg` へ埋め込む。街の一覧・通常海域の現地確認・危険海域の現地確認に共用する。再切り出しは `node scripts/extractUIAtlas.cjs artwork/ui/atlases/map-bounty.json`。元の行動アトラスは他19種の再生成用に保持し、未採用のセル7は切り出し設定から除いた。
 
+## 2026年10月14日の退出扉の修正
+
+扉の金具と開く方向の食い違いを解消するため、組み込み画像生成ツール（built-in image_gen）で退出アイコンを描き直した。右の柱に蝶番を固定し、手前に開く扉の厚み・上下の辺・金具・自由端の取っ手を同じ向きへ揃えた。
+
+最終採用画像は `C:/Users/peepk/.codex/generated_images/01a121ec-ab48-7871-944a-f4403a99fc5a/exec-852f78a7-63e5-4f96-85c2-821315fab79a.png`。扉の上端を石枠に合う丸アーチ形へ修正し、ユーザーの承認後に差し替えた。本番用の原画 `artwork/ui/atlases/actions.png` のセル6（`[300, 296, 259, 260]`）へ透過・切り出し・最近傍縮小だけで配置し、他セルのRGBA画素はすべて維持した。既存の `actions.json` と共通切り出しスクリプトから `image/ui/action-exit.svg` を再現できる。街・村の出入り、難破船からの退出、辞官、逃走で同じ素材を使い、参照更新版は `20261014-exit-door-arched` とする。単独の試作用原画や設定をリポジトリには追加しない。
+
+初回案の生成指示（最終案は扉の丸アーチ形と枠への適合を指定して修正）:
+
+```text
+Use case: stylized-concept.
+Asset type: ONE transparent pixel-art EXIT / OPEN DOOR UI icon for the medieval Northern European maritime game Shiogatari, readable at 23px.
+Input image 1 is a STYLE AND PALETTE REFERENCE ONLY: the existing actions atlas. Do not reproduce the atlas. Create one newly constructed doorway icon replacing its confusing door geometry.
+Subject: one compact grey stone arched doorway and ONE thick oak door leaf, attached by two iron hinges to the RIGHT vertical stone jamb. The door clearly opens OUTWARD TOWARD THE VIEWER, approximately 55 degrees. The hinge edge stays on the right jamb; the free left edge projects toward the viewer, visibly IN FRONT OF and LOWER THAN the stone threshold. A coherent foreshortened wooden door face is visible. Its top and bottom edges, thickness, two iron strap hinges and single ring handle all agree with that SAME outward rotation. The handle is near the FREE edge, never beside the hinge. The open dark passage remains clearly visible to the LEFT of the leaf. No disconnected hinge, inverted perspective, inward-receding leaf, second leaf, or door vanishing inside the opening.
+Style: match the reference's polished restrained 16-bit pixel game icons, broad intentional color clusters, about 48–56 logical pixels, 3–4 shade steps per material, thin dark navy contour, upper-left illumination. Warm golden oak, muted grey-beige stone, cool blue-grey iron. Clear door construction and large simple planes before fine decoration. Keep the stone frame slim enough for the doorway and leaf to remain legible at 23px.
+Framing: ONE complete centered isolated icon, nearly square compact silhouette, generous fully transparent margin, actual transparent RGBA background. No surrounding wall, scenery, floor extending beyond the threshold, extra objects, arrow, text, labels, glow, watermark, soft shadow, checkerboard or grid.
+```
+
 ## モチーフと割り当て
 
 | セル | ファイル | モチーフ | 用途 |
