@@ -81,18 +81,24 @@ async function main() {
     dangerousSeaActionBlocked: () => false, beginDangerousSeaAction() {}, finishDangerousSeaAction() {},
     updateDangerousSeaDay() {}, updateDangerousExplorationWorld() {}, updateDangerousBountyWorld() {}, updateDangerousSeaEvents() {},
     SHIP_TYPES:modules.get("./shipConfig.js").namespace.SHIP_TYPES,
-    buildLossesMap:n=>n,applyTroopLosses:n=>{fixture.troops.infantry-=n;},pushLog(){},enqueueEvent:e=>notices.push(e),
+    buildLossesMap:n=>n,applyTroopLosses:n=>{fixture.troops.infantry=Math.max(0,(fixture.troops.infantry || 0)-n);},
+    totalTroops:()=>fixture.troops.infantry || 0,pushLog(){},enqueueEvent:e=>notices.push(e),
     pushToast:(title,body)=>toasts.push({title,body}),
     baseAdvanceDay:()=>{fixture.day++;if(fixture.day>30){fixture.day=1;fixture.season++;if(fixture.season>3){fixture.season=0;fixture.year++;}}},
     settlements:[],FOOD_CONSUMPTION_DAYS:[],absDay:()=>0,updateExplorationWorld(){},updateBountyWorld(){},tickDailyWar(){},tickRelationDrift(){},
     maybeQueueHonorInvite(){},applySupportDrift(){},processScheduledOmens(){},questTickDay(){}});
-  for (const name of ["applySeasonUpkeep","advanceDayWithEvents"]) {
+  for (const name of ["applySeasonUpkeep","applyPeriodicFood","advanceDayWithEvents"]) {
     const offset=timeSource.indexOf(`function ${name}(`);
     vm.runInContext(timeSource.slice(offset,timeSource.indexOf("\n}",offset)+2),context);
   }
   vm.runInContext("advanceDayWithEvents(1)",context);
   assert.equal(fixture.year,1001); assert.equal(fixture.day,1); assert.equal(fixture.troops.infantry,8);
-  assert.equal(fixture.funds,4290); assert.equal(notices.length,1); assert.equal(fixture.supplies.food,900);
+  assert.equal(fixture.funds,4290); assert.equal(notices.length,2); assert.equal(fixture.supplies.food,900);
+  assert.equal(notices[0].title, "維持費不足による部隊員の離脱");
+  assert.equal(notices[0].kind, "warn");
+  assert.match(notices[0].body, /15資金不足.*2人去りました/);
+  assert.match(notices[0].body, /残り部隊員 8人/);
+  assert.equal(notices[1].title, "船維持費のため自動売却");
   fixture.troops={}; fixture.funds=0; fixture.day=30; fixture.fleet=normalizeFleet({counts:{cog:2}});
   vm.runInContext("advanceDayWithEvents(61)",context);
   assert.equal(fixture.fleet.counts.cog,1); assert.equal(fixture.funds,3960);
@@ -121,6 +127,31 @@ async function main() {
   assert.equal(fixture.tideAlliance.bonus,10);
   assert.equal(notices.length, noticesBeforeTide);
   assert.deepEqual(toasts.map(row => row.title), ['潮待ちの恵み', '潮盟の支え']);
+  // 食料不足の実損と、消費日以外・充足時・端数不足時に離脱通知が出ないことを確認する。
+  Object.assign(fixture, { day: 9, faith: 0, funds: 100, troops: { infantry: 10 }, supplies: { food: 1 }, tideAlliance: undefined });
+  context.FOOD_CONSUMPTION_DAYS = [10, 30];
+  notices.length = 0;
+  vm.runInContext("advanceDayWithEvents(1)", context);
+  assert.equal(fixture.troops.infantry, 8); assert.equal(fixture.supplies.food, 0);
+  assert.equal(notices.length, 1); assert.equal(notices[0].title, "食料不足による部隊員の離脱");
+  assert.equal(notices[0].kind, "warn");
+  assert.match(notices[0].body, /食料が1不足.*2人去りました/);
+  assert.match(notices[0].body, /残り部隊員 8人/);
+  notices.length = 0;
+  vm.runInContext("advanceDayWithEvents(1)", context);
+  assert.equal(notices.length, 0); assert.equal(fixture.troops.infantry, 8);
+  fixture.day = 29; fixture.supplies.food = 2;
+  vm.runInContext("advanceDayWithEvents(1)", context);
+  assert.equal(notices.length, 0); assert.equal(fixture.troops.infantry, 8);
+  fixture.day = 30; fixture.funds = 15;
+  vm.runInContext("advanceDayWithEvents(1)", context);
+  assert.equal(notices.length, 0); assert.equal(fixture.troops.infantry, 8);
+  // 高額な兵種の維持費が保有人数を超える離脱数を要求しても、通知は実際の人数にする。
+  context.TROOP_STATS.infantry.upkeep = 100;
+  fixture.day = 30; fixture.funds = 0; fixture.troops = { infantry: 1 };
+  vm.runInContext("advanceDayWithEvents(1)", context);
+  assert.equal(notices.length, 1); assert.equal(fixture.troops.infantry, 0);
+  assert.match(notices[0].body, /1人去りました/); assert.match(notices[0].body, /残り部隊員 0人/);
   console.log("部隊・船維持費の分離、季節境界・複数季節、自動売却・端数・軽減上限・潮盟の支給順: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

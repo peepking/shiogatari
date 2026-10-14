@@ -109,10 +109,15 @@ function applySeasonUpkeep() {
   if (deficitFunds > 0) {
     lossCount = Math.floor(deficitFunds / 6);
     if (lossCount > 0) {
+      const before = totalTroops();
       applyTroopLosses(buildLossesMap(lossCount), "upkeep");
+      lossCount = before - totalTroops();
     }
   }
   const shipPayment = payShipUpkeep(state, forecast.shipFunds);
+  if (lossCount > 0) {
+    enqueueEvent({ title: "維持費不足による部隊員の離脱", body: `部隊維持費が${deficitFunds}資金不足し、部隊員が${lossCount}人去りました。\n部隊維持費 ${fundsPaid}/${upkeepCost}を支払いました。残り部隊員 ${totalTroops()}人。`, kind: "warn" });
+  }
   if (shipPayment.sold.length) {
     const soldText = shipPayment.sold.map(row => `${row.name || SHIP_TYPES[row.id].name} ${row.count}隻（資金＋${row.proceeds}）`).join(" / ");
     enqueueEvent({ title: "船維持費のため自動売却", body: `${soldText}\n船維持費 ${shipPayment.cost}を支払いました。残り資金 ${state.funds}。積載上限が減るため、物資・兵員の超過を確認してください。` });
@@ -147,6 +152,10 @@ function applyPeriodicFood() {
     lossCount = Math.floor(unfed * 0.5);
     lossCount = Math.min(lossCount, totalTroops()); // 安全上の上限を設ける
     applyTroopLosses(buildLossesMap(lossCount), "food");
+    lossCount = troopCount - totalTroops();
+  }
+  if (lossCount > 0) {
+    enqueueEvent({ title: "食料不足による部隊員の離脱", body: `食料が${deficit}不足し、部隊員が${lossCount}人去りました。\n食料 ${foodPaid}/${need}を消費しました。残り部隊員 ${totalTroops()}人。`, kind: "warn" });
   }
 
   pushLog(
