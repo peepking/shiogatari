@@ -32,6 +32,7 @@ async function main() {
   const battleState = { battleKind: "grand", randomSeed: 1, size: 10, battleTerrain: "plain", grid: Array.from({ length: 10 }, () => Array(10).fill("plain")),
     enemyFormation: front, allyFormation: "balance", outfitting: { effects: {}, equipped: [] } };
   const context = vm.createContext({ state, battleState,
+    battleEffects: { clear() {} },
     ...modules["./battleUnitFormation.js"].namespace, rosterUnitSequence: 0,
     ...modules["./battleGeometry.js"].namespace, ...modules["./battlePersonnel.js"].namespace,
     battleRoster: { standby: {}, sortie: front.map(e => ({ ...e, sources: { 3: 10 } })), reserve: reserves.map(e => ({ ...e, sources: { 3: 10 } })) },

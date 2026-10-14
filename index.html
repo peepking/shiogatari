@@ -5,8 +5,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
-  <link rel="stylesheet" href="styles.css?v=20261011-map-shared-ui" />
-    <link rel="stylesheet" href="layout.css?v=20261014-exit-door-aligned" />
+  <link rel="stylesheet" href="styles.css?v=20261015-battle-rigging" />
+    <link rel="stylesheet" href="layout.css?v=20261015-battle-rigging" />
 </head>
 
 <body>
@@ -292,6 +292,7 @@
                 </div>
                 <div class="battle-viewport" id="battleViewport" tabindex="0" aria-label="戦場。拡大時はスクロールできます">
                   <canvas id="battleCanvas" width="640" height="640" aria-label="戦闘マップ"></canvas>
+                  <canvas id="battleRiggingCanvas" width="640" height="76" aria-label="艤装の支援射撃" hidden></canvas>
                 </div>
                 <div class="tiny" id="battleOutfitting"></div>
                 <div class="battle-panel">

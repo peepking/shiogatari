@@ -74,8 +74,9 @@ export function renderPirateStoryControls(sync) {
   const target = data.active ? pirateStoryTarget(data.active.id) : null;
   const status = data.completed ? "海賊王を討伐・海没神話への航路が開かれた" : target ? `${target.name}を討伐する` : data.waitingId ? "船影の位置を待っている" : "次の船長の噂を探す";
   panel.innerHTML = `<article class="chart-card quest-progress-card"><div class="chart-heading">${resourceIcon("chart")}<b>海賊王の海図</b><span>${data.defeated.length}/6枚</span></div><div class="tiny">${status}</div><progress max="6" value="${data.defeated.length}" aria-label="海賊王の海図 取得${data.defeated.length}枚"></progress>
+    ${target ? `<div class="quest-progress-rows"><div class="quest-progress-row"><div class="quest-progress-label"><span>目的地</span><b>(${data.active.position.x + 1}, ${data.active.position.y + 1})</b></div></div></div>` : ""}
     ${target ? '<button class="btn chart-location" id="pirateStoryLocation">対象を地図で確認</button>' : ""}
-    <details class="quest-description"><summary>海賊五列強と海図の記録</summary>${PIRATE_LORDS.map(lord => `<p>${data.defeated.includes(lord.id) ? "討伐済み" : data.active?.id === lord.id ? "発見済み" : "未発見"}：${escapeHtml(lord.name)}</p>`).join("")}<p class="tiny">海賊五列強と呼ばれる六人が、それぞれ海図の破片を持っています。期限はありません。この海図は通常の海図達成数に含まれません。</p></details></article>`;
+    <details class="quest-description"><summary>海賊五列強と海図の記録</summary>${PIRATE_LORDS.map(lord => `<p>${data.defeated.includes(lord.id) ? "討伐済み" : data.active?.id === lord.id ? "発見済み" : "未発見"}：${escapeHtml(lord.name)}</p>`).join("")}<p class="tiny">海賊五列強と呼ばれる六人が、それぞれ海図の破片を持っています。期限はありません。</p></details></article>`;
   const location = document.getElementById("pirateStoryLocation");
   if (location) location.onclick = () => { if (state.pirateKingStory?.active) focusMapPosition(state.pirateKingStory.active.position); };
 }

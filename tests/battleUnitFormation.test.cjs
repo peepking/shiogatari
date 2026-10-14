@@ -191,6 +191,7 @@ async function main() {
     Object.assign(state, { ready: true, started: false, running: false, speed: 1, result: "", random: random(42) });
     const timers = new Map(); let id = 0;
     const context = vm.createContext({ battleState: state, battleStrategy: { ...strategy, speed: 1 }, ...deps,
+      battleEffects: { sync() {}, pause() {} },
       stepBattle: step, BASE_TICK_MS: 1000, SPEED_OPTIONS: [1, 2, 4], OUTFITTING_ITEMS: {}, elements: {},
       setInterval(callback) { timers.set(++id, callback); return id; }, clearInterval(key) { timers.delete(key); },
       updateSpeedUI() {}, updateBattleButtons() {}, updateBattleStatus() {}, updateBattleInfo() {}, renderRosterUI() {}, renderBattle() {},

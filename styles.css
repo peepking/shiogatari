@@ -1162,6 +1162,18 @@ option {
   background: #0b1020;
 }
 
+/* 艤装は戦場の外へ置き、マスと兵の表示を覆わない。 */
+.battle-viewport.has-rigging #battleCanvas { border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+#battleRiggingCanvas {
+  display: block;
+  margin: 0 auto;
+  height: auto;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 0;
+  border-radius: 0 0 8px 8px;
+  background: #101d2b;
+}
+
 #mapInfo {
   font-size: 11px;
   color: #bfc4bd;

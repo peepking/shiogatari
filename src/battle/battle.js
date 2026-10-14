@@ -12,6 +12,7 @@ import { getTerrainAt } from "../world/map.js";
 import { state } from "../core/state.js";
 import { updateBattleLayout } from "../ui/layout.js";
 import { drawBattleTerrain } from "./battleTerrainArt.js";
+import { createBattleEffectPlayer } from "./battleEffects.js";
 import { rosterOptions, canAutoDeploy, splitRosterCounts } from "../ui/rosterOptions.js";
 import { saveGameToStorage } from "../core/storage.js";
 import { TROOP_STATS } from "../resources/troops.js";
@@ -25,33 +26,22 @@ import { formationInfoMarkup, formationDetailMarkup, formationOptions, syncUnitF
 import { formationOrderRecipients, selectFormationOrderRecipients, applyFormationOrders } from "./battleUnitFormationOrders.js";
 
 const BASE_TICK_MS = BATTLE_RULES.tickMs;
-const MOVE_FX_TTL = BATTLE_RULES.moveFxTtl;
 const DEFAULT_BATTLE_SIZE = 10;
 const SPEED_OPTIONS = [1, 2, 4];
 const MAX_UNIT_COUNT = 10;
 const MAX_SQUADS = 20;
 const BATTLE_HP_MULTIPLIER = 3;
 let appliedRosterSignature = "";
-const ATTACK_FX_TTL = BATTLE_RULES.attackFxTtl;
-const SUPPORT_FX = {
-  harpoon: { color: "#70e8ff", width: 3.5, glow: 6, rays: 5, radius: 0.18 },
-  ballista: { color: "#c49aff", width: 5.5, glow: 10, rays: 7, radius: 0.25 },
-  fire_ballista: { color: "#ff5d45", width: 6.5, glow: 14, rays: 9, radius: 0.29 },
-  grape_ballista: { color: "#a9c5ff", width: 2, glow: 4, rays: 5, radius: 0.14 },
-  fire_grape_ballista: { color: "#ff7050", width: 2.5, glow: 6, rays: 6, radius: 0.17 },
-  cannon: { color: "#ff9955", width: 8, glow: 16, rays: 10, radius: 0.34 },
-};
-const MOVE_COLORS = {
-  ally: "#4ec7f0",
-  enemy: "#f26b6b",
-  allyRetreat: "#f6a63c",
-  enemyRetreat: "#f08232",
-};
-const ATTACK_COLORS = {
-  ally: "#ffd447", // 黄金色で移動ラインと差別化
-  enemy: "#ff4df5", // マゼンタ寄りでコントラストを確保
-};
 const DECK_KEY = "deck";
+const battleEffects = createBattleEffectPlayer({
+  render: renderBattle,
+  /** @param {Function} callback 次フレームの描画。 @returns {number} 予約ID。 */
+  requestFrame(callback) { return window.requestAnimationFrame(callback); },
+  /** @param {number} id 予約ID。 @returns {void} 予約を取り消す。 */
+  cancelFrame(id) { window.cancelAnimationFrame(id); },
+  /** @returns {number} 表示用の単調増加時計。 */
+  now() { return performance.now(); },
+});
 
 /**
  * CSSで決めた表示幅に描画解像度を合わせ、縦横比を維持する。
@@ -64,8 +54,9 @@ function resizeBattleCanvas() {
   const dpr = window.devicePixelRatio || 1;
   const drawSize = canvas.clientWidth || 640;
   const cellDisplay = drawSize / size;
-  canvas.width = Math.floor(drawSize * dpr);
-  canvas.height = Math.floor(drawSize * dpr);
+  const resolution = Math.floor(drawSize * dpr);
+  if (canvas.width !== resolution) canvas.width = resolution;
+  if (canvas.height !== resolution) canvas.height = resolution;
   if (!battleState.ctx) battleState.ctx = canvas.getContext("2d");
   battleState.dpr = dpr;
   battleState.cellDisplay = cellDisplay;
@@ -1092,7 +1083,7 @@ function updateBattleButtons() {
  */
 function renderBattle() {
   const canvas = elements.battleCanvas;
-  if (!canvas) return;
+  if (!canvas || elements.battleBlock?.hidden) return;
   resizeBattleCanvas();
   const ctx = battleState.ctx;
   if (!ctx) return;
@@ -1100,6 +1091,8 @@ function renderBattle() {
   const dpr = battleState.dpr || 1;
   const drawSize = (canvas.width || 0) / dpr;
   const cell = drawSize / size;
+  battleEffects.setLayout(cell, size);
+  battleEffects.sync(battleState, Boolean(document.hidden || elements.battleBlock?.hidden));
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, drawSize, drawSize);
   drawBattleTerrain(ctx, battleState.grid, cell, renderBattle, size);
@@ -1116,7 +1109,11 @@ function renderBattle() {
     ctx.lineTo(drawSize, pos);
     ctx.stroke();
   }
-  const alive = battleState.units.filter(isBattleOnBoard);
+  battleEffects.drawGround(ctx, cell);
+  // 退出が確定した敗走兵も、最後の移動とフェードが終わるまで表示だけを残す。
+  const alive = battleState.units.filter(unit => isBattleOnBoard(unit)
+    || (unit.hp > 0 && unit.status === "escaped" && battleEffects.unitPose(unit).moving))
+    .map(unit => ({ unit, pose: battleEffects.unitPose(unit) }));
   if (battleState.editing) {
     ctx.strokeStyle = "rgba(255, 122, 122, 0.9)";
     ctx.lineWidth = 2;
@@ -1127,120 +1124,110 @@ function renderBattle() {
     ctx.lineTo(lineX, canvas.height);
     ctx.stroke();
   }
-  alive.forEach((unit) => {
-    const centerX = unit.x * cell + cell / 2;
-    const centerY = unit.y * cell + cell / 2;
-    const selected =
-      (battleState.selectedId === unit.id || battleState.selectedUnitId === unit.id) && unit.hp > 0;
-    ctx.fillStyle = unit.side === "ally" ? "#7aa7ff" : "#ff7a7a";
-    ctx.beginPath();
-    ctx.arc(centerX, centerY, cell * 0.28, 0, Math.PI * 2);
-    ctx.fill();
-    if (selected) {
-      ctx.strokeStyle = "#7aa7ff";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, cell * 0.34, 0, Math.PI * 2);
-      ctx.stroke();
-    }
-
+  alive.forEach(({ unit, pose }) => {
+    const centerX = (pose.x + 0.5) * cell;
+    const centerY = (pose.y + 0.5) * cell;
+    ctx.save();
+    ctx.globalAlpha *= pose.alpha;
     const img = getUnitImage(unit.type);
     if (img?.complete && img.naturalWidth > 0) {
       const maxW = cell * 0.9;
       const ratio = img.naturalHeight / img.naturalWidth || 1;
       const drawW = maxW;
       const drawH = Math.min(cell * 0.9, drawW * ratio);
-      const drawY = centerY - drawH / 2;
       ctx.save();
-      if (unit.side === "enemy") {
-        ctx.translate(centerX, 0);
-        ctx.scale(-1, 1);
-        ctx.drawImage(img, -drawW / 2, drawY, drawW, drawH);
-      } else {
-        ctx.drawImage(img, centerX - drawW / 2, drawY, drawW, drawH);
-      }
+      ctx.translate(centerX + pose.attackX * cell, centerY + (pose.bob + pose.attackY) * cell);
+      ctx.rotate(pose.angle + pose.attackAngle);
+      ctx.scale(unit.side === "enemy" ? -1 : 1, pose.scaleY * pose.attackScaleY);
+      ctx.shadowColor = "rgba(5,12,20,0.8)";
+      ctx.shadowBlur = Math.min(2, cell * 0.055);
+      ctx.shadowOffsetY = Math.min(1, cell * 0.025);
+      if (pose.hitFlash > 0) ctx.filter = `brightness(${1 + pose.hitFlash * 1.15})`;
+      ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
       ctx.restore();
     }
 
-    const hpRatio = unit.hp / Math.max(1, unit.maxHp);
-    ctx.fillStyle = "#e8efff";
-    ctx.font = `bold ${Math.max(9, Math.round(cell * 0.19))}px sans-serif`;
-    ctx.fillText(unitFormation(unit).mark, unit.x * cell + 2, unit.y * cell + Math.max(10, cell * 0.2));
-    const barW = cell * 0.5;
-    const barH = 4;
-    ctx.fillStyle = "rgba(0,0,0,0.5)";
-    ctx.fillRect(centerX - barW / 2, centerY + cell * 0.22, barW, barH);
-    ctx.fillStyle = "#7dffb2";
-    ctx.fillRect(centerX - barW / 2, centerY + cell * 0.22, barW * hpRatio, barH);
-    if (unit.status === "routing" || unit.shaken) {
-      ctx.fillStyle = unit.status === "routing" ? "#ffb47a" : "#ffe08a";
-      ctx.font = `bold ${Math.max(10, Math.round(cell * 0.24))}px sans-serif`;
-      ctx.fillText(unit.status === "routing" ? "逃" : "!", centerX + cell * 0.2, centerY - cell * 0.2);
-    }
+    ctx.restore();
   });
 
-  // 攻撃エフェクト（ライン + スパーク）
-  (battleState.attackFx || []).forEach((fx) => {
-    const from = fx.support ? { x: -0.4, y: battleState.size - 1, side: "ally", hp: 1 } : getUnitById(fx.from, true);
-    const to = getUnitById(fx.to, true);
-    if (!from || !to || from.hp <= 0 || (!fx.support && to.hp <= 0)) return;
-    const fromX = from.x * cell + cell / 2;
-    const fromY = from.y * cell + cell / 2;
-    const toX = to.x * cell + cell / 2;
-    const toY = to.y * cell + cell / 2;
-    const ally = from.side === "ally";
-    const supportFx = fx.support ? SUPPORT_FX[fx.equipmentId] || SUPPORT_FX.harpoon : null;
-    const color = supportFx ? supportFx.color : ally ? ATTACK_COLORS.ally : ATTACK_COLORS.enemy;
-    const alpha = Math.max(0.2, Math.min(1, (fx.ttl || 1) / ATTACK_FX_TTL));
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    // ライン（頭太尻細）
-    ctx.strokeStyle = color;
-    ctx.lineWidth = supportFx?.width || 2.4;
-    if (supportFx) { ctx.shadowColor = color; ctx.shadowBlur = supportFx.glow; }
-    ctx.lineCap = "round";
+  battleEffects.draw(ctx, cell);
+  // 全体射撃が重なっても、戦況表示はエフェクトの上で読めるよう最後に描く。
+  alive.forEach(({ unit, pose }) => drawBattleUnitStatus(ctx, unit, pose, cell));
+  renderBattleRigging(cell);
+}
+
+/**
+ * HP・陣形・選択・敗走を攻撃演出より手前へ描く。画像の攻撃姿勢を適用せず、移動中心と退出時の薄さだけを共有する。
+ * @param {CanvasRenderingContext2D} ctx 戦場の描画先。
+ * @param {object} unit 確定済みの部隊。
+ * @param {object} pose 同フレームの表示姿勢。
+ * @param {number} cell セル幅。
+ * @returns {void}
+ */
+function drawBattleUnitStatus(ctx, unit, pose, cell) {
+  const centerX = (pose.x + 0.5) * cell, centerY = (pose.y + 0.5) * cell;
+  ctx.save();
+  ctx.globalAlpha *= pose.alpha;
+  if ((battleState.selectedId === unit.id || battleState.selectedUnitId === unit.id) && unit.hp > 0) {
+    ctx.strokeStyle = "#f1d58f";
+    ctx.lineWidth = Math.max(1.5, Math.min(2, cell * 0.045));
     ctx.beginPath();
-    ctx.moveTo(fromX, fromY);
-    ctx.lineTo(toX, toY);
+    ctx.arc(centerX, centerY, cell * 0.38, 0, Math.PI * 2);
     ctx.stroke();
-    // スパーク
-    ctx.fillStyle = color;
-    const spark = supportFx?.rays || (fx.impact ? 5 : 3);
-    for (let i = 0; i < spark; i++) {
-      const angle = (Math.PI * 2 * i) / spark;
-      const len = supportFx ? cell * supportFx.radius : fx.crit ? cell * 0.22 : cell * 0.16;
-      ctx.beginPath();
-      ctx.moveTo(toX, toY);
-      ctx.lineTo(toX + Math.cos(angle) * len, toY + Math.sin(angle) * len);
-      ctx.stroke();
-    }
-    ctx.restore();
-  });
-  // 移動軌跡（細いライン表示）
-  (battleState.moveFx || []).forEach((fx) => {
-    const fromX = fx.fromX * cell + cell / 2;
-    const fromY = fx.fromY * cell + cell / 2;
-    const toX = fx.toX * cell + cell / 2;
-    const toY = fx.toY * cell + cell / 2;
-    const ally = fx.side === "ally";
-    const color = fx.retreat
-      ? ally
-        ? MOVE_COLORS.allyRetreat
-        : MOVE_COLORS.enemyRetreat
-      : ally
-        ? MOVE_COLORS.ally
-        : MOVE_COLORS.enemy;
-    const alpha = Math.max(0.15, Math.min(1, (fx.ttl || 1) / MOVE_FX_TTL));
-    ctx.save();
-    ctx.globalAlpha = alpha;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(fromX, fromY);
-    ctx.lineTo(toX, toY);
-    ctx.stroke();
-    ctx.restore();
-  });
+  }
+  ctx.fillStyle = "#e8efff";
+  ctx.font = `bold ${Math.max(9, Math.round(cell * 0.19))}px sans-serif`;
+  ctx.strokeStyle = "rgba(8,16,24,0.9)";
+  ctx.lineWidth = 2;
+  ctx.lineJoin = "round";
+  const mark = unitFormation(unit).mark;
+  const markX = centerX - cell / 2 + 2, markY = centerY - cell / 2 + Math.max(10, cell * 0.2);
+  ctx.strokeText(mark, markX, markY);
+  ctx.fillText(mark, markX, markY);
+  const barW = cell * 0.5, barH = Math.max(1.5, Math.min(4, cell * 0.07));
+  const barY = centerY + cell * 0.22;
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(centerX - barW / 2, barY, barW, barH);
+  ctx.fillStyle = unit.side === "ally" ? "#8bc5dd" : "#e7917c";
+  ctx.fillRect(centerX - barW / 2, barY, barW * unit.hp / Math.max(1, unit.maxHp), barH);
+  if (pose.routing || unit.shaken) {
+    ctx.fillStyle = pose.routing ? "#ffb47a" : "#ffe08a";
+    ctx.font = `bold ${Math.max(10, Math.round(cell * 0.24))}px sans-serif`;
+    const status = pose.routing ? "逃" : "!";
+    ctx.strokeText(status, centerX + cell * 0.2, centerY - cell * 0.2);
+    ctx.fillText(status, centerX + cell * 0.2, centerY - cell * 0.2);
+  }
+  ctx.restore();
+}
+
+/**
+ * 戦場直下の帯へ艤装を描く。両Canvasで同じ世界座標を使い、砲口から弾道をつなぐ。
+ * 兵のマスや選択判定は正方形の戦場Canvasだけを使用する。
+ * @param {number} cell 戦場のセル幅。
+ * @returns {void}
+ */
+function renderBattleRigging(cell) {
+  const canvas = document.getElementById("battleRiggingCanvas");
+  if (!canvas) return;
+  const visible = battleEffects.hasRigging() && !elements.battleBlock?.hidden;
+  canvas.hidden = !visible;
+  document.getElementById("battleViewport")?.classList.toggle("has-rigging", visible);
+  if (!visible) return;
+  const dpr = battleState.dpr || 1;
+  const height = battleEffects.riggingHeight();
+  const width = elements.battleCanvas.width;
+  if (canvas.width !== width) canvas.width = width;
+  const resolution = Math.ceil(height * dpr);
+  if (canvas.height !== resolution) canvas.height = resolution;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, width / dpr, height);
+  ctx.save();
+  ctx.translate(0, -battleState.size * cell);
+  battleEffects.drawRigging(ctx, cell);
+  battleEffects.draw(ctx, cell);
+  ctx.restore();
 }
 
 /**
@@ -1278,6 +1265,7 @@ function startBattle() {
   updateBattleStatus();
   renderRosterUI();
   scheduleBattleTimer();
+  battleEffects.sync(battleState);
   addBattleLog(resuming ? "戦闘再開。" : "戦闘開始。");
   updateBattleInfo();
 }
@@ -1288,6 +1276,8 @@ function startBattle() {
  */
 function pauseBattle() {
   battleState.running = false;
+  if (battleState.result) battleEffects.sync(battleState);
+  else battleEffects.pause();
   if (battleState.timer) {
     clearInterval(battleState.timer);
     battleState.timer = null;
@@ -1306,6 +1296,7 @@ function resetBattle(useDraft = false, preserveField = true) {
   if (battleState.started) return;
   normalizeRosterFormations();
   pauseBattle();
+  battleEffects.clear();
   if (!preserveField || battleState.randomSeed == null) {
     battleState.randomSeed = Math.floor(Math.random() * 4294967296);
   }
@@ -1415,6 +1406,7 @@ function setBattleSpeed(speed) {
   if (battleState.running) {
     scheduleBattleTimer();
   }
+  battleEffects.sync(battleState);
   updateSpeedUI();
 }
 
@@ -1492,6 +1484,7 @@ function openBattleView() {
  */
 function closeBattleView() {
   pauseBattle();
+  battleEffects.clear();
   battleState.running = false;
   battleState.resultCode = "";
   battleState.result = "";
@@ -1512,9 +1505,17 @@ function closeBattleView() {
  * 戦闘UIのイベントを設定する。
  */
 export function wireBattleUI() {
+  // 待機・停止中も、幅やDPRの変更時だけ両Canvasの解像度を揃える。
+  window.addEventListener("resize", () => {
+    if (!elements.battleBlock?.hidden) renderBattle();
+  });
   if (!elements.battleCanvas) return;
   /** 新規航海を始める前に戦闘の進行と表示を終了する。 */
   document.addEventListener("game-reset", function resetBattleSession() { closeBattleView(); battleState.started = false; });
+  /** @returns {void} 非表示中の演出を破棄し、復帰時に古い攻撃をまとめて再生しない。 */
+  document.addEventListener("visibilitychange", function syncBattleVisibility() {
+    if (battleState.ready) renderBattle();
+  });
   battleState.ctx = elements.battleCanvas.getContext("2d");
   resizeBattleCanvas();
   resetRoster();

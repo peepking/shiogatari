@@ -59,10 +59,11 @@ main .grid > * { min-width: 0; }
 .workspace-map > .bd { padding: 10px; }
 .workspace-map .map-block, .workspace-map .battle-block { border: 0; padding: 0; margin: 0; }
 .workspace-map .footer { display: none; }
-#mapCanvas, #battleCanvas { width: 100%; max-width: min(100%, calc(100dvh - 240px)); height: auto; aspect-ratio: 1; }
+#mapCanvas, #battleCanvas, #battleRiggingCanvas { width: 100%; max-width: min(100%, calc(100dvh - 240px)); height: auto; }
+#mapCanvas, #battleCanvas { aspect-ratio: 1; }
 .battle-viewport { max-width: 100%; overflow: auto; }
 .battle-viewport.is-zoomed { max-height: 70dvh; overscroll-behavior: contain; }
-#battleViewport.is-zoomed #battleCanvas { width: 720px; min-width: 720px; max-width: none; display: block; }
+#battleViewport.is-zoomed #battleCanvas, #battleViewport.is-zoomed #battleRiggingCanvas { width: 720px; min-width: 720px; max-width: none; display: block; }
 .map-header { flex-wrap: wrap; }
 /* PCでは地点情報の増減で画面が揺れないように高さとスクロールバーの幅を確保する。 */
 @media (min-width: 851px) {
@@ -292,7 +293,7 @@ main .grid > * { min-width: 0; }
 .battle-playback { display: flex; }
 .battle-count { flex-basis: 100%; justify-content: center; white-space: normal; text-align: center; }
 .battle-playback > .row { justify-content: center; margin-top: 0; }
-.battle-view #battleCanvas { max-width: min(100%, calc(100dvh - 365px)); }
+.battle-view #battleCanvas, .battle-view #battleRiggingCanvas { max-width: min(100%, calc(100dvh - 365px)); }
 .battle-view .workspace-drawers { margin-bottom: 14px; }
 
 /* 狭い画面では無理な三列表示を避け、操作を縦に並べる */
@@ -302,7 +303,7 @@ main .grid > * { min-width: 0; }
   .game-menu { margin-left: auto; }
   main .grid { grid-template-columns: 220px minmax(0, 1fr) 240px; gap: 10px; }
   .game-toolbar .asset-card { justify-content: center; }
-  #mapCanvas, #battleCanvas { max-width: min(100%, calc(100dvh - 280px)); }
+  #mapCanvas, #battleCanvas, #battleRiggingCanvas { max-width: min(100%, calc(100dvh - 280px)); }
 }
 @media (max-width: 850px) {
   main .grid { grid-template-columns: minmax(0, 1fr); }
@@ -322,5 +323,5 @@ main .grid > * { min-width: 0; }
   .game-toolbar .asset-body { flex-direction: column; gap: 2px; }
   .game-toolbar .asset-body .label { white-space: nowrap; }
   .game-header { position: static; }
-  #mapCanvas, #battleCanvas, .battle-view #battleCanvas { max-width: 100%; }
+  #mapCanvas, #battleCanvas, #battleRiggingCanvas, .battle-view #battleCanvas, .battle-view #battleRiggingCanvas { max-width: 100%; }
 }
