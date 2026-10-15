@@ -1,9 +1,35 @@
 import { state } from "../core/state.js";
-import { saveGameToStorage } from "../core/storage.js";
+import { saveGameToStorage, scheduleGameSave } from "../core/storage.js";
+import { MODE_LABEL } from "../core/constants.js";
 import { settlements } from "../world/map.js";
 import { confirmAction, pushLog, pushToast } from "../ui/dom.js";
 import { enqueueEvent } from "../app/events.js";
-import { fishOffering, completeExpandedOracle, restoreOracleState } from "./oracleExpansion.js";
+import { fishOffering, completeExpandedOracle, restoreOracleState, advanceExpandedOracle } from "./oracleExpansion.js";
+
+/**
+ * 拠点のマスへの到着で巡礼を進める。防衛中・入場拒否でも位置だけで判定する。
+ * 移動の日数処理後に保存し、失敗時は移動先を保持したまま進捗と報酬を戻す。再描画・ロードで同じ到着を再確認できる。
+ * 戦闘準備中の到着は移動・戦闘の既存保存へ含め、神託だけを先に保存しない。
+ * @returns {boolean} 巡礼の進捗を確定したか。
+ */
+export function updatePilgrimageArrival() {
+  if (state.dangerousSeas?.action) return false;
+  const visit = state.quests?.active?.filter(q => q.type === "oracle_pilgrimage")
+    .flatMap(q => q.visits || []).find(v => v && !v.done && v.target?.x === state.position.x && v.target?.y === state.position.y);
+  if (!visit) return false;
+  const before = structuredClone(state);
+  const progress = advanceExpandedOracle(state, { kind: "arrival", settlementId: visit.id }, settlements);
+  if (!progress.changed) return false;
+  const deferred = state.pendingEncounter?.active || state.modeLabel === MODE_LABEL.BATTLE;
+  if (!deferred && !saveGameToStorage()) {
+    restoreOracleState(state, before);
+    pushToast("保存できません", "到着位置は保持し、巡礼の進捗と報酬を取り消しました。保存できる状態で再確認します。", "warn");
+    return false;
+  }
+  announceOracleResults(progress.outcomes);
+  if (deferred) scheduleGameSave();
+  return true;
+}
 
 /** @param {Array} outcomes 確定済みの結果。 @returns {void} 神託の達成・失敗を通知する。 */
 export function announceOracleResults(outcomes) {

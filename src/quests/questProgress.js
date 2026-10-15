@@ -64,10 +64,10 @@ export function getQuestProgress(q, state, { now, canFinish, origin, target, ite
     destination = target || q.target;
     next = `${placeName(destination)}の村に入り、食料を分かち与えてください。`;
   } else if (q.type === "oracle_pilgrimage") {
-    for (const visit of q.visits || []) rows.push({ label: visit.name, done: visit.done, text: visit.done ? "訪問済み" : "未訪問" });
+    for (const visit of q.visits || []) rows.push({ label: visit.name, done: visit.done, text: visit.done ? "到着済み" : "未到着" });
     destination = q.visits?.find(visit => !visit.done)?.target;
     automatic = true;
-    next = "指定された2拠点に入ってください。訪問順は問いません。";
+    next = "指定された2拠点のマスへ移動してください。順序は問わず、拠点への入場は不要です。";
   } else if (q.type === "oracle_support") {
     rows.push(quantityRow("受領後の寄付資金", q.supportedFunds, q.requiredFunds, "funds"));
     rows.push(quantityRow("受領後の担い手（人）", q.supportedPeople, q.requiredPeople));
@@ -129,7 +129,7 @@ export function getQuestProgress(q, state, { now, canFinish, origin, target, ite
   return {
     rows, next, ready, automatic,
     destination: !expired && Number.isFinite(position?.x) && Number.isFinite(position?.y) ? { x: position.x, y: position.y } : null,
-    automaticLabel: q.type === "oracle_pilgrimage" ? "2拠点への入場で自動完了" : q.type === "oracle_support" ? "指定拠点で必要な支援を行うと自動完了"
+    automaticLabel: q.type === "oracle_pilgrimage" ? "2拠点のマスへの到着で自動完了" : q.type === "oracle_support" ? "指定拠点で必要な支援を行うと自動完了"
       : q.type === "oracle_explore" ? "指定の漂流物の探索成功で自動完了" : BATTLE_TYPES.includes(q.type) ? "必要な戦闘すべてに勝利すると自動完了" : "護送先への到着・入場で自動完了",
     status: expired ? "expired" : ready ? "ready" : "active",
     statusText: expired ? "期限切れ" : ready ? "完了できます" : "進行中",

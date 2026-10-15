@@ -78,7 +78,10 @@ async function main() {
   assert.deepEqual(plain(choices.oracle_share.map(s => s.id)), ["here", "edge"]);
   assert.deepEqual(plain(choices.oracle_support.map(s => s.id)), ["edge"]);
   assert.deepEqual(plain(choices.oracle_explore.map(s => s.id)), [1]);
-  assert.deepEqual(plain(choices.oracle_pilgrimage.map(pair => pair.map(s => s.id))), [["edge", "diagonal"]]);
+  const pilgrimagePairs = plain(choices.oracle_pilgrimage.map(pair => pair.map(s => s.id)));
+  assert.ok(pilgrimagePairs.some(pair => pair[0] === "edge" && pair[1] === "diagonal"));
+  assert.ok(pilgrimagePairs.some(pair => pair.includes("banned")), "巡礼は入場禁止の拠点も到着できれば候補にできる");
+  assert.ok(pilgrimagePairs.every(pair => !pair.includes("far") && !pair.includes("danger") && !pair.includes("haven")));
   assert.deepEqual(plain(choices.oracle_fish), ["common", "big"]);
   state.expansion.fishing.rodId = null;
   state.expansion.exploration.sites = [];
@@ -140,19 +143,45 @@ async function main() {
   assert.equal(quests.completeQuest(q.id), true); assert.equal(state.supplies.food, 2);
   assert.equal(quests.completeQuest(q.id), false);
 
-  // 本体の入場処理で巡礼を進め、保存失敗なら入場自体を取り消す。
+  // 本体の移動で巡礼を進める。保存失敗では到着位置を保ち、進捗を復元して再確認する。
   reset(); q = accept("oracle_pilgrimage", [[village, town]]);
+  state.position = { x: village.coords.x === 0 ? 1 : village.coords.x - 1, y: village.coords.y };
+  state.selectedPosition = { ...village.coords };
   saveFails = true;
-  assert.equal(actions.attemptEnter("village"), false);
+  assert.equal(actions.moveToSelected().ok, true);
+  assert.deepEqual(plain(state.position), plain(village.coords));
   assert.equal(state.modeLabel, mode.NORMAL); assert.equal(state.quests.active[0].visits[0].done, false);
   saveFails = false;
-  assert.equal(actions.attemptEnter("village"), true);
-  assert.equal(state.quests.active[0].visits[0].done, true);
+  assert.equal(quests.getQuests().active[0].visits[0].done, true);
+  assert.equal(state.modeLabel, mode.NORMAL);
+  quests.getQuests(); assert.equal(state.faith, 0);
   assert.equal(storage.saveGameToStorage(), true); assert.equal(storage.loadGameFromStorage(), true);
   assert.equal(state.quests.active[0].visits[0].done, true);
-  state.position = { ...town.coords }; state.modeLabel = mode.NORMAL;
-  assert.equal(actions.attemptEnter(town.kind), true);
+  state.position = { x: town.coords.x === 0 ? 1 : town.coords.x - 1, y: town.coords.y };
+  state.selectedPosition = { ...town.coords }; state.modeLabel = mode.NORMAL;
+  state.warLedger.entries = [{ factions: ["pirates", town.factionId], activeFronts: [{ id: "oracle-siege", settlementId: town.id,
+    attacker: "pirates", defender: town.factionId, startAbs: absDay(state), endAbs: absDay(state) + 60, resolved: false }] }];
+  const faction = cache.get("faction.js").namespace;
+  assert.equal(faction.isSettlementUnderSiege(town.id), true);
+  assert.equal(actions.moveToSelected().ok, true);
+  assert.equal(faction.isSettlementUnderSiege(town.id), true);
+  assert.equal(actions.attemptEnter(town.kind), false, "防衛中の入場拒否は維持する");
   assert.equal(state.quests.active.length, 0); assert.equal(state.faith, 4);
+  assert.equal(state.modeLabel, mode.NORMAL);
+  quests.getQuests(); assert.equal(state.faith, 4);
+
+  // 旧セーブで目的地のマスにいる場合も、入場操作なしで到着を反映する。
+  reset(); q = accept("oracle_pilgrimage", [[village, town]]); q.visits[0].done = true;
+  state.position = { ...town.coords };
+  assert.equal(storage.saveGameToStorage(), true); assert.equal(storage.loadGameFromStorage(), true);
+  assert.equal(quests.getQuests().active.length, 0); assert.equal(state.faith, 4);
+  // 到着した日が期限翌日なら達成せず、期限当日の到着は有効。
+  for (const remaining of [0, 1]) {
+    reset(); q = accept("oracle_pilgrimage", [[village, town]]); q.visits[0].done = true;
+    q.acceptedAbs = absDay(state) - 90 + remaining; q.deadlineAbs = absDay(state) + remaining;
+    state.position = { x: town.coords.x === 0 ? 1 : town.coords.x - 1, y: town.coords.y }; state.selectedPosition = { ...town.coords };
+    actions.moveToSelected(); assert.equal(state.faith, remaining ? 4 : 0);
+  }
 
   // 本体の探索終了を使い、非戦闘・勝利・非成功で地点と神託を同時に消費する。
   for (const success of [true, false]) {
@@ -239,9 +268,11 @@ async function main() {
   state.expansion.fishing.counts = { aji: 3 };
   accept("oracle_fish", ["common"]); questUI.renderQuestUI();
   assert.match(list.innerHTML, /一般魚（匹）/); assert.match(list.innerHTML, /3 \/ 5/);
+  state.position = { x: 0, y: 0 };
   accept("oracle_pilgrimage", [[village, town]]); questUI.renderQuestUI();
   assert.equal((list.innerHTML.match(/class="btn quest-location"/g) || []).length, 2);
-  assert.match(list.innerHTML, /2拠点への入場で自動完了/);
+  assert.match(list.innerHTML, /2拠点のマスへの到着で自動完了/);
+  assert.match(list.innerHTML, /拠点への入場は不要/);
   state.tideAlliance.sites[village.id] = { funds: 0, people: 0 };
   accept("oracle_support", [village]); questUI.renderQuestUI();
   assert.match(list.innerHTML, /受領後の寄付資金/); assert.match(list.innerHTML, /資金・担い手のどちらか/);

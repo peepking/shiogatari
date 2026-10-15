@@ -4,7 +4,7 @@ import { canCompleteAmnesty, completeAmnesty } from "../wanted/amnesty.js";
 import { saveGameToStorage } from "../core/storage.js";
 import { honorSuspensionReason, wantedFacilityReason, wantedEntryReason } from "../wanted/wantedPolicy.js";
 import { expandedOracleChoices, makeExpandedOracle, isExpandedOracle, canCompleteExpandedOracle, reconcileExpandedOracles } from "./oracleExpansion.js";
-import { commitExpandedOracle, announceOracleResults } from "./oracleUI.js";
+import { commitExpandedOracle, announceOracleResults, updatePilgrimageArrival } from "./oracleUI.js";
 import { dangerousSeaAt } from "../dangerousSeas/dangerousSeaWorld.js";
 import { tideOracleReward } from "../faith/tideAlliance.js";
 import { pushLog, pushToast } from "../ui/dom.js";
@@ -299,6 +299,7 @@ function generateSeasonQuestsForSettlement(settlement) {
 export function getQuests() {
   ensureState();
   announceOracleResults(reconcileExpandedOracles(state, settlements));
+  updatePilgrimageArrival();
   return state.quests;
 }
 

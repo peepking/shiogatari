@@ -77,7 +77,8 @@ export function expandedOracleChoices(state, settlements, map, { canEnter, isDan
   const origin = state.position, now = absDay(state), radius = ORACLE_CONFIG.radius;
   const reachable = reachablePositions(map, origin, isDangerous);
   const nearby = settlements.filter(s => ["town", "village"].includes(s.kind) && !s.pirateHaven && validPosition(s.coords)
-    && distance(origin, s.coords) <= radius && !isDangerous(s.coords) && reachable.has(`${s.coords.x},${s.coords.y}`) && canEnter(s));
+    && distance(origin, s.coords) <= radius && !isDangerous(s.coords) && reachable.has(`${s.coords.x},${s.coords.y}`));
+  const accessible = nearby.filter(canEnter);
   const ports = nearby.filter(s => distance(origin, s.coords) > 0), pairs = [];
   for (let i = 0; i < ports.length; i++) for (let j = i + 1; j < ports.length; j++) {
     if (distance(ports[i].coords, ports[j].coords) <= radius) pairs.push([ports[i], ports[j]]);
@@ -95,12 +96,12 @@ export function expandedOracleChoices(state, settlements, map, { canEnter, isDan
   }) : [];
   return {
     oracle_fish: categories,
-    oracle_share: nearby.filter(s => s.kind === "village"),
+    oracle_share: accessible.filter(s => s.kind === "village"),
     oracle_pilgrimage: pairs,
     oracle_explore: (state.expansion?.exploration?.sites || []).filter(s => s.kind === "drift" && s.id !== state.expansion.exploration.pending?.siteId
       && validPosition(s.position) && distance(origin, s.position) <= radius && !isDangerous(s.position)
       && reachable.has(`${s.position.x},${s.position.y}`) && s.expiresAbs > now + ORACLE_CONFIG.days),
-    oracle_support: nearby.filter(s => Object.hasOwn(state.tideAlliance?.sites || {}, s.id)),
+    oracle_support: accessible.filter(s => Object.hasOwn(state.tideAlliance?.sites || {}, s.id)),
   };
 }
 
@@ -120,7 +121,7 @@ export function makeExpandedOracle(type, choices, now, random = Math.random) {
     q.desc = `${FISH_CATEGORIES[chosen]}を${q.qty}匹捧げよ。魚種は問わない。売値の安い釣果から奉納する。`;
   } else if (type === "oracle_pilgrimage") {
     q.visits = chosen.map(s => ({ id: s.id, name: s.name, target: { ...s.coords }, done: false }));
-    q.desc = `${chosen.map(s => s.name).join("と")}を訪れ、祈りを巡らせよ。順序は問わない。`;
+    q.desc = `${chosen.map(s => s.name).join("と")}へ到着し、祈りを巡らせよ。順序は問わない。拠点のマスへの到着で達成でき、入場は不要。`;
   } else if (type === "oracle_explore") {
     Object.assign(q, { siteId: chosen.id, target: { ...chosen.position }, danger: chosen.danger });
     q.desc = `指定地点の漂流物を探索せよ。戦闘確率${chosen.danger * 100}%。敗北・逃走・引き分けでは失敗。`;
@@ -197,7 +198,7 @@ export function completeExpandedOracle(state, q, settlements) {
 }
 
 /**
- * 成功した入場・支援・探索の確定処理へ接続する。訪問の再適用は無視し、支援は確定した実数だけを加算する。
+ * 成功した移動の到着・支援・探索の確定処理へ接続する。到着の再適用は無視し、支援は確定した実数だけを加算する。
  * @param {object} state 状態。 @param {object} event 行動結果。 @param {Array} settlements 拠点。 @returns {object} 変更の有無と完了結果。
  */
 export function advanceExpandedOracle(state, event, settlements) {
@@ -206,8 +207,8 @@ export function advanceExpandedOracle(state, event, settlements) {
   for (const q of [...(state.quests?.active || [])]) {
     if (!isExpandedOracle(q) || absDay(state) > q.deadlineAbs || expandedOracleError(q, state, settlements)) continue;
     let complete = false;
-    if (q.type === "oracle_pilgrimage" && event.kind === "visit") {
-      const visit = q.visits.find(v => v.id === event.settlementId && !v.done);
+    if (q.type === "oracle_pilgrimage" && event.kind === "arrival") {
+      const visit = q.visits.find(v => v.id === event.settlementId && !v.done && distance(state.position, v.target) === 0);
       if (visit) { visit.done = true; changed = true; complete = q.visits.every(v => v.done); }
     } else if (q.type === "oracle_support" && event.kind === "support" && q.targetId === event.settlementId) {
       if (![event.funds, event.people].every(n => Number.isSafeInteger(n) && n >= 0)) continue;

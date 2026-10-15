@@ -6,9 +6,7 @@ import { PIRATE_CONFIG, PIRATE_IMAGES, pirateEnemyCount } from "../pirates/pirat
 import { enqueuePirateCheckpoint, enqueueSettlementCheckpoint, handlePirateCheckpoint, wantedFaction } from "../pirates/pirateEncounters.js";
 import { recordCrime, totalWanted, WANTED_FACTIONS } from "../wanted/playerWanted.js";
 import { visitTideSite } from "../faith/tideAlliance.js";
-import { advanceExpandedOracle, restoreOracleState } from "../quests/oracleExpansion.js";
-import { announceOracleResults } from "../quests/oracleUI.js";
-import { saveGameToStorage } from "../core/storage.js";
+import { updatePilgrimageArrival } from "../quests/oracleUI.js";
 import { activateAfterglow, rollFaithRecruitment } from "../faith/faith.js";
 import { MODE_LABEL, PLACE } from "../core/constants.js";
 import { pushLog, pushToast, setOutput } from "../ui/dom.js";
@@ -371,6 +369,7 @@ export function moveToSelected(syncUI) {
   const dangerousPursuit = dangerousPursuitBeforeDay();
   advanceDayWithEvents(1, { activity: "move", suppressDangerRaid: !!dangerousPursuit });
   finishDangerousSeaAction("move");
+  updatePilgrimageArrival();
   setTravelEventSync(syncUI);
   const travelEventHit = rollTravelEvents();
   if (dangerousPursuit) { notifyAutoMoveStop(); return { ok: true, code: "encounter", detail: dangerousPursuit }; }
@@ -430,19 +429,10 @@ export function attemptEnter(target, clearActionMessage, syncUI) {
     ]);
     return false;
   }
-  const oracleBefore = state.quests?.active?.some(q => q.type === "oracle_pilgrimage") ? structuredClone(state) : null;
   state.modeLabel = insideLabel;
   recordVisit(state, hereSettlement);
   enqueueSettlementCheckpoint(hereSettlement, enqueueCheckpointEvent);
   if (!hereSettlement?.pirateHaven) visitTideSite(state, hereSettlement?.id);
-  const oracleProgress = advanceExpandedOracle(state, { kind: "visit", settlementId: hereSettlement?.id }, settlements);
-  if (oracleProgress.changed && !saveGameToStorage()) {
-    restoreOracleState(state, oracleBefore);
-    pushToast("保存できません", "入場と巡礼の進捗を取り消しました。", "warn");
-    syncUI?.();
-    return false;
-  }
-  announceOracleResults(oracleProgress.outcomes);
   const recruit = rollFaithRecruitment(state, hereSettlement, TROOP_STATS);
   if (recruit) enqueueEvent({ title: "潮盟の便り", body: `潮の縁者の紹介で、${TROOP_STATS[recruit.type].name} Lv${recruit.level} ${recruit.remaining}人が雇用候補に加わりました。` });
   rollChartRumor(hereSettlement);
