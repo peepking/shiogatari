@@ -24,6 +24,8 @@ import { orderRosterCandidates } from "../ui/rosterPriority.js";
 import { initializeUnitFormation, normalizeFormationOrder, normalizeFormationRoster, queueUnitFormation, unitFormation, DEFAULT_FORMATION_ORDER } from "./battleUnitFormation.js";
 import { formationInfoMarkup, formationDetailMarkup, formationOptions, syncUnitFormationPanel, wireUnitFormationPanel, syncBulkFormationPanel, wireBulkFormationPanel } from "./battleUnitFormationUI.js";
 import { formationOrderRecipients, selectFormationOrderRecipients, applyFormationOrders } from "./battleUnitFormationOrders.js";
+import { TACTICAL_ORDERS, normalizeTacticalOrders, initializeTacticalOrders, queueTacticalOrder, migrateTacticalRoster, tacticalEnemyIdentity } from "./battleTacticalOrders.js";
+import { rosterTacticalMarkup, tacticalInfoMarkup, syncTacticalPanels, wireTacticalPanels, drawTacticalOverlay } from "./battleTacticalOrdersUI.js";
 
 const BASE_TICK_MS = BATTLE_RULES.tickMs;
 const DEFAULT_BATTLE_SIZE = 10;
@@ -163,6 +165,7 @@ function rosterSignature() {
   return JSON.stringify([battleRoster.sortie, battleRoster.reserve].map(list => list.map(entry => {
     const copy = { ...entry };
     delete copy.formationOrder;
+    for (const field of ["actionOrder", "targetOrder", "targetAreaOrder", "focusEnemyId"]) delete copy[field];
     return copy;
   })));
 }
@@ -171,12 +174,58 @@ function rosterSignature() {
 function normalizeRosterFormations() {
   const entries = [...battleRoster.sortie, ...battleRoster.reserve];
   normalizeFormationRoster(entries);
+  for (const entry of entries) normalizeTacticalOrders(entry);
   for (const entry of entries) rosterUnitSequence = Math.max(rosterUnitSequence, Number(entry.rosterUnitId.slice(7)));
 }
 
 /** @param {object} entry 新規編成。 @returns {object} 新しい識別子とおまかせの初期指示を持つ編成。 */
 function createRosterEntry(entry) {
-  return { ...entry, rosterUnitId: `roster-${++rosterUnitSequence}`, formationOrder: DEFAULT_FORMATION_ORDER };
+  return normalizeTacticalOrders({ ...entry, rosterUnitId: `roster-${++rosterUnitSequence}`, formationOrder: DEFAULT_FORMATION_ORDER });
+}
+
+/**
+ * 準備では編成と盤上の指示だけを更新し、戦闘中は項目ごとに次tickへ予約する。
+ * @param {Array} items 対象。 @param {string} field 項目。 @param {string} value 指示。
+ * @param {string|null} focusEnemyId 指定敵。 @returns {number} 受付部隊数。
+ */
+function changeTacticalOrders(items, field, value, focusEnemyId = null) {
+  if (battleState.result || battleState.editing) return 0;
+  if (field !== "reset" && !Object.hasOwn(TACTICAL_ORDERS, field)) return 0;
+  if (field === "targetOrder" && value === "focus" && !battleState.units.some(enemy => enemy.id === focusEnemyId
+    && enemy.side === "enemy" && isBattleActive(enemy))) return 0;
+  if (battleState.running) pauseBattle();
+  let count = 0;
+  for (const item of formationOrderRecipients(items, battleState.started)) {
+    const entry = battleState.started ? item : [...battleRoster.sortie, ...battleRoster.reserve].find(row => row.rosterUnitId === item.rosterUnitId);
+    if (!entry) continue;
+    const fields = field === "reset" ? Object.keys(TACTICAL_ORDERS) : [field];
+    for (const key of fields) {
+      if (battleState.started) queueTacticalOrder(entry, key, field === "reset" ? "auto" : value, focusEnemyId);
+      else {
+        entry[key] = field === "reset" ? "auto" : value;
+        if (key === "targetOrder") entry.focusEnemyId = entry[key] === "focus" ? focusEnemyId : null;
+        normalizeTacticalOrders(entry);
+      }
+    }
+    if (!battleState.started) {
+      const unit = battleState.units.find(actor => actor.side === "ally" && actor.rosterUnitId === entry.rosterUnitId);
+      if (unit) initializeTacticalOrders(unit, entry);
+    }
+    count++;
+  }
+  if (!battleState.started) { saveGrandPreparation(); renderRosterUI(); }
+  updateBattleInfo(); renderBattle();
+  return count;
+}
+
+/** @param {Array} items 対象部隊。 @returns {void} 対象を保持して盤面での敵選択を始める。 */
+function beginTacticalEnemySelection(items) {
+  if (!items.length || battleState.result || battleState.editing) return;
+  if (battleState.running) pauseBattle();
+  battleState.focusSelection = [...items];
+  const note = document.getElementById("battleTacticalSelectionNote");
+  if (note) note.textContent = `${items.length}部隊の標的を選択中です。盤面の敵を押してください。`;
+  updateBattleInfo(); updateBattleButtons();
 }
 
 /**
@@ -250,7 +299,8 @@ function saveGrandPreparation() {
   if (battleState.battleKind !== "grand" || battleState.started || !state.pendingEncounter?.active) return;
   if (appliedRosterSignature !== rosterSignature()) return;
   state.pendingEncounter.preparation = JSON.parse(JSON.stringify({
-    version: 3, size: battleState.size, seed: battleState.randomSeed, grid: battleState.grid,
+    version: 4, size: battleState.size, seed: battleState.randomSeed, grid: battleState.grid,
+    enemyIdentity: battleState.enemyIdentity,
     roster: { sortie: battleRoster.sortie, reserve: battleRoster.reserve },
     formation: battleState.allyFormation, strategy: battleStrategy,
     customCoordinates: Object.fromEntries(Object.entries(battleState.customSlots).map(([id, index]) => [id, buildDeploySlots("ally", battleState.size)[index]])),
@@ -259,7 +309,7 @@ function saveGrandPreparation() {
 }
 
 const battleStrategy = {
-  targetMode: "type", // "type" = 兵種準拠
+  targetMode: "auto", // 全味方への一括指示用の選択値
   kiteMode: "kite", // "kite" | "retreat" | "none"
   retreatThreshold: 30, // 退却判定に使う残HP割合
   chargeMode: "cavalry", // "cavalry" | "all" | "none"
@@ -552,6 +602,7 @@ function renderRosterUI() {
               ${battleState.battleKind === "grand" ? `<button class="btn ghost" data-action="move-group" ${disableAll || (list === battleRoster.reserve ? battleRoster.sortie.length >= battleDeploymentLimit(battleState.size) : battleRoster.reserve.length >= REINFORCEMENT_RULES.reserveLimit) ? "disabled" : ""}>${list === battleRoster.reserve ? "前衛へ" : "予備隊へ"}</button>` : ""}
               <button class="btn ghost" data-action="to-standby" ${disableAll ? "disabled" : ""}>待機</button>
             </div>
+            ${rosterTacticalMarkup(s, battleState, disableAll)}
           </div>
         `;
       })
@@ -568,7 +619,7 @@ function renderRosterUI() {
  * 作戦UIを現在の設定で同期する。
  */
 function renderStrategyUI() {
-  if (elements.strategyTarget) elements.strategyTarget.value = battleStrategy.targetMode;
+  if (elements.strategyTarget) elements.strategyTarget.value = "";
   if (elements.strategyKite) elements.strategyKite.value = battleStrategy.kiteMode;
   if (elements.strategyRetreat) elements.strategyRetreat.value = String(battleStrategy.retreatThreshold);
   if (elements.strategyCharge) elements.strategyCharge.value = battleStrategy.chargeMode;
@@ -581,13 +632,16 @@ function renderStrategyUI() {
  * UI入力から作戦設定を反映する。
  */
 function applyStrategyFromUI() {
-  const target = elements.strategyTarget?.value || "type";
+  const target = elements.strategyTarget?.value;
   const kite = elements.strategyKite?.value || "kite";
   const retreat = clamp(Number(elements.strategyRetreat?.value) || 30, 1, 100);
   const charge = elements.strategyCharge?.value || "cavalry";
   const speedSel = document.querySelector("input[name='strategySpeed']:checked");
   const speedVal = Number(speedSel?.value || battleStrategy.speed);
-  battleStrategy.targetMode = target;
+  if (target) {
+    const items = battleState.started ? battleState.units : [...battleRoster.sortie, ...battleRoster.reserve];
+    changeTacticalOrders(items, "targetOrder", target);
+  }
   battleStrategy.kiteMode = kite;
   battleStrategy.retreatThreshold = retreat;
   battleStrategy.chargeMode = charge;
@@ -700,6 +754,7 @@ function createUnits(entries, side, size, slots) {
     const unit = createUnit(type, side, i, pos, count, level);
     unit.rosterUnitId = entry?.rosterUnitId ?? null;
     initializeUnitFormation(unit, side === "enemy" ? "auto" : entry?.formationOrder);
+    initializeTacticalOrders(unit, side === "enemy" ? {} : entry);
     unit.sources = side === "ally" ? { ...entry.sources } : { [Math.round(unit.level)]: unit.count };
     unit.status = "active";
     unit.deployedAt = 0;
@@ -1006,6 +1061,7 @@ function updateBattleInfo() {
   const fmt = (n) => Math.round(n);
   const unit = focusedUnit();
   syncUnitFormationPanel(battleState, unit);
+  syncTacticalPanels(battleState, unit, [...battleRoster.sortie, ...battleRoster.reserve], type => TROOP_STATS[type]?.name || type);
   if (!unit) {
     infoEl.textContent = "部隊にカーソルを合わせるかクリックすると詳細を表示します。";
     return;
@@ -1030,6 +1086,7 @@ function updateBattleInfo() {
     <div>${status}</div>
     <div>士気 ${Math.round(unit.morale ?? 100)} / ${unit.status === "reserve" ? "未投入" : unit.status === "routing" ? "敗走中" : unit.status === "escaped" ? "退出済み" : unit.shaken ? "動揺" : "平静"}</div>
     ${formationInfoMarkup(unit, battleState, BASE_TICK_MS)}
+    ${tacticalInfoMarkup(unit, battleState)}
     <details class="quest-description" data-battle-unit-details ${expanded ? "open" : ""}><summary>能力・陣形の効果</summary>
     <div>攻撃 ${effAtk} / 防御 ${effDef} / 攻撃間隔 ${unit.spd}カウント</div>
     <div>射程 ${unit.range}マス / 移動力 ${unit.move}マス</div>
@@ -1062,7 +1119,7 @@ function updateBattleButtons() {
   const hasSortie = battleRoster.sortie.length > 0;
   const applied = appliedRosterSignature === rosterSignature();
   if (elements.battleStartBtn)
-    elements.battleStartBtn.disabled = battleState.running || !!battleState.result || battleState.editing || !hasSortie || !applied;
+    elements.battleStartBtn.disabled = battleState.running || !!battleState.result || battleState.editing || !!battleState.focusSelection || !hasSortie || !applied;
   if (elements.battlePauseBtn) elements.battlePauseBtn.disabled = !battleState.running;
   if (elements.battleBackBtn)
     elements.battleBackBtn.disabled = !battleState.result;
@@ -1110,6 +1167,7 @@ function renderBattle() {
     ctx.stroke();
   }
   battleEffects.drawGround(ctx, cell);
+  drawTacticalOverlay(ctx, battleState, getUnitById(battleState.selectedId), cell);
   // 退出が確定した敗走兵も、最後の移動とフェードが終わるまで表示だけを残す。
   const alive = battleState.units.filter(unit => isBattleOnBoard(unit)
     || (unit.hp > 0 && unit.status === "escaped" && battleEffects.unitPose(unit).moving))
@@ -1314,6 +1372,9 @@ function resetBattle(useDraft = false, preserveField = true) {
   battleState.resultCode = "";
   battleState.result = "";
   battleState.hoveredId = null;
+  battleState.focusSelection = null;
+  const selectionNote = document.getElementById("battleTacticalSelectionNote");
+  if (selectionNote) selectionNote.textContent = "";
   battleState.selectedId = null;
   battleState.attackFx = [];
   battleState.moveFx = [];
@@ -1353,6 +1414,7 @@ function resetBattle(useDraft = false, preserveField = true) {
         const unit = createUnit(entry.type, side, index, { x: -1, y: -1 }, entry.count, entry.level);
         unit.rosterUnitId = entry.rosterUnitId ?? null;
         initializeUnitFormation(unit, side === "enemy" ? "auto" : entry.formationOrder);
+        initializeTacticalOrders(unit, side === "enemy" ? {} : entry);
         unit.id = `${side}-reserve-${index}`; unit.status = "reserve"; unit.deployedAt = null;
         unit.sources = side === "ally" ? { ...entry.sources } : { [Math.round(unit.level)]: unit.count };
         battleState.units.push(unit);
@@ -1441,6 +1503,8 @@ function openBattleView() {
   battleState.started = false;
   battleState.battleKind = state.pendingEncounter?.battleKind === "grand" ? "grand" : "normal";
   const saved = battleState.battleKind === "grand" ? state.pendingEncounter?.preparation : null;
+  battleState.enemyIdentity = tacticalEnemyIdentity(battleState.enemyFormation || DEFAULT_ENEMY_FORMATION,
+    state.pendingEncounter?.enemyReserve || [], state.pendingEncounter || {});
   if (saved?.strategy) Object.assign(battleStrategy, saved.strategy);
   const group = document.getElementById("rosterGroup");
   if (group) group.value = "sortie";
@@ -1461,6 +1525,7 @@ function openBattleView() {
   const restored = saved ? restoreGrandRoster(battleRoster.standby, saved.roster) : null;
   if (restored) Object.assign(battleRoster, restored);
   else autoDeployRoster(MAX_SQUADS);
+  migrateTacticalRoster([...battleRoster.sortie, ...battleRoster.reserve], saved, battleState.enemyIdentity);
   const validField = saved && Number.isInteger(saved.seed) && Array.isArray(saved.grid)
     && BATTLE_SIZE_RULES.some(rule => rule.size === saved.grid.length)
     && saved.grid.every(row => Array.isArray(row) && row.length === saved.grid.length);
@@ -1483,6 +1548,9 @@ function openBattleView() {
  * 戦闘表示を閉じる。
  */
 function closeBattleView() {
+  battleState.focusSelection = null;
+  const selectionNote = document.getElementById("battleTacticalSelectionNote");
+  if (selectionNote) selectionNote.textContent = "";
   pauseBattle();
   battleEffects.clear();
   battleState.running = false;
@@ -1538,6 +1606,16 @@ export function wireBattleUI() {
     select: id => { battleState.selectedId = id || null; updateBattleInfo(); renderBattle(); },
     change: changeFormationOrder,
   });
+  wireTacticalPanels({
+    state: battleState, unit: focusedUnit, roster: () => [...battleRoster.sortie, ...battleRoster.reserve],
+    pause: () => { if (battleState.running) pauseBattle(); }, sync: updateBattleInfo,
+    change: changeTacticalOrders, selectEnemy: beginTacticalEnemySelection,
+  });
+  document.getElementById("battleTacticalCancel")?.addEventListener("click", () => {
+    battleState.focusSelection = null;
+    document.getElementById("battleTacticalSelectionNote").textContent = "";
+    updateBattleInfo(); updateBattleButtons();
+  });
   for (const prefix of ["rosterFormationBulk", "battleFormationBulk"]) {
     wireBulkFormationPanel(prefix, {
       pause: () => { if (battleState.running) pauseBattle(); },
@@ -1546,6 +1624,17 @@ export function wireBattleUI() {
     });
   }
   elements.rosterSortie?.addEventListener("change", e => {
+    const tactical = e.target.closest("[data-tactical-roster]");
+    if (tactical && !battleState.started) {
+      const entry = [...battleRoster.sortie, ...battleRoster.reserve].find(item => item.rosterUnitId === tactical.dataset.tacticalRoster);
+      if (!entry) return;
+      const field = tactical.dataset.tacticalField;
+      const enemyId = field === "focusEnemyId" ? tactical.value : document.getElementById(`focus-${entry.rosterUnitId}`)?.value;
+      if (field === "focusEnemyId") {
+        if (enemyId) changeTacticalOrders([entry], "targetOrder", "focus", enemyId);
+      } else if (tactical.value !== "focus" || enemyId) changeTacticalOrders([entry], field, tactical.value, enemyId);
+      return;
+    }
     const select = e.target.closest("[data-roster-unit]");
     if (select && !battleState.started) changeFormationOrder(select.value, select.dataset.rosterUnit);
   });
@@ -1669,6 +1758,19 @@ export function wireBattleUI() {
     renderBattle();
   });
   elements.battleCanvas.addEventListener("click", (e) => {
+    if (battleState.focusSelection) {
+      const rect = elements.battleCanvas.getBoundingClientRect();
+      const point = battleCellAt(e.clientX, e.clientY, rect, battleState.size);
+      const enemy = findUnitAt(point.x, point.y);
+      if (enemy?.side === "enemy" && isBattleActive(enemy)) {
+        const items = battleState.focusSelection;
+        battleState.focusSelection = null;
+        const count = changeTacticalOrders(items, "targetOrder", "focus", enemy.id);
+        document.getElementById("battleTacticalSelectionNote").textContent = `${count}部隊の標的を指定しました。`;
+        updateBattleButtons();
+      }
+      return;
+    }
     if (battleState.editing) {
       const canvas = elements.battleCanvas;
       const rect = canvas.getBoundingClientRect();

@@ -3,6 +3,9 @@ import { MORALE_RULES, isBattleActive, isBattleOnBoard, updateBattleMorale, loca
 import { selectBattleTarget } from "./battleTarget.js";
 import { chooseUnitFormation, formationDamage, initializeUnitFormation, resolveUnitFormation, unitFormation, UNIT_FORMATION_RULES } from "./battleUnitFormation.js";
 import { REINFORCEMENT_RULES, deployReinforcements, canSideContinue } from "./battleReinforcements.js";
+import { resolveTacticalAI } from "./battleTacticalAI.js";
+import { initializeTacticalOrders } from "./battleTacticalOrders.js";
+import { isRegrouping, findRegroupPlan, finishRegroupTick } from "./battleRegroup.js";
 
 /** 現行ルールの時間・表示寿命。描画と計算で共有する。 */
 export const BATTLE_RULES = Object.freeze({ tickMs: 1000, maxTicks: 60, attackFxTtl: 2, moveFxTtl: 3 });
@@ -112,9 +115,9 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
   }
 
   /** @param {object} unit 部隊。 @param {Array} enemies 候補。 @returns {object|null} 標的。 */
-  function selectTarget(unit, enemies) {
+  function selectTarget(unit, enemies, reachable = null) {
     return selectBattleTarget(unit, enemies, { strategy: battleStrategy, seed: battleState.randomSeed || 0,
-      tick: battleState.tick, strength: calcStrength });
+      tick: battleState.tick, strength: calcStrength, size: battleState.size, reachable });
   }
 
   /** 開始時の共通盤面から脅威・圧力・攻撃可能性を評価する。
@@ -174,6 +177,11 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
       const key = `${nx},${ny}`;
       if (occupied.has(key)) return;
       const rate = terrainRate({ ...unit, x: nx, y: ny });
+      if (unit.tacticalState === "hold") {
+        const enemies = battleState.units.filter(enemy => enemy.side !== unit.side && isBattleActive(enemy) && !enemy.arriving);
+        if (Math.min(Infinity, ...enemies.map(enemy => manhattan({ x: nx, y: ny }, enemy)))
+          < Math.min(Infinity, ...enemies.map(enemy => manhattan(unit, enemy)))) return;
+      }
       if (rate > curRate && (!best || rate > best.rate)) {
         best = { x: nx, y: ny, rate };
       }
@@ -196,7 +204,7 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
    */
   function kiteForRanged(unit, enemies, target, occupied) {
     if (unit.role !== "ranged") return false;
-    const melee = enemies.filter((e) => isBattleActive(e) && e.role === "melee");
+    const melee = enemies.filter((e) => isBattleActive(e) && !e.arriving && e.role === "melee");
     if (!melee.length) return false;
     const adjMelee = melee.filter((m) => manhattan(unit, m) === 1);
     if (!adjMelee.length) return false;
@@ -241,9 +249,11 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
     battleState.elapsedMs += dtMs;
     battleState.tick += 1;
     for (const unit of battleState.units) if (unit.arriving) unit.arriving = false;
+    logs.push(...resolveTacticalAI(battleState));
     resolveFormations(battleState.units.filter(unit => unit.status !== "reserve"));
     const arrivals = deployReinforcements(battleState);
     for (const unit of arrivals) {
+      initializeTacticalOrders(unit);
       initializeUnitFormation(unit, unit.formationOrder, battleState.tick + 1);
       addBattleLog(`${unit.side === "ally" ? "味方" : "敵"}の増援: ${unit.name} ${unit.count}人が到着した。`);
       if (unit.formationOrder === "auto") unit.formationChangeAt = battleState.tick;
@@ -269,14 +279,25 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
       unit.switchLock = Math.max(0, (unit.switchLock || 0) - 1);
       unit.cooldown = Math.max(0, unit.cooldown - 1);
       const enemyList = unit.side === "ally" ? enemies : allies;
-      let target = enemyList.find(e => e.id === unit.targetId);
-      if (target && !isBattleActive(target) && enemyList.some(isBattleActive)) target = null;
-      if (!target || manhattan(unit, target) > unit.range + 5 || unit.switchLock <= 0) {
-        const next = selectTarget(unit, enemyList);
-        if (next && next.id !== unit.targetId) unit.switchLock = unit.role === "ranged" ? 2 : 3;
-        target = next;
+      const priority = movementPriority(unit.id, battleState.randomSeed || 0, battleState.tick);
+      const paths = new Map();
+      /** @param {object} enemy 候補。 @returns {boolean} 現在の占有盤面で攻撃位置へ到達できるか。 */
+      function reachable(enemy) {
+        if (!paths.has(enemy.id)) paths.set(enemy.id, findTacticalPath(unit, enemy, battleState.size, occupied, priority, alive));
+        return paths.get(enemy.id).length > 0;
       }
+      const target = selectTarget(unit, enemyList, unit.tacticalState === "advance" ? reachable : null);
+      if (unit.targetOrder === "focus" && unit.tacticalState === "advance" && target?.id !== unit.focusEnemyId)
+        unit.tacticalTargetReason = "指定敵を追跡できないため近くの敵に対処";
+      if (target && target.id !== unit.targetId) unit.switchLock = unit.role === "ranged" ? 2 : 3;
       const plan = { unit, path: [], kind: "hold", wantsMove: false };
+      if (isRegrouping(unit)) {
+        const retreat = findRegroupPlan(unit, battleState);
+        unit.regroupGoal = retreat.goal;
+        unit.tacticalState = retreat.path.length ? "withdrawing" : retreat.safe ? "recovering" : "withdrawing";
+        if (!retreat.path.length && !retreat.safe) unit.tacticalReason = "退路なし";
+        return { unit, path: retreat.path.slice(0, unit.move), kind: "regroup", wantsMove: retreat.path.length > 0 };
+      }
       if (!target) return plan;
       unit.targetId = target.id;
       const strategy = unit.side === "ally" ? battleStrategy : { kiteMode: "kite", retreatThreshold: 30, chargeMode: "cavalry" };
@@ -285,10 +306,12 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
       if (unit.hp / Math.max(1, unit.maxHp) < retreatLimit && retreatToBetterTerrain(shadow, new Set(occupied))) {
         return { unit, path: [{ x: shadow.x, y: shadow.y }], kind: "retreat", wantsMove: true };
       }
-      if (strategy.kiteMode !== "none" && kiteForRanged(shadow, enemyList, target, new Set(occupied))) {
+      const kiteTarget = manhattan(unit, target) <= unit.range ? target
+        : selectTarget(unit, enemyList.filter(enemy => manhattan(unit, enemy) <= unit.range));
+      if (strategy.kiteMode !== "none" && kiteForRanged(shadow, enemyList, kiteTarget || target, new Set(occupied))) {
         return { unit, path: [{ x: shadow.x, y: shadow.y }], kind: "kite", wantsMove: true };
       }
-      const priority = movementPriority(unit.id, battleState.randomSeed || 0, battleState.tick);
+      if (unit.tacticalState === "hold") return plan;
       if (unit.role === "support") {
         const path = findTacticalPath(unit, target, battleState.size, occupied, priority, alive).slice(0, unit.move);
         return { unit, path, kind: "support", wantsMove: path.length > 0 };
@@ -302,7 +325,7 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
         const friendMin = Math.min(...friends.map(friend => manhattan(friend, target)));
         if (manhattan(unit, target) <= friendMin - 2) steps = 1;
       }
-      const path = findTacticalPath(unit, target, battleState.size, occupied, priority, alive).slice(0, steps);
+      const path = (paths.get(target.id) || findTacticalPath(unit, target, battleState.size, occupied, priority, alive)).slice(0, steps);
       return { unit, path, kind: "approach", wantsMove: true };
     });
     const movement = resolveBattleMovement(plans, alive, battleState.size, battleState.randomSeed || 0, battleState.tick);
@@ -342,6 +365,7 @@ export function stepBattle(battleState, battleStrategy, { defendedDamage, fireOu
     }
     for (const unit of updateBattleMorale(battleState, before))
       addBattleLog(`${unit.side === "ally" ? "味方" : "敵"}の${unit.name}が士気を失い敗走した。`);
+    logs.push(...finishRegroupTick(battleState, before));
     for (const unit of alive) {
       if (unit.hp <= 0) unit.status = "destroyed";
       else if (unit.status === "routing" && unit.x === (unit.side === "ally" ? 0 : battleState.size - 1)) unit.status = "escaped";

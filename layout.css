@@ -281,6 +281,11 @@ main .grid > * { min-width: 0; }
 .roster-options .tiny { line-height: 1.6; }
 .roster-row { grid-template-columns: minmax(0, 1fr) auto; }
 .roster-right { grid-column: 1 / -1; flex-direction: row; }
+.roster-right:has(.roster-formation-select) { flex-wrap: wrap; }
+.roster-right:has(.roster-formation-select) > label { flex-basis: 100%; }
+.roster-right .roster-formation-select { flex: 1 1 100%; }
+.roster-right .btn { white-space: nowrap; }
+.roster-row > details { grid-column: 1 / -1; min-width: 0; }
 .roster-controls { flex: 1; min-width: 0; }
 .roster-line { min-width: 0; }
 .roster-line b { white-space: nowrap; }

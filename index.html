@@ -5,8 +5,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>潮語り航海録（β版）</title>
-  <link rel="stylesheet" href="styles.css?v=20261015-battle-rigging" />
-    <link rel="stylesheet" href="layout.css?v=20261015-battle-rigging" />
+  <link rel="stylesheet" href="styles.css?v=20261015-battle-tactics" />
+    <link rel="stylesheet" href="layout.css?v=20261015-battle-tactics" />
 </head>
 
 <body>
@@ -25,9 +25,10 @@
             <div class="bd">
               <div class="strategy-grid">
                 <div>
-                  <label for="strategyTarget">攻撃方針</label>
+                  <label for="strategyTarget">全味方へ攻撃目標を一括指示</label>
                   <select id="strategyTarget">
-                    <option value="type">兵種準拠</option>
+                    <option value="">変更しない</option>
+                    <option value="auto">おまかせ</option>
                     <option value="hp">HP優先</option>
                     <option value="rear">後衛狙い</option>
                     <option value="strong">強敵狙い</option>
@@ -43,7 +44,7 @@
                   </select>
                 </div>
                 <div>
-                  <label for="strategyRetreat">退避HP閾値（%）</label>
+                  <label for="strategyRetreat">地形退避HP閾値（%）</label>
                   <input type="number" id="strategyRetreat" min="5" max="100" step="1" value="30" />
                 </div>
                 <div>
@@ -97,7 +98,9 @@
                   <select id="battleUnitFormationOrder"></select>
                   <p class="tiny" id="battleUnitFormationNote"></p>
                 </details>
+                <details id="battleTacticalUnitEditor" hidden><summary>部隊の戦術を指示</summary></details>
               </div>
+              <details id="battleTacticalBulkEditor" class="mt-10" hidden><summary>まとめて戦術を指示</summary></details>
               <div class="battle-log mt-10" id="battleLog"></div>
             </div>
           </section>
@@ -139,6 +142,7 @@
                 </div>
                 <div class="roster-col">
                   <div id="rosterSortieHeading" class="tiny mb-4">出撃（最大20部隊）</div>
+                  <details id="rosterTacticalEditor" class="mb-12"><summary>まとめて戦術を指示</summary></details>
                   <fieldset id="rosterFormationBulkEditor" class="battle-unit-orders mb-12">
                     <legend>まとめて陣形を指示</legend>
                     <label for="rosterFormationBulkTarget">指示する対象</label>
@@ -321,6 +325,8 @@
                   <button class="btn good" id="battleFormationSave" hidden>保存</button>
                 </div>
                 <div id="battleStatus" class="battle-status"></div>
+                <p class="tiny" id="battleTacticalSelectionNote" role="status"></p>
+                <button class="btn ghost" type="button" id="battleTacticalCancel" hidden>標的選択をキャンセル</button>
               </div>
             </div>
 
@@ -794,6 +800,10 @@
           <p>部隊は被害や包囲、近くの味方の撃破・敗走で士気を失います。動揺すると攻撃が弱まり、さらに下がると敗走します。HPが残っていても、戦闘可能な部隊がいなくなれば敗北します。</p>
           <p>盾壁は被害と火力を抑え、円陣は士気の維持に向きます。散開は射撃に強い一方で近接に弱く、突撃は火力と被害が増えます。迷ったら「おまかせ」で戦況に応じた陣形を選べます。</p>
           <p>陣形を切り替えた直後は待ち時間があります。指示は予約され、切り替え可能になると反映されます。一時停止しても待ち時間は進みません。現在の陣形・予約・士気は部隊詳細で確認できます。</p>
+          <p>行動・攻撃目標・担当区域も初期指示は「おまかせ」です。「部隊の戦術を指示」または「まとめて戦術を指示」から、必要な項目だけ変更できます。開始後の戦術指示は、再開後の次のカウントで反映します。</p>
+          <p>「待機」は追撃を止めますが、射程内への攻撃と距離維持は続けます。「進軍」でも弓兵は距離を保ちます。手動の進軍・待機では自動の立て直しを行わないため、士気低下に注意してください。</p>
+          <p>「立て直し」は安全な後方で士気を回復します。HPは回復せず、退路が塞がれていれば下がれません。おまかせは完了後に復帰しますが、手動では次の行動を指示するまで待ちます。敗走した部隊は復帰できません。</p>
+          <p>「敵を指定」は敵一覧か盤面から選べます。待機中は指定敵を追わず、射程内の別の敵を攻撃します。担当区域は上側・中央・下側の敵を優先する設定で、移動を禁止する境界ではありません。選択部隊の補助表示にある斜線は敵の足止め範囲です。</p>
         </details>
         <details class="guide-question" id="guide-roster">
           <summary>おまかせ編成の条件と兵の分け方</summary>

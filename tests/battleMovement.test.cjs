@@ -76,8 +76,11 @@ async function main() {
   await morale.link(() => formation);
   const reinforcements = new vm.SourceTextModule(await readSource("battleReinforcements.js"));
   const geometry = new vm.SourceTextModule(await readSource("battleGeometry.js"));
+  const tacticalModules = {};
+  for (const name of ["battleTacticalOrders", "battleTacticalAI", "battleRegroup"])
+    tacticalModules[`./${name}.js`] = new vm.SourceTextModule(await readSource(`${name}.js`));
   await core.link(name => ({ "./battleMovement.js": movement, "./battleMorale.js": morale, "./battleReinforcements.js": reinforcements,
-    "./battleUnitFormation.js": formation, "./battleTarget.js": target, "./battleGeometry.js": geometry })[name]); await core.evaluate();
+    "./battleUnitFormation.js": formation, "./battleTarget.js": target, "./battleGeometry.js": geometry, ...tacticalModules })[name]); await core.evaluate();
   const { stepBattle: step, battleResult } = core.namespace;
   /** @param {string} side 陣営。 @param {number} x 座標。 @returns {object} 部隊。 */
   function unit(side, x) {
@@ -97,7 +100,7 @@ async function main() {
   assert.equal(result.ended, true);
   assert.ok(duel.units.every(u => u.hp === 0 && u.status === "destroyed"));
   assert.equal(battleResult(duel.units), "draw", "先に攻撃した側だけが生き残らず相打ちになる");
-  assert.equal(result.logs.length, 2, "撃破ログを各部隊1回だけ出す");
+  assert.equal(result.logs.filter(log => log.includes("撃破された")).length, 2, "撃破ログを各部隊1回だけ出す");
 
   const spear = field([{ ...unit("ally", 2), atk: 10, type: "halberd", range: 2 }, { ...unit("enemy", 3), atk: 10 }]);
   step(spear, strategy, dependencies);

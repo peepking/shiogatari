@@ -79,7 +79,7 @@ async function main() {
     assert.equal(entry.formationOrder, expectedOrder);
     assert.equal(units.find(unit => unit.rosterUnitId === entry.rosterUnitId).formationOrder, expectedOrder);
   }
-  assert.equal(context.state.pendingEncounter.preparation.version, 3);
+  assert.equal(context.state.pendingEncounter.preparation.version, 4);
   assert.equal(context.state.pendingEncounter.preparation.roster.reserve[0].formationOrder, "auto");
   assert.equal(vm.runInContext("rosterSignature()", context), context.appliedRosterSignature);
   const draft = { type: "archer", count: 1, rosterUnitId: "roster-99", formationOrder: "line" };

@@ -17,7 +17,7 @@ function field(units) { return { battleKind: "grand", units, size: 10, tick: 0, 
 /** @returns {Promise<void>} 同時上限・後端投入・登場制限・継戦・封鎖・精算を検証する。 */
 async function main() {
   const modules = {};
-  for (const name of ["battleGeometry", "battleUnitFormation", "battleTarget", "battleCore", "battleMorale", "battleMovement", "battleReinforcements", "battlePersonnel"])
+  for (const name of ["battleTacticalOrders", "battleTacticalAI", "battleRegroup", "battleGeometry", "battleUnitFormation", "battleTarget", "battleCore", "battleMorale", "battleMovement", "battleReinforcements", "battlePersonnel"])
     modules[`./${name}.js`] = new vm.SourceTextModule(await readSource(`${name}.js`));
   const core = modules["./battleCore.js"];
   await core.link(name => modules[name]); await core.evaluate();

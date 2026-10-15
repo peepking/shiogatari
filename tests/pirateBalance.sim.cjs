@@ -19,6 +19,8 @@ function createSimulation() {
     outfittedStat: n => n,
     fireOutfitting: () => [],
     OUTFITTING_ITEMS: {},
+    /** @returns {object} 描画を伴わない検証では演出だけを省略する。 */
+    createBattleEffectPlayer() { return { clear() {}, sync() {} }; },
   });
   vm.runInContext(`const TROOP_STATS = ${troops[1]};`, context);
   const damage = read("outfitting.js").match(/export function defendedDamage\([^\n]+/);
@@ -31,6 +33,8 @@ function createSimulation() {
   vm.runInContext(read("battleMorale.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(read("battleMovement.js").replace(/^export /gm, ""), context);
   vm.runInContext(read("battleReinforcements.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
+  for (const name of ["battleTacticalOrders", "battleRegroup", "battleTacticalAI", "battleTacticalOrdersUI"])
+    vm.runInContext(read(`${name}.js`).replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(read("battleTarget.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(read("battleCore.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);
   vm.runInContext(read("battle.js").replace(/^import .*;\r?\n/gm, "").replace(/^export /gm, ""), context);

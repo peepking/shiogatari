@@ -70,6 +70,7 @@ async function main() {
     MAX_SQUADS: 20, BATTLE_HP_MULTIPLIER: 3, battleState: { outfitting: { effects: {} } },
     clamp: (n, min, max) => Math.max(min, Math.min(max, n)), outfittedStat: n => n });
   vm.runInContext(readSource("battleGeometry.js").replace(/^export /gm, ""), context);
+  vm.runInContext(readSource("battleTacticalOrders.js").replace(/^export /gm, ""), context);
   for (const name of ["takeFromStandby", "pushToStandby", "createUnit", "createUnits"]) {
     if (name === "createUnits") vm.runInContext(readSource("battleUnitFormation.js").replace(/^export /gm, ""), context);
     const start = battleSource.indexOf(`function ${name}(`);

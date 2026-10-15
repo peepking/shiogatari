@@ -75,7 +75,8 @@ export function findAttackPath(unit, target, size, occupied, priority = 0, evalu
  */
 export function findTacticalPath(unit, target, size, occupied, priority, units) {
   const friends = units.filter(friend => friend.side === unit.side && friend.id !== unit.id && friend.role === "melee"
-    && (!friend.status || friend.status === "active") && !friend.arriving);
+    && (!friend.status || friend.status === "active") && !friend.arriving
+    && !["withdrawing", "recovering"].includes(friend.tacticalState));
   const direction = unit.side === "ally" ? 1 : -1;
   const support = unit.role === "support";
   if (support && !friends.length) return [];

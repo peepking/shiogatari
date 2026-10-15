@@ -13,6 +13,7 @@ const context = vm.createContext({
   clamp: (value, min, max) => Math.max(min, Math.min(max, value)),
 });
 vm.runInContext(readSource("battleUnitFormation.js").replace(/^export /gm, ""), context);
+vm.runInContext(readSource("battleTacticalOrders.js").replace(/^export /gm, ""), context);
 vm.runInContext(readSource("battleGeometry.js").replace(/^export /gm, ""), context);
 vm.runInContext(source.match(/const BATTLE_HP_MULTIPLIER = \d+;/)[0], context);
 for (const name of ["buildDeploySlots", "createUnit", "createUnits", "terrainRate", "effectiveAtk", "effectiveDef", "calcStrength"]) {

@@ -17,6 +17,7 @@ async function checkBattleTerrain() {
     document: { hidden: false }, battleEffects: { sync() {}, draw() {}, drawGround() {}, setLayout() {} }, renderBattleRigging() {},
     elements: { battleCanvas: { width: 80 } }, battleState: { size: 2, grid, ctx, units: [] },
     resizeBattleCanvas() {}, isBattleOnBoard() {}, drawBattleTerrain: terrainArt.namespace.drawBattleTerrain,
+    drawTacticalOverlay() {}, getUnitById() { return null; },
   });
   const source = await readSource("battle.js"), start = source.indexOf("function renderBattle(");
   vm.runInContext(source.slice(start, source.indexOf("\n}", start) + 2), context);
@@ -134,6 +135,7 @@ async function checkBattleStatusLayers() {
     battleEffects: { setLayout() {}, sync() { renderCounts.sync++; }, drawGround() {},
       unitPose(unit) { return poses[unit.id]; }, draw() { calls.push({ kind: "attack" }); } },
     resizeBattleCanvas() { renderCounts.resize++; }, drawBattleTerrain() {}, renderBattleRigging() {},
+    drawTacticalOverlay() {}, getUnitById() { return null; },
     isBattleOnBoard(unit) { return unit.hp > 0 && unit.status === "active"; },
     getUnitImage(type) { return images[type]; },
     unitFormation(unit) { return { mark: unit.id === active.id ? "隊A" : "隊B" }; },
@@ -202,7 +204,7 @@ async function main() {
   await geometry.link(() => {}); await geometry.evaluate(); await formation.link(() => {}); await formation.evaluate();
   const { selectBattleSize, deploymentDepth, battleDeploymentLimit, battleCellAt } = geometry.namespace;
   const modules = { "./battleGeometry.js": geometry };
-  for (const name of ["battleUnitFormation", "battleTarget", "battleCore", "battleMorale", "battleMovement", "battleReinforcements"])
+  for (const name of ["battleTacticalOrders", "battleTacticalAI", "battleRegroup", "battleUnitFormation", "battleTarget", "battleCore", "battleMorale", "battleMovement", "battleReinforcements"])
     modules[`./${name}.js`] = new vm.SourceTextModule(await readSource(`${name}.js`));
   await modules["./battleCore.js"].link(name => modules[name]); await modules["./battleCore.js"].evaluate();
   const battle = await readSource("battle.js");

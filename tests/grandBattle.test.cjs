@@ -8,7 +8,7 @@ function extract(source, name) { const start = source.indexOf(`function ${name}(
 /** @returns {Promise<void>} 大会戦の生成・編成・復元・盤上除外を検証する。 */
 async function main() {
   const modules = {};
-  for (const name of ["battleGeometry", "battleUnitFormation", "battleTarget", "grandBattle", "battleReinforcements", "battleMovement", "battleMorale", "battlePersonnel"])
+  for (const name of ["battleTacticalOrders", "battleGeometry", "battleUnitFormation", "battleTarget", "grandBattle", "battleReinforcements", "battleMovement", "battleMorale", "battlePersonnel"])
     modules[`./${name}.js`] = new vm.SourceTextModule(await read(`${name}.js`));
   await modules["./grandBattle.js"].link(name => modules[name]); await modules["./grandBattle.js"].evaluate();
   await modules["./battlePersonnel.js"].link(() => {}); await modules["./battlePersonnel.js"].evaluate();
@@ -34,6 +34,7 @@ async function main() {
   const context = vm.createContext({ state, battleState,
     battleEffects: { clear() {} },
     ...modules["./battleUnitFormation.js"].namespace, rosterUnitSequence: 0,
+    ...modules["./battleTacticalOrders.js"].namespace,
     ...modules["./battleGeometry.js"].namespace, ...modules["./battlePersonnel.js"].namespace,
     battleRoster: { standby: {}, sortie: front.map(e => ({ ...e, sources: { 3: 10 } })), reserve: reserves.map(e => ({ ...e, sources: { 3: 10 } })) },
     MAX_SQUADS: 20, MAX_UNIT_COUNT: 10, BATTLE_HP_MULTIPLIER: 3, MORALE_RULES: { initial: 100 },

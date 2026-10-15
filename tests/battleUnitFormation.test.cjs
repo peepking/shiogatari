@@ -29,7 +29,7 @@ function extract(source, name) {
  */
 async function main() {
   const modules = {};
-  for (const name of ["battleGeometry", "battleUnitFormation", "battleUnitFormationOrders", "battleUnitFormationUI", "battleTarget", "battleCore",
+  for (const name of ["battleTacticalOrders", "battleTacticalAI", "battleRegroup", "battleGeometry", "battleUnitFormation", "battleUnitFormationOrders", "battleUnitFormationUI", "battleTarget", "battleCore",
     "battleMorale", "battleMovement", "battleReinforcements", "grandBattle"])
     modules[`./${name}.js`] = new vm.SourceTextModule(readSource(`${name}.js`));
   await modules["./battleCore.js"].link(name => modules[name]);
@@ -218,7 +218,7 @@ async function main() {
   assert.equal(run(false), run(true), "停止・速度変更・再開でHP・士気・座標・時刻・乱数列は同じ");
 
   const roster = { sortie: [], reserve: [], standby: {} };
-  const ctx = vm.createContext({ battleRoster: roster, rosterUnitSequence: 0, ...f });
+  const ctx = vm.createContext({ battleRoster: roster, rosterUnitSequence: 0, ...f, ...modules["./battleTacticalOrders.js"].namespace });
   for (const name of ["createRosterEntry", "normalizeRosterFormations", "rosterSignature"]) vm.runInContext(extract(raw, name), ctx);
   const first = vm.runInContext("createRosterEntry({type:'infantry',count:5})", ctx);
   roster.sortie.push(first); vm.runInContext("normalizeRosterFormations()", ctx);
@@ -229,7 +229,7 @@ async function main() {
   const second = vm.runInContext("createRosterEntry({type:'infantry',count:5})", ctx);
   assert.notEqual(first.rosterUnitId, second.rosterUnitId); assert.equal(second.formationOrder, "auto");
 
-  // 実際の準備保存を使い、版3の指示と識別子を確認する。戦闘中の予約は書き戻さない。
+  // 実際の準備保存を使い、版4の指示と識別子を確認する。戦闘中の予約は書き戻さない。
   second.sources = { 1: 5 }; second.level = 1; roster.sortie.push(second);
   ctx.state = { pendingEncounter: { active: true } };
   ctx.battleState = { ...field([]), battleKind: "grand", started: false, customSlots: {}, allyFormation: "balance" };
@@ -239,7 +239,7 @@ async function main() {
   vm.runInContext(extract(raw, "saveGrandPreparation"), ctx);
   vm.runInContext("saveGrandPreparation()", ctx);
   const preparation = JSON.stringify(ctx.state.pendingEncounter.preparation);
-  assert.equal(ctx.state.pendingEncounter.preparation.version, 3);
+  assert.equal(ctx.state.pendingEncounter.preparation.version, 4);
   assert.equal(ctx.state.pendingEncounter.preparation.roster.sortie[0].rosterUnitId, second.rosterUnitId);
   assert.equal(ctx.state.pendingEncounter.preparation.roster.sortie[0].formationOrder, "auto");
   ctx.battleState.started = true; second.formationOrder = "charge";

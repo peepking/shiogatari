@@ -1872,7 +1872,10 @@ fieldset.battle-unit-orders {
 }
 
 .battle-unit-orders summary,
-#battleFormationBulkEditor > summary {
+#battleFormationBulkEditor > summary,
+#rosterTacticalEditor > summary,
+#battleTacticalBulkEditor > summary,
+#battleTacticalUnitEditor > summary {
   cursor: pointer;
   padding: 8px 0;
 }

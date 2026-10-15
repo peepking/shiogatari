@@ -1,5 +1,6 @@
 import { REINFORCEMENT_RULES } from "./battleReinforcements.js";
 import { normalizeFormationRoster } from "./battleUnitFormation.js";
+import { normalizeTacticalOrders } from "./battleTacticalOrders.js";
 
 /** 前衛と同じ兵種・レベル候補から均等抽選し、半数の人数を最大10部隊にまとめる。
  * @param {Array} front 前衛。 @param {Function} random 乱数。 @returns {Array} 固定予備隊。
@@ -36,5 +37,6 @@ export function restoreGrandRoster(standby, saved) {
   for (const entry of [...restored.sortie, ...restored.reserve])
     entry.level = Math.round(Object.entries(entry.sources).reduce((sum, [level, count]) => sum + Number(level) * count, 0) / entry.count * 10) / 10;
   normalizeFormationRoster([...restored.sortie, ...restored.reserve]);
+  for (const entry of [...restored.sortie, ...restored.reserve]) normalizeTacticalOrders(entry);
   return restored;
 }
