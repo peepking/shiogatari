@@ -10,6 +10,7 @@ import { SUPPLY_ITEMS } from "../resources/supplies.js";
 import { elements, pushToast, pushLog } from "../ui/dom.js";
 import { enqueueEvent } from "../app/events.js";
 import { capacityOverflowText } from "../ui/capacityUI.js";
+import { awardExplorationFragment, announceFragment } from "../exploration/chartWorld.js";
 import { advanceDayWithEvents } from "../app/time.js";
 import { beginDangerousSeaAction, finishDangerousSeaAction, dangerousSeaActionBlocked } from "./dangerousSeaHazards.js";
 import { dangerousSeaAt } from "./dangerousSeaWorld.js";
@@ -71,6 +72,7 @@ function rewardResources(reward) {
   if (!reward) return [];
   const resources = reward.funds ? [{ id: "funds", label: "回収資金", value: `+${reward.funds}` }] : [];
   if (reward.fame) resources.push({ id: "fame", label: "名声", value: `+${reward.fame}` });
+  if (reward.fragment) resources.push({ id: "chart", label: "海図の断片", value: "+1" });
   for (const [id, qty] of Object.entries(reward.supplies)) if (qty) resources.push({ id, label: SUPPLY_ITEMS.find(item => item.id === id)?.name || id, value: `+${qty}` });
   for (const [id, qty] of Object.entries(reward.troops)) if (qty) resources.push({ id, label: `救助: ${TROOP_STATS[id]?.name || id} Lv1`, value: `+${qty}人` });
   return resources;
@@ -81,6 +83,7 @@ function rewardResources(reward) {
  */
 function ghostFleetBody(event) {
   const lines = [hintText(event), `調査 ${event.progress + 1}/3（各1日、残り${3 - event.progress}段階）。`];
+  if (event.progress < 2 && event.rewards.guide.fragment) lines.push("最後まで調べると、どちらの結末でも海図の断片1枚を得られます。");
   if (event.progress === 2) for (const choice of dangerousEventChoices(event)) {
     lines.push(`${DEFS[event.kind].choices[choice]}：${rewardResources(event.rewards[choice]).map(resource => `${resource.label} ${resource.value}`).join("・")}`);
   }
@@ -136,7 +139,7 @@ export function processDangerousSeaEvent() {
   const choices = dangerousEventChoices(event);
   const body = event.kind === "ghost_fleet" ? ghostFleetBody(event)
     : event.kind === "sinking_treasure" ? "積荷か乗員、片方だけを運び出せます。\n積荷：資金3000・香辛料4・織物3\n救助：資金300・海兵4人・斥候2人"
-    : event.kind === "seabed_bell" ? `海底から鐘の音が響きます。調査 ${event.progress + 1}/3（各1日）。`
+    : event.kind === "seabed_bell" ? `海底から鐘の音が響きます。調査 ${event.progress + 1}/3（各1日）。${event.rewards.answer.fragment ? "\n最後まで調べると、海図の断片1枚を得られます。" : ""}`
       : hintText(event);
   const risk = event.kind === "ghost_fleet" ? event.progress < 2 ? "この段階には回収の事故はありません。" : "事故で回収資金・物資が半減する恐れあり（名声は減りません）。" : "事故で回収資金・物資が半減する恐れあり";
   enqueueEvent({ kind: "dangerous_event", title: def.name, body: [body, choiceOutlook(event, choices[0]), `期限まであと${Math.max(0, event.expiresAbs - absDay(state))}日 / ${risk}`].filter(Boolean).join("\n"),
@@ -154,6 +157,7 @@ function settleEvent(success, save = true) {
   const progress = pending(), event = currentEvent();
   if (!event || progress.applied) return false;
   const before = structuredClone(state);
+  let fragment = null;
   if (success) {
     receiveFunds(state, progress.reward.funds);
     if (progress.reward.fame) {
@@ -162,6 +166,13 @@ function settleEvent(success, save = true) {
     }
     for (const [id, qty] of Object.entries(progress.reward.supplies)) state.supplies[id] = (state.supplies[id] || 0) + qty;
     for (const [id, qty] of Object.entries(progress.reward.troops)) { addTroops(id, 1, qty); recordVoyage(state, "refugeesRescued", qty); }
+    if (progress.reward.fragment) {
+      fragment = awardExplorationFragment(DEFS[event.kind].name, false);
+      if (!fragment) {
+        delete progress.reward.fragment;
+        progress.resultText += "\n海図の断片を受け取れる空きがありませんでした。";
+      }
+    }
     event.progress++;
   } else {
     progress.reward = { funds: 0, supplies: {}, troops: {} }; progress.complete = true; progress.accident = false;
@@ -171,6 +182,7 @@ function settleEvent(success, save = true) {
   event.choices.push({ choice: progress.choice, day: absDay(state), success, accident: progress.accident, reward: structuredClone(progress.reward) });
   progress.applied = true; progress.stage = "result"; progress.encounter = null;
   if (save && !saveGameToStorage()) { Object.assign(state, before); pushToast("保存できません", "報酬を確定できませんでした。同じ出来事を再開してください。", "warn"); return false; }
+  if (fragment) announceFragment(fragment, DEFS[event.kind].name);
   const ghostResult = event.kind === "ghost_fleet" && progress.complete
     ? ` / ${DEFS[event.kind].choices[progress.choice]} / ${rewardResources(progress.reward).map(resource => `${resource.label} ${resource.value}`).join("・")} / ${progress.accident ? "回収事故あり" : "回収事故なし"}` : "";
   pushLog(DEFS[event.kind].name, progress.resultText + ghostResult, "-");

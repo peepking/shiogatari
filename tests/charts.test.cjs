@@ -136,6 +136,22 @@ async function main() {
   rollChartMerchant({ id: "port", kind: "town" }); assert.equal(events.length, beforeMerchant + 1);
   assert.ok(awardExplorationFragment());
   assert.equal(state.expansion.charts.active[0].fragments, 1);
+  state.expansion = createExpansionState(); state.quests.active = [];
+  context.Math.random = () => .99;
+  const ordinary = [{ id: 201, reward: 500 }, { id: 202, reward: 500 }];
+  ordinary.forEach(offerQuestFragment);
+  assert.ok(ordinary.every(quest => !quest.rewardFragment), "配列の添字を確定報酬の指定と誤認しない");
+  const dedicated = { id: 203, reward: 500 };
+  offerQuestFragment(dedicated, true);
+  assert.ok(dedicated.rewardFragment, "確定報酬の追加依頼は通常3%の当落に依存しない");
+  assert.equal(state.expansion.charts.active.length, 0, "候補表示だけでは海図枠を予約しない");
+  assert.equal(reserveQuestFragment(dedicated), true); state.quests.active.push(dedicated);
+  const notifications = events.length, target = state.expansion.charts.active[0];
+  const fundsBefore = state.funds;
+  payQuestFunds(dedicated, 500, false);
+  assert.equal(target.fragments, 1); assert.equal(state.funds, fundsBefore);
+  assert.equal(events.length, notifications, "保存前の付与は通知を保留できる");
+  payQuestFunds(dedicated, 500, false); assert.equal(target.fragments, 1, "同じ予約を重ねて取得しない");
   console.log("海図の予約・完成・購入上限・偽物・入場抽選・復元: 全項目成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

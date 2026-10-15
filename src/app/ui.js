@@ -52,7 +52,7 @@ import { confirmAction } from "../ui/dom.js";
 import { processScheduledOmens } from "./time.js";
 import { snapshotOutfitting, outfittingBattleLosses } from "../fleet/outfitting.js";
 import { renderOutfittingControl } from "../fleet/outfittingUI.js";
-import { syncChartReservations, awardBattleFragment, chartLabel } from "../exploration/chartWorld.js";
+import { syncChartReservations, awardBattleFragment, awardExplorationFragment, chartLabel } from "../exploration/chartWorld.js";
 import { renderChartCards, renderChartControl, resumeChartExploration } from "../exploration/chartUI.js";
 import { renderFishingControl, resumeFishing, wireFishingUI } from "../fishing/fishingUI.js";
 import {
@@ -704,6 +704,7 @@ function killedEnemyCount(meta) {
 
 /**
  * 戦闘結果を処理し、報酬・損耗・依頼/神託の成否を反映する。
+ * 行商人救助の断片は戦闘前の当選を勝利時だけ適用し、通常の資金報酬と謝礼へ追加する。
  * @param {"win"|"lose"|"draw"} resultCode 戦闘結果
  * @param {object} meta 戦闘メタ情報
  * @returns {void}
@@ -903,8 +904,7 @@ function processBattleOutcome(resultCode, meta) {
         }
       } else if (questType === QUEST_TYPES.PIRATE_HUNT || questType === QUEST_TYPES.BOUNTY_HUNT) {
         if (isWin) {
-          completeHuntBattleQuest(questId, true);
-          summary.push(`討伐達成: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "海賊船団" : "海賊"}`);
+          if (completeHuntBattleQuest(questId, true)) summary.push(`討伐達成: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "海賊船団" : "海賊"}`);
         } else {
           completeHuntBattleQuest(questId, false, "戦闘に敗北しました");
           summary.push(`討伐失敗: ${questType === QUEST_TYPES.BOUNTY_HUNT ? "海賊船団" : "海賊"}`);
@@ -952,6 +952,8 @@ function processBattleOutcome(resultCode, meta) {
           summary.push("救助成功: 支持/好感度が上昇");
           const extras = grantMerchantBonusLoot(enemyTotal, isStrong, "help");
           if (extras.texts.length) summary.push({ text: `追加報酬: ${extras.texts.join(" / ")}`, label: "追加報酬", resources: extras.resources });
+          const fragment = eventContext?.chartFragment === true ? awardExplorationFragment("行商人救助の謝礼") : null;
+          if (fragment) summary.push({ text: `救助の謝礼: ${chartLabel(fragment)}の断片 +1`, icon: "chart" });
         } else {
           addWarScore(playerFactionId, fid, -4, absDay(state), 0, 0);
           if (setId && fid) adjustSupport(setId, fid, -1);

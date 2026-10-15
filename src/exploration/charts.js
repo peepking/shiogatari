@@ -36,6 +36,21 @@ export function canAssignChart(data, offer) {
 }
 
 /**
+ * 取引用断片の固定された対象・価格・残数を復元する。通常物資には変換しない。
+ * @param {*} value 保存値。 @param {string} source 購入元。 @returns {object|null} 有効な商品。
+ */
+export function normalizeChartTradeDeal(value, source) {
+  const offer = value?.chartOffer;
+  if (!["trader", "haven"].includes(source) || value?.chartSource !== source || value.id !== "chart" ||
+    !Number.isSafeInteger(value.price) || value.price < 1 || ![0, 1].includes(value.stock) ||
+    !offer || !CONFIG.sizes.includes(offer.size) || !Object.hasOwn(CONFIG.rewards, offer.kind) ||
+    (offer.chartId != null && (!Number.isSafeInteger(offer.chartId) || offer.chartId < 1))) return null;
+  return { id: "chart", name: `海図の断片：${CONFIG.rewards[offer.kind].name}（${offer.size}枚・本物）`,
+    price: value.price, qty: 1, stock: value.stock, chartSource: source,
+    chartOffer: { chartId: offer.chartId ?? null, size: offer.size, kind: offer.kind } };
+}
+
+/**
  * 既存海図を取得するか、事前に選んだ完成地点で新規海図を割り当てる。
  * @param {object} data 状態。 @param {object} offer 予告。 @param {object|null} destination 完成地点。
  * @returns {object|null} 割当先。
@@ -144,7 +159,10 @@ export function normalizeCharts(source = {}) {
   }
   const rumorSeasons = Object.fromEntries(Object.entries(source.rumorSeasons || {}).filter(([key, value]) => key.length < 100 && Number.isSafeInteger(value)));
   const merchantSeasons = Object.fromEntries(Object.entries(source.merchantSeasons || {}).filter(([key, value]) => key.length < 100 && Number.isSafeInteger(value)));
-  return { nextId: Math.max(Number.isSafeInteger(source.nextId) ? source.nextId : 1, 1, ...active.map(c => c.id + 1)), active, rumorSeasons, merchantSeasons, pending };
+  const havenStocks = Object.fromEntries(Object.entries(source.havenStocks || {}).filter(([key, value]) =>
+    key.length < 100 && value && Number.isSafeInteger(value.season)).map(([key, value]) =>
+    [key, { season: value.season, deal: normalizeChartTradeDeal(value.deal, "haven") }]));
+  return { nextId: Math.max(Number.isSafeInteger(source.nextId) ? source.nextId : 1, 1, ...active.map(c => c.id + 1)), active, rumorSeasons, merchantSeasons, havenStocks, pending };
 }
 
 /** @param {object} data 海図状態。 @returns {Array} 公開中の無期限探索地点。 */

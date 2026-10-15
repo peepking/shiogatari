@@ -25,16 +25,20 @@ export const EXPLORATION_CONFIG = freezeDefinition({
   wreckReward: { funds: [900, 1100], goods: [4, 8], kinds: 2, troops: [3, 5], level: 1, shipChance: 0.2, ships: 1 },
 });
 
-/** 海図の初期調整値。危険度・海図種別・サイズの抽選は候補内で均等。 */
+/** 海図の初期調整値。危険度・海図種別・サイズは候補内で均等。追加依頼は拠点ごと季節に最大1件、購入元ごと同じ海図に1枚まで。 */
 export const CHART_CONFIG = freezeDefinition({
   sizes: [3, 5],
   battleFragmentChance: 0.005,
   questFragmentChance: 0.03,
   rumorChance: 0.05,
   explorationFragmentChance: { drift: 0.05, battlefield: 0.05, wreck: 0.1 },
+  merchantRescueFragmentChance: 0.2,
+  opportunities: { dedicatedQuestChance: 0.2, refugeeFragmentChance: 0.1 },
   merchants: {
     sailor: { chance: 0.01, price: 1000, success: 0.25 },
     archivist: { chance: 0.1, price: 2000, success: 0.5 },
+    trader: { chance: 0.1, price: 3000, success: 1 },
+    haven: { chance: 0.25, price: 4000, success: 1 },
   },
   rumorDistance: [10, 15],
   destinationDistance: [10, 20],

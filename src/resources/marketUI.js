@@ -11,7 +11,10 @@ import { recordVoyage, recordExpense } from "../core/voyageStats.js";
 import { absDay } from "../quests/questUtils.js";
 import { SUPPLY_ITEMS, calcSupplyCap, calcSupplyPrice, totalSupplies } from "./supplies.js";
 import { resourceIcon } from "../ui/resourceUI.js";
+import { havenChartDeal, chartTradeError, commitChartTrade } from "../exploration/chartTrade.js";
+import { announceFragment } from "../exploration/chartWorld.js";
 
+let currentTradeSettlementId = null;
 
 /**
  * 物資取引モーダルのエラー表示を更新する。
@@ -36,6 +39,7 @@ function setEventTradeError(msg) {
 export function renderTradeSelects() {
   const settlement = getCurrentSettlement();
   if (!settlement || !elements.tradeTableBody) return;
+  currentTradeSettlementId = settlement.id;
   const restriction = wantedFacilityReason(state, settlement, "trade", absDay(state));
   if (restriction) {
     elements.tradeTableBody.innerHTML = "";
@@ -45,6 +49,7 @@ export function renderTradeSelects() {
   }
   const demand = settlement.demand || {};
   const stock = settlement.stock || {};
+  const chartDeal = havenChartDeal(settlement);
   const rows = SUPPLY_ITEMS.map((i) => {
     const price = calcSupplyPrice(i.id, demand[i.id] ?? 10, {
       factionId: settlement.factionId,
@@ -83,10 +88,18 @@ export function renderTradeSelects() {
           <td class="ta-center">${quantityControl(`<input type="number" min="${-r.haveQty}" max="${r.townQty}" step="1" value="0" aria-label="${r.name}の取引数量" data-id="${r.id}" class="trade-quantity">`, true)}</td>
         </tr>`
     )
-    .join("");
+    .join("") + (chartDeal?.stock === 1 ? `
+        <tr>
+          <td class="ta-center">${resourceIcon("chart")}</td>
+          <td>${chartDeal.name}</td>
+          <td class="ta-center">買 ${chartDeal.price}</td>
+          <td class="ta-center">1</td>
+          <td class="ta-center">—</td>
+          <td class="ta-center">${quantityControl(`<input type="number" min="0" max="1" step="1" value="0" aria-label="海図の断片の購入数量" data-id="chart" class="trade-quantity">`, true)}</td>
+        </tr>` : "");
   const deltaEl = elements.tradeDelta;
   if (deltaEl) {
-    deltaEl.hidden = rows.length === 0;
+    deltaEl.hidden = rows.length === 0 && chartDeal?.stock !== 1;
     deltaEl.textContent = "資金変動: 0";
     deltaEl.className = "pill delta-zero";
     deltaEl.title = "買値のみ支持度補正・売値は手数料10%控除後";
@@ -102,6 +115,7 @@ function collectTrade(eventTrade = false) {
   const root = eventTrade ? elements.eventTradeTableBody : elements.tradeTableBody;
   const buys = {}, sells = {};
   let fundsDelta = 0, income = 0, expense = 0, quantityDelta = 0, baitDelta = 0, error = "";
+  let chartDeal = null, chartQuantity = 0;
   const isBaitTrade = getEventTradeSource() === "bait";
   root?.querySelectorAll('input').forEach(input => {
     refreshQuantity(input);
@@ -112,6 +126,18 @@ function collectTrade(eventTrade = false) {
       return;
     }
     const deal = currentEventTrade?.deals?.find(item => item.id === id);
+    if (id === "chart") {
+      if (!value) return;
+      chartDeal = eventTrade ? deal : state.expansion.charts.havenStocks?.[settlement?.id]?.deal;
+      if (value !== 1) { error = "海図の断片は1枚だけ購入できます。"; return; }
+      if (!eventTrade && settlement?.id !== currentTradeSettlementId) { error = "取引している無法港が変わりました。取引画面を開き直してください。"; return; }
+      const reason = chartTradeError(chartDeal, eventTrade ? "trader" : "haven", settlement, currentEventTrade);
+      if (reason) { error = reason; return; }
+      chartQuantity = 1;
+      fundsDelta -= chartDeal.price;
+      expense += chartDeal.price;
+      return;
+    }
     const dir = eventTrade ? deal?.direction ?? "buy" : "buy";
     const stock = eventTrade ? (dir === "sell" ? deal?.have ?? 0 : deal?.stock ?? 0) : settlement?.stock?.[id] ?? 0;
     const have = eventTrade ? 0 : state.supplies?.[id] ?? 0;
@@ -141,7 +167,7 @@ function collectTrade(eventTrade = false) {
   if (state.funds + fundsDelta < 0) shortages.push(`資金が${-(state.funds + fundsDelta)}不足しています。`);
   if (!isBaitTrade && after > cap) shortages.push(`物資上限を${after - cap}個超えています。`);
   error = (!eventTrade && wantedFacilityReason(state, settlement, "trade", absDay(state))) || error || shortages.join(" ");
-  return { buys, sells, fundsDelta, income, expense, after, cap, error, empty: !Object.keys(buys).length && !Object.keys(sells).length, isBaitTrade, baitDelta };
+  return { buys, sells, fundsDelta, income, expense, after, cap, error, empty: !chartQuantity && !Object.keys(buys).length && !Object.keys(sells).length, isBaitTrade, baitDelta, chartDeal, chartQuantity };
 }
 
 /** 既存の資金・エラー表示を更新し、取引後の積載と確定可否を表示する。 */
@@ -174,7 +200,7 @@ let currentEventTrade = null;
 
 /**
  * 現在のイベント取引の種別を取得する（DOMから）。
- * @returns {"bait"|"fishing"|"smuggle"|""}
+ * @returns {"bait"|"fishing"|"smuggle"|"merchant"|""}
  */
 function getEventTradeSource() {
   return elements.eventTradeModal?.dataset.tradeSource || "";
@@ -255,28 +281,43 @@ function confirmEventTrade(closeModal, syncUI) {
     state.eventTrade = null;
     return;
   }
-  const { buys, sells, fundsDelta, income, expense, error, empty } = recalcEventTradeDelta();
+  const { buys, sells, fundsDelta, income, expense, error, empty, chartDeal, chartQuantity } = recalcEventTradeDelta();
   if (error || empty) return;
-  if (!state.supplies) state.supplies = {};
   const isBait = getEventTradeSource() === "bait";
-  Object.entries(buys).forEach(([id, qty]) => {
-    if (isBait) {
-      const data = state.expansion.fishing;
-      data.bait[id] = (data.bait[id] || 0) + qty;
-    } else {
-      state.supplies[id] = (state.supplies[id] || 0) + qty;
+  /** @returns {void} 海図と同時に購入する物資・代金を反映し、保存対象の取引を終了する。 */
+  const apply = () => {
+    if (!state.supplies) state.supplies = {};
+    Object.entries(buys).forEach(([id, qty]) => {
+      if (isBait) {
+        const data = state.expansion.fishing;
+        data.bait[id] = (data.bait[id] || 0) + qty;
+      } else {
+        state.supplies[id] = (state.supplies[id] || 0) + qty;
+      }
+    });
+    Object.entries(sells).forEach(([id, qty]) => {
+      const deal = currentEventTrade?.deals?.find((item) => item.id === id);
+      if (deal?.direction === "sell") {
+        if (getEventTradeSource() === "fishing") sellCatch(state, id, qty);
+        else state.supplies[id] = Math.max(0, (state.supplies[id] ?? 0) - qty);
+      }
+    });
+    state.funds += fundsDelta;
+    recordVoyage(state, "income", income);
+    recordExpense(state, expense, "trade");
+    if (chartQuantity) {
+      for (const [id, qty] of Object.entries(buys)) {
+        const bought = currentEventTrade.deals.find(d => d.id === id);
+        if (bought) bought.stock -= qty;
+      }
+      state.eventTrade = null;
     }
-  });
-  Object.entries(sells).forEach(([id, qty]) => {
-    const deal = currentEventTrade?.deals?.find((item) => item.id === id);
-    if (deal?.direction === "sell") {
-      if (getEventTradeSource() === "fishing") sellCatch(state, id, qty);
-      else state.supplies[id] = Math.max(0, (state.supplies[id] ?? 0) - qty);
-    }
-  });
-  state.funds += fundsDelta;
-  recordVoyage(state, "income", income);
-  recordExpense(state, expense, "trade");
+  };
+  if (chartQuantity) {
+    const result = commitChartTrade(chartDeal, "trader", apply, null, currentEventTrade);
+    if (result.error) { setEventTradeError(result.error); return; }
+    announceFragment(result.chart, "行商人からの購入");
+  } else apply();
   if (getEventTradeSource() === "smuggle") {
     const sid = currentEventTrade?.settlementId;
     const fid = currentEventTrade?.factionId;
@@ -286,7 +327,7 @@ function confirmEventTrade(closeModal, syncUI) {
     currentEventTrade?.deals?.find((d) => d.id === id)?.name ??
     SUPPLY_ITEMS.find((i) => i.id === id)?.name ??
     id;
-  const buySummary = Object.entries(buys).map(([id, q]) => `${dealName(id)} x${q}`).join(" / ");
+  const buySummary = [...Object.entries(buys).map(([id, q]) => `${dealName(id)} x${q}`), ...(chartQuantity ? [`${chartDeal.name} x1`] : [])].join(" / ");
   const sellSummary = Object.entries(sells).map(([id, q]) => `${dealName(id)} x${q}`).join(" / ");
   pushLog(currentEventTrade.title || "取引", `資金${fundsDelta} / 入手: ${buySummary || "なし"} / 売却: ${sellSummary || "なし"}`, "-");
   pushToast(currentEventTrade.title || "取引", `資金${fundsDelta}`, fundsDelta <= 0 ? "info" : "good");
@@ -327,24 +368,31 @@ export function wireMarketModals({ openModal, closeModal, bindModal, syncUI, cle
   elements.tradeConfirm?.addEventListener("click", () => {
     const settlement = getCurrentSettlement();
     if (!settlement) return;
-    const { buys, sells, fundsDelta, income, expense, error, empty } = recalcTradeDelta();
+    const { buys, sells, fundsDelta, income, expense, error, empty, chartDeal, chartQuantity } = recalcTradeDelta();
     if (error || empty) return;
-    const allIds = new Set([...Object.keys(buys), ...Object.keys(sells)]);
-    for (const id of allIds) {
-      const buy = buys[id] ?? 0;
-      const sell = sells[id] ?? 0;
-      const contraband = CONTRABAND.some(item => item.id === id);
-      settlement.stock[id] = contraband && !settlement.pirateHaven ? 0 : (settlement.stock?.[id] ?? 0) - buy + sell;
-      if (contraband && settlement.pirateHaven && (buy || sell)) piracyState().lastTrade = absDay(state);
-      state.supplies[id] = Math.max(0, (state.supplies[id] ?? 0) + buy - sell);
-    }
-    state.funds += fundsDelta;
-    recordVoyage(state, "income", income);
-    recordExpense(state, expense, "trade");
+    /** @returns {void} 港の物資・在庫・代金・統計を海図と同じ保存単位へ反映する。 */
+    const apply = () => {
+      const allIds = new Set([...Object.keys(buys), ...Object.keys(sells)]);
+      for (const id of allIds) {
+        const buy = buys[id] ?? 0;
+        const sell = sells[id] ?? 0;
+        const contraband = CONTRABAND.some(item => item.id === id);
+        settlement.stock[id] = contraband && !settlement.pirateHaven ? 0 : (settlement.stock?.[id] ?? 0) - buy + sell;
+        if (contraband && settlement.pirateHaven && (buy || sell)) piracyState().lastTrade = absDay(state);
+        state.supplies[id] = Math.max(0, (state.supplies[id] ?? 0) + buy - sell);
+      }
+      state.funds += fundsDelta;
+      recordVoyage(state, "income", income);
+      recordExpense(state, expense, "trade");
+    };
+    if (chartQuantity) {
+      const result = commitChartTrade(chartDeal, "haven", apply, settlement);
+      if (result.error) { setTradeError(result.error); return; }
+      announceFragment(result.chart, "無法港での購入");
+    } else apply();
     if (elements.tradeFunds) elements.tradeFunds.textContent = String(state.funds);
-    const buySummary = Object.entries(buys)
-      .map(([id, q]) => `${SUPPLY_ITEMS.find((i) => i.id === id)?.name ?? id} x${q}`)
-      .join(" / ");
+    const buySummary = [...Object.entries(buys)
+      .map(([id, q]) => `${SUPPLY_ITEMS.find((i) => i.id === id)?.name ?? id} x${q}`), ...(chartQuantity ? [`${chartDeal.name} x1`] : [])].join(" / ");
     const sellSummary = Object.entries(sells)
       .map(([id, q]) => `${SUPPLY_ITEMS.find((i) => i.id === id)?.name ?? id} x${q}`)
       .join(" / ");

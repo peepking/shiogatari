@@ -40,7 +40,8 @@ import { awardQuestNationalPower, nationalPowerResources } from "../factions/nat
 import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "../resources/supplies.js";
 import { TROOP_STATS } from "../resources/troops.js";
 import { getQuestDeadlineDays } from "./questDeadlines.js";
-import { offerQuestFragment, reserveQuestFragment, payQuestFunds, chartLabel } from "../exploration/chartWorld.js";
+import { offerQuestFragment, reserveQuestFragment, payQuestFunds, chartLabel, awardExplorationFragment, announceFragment, syncChartReservations } from "../exploration/chartWorld.js";
+import { makeChartQuestOpportunity, fixRefugeeFragmentReward, snapshotChartQuestChange, commitChartQuestChange } from "./chartQuestOpportunities.js";
 
 
 /** @enum {string} 依頼種別 */
@@ -288,7 +289,9 @@ function generateSeasonQuestsForSettlement(settlement) {
     .sort(() => Math.random() - 0.5)
     .slice(0, 3);
   state.quests.availableBySettlement[settlement.id] = pool;
-  pool.forEach(offerQuestFragment);
+  pool.forEach(quest => offerQuestFragment(quest));
+  const chartQuest = makeChartQuestOpportunity(settlement, { supply: genSupplyQuest, hunt: genPirateHuntQuest });
+  if (chartQuest) pool.push(chartQuest);
   state.quests.lastSeasonBySettlement[settlement.id] = { year: state.year, season: state.season };
 }
 
@@ -367,7 +370,7 @@ function generateNobleQuestsForNoble(noble, settlement) {
   ].filter(Boolean);
   const shuffled = pool.sort(() => Math.random() - 0.5).slice(0, 3);
   state.nobleQuests.availableByNoble[noble.id] = shuffled;
-  shuffled.forEach(offerQuestFragment);
+  shuffled.forEach(quest => offerQuestFragment(quest));
   state.nobleQuests.lastSeasonByNoble[noble.id] = { year: state.year, season: state.season };
 }
 
@@ -405,6 +408,7 @@ export function addRefugeeEscortQuest(targetSet) {
     deadlineAbs: absDay(state) + getQuestDeadlineDays(QUEST_TYPES.REFUGEE_ESCORT),
     desc: `${titleTarget}へ難民旅団を護送せよ。`,
   };
+  fixRefugeeFragmentReward(q);
   bindQuestPower(q, FACTIONS, settlements);
   state.quests.active.push(q);
   pushLog("依頼受注", q.title, "-");
@@ -427,6 +431,7 @@ export function acceptQuest(id, settlement) {
   const idx = list.findIndex((q) => q.id === id);
   if (idx === -1) return null;
   if (list[idx].pirateKind && state.honorFactions?.length) return null;
+  const previous = list[idx].chartOpportunity ? snapshotChartQuestChange() : null;
   if (!reserveQuestFragment(list[idx])) return null;
   const q = list.splice(idx, 1)[0];
   const now = absDay(state);
@@ -456,6 +461,7 @@ export function acceptQuest(id, settlement) {
   }
   bindQuestPower(q, FACTIONS, settlements);
   state.quests.active.push(q);
+  if (previous && !commitChartQuestChange(previous)) return null;
   pushLog("依頼受注", q.title, "-");
   return q;
 }
@@ -1157,6 +1163,8 @@ export function completeQuest(id) {
   if (idx === -1) return false;
   const q = state.quests.active[idx];
   if (isExpandedOracle(q)) return commitExpandedOracle(q);
+  if (q.chartOpportunity && q.deadlineAbs != null && absDay(state) > q.deadlineAbs) return false;
+  const previous = q.chartOpportunity ? snapshotChartQuestChange() : null;
   const here = getSettlementAtPosition(state.position.x, state.position.y);
   if (q.type === "amnesty") {
     const previous = structuredClone({ wanted: state.wanted, supplies: state.supplies, quests: state.quests });
@@ -1298,8 +1306,13 @@ export function completeQuest(id) {
   }
   if (!q.pirateKind) awardQuestNationalPower(q);
   resolvePirateRelations(q);
-  payQuestFunds(q);
+  payQuestFunds(q, q.reward || 0, !previous);
   state.quests.active.splice(idx, 1);
+  if (previous) {
+    if (!commitChartQuestChange(previous)) return false;
+    const chart = state.expansion.charts.active.find(chart => chart.id === q.rewardFragment?.chartId);
+    if (chart) announceFragment(chart, "依頼報酬");
+  }
   const rewards = [];
   if (q.rewardFragment) rewards.push(`${chartLabel(q.rewardFragment)}の断片+1`);
   if (q.reward && q.reward > 0) rewards.push(`資金+${q.reward}`);
@@ -1456,12 +1469,19 @@ export function completeHuntBattleQuest(id, success, reason = "") {
   );
   if (idx === -1) return false;
   const q = state.quests.active[idx];
+  if (q.chartOpportunity && q.deadlineAbs != null && absDay(state) > q.deadlineAbs) return false;
+  const previous = q.chartOpportunity ? snapshotChartQuestChange() : null;
   if (success) {
     if (!q.pirateKind) awardQuestNationalPower(q);
     resolvePirateRelations(q);
-    payQuestFunds(q);
+    payQuestFunds(q, q.reward || 0, !previous);
     if (q.rewardFame) state.fame += q.rewardFame;
     state.quests.active.splice(idx, 1);
+    if (previous) {
+      if (!commitChartQuestChange(previous)) return false;
+      const chart = state.expansion.charts.active.find(chart => chart.id === q.rewardFragment?.chartId);
+      if (chart) announceFragment(chart, "依頼報酬");
+    }
     const rewards = [];
     if (q.rewardFragment) rewards.push(`${chartLabel(q.rewardFragment)}の断片+1`);
     if (q.reward) rewards.push(`資金+${q.reward}`);
@@ -1474,6 +1494,10 @@ export function completeHuntBattleQuest(id, success, reason = "") {
     enqueueQuestResult("討伐達成", q, [{ id: "funds", label: "資金", value: q.reward || 0 }, { id: "fame", label: "名声", value: q.rewardFame || 0 }]);
   } else {
     state.quests.active.splice(idx, 1);
+    if (previous) {
+      syncChartReservations();
+      if (!commitChartQuestChange(previous)) return false;
+    }
     const note = reason ? ` / ${reason}` : "";
     pushLog("討伐失敗", `${q.title}${note}`, "-");
     pushToast("討伐失敗", `${q.title}${note}`, "bad");
@@ -1773,6 +1797,7 @@ export function questTickDay(days = 1) {
       state.quests.active = state.quests.active.filter(
         (q) => !(q.deadlineAbs != null && now > q.deadlineAbs)
       );
+      if (expired.some(q => q.chartOpportunity)) syncChartReservations();
       expired.forEach((q) => pushToast("依頼失敗", `${q.title} の期限切れ`, "bad"));
     }
     // 依頼は毎季節の1日で全拠点ぶん一括更新する。
@@ -1804,6 +1829,8 @@ export function completeRefugeeEscortAt(settlement) {
   );
   if (idx === -1) return false;
   const q = state.quests.active[idx];
+  if (q.deadlineAbs != null && absDay(state) > q.deadlineAbs) return false;
+  const previous = typeof q.refugeeFragmentReward === "boolean" ? snapshotChartQuestChange() : null;
   const factionId = settlement.factionId || "pirates";
   recordVoyage(state, "refugeesRescued", q.refugeeCount);
   state.fame += 4;
@@ -1812,10 +1839,15 @@ export function completeRefugeeEscortAt(settlement) {
   if (settlement.nobleId) adjustNobleFavor(settlement.nobleId, 3);
   state.quests.active.splice(idx, 1);
   state.refugeeEscort = { active: false, targetId: null, factionId: null, nobleId: null };
-  const rewardText = "名声+4 / 支持が上昇";
+  const fragment = q.refugeeFragmentReward === true ? awardExplorationFragment("難民護送の謝礼", false) : null;
+  if (previous && !commitChartQuestChange(previous)) return false;
+  if (fragment) announceFragment(fragment, "難民護送の謝礼");
+  const rewardText = `名声+4 / 支持が上昇${fragment ? ` / ${chartLabel(fragment)}の断片+1` : ""}`;
   pushLog("護送完了", `${q.title} / ${rewardText}`, "-");
   pushToast("護送完了", `${q.title} / ${rewardText}`, "good");
-  enqueueQuestResult("護送完了", q, [{ id: "fame", label: "名声", value: 4 }], "支持が上昇");
+  const rewards = [{ id: "fame", label: "名声", value: 4 }];
+  if (fragment) rewards.push({ id: "chart", label: `${chartLabel(fragment)}の断片`, value: 1 });
+  enqueueQuestResult("護送完了", q, rewards, "支持が上昇");
   return true;
 }
 

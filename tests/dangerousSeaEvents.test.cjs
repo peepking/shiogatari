@@ -59,6 +59,11 @@ async function main() {
   assert.equal(rules.dangerousSeaEventOutcome(bell, "listen", 0).complete, false);
   bell.progress = 1; assert.equal(rules.dangerousSeaEventOutcome(bell, "descend", 0).reward.funds, 0);
   bell.progress = 2; assert.equal(rules.dangerousSeaEventOutcome(bell, "answer", 0).reward.funds, 2200);
+  assert.equal(rules.dangerousSeaEventOutcome(bell, "answer", 0).reward.fragment, true);
+  bell.accidentRoll = 0;
+  assert.equal(rules.dangerousSeaEventOutcome(bell, "answer", 0).reward.fragment, true, "事故でも断片を失わない");
+  const oldBell = plain(bellData); delete oldBell.active.se.rewards.answer.fragment;
+  assert.equal(rules.normalizeDangerousSeaEvents(oldBell).active.se.rewards.answer.fragment, undefined, "旧保存の固定報酬へ断片を遡及追加しない");
   assert.equal(rules.closeDangerousSeaEvent(bellData, bell.id, 120004), true);
   assert.equal(rules.closeDangerousSeaEvent(bellData, bell.id, 120004), false, "履歴へ二重移動しない");
   assert.equal(bellData.history.length, 1);
@@ -95,8 +100,13 @@ function verifyGhostFleet(rules, config, point, enemy) {
   }
   const guide = rules.dangerousSeaEventOutcome(event, "guide", 0), cargo = rules.dangerousSeaEventOutcome(event, "take_cargo", 0);
   assert.equal(guide.reward.fame, 15); assert.equal(guide.complete, true); assert.equal(guide.accident, true);
+  assert.equal(guide.reward.fragment, true, "船団の案内でも断片を得る");
   assert.deepEqual(plain(guide.reward.supplies), { wood: 3, fiber: 2, salt: 1 });
-  assert.deepEqual(plain(cargo.reward), { funds: 2100, fame: 0, supplies: { spice: 2, textile: 1 }, troops: {} });
+  assert.deepEqual(plain(cargo.reward), { funds: 2100, fame: 0, supplies: { spice: 2, textile: 1 }, troops: {}, fragment: true });
+  for (const fragment of [1, null, "true"]) {
+    const invalid = plain(data); invalid.active.sw.rewards.guide.fragment = fragment;
+    assert.equal(rules.normalizeDangerousSeaEvents(invalid).active.sw, null, "不正な断片フラグを復元しない");
+  }
   for (const [scouts, threshold] of [[0, .15], [1, .1275], [4, .1275], [5, .09], [9, .09], [10, .045]]) {
     event.accidentRoll = threshold - .00001; assert.equal(rules.dangerousSeaEventOutcome(event, "guide", scouts).accident, true);
     event.accidentRoll = threshold + .00001; assert.equal(rules.dangerousSeaEventOutcome(event, "guide", scouts).accident, false);

@@ -39,10 +39,11 @@ function eventSlots(data, kind) { return kind === "storm_aftermath" ? data.storm
 function normalizeReward(raw) {
   const fame = raw?.fame === undefined ? 0 : raw.fame;
   if (!raw || !integer(raw.funds) || !integer(fame) || !raw.supplies || !raw.troops) return null;
+  if (raw.fragment !== undefined && typeof raw.fragment !== "boolean") return null;
   for (const [group, ids] of [[raw.supplies, supplyIds], [raw.troops, troopIds]]) {
     if (typeof group !== "object" || Array.isArray(group) || Object.entries(group).some(([id, qty]) => !ids.has(id) || !integer(qty))) return null;
   }
-  return { funds: raw.funds, fame, supplies: { ...raw.supplies }, troops: { ...raw.troops } };
+  return { funds: raw.funds, fame, supplies: { ...raw.supplies }, troops: { ...raw.troops }, ...(raw.fragment === true ? { fragment: true } : {}) };
 }
 
 /** 既存編成の上限と専用参照だけを復元し、物語や他の賞金首の参照を持ち込まない。 @param {*} raw 保存値。 @param {object} event 地点。 @returns {object|null} 固定遭遇。 */
@@ -170,7 +171,7 @@ export function closeDangerousSeaEvent(data, id, now, reason = "complete") {
 
 /**
  * 固定乱数と選択時の斥候から結果を一度確定する。積荷と救助は排他的、事故では資金・物資を半減し兵を減らさない。
- * 段階イベントは一日ずつ順に進み、最後だけ報酬を得る。亡霊船団の固有事故は最終段階だけ判定し、名声は減らさない。
+ * 段階イベントは一日ずつ順に進み、最後だけ報酬を得る。亡霊船団の固有事故は最終段階だけ判定し、名声・海図断片は減らさない。
  * @param {object} event 地点。 @param {string} choice 選択。 @param {number} scouts 斥候段階。
  * @returns {object|null} 保存する固定結果。
  */

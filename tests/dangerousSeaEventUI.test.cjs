@@ -29,6 +29,10 @@ async function main() {
     "map.js": { snapshotWorld: () => ({}), restoreWorld() {} },
     "dom.js": { elements: { battleBlock: { hidden: true }, battleResultModal: { hidden: true } }, pushToast() {}, pushLog: (...args) => logs.push(args) },
     "events.js": { enqueueEvent: event => state.eventQueue.push(event) },
+    "chartWorld.js": {
+      awardExplorationFragment: () => { if (state.expansion.charts.full) return null; state.expansion.charts.fragmentCount++; return { id: 1 }; },
+      announceFragment() {},
+    },
     "outfitting.js": { snapshotOutfitting: () => ({ scouts }) },
     "troops.js": { TROOP_STATS: { marine: { name: "海兵" }, scout: { name: "斥候" }, medic: { name: "衛生兵" } },
       addTroops: (id, level, qty) => { state.troops[id] ||= {}; state.troops[id][level] = (state.troops[id][level] || 0) + qty; }, formatTroopDisplay: () => ({ total: Object.values(state.troops).flatMap(Object.values).reduce((sum, qty) => sum + qty, 0), cap: 30 }) },
@@ -75,7 +79,7 @@ async function main() {
     saves = 0; failAt = 0; days = 0; scouts = 0; newHazard = null; logs.length = 0;
     Object.assign(state, { year: 1000, season: 0, day: 1, position: { x: 0, y: 49 }, modeLabel: mode.NORMAL, pendingEncounter: { active: false },
       funds: 0, fame: 0, troops: {}, supplies: {}, voyageStats: { income: 0, refugeesRescued: 0, peaks: { fame: 0 } }, wanted: {}, eventQueue: [],
-      expansion: { fishing: {}, exploration: {}, charts: {} }, dangerousSeas: { nextActionId: 1, action: null, pendingHazard: null, events: rules.createDangerousSeaEvents() } });
+      expansion: { fishing: {}, exploration: {}, charts: { fragmentCount: 0 } }, dangerousSeas: { nextActionId: 1, action: null, pendingHazard: null, events: rules.createDangerousSeaEvents() } });
     let roll = 0;
     return rules.spawnDangerousSeaEvent(state.dangerousSeas.events, regionId, kind, [{ x: 0, y: 49, level: "outer", travelDays: 2 }], 120001,
       () => ({ formation: [{ type: "pirate_spear", count: 10, level: 2 }] }), () => ++roll === 3 ? variant : 0.9);
@@ -217,6 +221,7 @@ async function main() {
     assert.match(state.eventQueue[0].body, index < 2 ? /調査/ : /品/, "本文で調査継続と最後の回収を段階に合わせて示す");
     assert.equal(choose(event.id, choice), true);
     assert.equal(state.day, index + 2); assert.equal(state.funds, index === 2 ? 2200 : 0);
+    assert.equal(state.expansion.charts.fragmentCount, index === 2 ? 1 : 0, "鐘は最後にだけ断片を付与する");
     assert.equal(choose(event.id, "ack"), true);
     if (index < 2) { event = state.dangerousSeas.events.active.se; assert.equal(event.progress, index + 1); }
   }
@@ -244,6 +249,7 @@ async function main() {
       assert.equal(state.day, index + 2, "中断・再読込で日数を重ねない");
       assert.equal(state.fame, index === 2 && finalChoice === "guide" ? 15 : 0);
       assert.equal(state.voyageStats.peaks.fame, state.fame);
+      assert.equal(state.expansion.charts.fragmentCount, index === 2 ? 1 : 0, "両結末・事故・再開でも断片は最後に一度だけ得る");
       if (index < 2) {
         assert.equal(state.funds, 0); assert.deepEqual(plain(state.supplies), {});
         assert.equal(state.dangerousSeas.events.pending.accident, false);
@@ -272,13 +278,21 @@ async function main() {
     event = ghostFinal(); open(event); failAt = saves + offset;
     assert.equal(choose(event.id, "guide"), offset !== 1);
     assert.equal(state.fame, 0); assert.equal(state.voyageStats.peaks.fame, 0); assert.deepEqual(plain(state.supplies), {});
+    assert.equal(state.expansion.charts.fragmentCount, 0, "保存失敗時は断片も巻き戻す");
     failAt = 0;
     if (offset === 1) choose(event.id, "guide"); else ui.resumeDangerousSeaEvent();
     assert.equal(state.day, 4); assert.equal(state.fame, 15); assert.equal(state.voyageStats.peaks.fame, 15);
     ui.resumeDangerousSeaEvent(); assert.equal(state.fame, 15); assert.equal(choose(event.id, "take_cargo"), false);
+    assert.equal(state.expansion.charts.fragmentCount, 1, "保存再試行と再表示で断片を重ねない");
     choose(event.id, "ack");
   }
   // 斥候情報は段階に応じて保持し、途中辞退・期限後の再訪では追加日数や報酬を得ない。
+  event = ghostFinal(); state.expansion.charts.full = true; open(event); choose(event.id, "guide");
+  assert.equal(state.expansion.charts.fragmentCount, 0);
+  assert.equal(state.fame, 15, "断片の空きがなくても他の最終報酬を受け取る");
+  assert.match(state.eventQueue[0].body, /断片を受け取れる空きがありません/);
+  assert.equal(state.eventQueue[0].resources.some(resource => resource.id === "chart"), false, "受け取れなかった断片を獲得結果へ表示しない");
+
   for (const [tier, clue] of [[0, /古い帆影/], [1, /現代では使われない旗/], [5, /水先案内/], [10, /生きた乗員/]]) {
     event = prepare("ghost_fleet"); event.hintTier = tier; open(event); assert.match(state.eventQueue[0].body, clue);
   }

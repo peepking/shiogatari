@@ -60,7 +60,7 @@ export function syncChartReservations() {
 }
 
 /** @param {object} offer 予告。 @returns {object|null} 完成地点を内部固定した割当先。 */
-function allocate(offer) {
+export function allocateChart(offer) {
   const data = state.expansion.charts;
   if (!canAssignChart(data, offer)) return null;
   const current = data.active.find(c => c.size === offer.size);
@@ -68,11 +68,11 @@ function allocate(offer) {
 }
 
 /**
- * 候補生成時だけ資金から断片への置換を抽選する。候補段階では海図枠を予約しない。
- * @param {object} quest 依頼。 @returns {void}
+ * 候補生成時だけ資金から断片への置換を抽選する。確定報酬の追加依頼は抽選を省く。候補段階では海図枠を予約しない。
+ * @param {object} quest 依頼。 @param {boolean} [guaranteed=false] 断片確定報酬か。 @returns {void}
  */
-export function offerQuestFragment(quest) {
-  if (!quest || !(quest.reward > 0) || quest.rewardFragment || Math.random() >= CONFIG.questFragmentChance) return;
+export function offerQuestFragment(quest, guaranteed = false) {
+  if (!quest || !(quest.reward > 0) || quest.rewardFragment || (guaranteed !== true && Math.random() >= CONFIG.questFragmentChance)) return;
   const offer = chooseChart(state.expansion.charts);
   if (!offer) return;
   quest.rewardFragment = offer;
@@ -87,7 +87,7 @@ export function offerQuestFragment(quest) {
 export function reserveQuestFragment(quest) {
   if (!quest.rewardFragment) return true;
   syncChartReservations();
-  const chart = allocate(quest.rewardFragment);
+  const chart = allocateChart(quest.rewardFragment);
   if (!chart) {
     pushToast("受注できません", "予告された海図の断片枠が埋まっているか、その海図は終了しています。", "warn");
     return false;
@@ -113,12 +113,14 @@ export function announceFragment(chart, source) {
 
 /**
  * 依頼の資金報酬だけを置き換える。断片予約は一度だけ消費し、その他の報酬は呼び出し元が付与する。
- * @param {object} quest 依頼。 @param {number} [funds] 通常の資金報酬。 @returns {number} 実際の資金報酬。
+ * @param {object} quest 依頼。 @param {number} [funds] 通常の資金報酬。
+ * @param {boolean} [notify=true] 断片の取得通知も行うか。
+ * @returns {number} 実際の資金報酬。
  */
-export function payQuestFunds(quest, funds = quest.reward || 0) {
+export function payQuestFunds(quest, funds = quest.reward || 0, notify = true) {
   if (!quest.rewardFragment) { receiveFunds(state, funds); return funds; }
   const chart = state.expansion.charts.active.find(c => c.id === quest.rewardFragment.chartId);
-  if (claimFragment(chart, "quest", quest.id)) announceFragment(chart, "依頼報酬");
+  if (claimFragment(chart, "quest", quest.id) && notify) announceFragment(chart, "依頼報酬");
   quest.reward = 0;
   return 0;
 }
@@ -132,19 +134,24 @@ export function awardBattleFragment(questId) {
   if (Math.random() >= CONFIG.battleFragmentChance) return null;
   syncChartReservations();
   const offer = chooseChart(state.expansion.charts);
-  const chart = offer && allocate(offer);
+  const chart = offer && allocateChart(offer);
   if (!chart || !claimFragment(chart, "battle")) return null;
   announceFragment(chart, "戦闘報酬");
   return chart;
 }
 
-/** @returns {object|null} 探索時に当選済みの断片を未予約枠へ付与する。 */
-export function awardExplorationFragment() {
+/**
+ * 探索・イベントで確定済みの断片を未予約枠へ付与する。保存を伴う呼び出し元は確定後に通知する。
+ * @param {string} [source="探索報酬"] 入手元の表示名。
+ * @param {boolean} [notify=true] 取得通知も行うか。
+ * @returns {object|null} 断片を付与した海図。
+ */
+export function awardExplorationFragment(source = "探索報酬", notify = true) {
   syncChartReservations();
   const offer = chooseChart(state.expansion.charts);
-  const chart = offer && allocate(offer);
+  const chart = offer && allocateChart(offer);
   if (!chart || !claimFragment(chart, "exploration")) return null;
-  announceFragment(chart, "探索報酬");
+  if (notify) announceFragment(chart, source);
   return chart;
 }
 
@@ -183,7 +190,7 @@ export function handleChartPurchase(action) {
   }
   if (state.funds < settings.price) { enqueueEvent({ title: "資金不足", body: "購入資金が足りません。資金は消費していません。" }); return true; }
   if (payload.genuine) {
-    const chart = allocate(payload.offer);
+    const chart = allocateChart(payload.offer);
     if (!chart || !claimFragment(chart, payload.source)) return true;
     spendFunds(state, settings.price, "trade");
     announceFragment(chart, payload.source === "sailor" ? "海図売りからの購入" : "古文書商からの購入");
@@ -224,7 +231,7 @@ export function rollChartRumor(settlement) {
   syncChartReservations();
   const offer = chooseChart(data, true);
   if (!offer) return;
-  const chart = allocate(offer);
+  const chart = allocateChart(offer);
   if (!chart) return;
   const position = choosePosition(settlement.coords, offer.kind, true);
   if (!position) { syncChartReservations(); return; }

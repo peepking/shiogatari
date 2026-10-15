@@ -92,7 +92,9 @@ async function main() {
   const encounterState={position:{x:0,y:0},fame:0,warLedger:{entries:[]}};
   let relation="peace", builtFaction=null, rescued=null;
   const encounterMath=Object.create(Math);encounterMath.random=()=>0.99;
+  const chartConfig = await load("expansionConfig.js"); await chartConfig.evaluate();
   const encounterContext=vm.createContext({state:encounterState,Math:encounterMath,wantedFaction:()=>null,
+    CHART_CONFIG: chartConfig.namespace.CHART_CONFIG,
     canRollPursuit:()=>false,hunterTier:()=>null,absDay:()=>120001,
     settlements:[{id:"enemyTown",factionId:"north",coords:{x:1,y:0}}],
     FACTIONS:[{id:"north",name:"North"},{id:"pirates",name:"Pirates"}],
@@ -117,6 +119,16 @@ async function main() {
   vm.runInContext('handleMerchantAction({type:"merchant_rescue_help",payload:{enemyFactionId:"north",nobleId:"n"}})',encounterContext);
   assert.equal(rescued.enemyFactionId,"pirates");
   assert.equal(rescued.eventContext.nobleId,"n");
+  for (const [roll, expected] of [[0, true], [.199999, true], [.2, false], [.99, false]]) {
+    encounterMath.random = () => roll;
+    vm.runInContext('handleMerchantAction({type:"merchant_rescue_help",payload:{}})', encounterContext);
+    assert.equal(rescued.eventContext.chartFragment, expected, "救助謝礼の当選率は20%");
+    encounterContext.savedRescue = JSON.parse(JSON.stringify(rescued.eventContext));
+    encounterMath.random = () => assert.fail("保存済みの救助謝礼を再抽選しない");
+    vm.runInContext('handleMerchantAction({type:"merchant_rescue_help",payload:savedRescue})', encounterContext);
+    assert.equal(rescued.eventContext.chartFragment, expected);
+  }
+  encounterMath.random = () => .99;
   encounterContext.canRollPursuit = () => true;
   encounterContext.hunterTier = () => ({ chance: 1, min: 110, max: 160 });
   encounterContext.wantedFaction = () => "north";

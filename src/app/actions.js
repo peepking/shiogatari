@@ -659,6 +659,7 @@ export function triggerWarAction(kind) {
 
 /**
  * 行商人関連の移動イベントを処理する。
+ * 救助の断片は成功時20%の追加謝礼として戦闘前に当落を固定し、再開時は保存した結果を使う。
  * @param {object} action
  * @returns {boolean}
  */
@@ -671,7 +672,7 @@ function handleMerchantAction(action) {
         source: "merchant",
         title: "行商人との取引",
         note: "購入専用の取引です。",
-        deals: deals.map((d) => ({
+        deals: deals.map((d) => d.chartSource === "trader" ? { ...d, chartOffer: { ...d.chartOffer } } : ({
           id: d.id,
           name: SUPPLY_ITEMS.find((i) => i.id === d.id)?.name || d.id,
           price: d.price ?? Math.max(1, Math.round((d.cost || 0) / Math.max(1, d.qty || 1))),
@@ -697,6 +698,8 @@ function handleMerchantAction(action) {
     }
     case "merchant_rescue_help": {
       const ctx = action.payload || {};
+      // 救助の謝礼に含む断片の当落を戦闘前に固定し、準備の再表示や保存復元で抽選し直さない。
+      ctx.chartFragment ??= Math.random() < CHART_CONFIG.merchantRescueFragmentChance;
       startTravelEncounter({
         forceStrength: "elite",
         enemyFactionId: "pirates",
@@ -1173,6 +1176,8 @@ function enqueueMerchantEvent(terrain) {
   // 海/浅瀬でなくても発生するようにし、地形は参考文言のみ
   const info = nearestSettlementInfo();
   const deals = pickDeals();
+  const chartDeal = createChartTradeDeal("trader");
+  if (chartDeal) deals.push(chartDeal);
   enqueueEvent({
     title: "行商人との遭遇",
     body: `${travelTerrainName(terrain)}で行商人と遭遇しました。襲撃すれば戦利品を狙えますが、戦闘になり、手配や近隣との関係悪化を招きます。`,
@@ -1199,7 +1204,7 @@ function enqueueMerchantRescueEvent(terrain) {
   const info = nearestSettlementInfo();
   enqueueEvent({
     title: "行商人救助",
-    body: `${travelTerrainName(terrain)}で襲撃を受けた行商人を発見しました。救助には手強い海賊との戦いが待っていますが、勝てば謝礼と近隣の信頼を得られそうです。弱った行商人を襲えば戦利品を狙えますが、手配や関係悪化を招きます。`,
+    body: `${travelTerrainName(terrain)}で襲撃を受けた行商人を発見しました。救助には手強い海賊との戦いが待っていますが、勝てば謝礼と近隣の信頼を得られそうです。救助成功時は${CHART_CONFIG.merchantRescueFragmentChance * 100}%で、謝礼に海図の断片1枚が加わります。弱った行商人を襲えば戦利品を狙えますが、手配や関係悪化を招きます。`,
     actions: [
       {
         id: "help",
@@ -1458,10 +1463,10 @@ function checkRefugeeEscortArrival() {
   if (!state.refugeeEscort?.active || !state.refugeeEscort.targetId) return;
   const here = getCurrentSettlement();
   if (here?.id !== state.refugeeEscort.targetId) return;
-  completeRefugeeEscortAt(here);
-  clearEscort();
+  if (completeRefugeeEscortAt(here)) clearEscort();
 }
 import { rollChartRumor, rollChartMerchant, enqueueChartMerchant, handleChartPurchase } from "../exploration/chartWorld.js";
+import { createChartTradeDeal } from "../exploration/chartTrade.js";
 import { onPirateStoryEntry } from "../pirates/pirateKingWorld.js";
 import { CHART_CONFIG } from "../core/expansionConfig.js";
 import { awardShips } from "../fleet/fleet.js";

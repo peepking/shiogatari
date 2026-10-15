@@ -194,10 +194,12 @@ async function main() {
   const theft = await loadPursuitDependency("./settlementCrime.js"); await theft.evaluate();
   const QUEST_TYPES = Object.fromEntries(["ORACLE_HUNT", "ORACLE_ELITE", "PIRATE_HUNT", "BOUNTY_HUNT",
     "NOBLE_SECURITY", "NOBLE_HUNT", "WAR_DEFEND_RAID", "WAR_ATTACK_RAID", "WAR_SKIRMISH", "WAR_BLOCKADE"].map(id => [id,id]));
-  const routes = ["normal", "armory", "raid", "pursuit", "hunter", "exploration", "bounty", "story_lord", "story_king1", "story_king2", ...Object.keys(QUEST_TYPES)];
+  const routes = ["normal", "merchant_help_hit", "merchant_help_miss", "armory", "raid", "pursuit", "hunter", "exploration", "bounty", "story_lord", "story_king1", "story_king2", ...Object.keys(QUEST_TYPES)];
   for (const route of routes) for (const outcome of ["win", "lose", "draw"]) {
     const quest = { id: 1 };
     const pending = { enemyFactionId: "north", enemyFormation: [{type:"infantry",count:20}], enemyTotal:120 };
+    const merchantHelp = route.startsWith("merchant_help_");
+    if (merchantHelp) Object.assign(pending, { eventTag: "merchant_rescue_help", eventContext: { beneficiaryFactionId: "north", chartFragment: route === "merchant_help_hit" } });
     if (QUEST_TYPES[route]) Object.assign(pending,{questId:1,questType:route,questFightIdx:1});
     if (route === "bounty") pending.bountyId = 1;
     if (route === "exploration") pending.explorationId = 1;
@@ -225,6 +227,8 @@ async function main() {
       SUPPLY_ITEMS:[{id:"food",name:"食料"}],TROOP_STATS:{},BONUS_CAPTURE_EVENT_TAGS:new Set(),
       getPlayerFactionId:()=>"west", calcLosses:()=>({lossProb:0.6}), killedEnemyCount:()=>0,
       calcCaptures:()=>({}),awardBattleFragment:()=>null,absDay:()=>0,
+      awardExplorationFragment: () => { calls.push({ name: "merchantFragment" }); return { kind: "treasure", size: 3 }; }, chartLabel: () => "財宝の隠し場所（3枚）",
+      adjustSupport: record("support"), adjustNobleFavor: record("favor"),
       nationalPowerResources:()=>[],completeBattlePower:()=>[],addWarScore:record("war"),
       completeOracleBattleQuest:record("oracleWin"),failOracleBattleQuest:record("oracleLose"),
       completeHuntBattleQuest:record("hunt"),completeNobleBattleQuest:record("noble"),completeWarBattleQuest:record("front"),
@@ -247,7 +251,8 @@ async function main() {
     }
     assert.equal(calls.filter(c=>c.name==="clear").length,1);
     assert.equal(calls.find(c=>c.name==="summary").args[3],20,"未投入の敵を報酬基準へ含めない");
-    assert.equal(state.funds,outcome==="win"?(route==="raid"?6400:route==="story_king1"?1000:1400):outcome==="lose"?500:1000);
+    assert.equal(state.funds,outcome==="win"?(route==="raid"?6400:route==="story_king1"?1000:merchantHelp?1700:1400):outcome==="lose"?500:1000);
+    assert.equal(calls.filter(call => call.name === "merchantFragment").length, route === "merchant_help_hit" && outcome === "win" ? 1 : 0, "救助の当選断片は勝利時だけ追加し、敗北・引き分け・落選では付与しない");
     if (route === "raid") assert.equal(calls.filter(c => c.name === "war").length, 0);
     assert.equal(state.fame,outcome==="win"?(route==="story_king1"?100:105):outcome==="lose"?95:100);
     if (route.startsWith("story_")) {
@@ -274,11 +279,12 @@ async function main() {
     assert.equal(state.voyageStats.enemyDefeated, 10, "敗走・未投入を撃破数へ含めない");
     assert.equal(state.voyageStats.battles[outcome], 1);
     assert.equal(state.voyageStats.losses.battle, outcome === "win" ? 0 : 6, "救護で生還した兵士は恒久損耗へ含めない");
-    assert.equal(state.voyageStats.income, outcome === "win" ? (route === "raid" ? 5400 : route === "story_king1" ? 0 : 400) : 0);
+    assert.equal(state.voyageStats.income, outcome === "win" ? (route === "raid" ? 5400 : route === "story_king1" ? 0 : merchantHelp ? 700 : 400) : 0);
     assert.equal(state.voyageStats.expenses.other, outcome === "lose" ? 500 : 0);
     const beforeRepeated = JSON.stringify(state);
     vm.runInContext(`processBattleOutcome(${JSON.stringify(outcome)},meta)`,context);
     assert.equal(JSON.stringify(state), beforeRepeated, "結果の再処理で報酬・撃破・戦闘数を増やさない");
+    assert.equal(calls.filter(call => call.name === "merchantFragment").length, route === "merchant_help_hit" && outcome === "win" ? 1 : 0, "救助の結果を再処理しても断片を重ねない");
   }
   await testDangerousOutcomes(raw, voyage.namespace, personnel.namespace, pursuit.namespace);
   console.log("戦後接続: 通常遭遇・依頼・海賊物語・危険海域の襲撃/探索/賞金首/限定イベント、勝敗/引分け/逃走・二重精算防止: 成功");

@@ -11,7 +11,7 @@ export function createExpansionState() {
   return {
     version: 1,
     exploration: { initialized: false, nextId: 1, sites: [], pending: null, lastTickAbs: null },
-    charts: { nextId: 1, active: [], rumorSeasons: {}, merchantSeasons: {}, pending: null },
+    charts: { nextId: 1, active: [], rumorSeasons: {}, merchantSeasons: {}, havenStocks: {}, pending: null },
     outfitting: { slots: OUTFITTING_CONFIG.initialSlots, owned: [], equipped: [null] },
     fishing: createFishingState(),
   };

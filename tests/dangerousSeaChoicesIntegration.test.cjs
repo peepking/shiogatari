@@ -177,6 +177,7 @@ async function main() {
       assert.equal(storage.loadGameFromStorage(), true); eventUI.resumeDangerousSeaEvent(syncViews); syncViews();
       assert.equal(state.eventQueue.length, 1); assert.equal(state.eventQueue[0].actions[0].payload.choice, "ack");
       assert.equal(state.fame, baseFame + (index === 2 && finalChoice === "guide" ? 15 : 0));
+      assert.equal(state.expansion.charts.active.reduce((sum, chart) => sum + chart.fragments, 0), index === 2 ? 1 : 0, "実保存の復元でも断片を一度だけ受け取る");
       assert.ok(state.voyageStats.peaks.fame >= state.fame);
       assert.equal(state.dangerousSeas.events.stormAftermath.sw.id, storm.id);
       assert.equal(eventUI.handleDangerousSeaEventAction({ eventId: ghost.id, choice: "guide" }), false);

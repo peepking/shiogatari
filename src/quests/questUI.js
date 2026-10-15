@@ -64,6 +64,7 @@ export function renderQuestRewards(q) {
   else if (q.reward) resources.push({ id: "funds", label: "資金", value: `+${q.reward}` });
   if (q.rewardFaith) resources.push({ id: "faith", label: q.type?.startsWith("oracle_") ? "信仰（今季の見込み）" : "信仰", value: `+${tideOracleReward(state, q)}` });
   if (q.rewardFame) resources.push({ id: "fame", label: "名声", value: `+${q.rewardFame}` });
+  if (q.refugeeFragmentReward === true) resources.push({ id: "chart", label: "海図の断片（追加謝礼）", value: "+1（空きがある場合）" });
   const power = questPowerRewardHtml(q);
   const pirateLabel = pirateRewardLabel(q);
   return (resources.length ? resourceList(resources) : power ? "" : "報酬は依頼内容を参照") + power + (pirateLabel ? `<div class="tiny">${escapeHtml(pirateLabel)}</div>` : "") + (q.type?.startsWith("oracle_") ? '<div class="tiny">季節が変わると報酬も変動します。</div>' : '');
@@ -274,7 +275,7 @@ export function renderQuestOffer(q, settlement) {
   if (q.battleKind === "grand") notes.push("予備隊あり・戦況への影響2倍");
   const distance = q.type === QUEST_TYPES.DELIVERY && target ? ` / 最短${manhattan(settlement.coords, target.coords)}マス` : "";
   return `<div class="quest-offer-place">${escapeHtml(place + distance)}</div>
-    <div class="quest-offer-title"><b>${escapeHtml(title)}</b></div>
+    <div class="quest-offer-title"><b>${escapeHtml(q.chartOpportunity ? `${title}（海図収集家）` : title)}</b></div>
     <div class="quest-offer-conditions">${renderQuestConditions(q)}</div>
     ${notes.length ? `<div class="quest-offer-impact">${notes.map(escapeHtml).join("<br>")}</div>` : ""}
     ${q.pirateKind ? '<div class="quest-offer-impact">黒ひげの好感度↑ / 対象拠点の支持度・貴族の好感度↓</div>' : ""}
