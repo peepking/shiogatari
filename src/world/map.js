@@ -664,7 +664,7 @@ function drawPin(ctx, pin, pad, cellSize, startX, startY) {
   const detailed = cellSize > MAP_CELL;
   const cx = pad + (pin.x - startX) * cellSize + cellSize * (detailed ? 0.81 : 0.65);
   const cy = pad + (pin.y - startY) * cellSize + cellSize * (detailed ? 0.2 : 0.35);
-  const r = Math.max(3, cellSize * (detailed ? 0.1 : 0.24));
+  const r = Math.max(3, cellSize * (detailed ? 0.13 : 0.24));
   if (typeof drawIllustratedPin === "function" && drawIllustratedPin(ctx, pin, cx, cy, r, detailed)) return;
   ctx.save();
   ctx.fillStyle = pin.color;

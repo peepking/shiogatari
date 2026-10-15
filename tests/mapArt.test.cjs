@@ -554,7 +554,7 @@ async function main() {
     },
   };
   for (const size of [700 / 19, 700 / 9, 700 / 19]) {
-    const radius = Math.max(3, size * 0.1);
+    const radius = Math.max(3, size * 0.13);
     art.symbols.drawIllustratedPin(ctx, { shape: "shield", color: "#aa0000", defenderColor: "#0000aa" }, size * 0.81, size * 0.2, radius, true);
     const [, x, y, width, height] = ctx.calls.at(-1);
     assert.ok(x > 0 && y > 0 && x + width < size && y + height < size, "画像の防衛盾を二つの詳細縮尺ともマス内に収める");

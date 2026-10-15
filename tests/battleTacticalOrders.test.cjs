@@ -70,15 +70,56 @@ async function main() {
   const medic = unit({ role: "support", type: "medic", actionOrder: "hold", x: 0 });
   tick(battlefield([medic, unit({ id: "guard", x: 4 }), enemy({ x: 7 })]));
   assert.equal(medic.x, 0, "待機中の支援兵は前衛を追わない");
-  const cavalry = unit({ traits: ["mounted"], move: 2, x: 0 });
+  const cavalry = unit({ type: "cavalry", traits: ["mounted"], move: 2, x: 0 });
   const guard = unit({ id: "guard", x: 1, y: 1, actionOrder: "hold" });
   const cavalryState = battlefield([cavalry, guard, enemy({ x: 7 })]);
   for (let i = 0; i < 4; i++) tick(cavalryState);
   assert.equal(cavalry.x, 0); assert.equal(cavalry.y, 3);
   tick(cavalryState); assert.equal(cavalry.cavalryReleased, true);
   assert.ok(cavalry.x > 0, "味方が接敵しなくても4tick後に騎兵を投入する");
-  const solo = unit({ traits: ["mounted"], move: 2, x: 0 });
+  const solo = unit({ type: "cavalry", traits: ["mounted"], move: 2, x: 0 });
   tick(battlefield([solo, enemy({ x: 7 })])); assert.equal(solo.cavalryReleased, true);
+
+  for (const side of ["ally", "enemy"]) for (const type of ["cavalry", "cavalier", "raider_cavalry"]) {
+    const ownX = side === "ally" ? 0 : 7, otherX = 7 - ownX;
+    const mounted = unit({ id: "mounted", side, type, traits: ["mounted"], move: 2, x: ownX });
+    const friend = unit({ id: "friend", side, actionOrder: "hold", x: side === "ally" ? 1 : 6, y: 1 });
+    const opponent = unit({ id: "opponent", side: side === "ally" ? "enemy" : "ally", actionOrder: "hold", x: otherX, cooldown: 100 });
+    const opening = battlefield([mounted, friend, opponent]); tick(opening);
+    assert.equal(mounted.tacticalState, type === "cavalry" ? "hold" : "advance", `${side}の${type}は兵種の役割に従って初動を決める`);
+    assert.equal(mounted.x === ownX, type === "cavalry", "重騎兵と略奪騎兵は味方の接敵を待たず実際に移動する");
+
+    const attacker = unit({ id: "attacker", side, type, x: 3, traits: ["mounted"], switchLock: 0 });
+    const near = unit({ id: "near", side: opponent.side, x: 4, actionOrder: "hold" });
+    const rear = unit({ id: "rear", side: opponent.side, role: "ranged", x: 5, actionOrder: "hold" });
+    const targeting = battlefield([attacker, near, rear]); targeting.tick = 1;
+    ai.resolveTacticalAI(targeting);
+    assert.equal(attacker.tacticalTargetMode, type === "cavalry" ? "rear" : "close");
+    const evaluation = { size: 8, seed: 42, tick: 1, strength: item => item.hp };
+    assert.equal(targets.selectBattleTarget(attacker, [near, rear], evaluation).id, type === "cavalry" ? "rear" : "near",
+      "重騎兵と略奪騎兵は健康な後衛より目の前の敵を優先する");
+    rear.hp = 200; attacker.switchLock = 0; targeting.tick++;
+    ai.resolveTacticalAI(targeting);
+    assert.equal(attacker.tacticalTargetMode, type === "cavalier" ? "close" : "opportunity");
+    assert.equal(targets.selectBattleTarget(attacker, [near, rear], evaluation).id, type === "cavalier" ? "near" : "rear",
+      "重騎兵は前線を維持し、略奪騎兵と通常騎兵は弱った敵への好機を使う");
+  }
+  for (const type of ["cavalier", "raider_cavalry"]) {
+    const manual = unit({ type, traits: ["mounted"], actionOrder: "hold", targetOrder: "rear", x: 0 });
+    const friend = unit({ id: "friend", x: 1, y: 1, actionOrder: "hold" });
+    tick(battlefield([manual, friend, enemy({ x: 7 })]));
+    assert.equal(manual.x, 0); assert.equal(manual.tacticalTargetMode, "rear", "前衛用の方針より手動待機・標的を優先する");
+    const injured = unit({ type, traits: ["mounted"], x: 3, morale: 20 });
+    tick(battlefield([injured, enemy({ x: 4 })]));
+    assert.equal(regroup.isRegrouping(injured), true, "前衛を担う騎乗兵も危険時の立て直しを継続する");
+    const reserveCavalry = unit({ id: "reserve-cavalry", type: "cavalry", traits: ["mounted"], move: 2, x: 0 });
+    const mountedFront = unit({ id: "mounted-front", type, traits: ["mounted"], move: 2, x: 3 });
+    const combined = battlefield([reserveCavalry, mountedFront, enemy({ x: 5 })]);
+    tick(combined); assert.equal(reserveCavalry.tacticalState, "hold");
+    for (let i = 0; i < 3 && !reserveCavalry.cavalryReleased; i++) tick(combined);
+    assert.equal(reserveCavalry.cavalryReleased, true,
+      "重騎兵・略奪騎兵の接敵によって通常騎兵を4tickより早く投入できる");
+  }
 
   const picker = unit({ range: 5, actionOrder: "hold", targetOrder: "hp", tacticalTargetMode: "hp", tacticalTargetArea: "lower" });
   const upper = enemy({ id: "upper", x: 4, y: 1, hp: 1 }), lower = enemy({ id: "lower", x: 4, y: 6, hp: 500 });

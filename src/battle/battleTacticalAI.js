@@ -3,25 +3,46 @@ import { isHostileZone, findTacticalPath, movementPriority } from "./battleMovem
 import { initializeTacticalOrders, applyPendingTacticalOrders, tacticalArea, tacticalDistance, TACTICAL_ORDER_RULES } from "./battleTacticalOrders.js";
 import { findRegroupPlan, isRegrouping, regroupEnemies, isRegroupSafe } from "./battleRegroup.js";
 
-/** @param {object} unit 部隊。 @param {Array} units 盤面。 @returns {object} 純粋な標的方針。 */
+/** 騎乗属性とは独立した兵種の戦術方針。重騎兵は近い敵を受け、略奪騎兵は弱った敵への好機も使う。 */
+const TACTICAL_UNIT_POLICIES = Object.freeze({
+  cavalry: Object.freeze({ waitForFront: true, preferRear: true, exploitWeakness: true }),
+  cavalier: Object.freeze({ waitForFront: false, preferRear: false, exploitWeakness: false }),
+  raider_cavalry: Object.freeze({ waitForFront: false, preferRear: false, exploitWeakness: true }),
+});
+
+/**
+ * 兵種IDから初動・標的の方針を返す。未登録兵種は役割に従い、騎乗属性だけで待機させない。
+ * @param {object} unit 部隊。 @returns {object} 戦術方針。
+ */
+function tacticalUnitPolicy(unit) {
+  return Object.hasOwn(TACTICAL_UNIT_POLICIES, unit.type) ? TACTICAL_UNIT_POLICIES[unit.type]
+    : { waitForFront: false, preferRear: unit.role === "ranged", exploitWeakness: true };
+}
+
+/** 手動、自衛、対騎兵、兵種が許す好機、基本方針の順で決める。
+ * @param {object} unit 部隊。 @param {Array} units 盤面。 @returns {object} 純粋な標的方針。
+ */
 function decideTacticalTarget(unit, units) {
   const enemies = regroupEnemies(unit, units);
   const nearby = enemies.filter(enemy => tacticalDistance(unit, enemy) <= Math.max(unit.range, unit.role === "ranged" ? 4 : 3));
+  const policy = tacticalUnitPolicy(unit);
   if (unit.targetOrder !== "auto") return { mode: unit.targetOrder, reason: "手動の攻撃目標" };
   if (unit.role !== "melee" && nearby.some(enemy => enemy.role === "melee" && tacticalDistance(unit, enemy) === 1))
     return { mode: "selfDefense", reason: "接近した敵に対処" };
   if (unit.traits?.includes("antiCavalry") && nearby.some(enemy => enemy.traits?.includes("mounted")))
     return { mode: "antiCavalry", reason: "騎乗兵を迎撃" };
-  if (nearby.some(enemy => enemy.hp / Math.max(1, enemy.maxHp) <= TACTICAL_ORDER_RULES.opportunityHp
+  if (policy.exploitWeakness && nearby.some(enemy => enemy.hp / Math.max(1, enemy.maxHp) <= TACTICAL_ORDER_RULES.opportunityHp
     || enemy.morale <= TACTICAL_ORDER_RULES.opportunityMorale)) return { mode: "opportunity", reason: "崩れかけた敵を狙う" };
-  return { mode: unit.role === "ranged" || unit.traits?.includes("mounted") ? "rear" : "close", reason: "兵種に合わせて攻撃" };
+  return { mode: policy.preferRear ? "rear" : "close", reason: "兵種に合わせて攻撃" };
 }
 
-/** @param {object} unit 部隊。 @param {object} state 戦場。 @returns {object} 通常の進軍・待機。 */
+/** 手動指示を優先し、通常騎兵だけ接敵を待つ。前衛は射程内で待機し、射程外へ進軍する。
+ * @param {object} unit 部隊。 @param {object} state 戦場。 @returns {object} 通常の進軍・待機。
+ */
 function decideTacticalAction(unit, state) {
   const enemies = regroupEnemies(unit, state.units);
   if (unit.actionOrder !== "auto") return { action: unit.actionOrder === "regroup" ? "withdrawing" : unit.actionOrder, reason: "手動の行動指示" };
-  if (unit.traits?.includes("mounted") && !unit.cavalryReleased) {
+  if (tacticalUnitPolicy(unit).waitForFront && !unit.cavalryReleased) {
     const friends = state.units.filter(friend => friend.side === unit.side && friend.id !== unit.id && friend.role === "melee"
       && isBattleActive(friend) && !friend.arriving && !isRegrouping(friend));
     const engaged = friends.some(friend => enemies.some(enemy => enemy.role === "melee"

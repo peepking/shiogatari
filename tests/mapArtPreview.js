@@ -94,7 +94,7 @@ function drawNativeMapSample(ctx, kind, x, y, size, crowded = false) {
   else if (["rumor", "altar", "inlet", "treasure"].includes(kind)) drawChartSite(ctx, kind, x, y, size, true);
   else if (kind === "bounty") drawBountySite(ctx, x, y, size, true);
   else if (kind === "pirateLord" || kind === "pirateKing") drawPirateStorySite(ctx, { id: kind === "pirateKing" ? "olav" : "lord" }, x, y, size, true);
-  else if (["star", "shield"].includes(kind)) drawIllustratedPin(ctx, { shape: kind, color: "#d8b76e", defenderColor: "#75b9d7" }, x + size * 0.81, y + size * 0.2, Math.max(3, size * 0.1), true);
+  else if (["star", "shield"].includes(kind)) drawIllustratedPin(ctx, { shape: kind, color: "#d8b76e", defenderColor: "#75b9d7" }, x + size * 0.81, y + size * 0.2, Math.max(3, size * 0.13), true);
   else if (["fish", "bell", "storm", "lantern", "sinkingShip"].includes(kind)) {
     const event = { fish: "fish_migration", bell: "seabed_bell", storm: "storm_aftermath", lantern: "fog_light", sinkingShip: "sinking_treasure" };
     drawDangerousSeaEvent(ctx, { kind: event[kind] }, x, y, size, true);
