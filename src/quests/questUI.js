@@ -1,4 +1,6 @@
 import { tideOracleReward } from "../faith/tideAlliance.js";
+import { fishOffering } from "./oracleExpansion.js";
+import { confirmExpandedOracle } from "./oracleUI.js";
 import { pirateRewardLabel } from "../pirates/pirateEconomy.js";
 import { wantedFacilityReason } from "../wanted/wantedPolicy.js";
 import { getCurrentSettlement } from "../app/actions.js";
@@ -150,6 +152,16 @@ function buildPlaceLabel(q, ctx) {
       return `神託 敵を討伐 ${formatCoords(q.target)}`;
     case QUEST_TYPES.ORACLE_ELITE:
       return `神託 精鋭を討伐 ${formatCoords(q.target)}`;
+    case QUEST_TYPES.ORACLE_FISH:
+      return "神託 釣果を捧げよ";
+    case QUEST_TYPES.ORACLE_SHARE:
+      return `${formatSettlement(target)}へ食料を届ける`;
+    case QUEST_TYPES.ORACLE_PILGRIMAGE:
+      return (q.visits || []).map(visit => `${visit.name}${formatCoords(visit.target)}`).join(" / ");
+    case QUEST_TYPES.ORACLE_EXPLORE:
+      return `漂流物を探索 ${formatCoords(q.target)}`;
+    case QUEST_TYPES.ORACLE_SUPPORT:
+      return `${formatSettlement(target)}の潮盟を支援`;
     case QUEST_TYPES.PIRATE_HUNT:
     case QUEST_TYPES.BOUNTY_HUNT:
       return `討伐 ${formatCoords(q.target)}`;
@@ -299,7 +311,7 @@ export function renderQuestUI(syncUI) {
           ? (q.fights || []).find((f) => !f.done)?.estimatedTotal
           : null;
       const estText = buildEstimateText(q);
-      const typeLabel = q.pirateKind ? "海賊依頼" : TYPE_LABEL[q.type] || "";
+      const typeLabel = q.pirateKind ? "海賊依頼" : q.type?.startsWith("oracle_") ? "神託" : TYPE_LABEL[q.type] || "";
       const placeLabel = buildPlaceLabel(q, {
         origin,
         target,
@@ -309,7 +321,8 @@ export function renderQuestUI(syncUI) {
         blockadeEstimate,
         estText,
       });
-      const progress = getQuestProgress(q, state, { now, canFinish: canCompleteQuest(q), origin, target, itemNames: ITEM_NAMES, troopNames: TROOP_NAMES });
+      const progress = getQuestProgress(q, state, { now, canFinish: canCompleteQuest(q), origin, target, itemNames: ITEM_NAMES, troopNames: TROOP_NAMES,
+        fishOwned: q.type === "oracle_fish" ? fishOffering(state, q).owned : 0 });
       const bodyText = buildBodyText(q, itemName, supplyInfo);
       return `
         <div class="sideBlock mb-8 quest-progress-card quest-${progress.status}">
@@ -318,7 +331,8 @@ export function renderQuestUI(syncUI) {
           <span class="quest-status">${progress.statusText}</span>
           <div class="quest-progress-rows">${progress.rows.map(renderProgressRow).join("")}</div>
           <p class="quest-next">${escapeHtml(progress.next)}</p>
-          ${progress.destination ? `<button class="btn quest-location" data-x="${progress.destination.x}" data-y="${progress.destination.y}">${q.type === QUEST_TYPES.DELIVERY ? "配達先を地図で確認" : "目的地を地図で確認"}</button>` : ""}
+          ${q.type === "oracle_pilgrimage" && progress.status !== "expired" ? `<div class="row flex-wrap">${(q.visits || []).filter(visit => !visit.done).map(visit => `<button class="btn quest-location" data-x="${visit.target.x}" data-y="${visit.target.y}">${escapeHtml(visit.name)}を地図で確認</button>`).join("")}</div>`
+    : progress.destination ? `<button class="btn quest-location" data-x="${progress.destination.x}" data-y="${progress.destination.y}">${q.type === QUEST_TYPES.DELIVERY ? "配達先を地図で確認" : "目的地を地図で確認"}</button>` : ""}
           <details class="quest-description"><summary>依頼の詳細・報酬</summary><div class="tiny">${escapeHtml(placeLabel)}</div><div class="tiny">${renderQuestConditions(q)}${escapeHtml(bodyText)}${q.pirateKind ? '<div class="tiny">達成すると黒ひげとの好感度が上がり、対象拠点の支持度・担当貴族の好感度が下がります。</div>' : ""}</div><div class="tiny">${renderQuestRewards(q)}</div></details>
           ${progress.automatic && !progress.ready ? `<div class="tiny quest-auto-note">${progress.automaticLabel}</div>` : `<button class="btn good quest-complete" data-id="${q.id}" ${progress.ready ? "" : "disabled"}>完了して報酬を受取</button>`}
         </div>
@@ -334,6 +348,11 @@ export function renderQuestUI(syncUI) {
     btn.addEventListener("click", () => {
       const id = Number(btn.getAttribute("data-id"));
       if (!id) return;
+      const q = state.quests?.active?.find(quest => quest.id === id);
+      if (q && ["oracle_fish", "oracle_share"].includes(q.type)) {
+        confirmExpandedOracle(q, () => { renderQuestUI(syncUI); syncUI?.(); });
+        return;
+      }
       if (completeQuest(id)) {
         renderQuestUI(syncUI);
         syncUI?.();

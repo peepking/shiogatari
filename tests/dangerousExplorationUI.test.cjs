@@ -24,9 +24,10 @@ async function main() {
   function enemy() { return { formation: [{ type: "infantry", count: 10, level: 3 }], total: 10, strength: "elite" }; }
   const mapData = Array.from({ length: 50 }, () => Array.from({ length: 50 }, () => ({ terrain: "sea", building: "none" })));
   const stubs = {
+    "./oracleExpansion.js": { advanceExpandedOracle: () => ({ changed: false, outcomes: [] }), restoreOracleState: (game, snapshot) => Object.assign(game, snapshot) },
     "./voyageStats.js": { receiveFunds: (game, amount) => { game.funds += amount; } },
     "./state.js": { state }, "./constants.js": { MODE_LABEL: { NORMAL: "normal", PREP: "prep", BATTLE: "battle" } },
-    "./map.js": { mapData, snapshotWorld: () => ({}), restoreWorld: () => true }, "./questUtils.js": { absDay: () => state.day },
+    "./map.js": { mapData, settlements: [], snapshotWorld: () => ({}), restoreWorld: () => true }, "./questUtils.js": { absDay: () => state.day },
     "./time.js": { advanceDayWithEvents: () => { calls.day++; state.day++; if (hazardOnDay) state.dangerousSeas.pendingHazard = { id: 99, kind: "wave", stage: "action_running" }; if (failAfterDay) saveFails = true; return 1; } },
     "./actions.js": { buildEnemyFormation: strength => { calls.normalEnemy++; calls.strength = strength; return { ...enemy(), strength }; }, buildDangerousEnemyFormation: () => { calls.dangerousEnemy++; return enemy(); } },
     "./storage.js": { saveGameToStorage: () => { saveCalls++; return !saveFails && saveCalls !== failSaveAt; } },

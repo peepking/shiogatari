@@ -2,7 +2,10 @@ import { receiveFaith, spendFunds, recordVoyage } from "../core/voyageStats.js";
 import { makePirateQuests, resolvePirateRelations } from "../pirates/pirateQuests.js";
 import { canCompleteAmnesty, completeAmnesty } from "../wanted/amnesty.js";
 import { saveGameToStorage } from "../core/storage.js";
-import { honorSuspensionReason, wantedFacilityReason } from "../wanted/wantedPolicy.js";
+import { honorSuspensionReason, wantedFacilityReason, wantedEntryReason } from "../wanted/wantedPolicy.js";
+import { expandedOracleChoices, makeExpandedOracle, isExpandedOracle, canCompleteExpandedOracle, reconcileExpandedOracles } from "./oracleExpansion.js";
+import { commitExpandedOracle, announceOracleResults } from "./oracleUI.js";
+import { dangerousSeaAt } from "../dangerousSeas/dangerousSeaWorld.js";
 import { tideOracleReward } from "../faith/tideAlliance.js";
 import { pushLog, pushToast } from "../ui/dom.js";
 import { enqueueEvent } from "../app/events.js";
@@ -15,9 +18,10 @@ import {
   getPlayerFactionId,
   getWarEntry,
   getWarScoreLabel,
+  isSettlementUnderSiege,
 } from "../factions/faction.js";
 import { FACTIONS } from "../world/lore.js";
-import { getSettlementAtPosition, getSettlementById, settlements } from "../world/map.js";
+import { getSettlementAtPosition, getSettlementById, settlements, mapData } from "../world/map.js";
 import {
   absDay,
   manhattan,
@@ -48,6 +52,11 @@ const QUEST_TYPES = {
   ORACLE_TROOP: "oracle_troop",
   ORACLE_HUNT: "oracle_hunt",
   ORACLE_ELITE: "oracle_elite",
+  ORACLE_FISH: "oracle_fish",
+  ORACLE_SHARE: "oracle_share",
+  ORACLE_PILGRIMAGE: "oracle_pilgrimage",
+  ORACLE_EXPLORE: "oracle_explore",
+  ORACLE_SUPPORT: "oracle_support",
   PIRATE_HUNT: "pirate_hunt",
   BOUNTY_HUNT: "bounty_hunt",
   REFUGEE_ESCORT: "refugee_escort",
@@ -289,6 +298,7 @@ function generateSeasonQuestsForSettlement(settlement) {
  */
 export function getQuests() {
   ensureState();
+  announceOracleResults(reconcileExpandedOracles(state, settlements));
   return state.quests;
 }
 
@@ -1020,7 +1030,7 @@ export function hasActiveOracle() {
       q.type === QUEST_TYPES.ORACLE_MOVE ||
       q.type === QUEST_TYPES.ORACLE_TROOP ||
       q.type === QUEST_TYPES.ORACLE_HUNT ||
-      q.type === QUEST_TYPES.ORACLE_ELITE
+      q.type === QUEST_TYPES.ORACLE_ELITE || isExpandedOracle(q)
   );
 }
 
@@ -1104,7 +1114,8 @@ export function canReceiveOracle() {
 }
 
 /**
- * 神託を1件受注する（ランダム生成）。
+ * 生成可能な種類から等確率で神託を1件受領する。近傍候補数で種類の重みを増やさない。
+ * 対象と季節枠を一括保存し、保存失敗時は受領前へ戻す。
  * @returns {object|null} 生成した神託（受注できなければnull）
  */
 export function receiveOracle() {
@@ -1112,9 +1123,23 @@ export function receiveOracle() {
   if (!canReceiveOracle()) return null;
   const pool = [genOracleSupply, genOracleMove, genOracleTroop, genOracleHunt];
   if ((state.faith || 0) >= 100) pool.push(genOracleElite);
-  const pick = pool[randInt(0, pool.length - 1)]();
+  const choices = expandedOracleChoices(state, settlements, mapData, {
+    canEnter: settlement => !wantedEntryReason(state, settlement, absDay(state)) && !isSettlementUnderSiege(settlement.id),
+    isDangerous: position => !!dangerousSeaAt(position),
+  });
+  for (const [type, candidates] of Object.entries(choices)) {
+    if (candidates.length) pool.push(() => makeExpandedOracle(type, candidates, absDay(state)));
+  }
+  const previous = structuredClone(state.quests), pick = pool[randInt(0, pool.length - 1)]();
+  if (!pick) return null;
+  if (isExpandedOracle(pick)) pick.id = nextId();
   state.quests.active.push(pick);
   state.quests.lastOracleSeason = { year: state.year, season: state.season };
+  if (!saveGameToStorage()) {
+    state.quests = previous;
+    pushToast("保存できません", "神託の受領を取り消しました。", "warn");
+    return null;
+  }
   pushLog("神託を受領", pick.title, "-");
   pushToast("神託を受領", pick.title, "warn");
   return pick;
@@ -1130,6 +1155,7 @@ export function completeQuest(id) {
   const idx = state.quests.active.findIndex((q) => q.id === id);
   if (idx === -1) return false;
   const q = state.quests.active[idx];
+  if (isExpandedOracle(q)) return commitExpandedOracle(q);
   const here = getSettlementAtPosition(state.position.x, state.position.y);
   if (q.type === "amnesty") {
     const previous = structuredClone({ wanted: state.wanted, supplies: state.supplies, quests: state.quests });
@@ -1303,6 +1329,7 @@ export function completeQuest(id) {
  * @returns {boolean}
  */
 export function canCompleteQuest(q) {
+  if (isExpandedOracle(q)) return canCompleteExpandedOracle(state, q, settlements);
   const here = getSettlementAtPosition(state.position.x, state.position.y);
   if (q.type === "amnesty") return canCompleteAmnesty(state, q, here);
   if (q.type === QUEST_TYPES.SUPPLY) {

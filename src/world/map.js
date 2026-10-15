@@ -505,7 +505,13 @@ function questToPin(q, nowAbs) {
     case QUEST_TYPES.ORACLE_ELITE:
       return [fromTarget(q.target, "bounty")].filter(Boolean);
     case QUEST_TYPES.ORACLE_MOVE:
+    case QUEST_TYPES.ORACLE_EXPLORE:
       return [fromTarget(q.target, "move")].filter(Boolean);
+    case QUEST_TYPES.ORACLE_PILGRIMAGE:
+      return (q.visits || []).filter(visit => !visit.done).map(visit => fromTarget(visit.target, "move")).filter(Boolean);
+    case QUEST_TYPES.ORACLE_SHARE:
+    case QUEST_TYPES.ORACLE_SUPPORT:
+      return [fromSettlementId(q.targetId, "supply", "supply")].filter(Boolean);
     case QUEST_TYPES.SUPPLY:
     case QUEST_TYPES.DELIVERY:
     case QUEST_TYPES.REFUGEE_ESCORT:

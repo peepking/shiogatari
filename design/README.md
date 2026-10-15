@@ -25,6 +25,7 @@ JavaScriptは `src/` の機能別フォルダへ配置する。各フォルダ�
 | 物資価格・交易UI | [物資相場・交易](trade-design.md) |
 | 国力・季節回復・戦争による消耗 | [国力](national-power-design.md) |
 | 現在信仰による恩恵・祈りの余潮 | [信仰による恩恵](faith-design.md) |
+| 魚の奉納・近隣への施し・巡礼・漂流物探索・潮盟支援の神託追加 | [神託の種類追加](oracle-expansion-design.md) |
 | 潮盟拠点の建設・支援・季節信仰・神託補正 | [潮盟拠点](tide-alliance-design.md) |
 | 釣り操作・生息条件・餌・竿・釣果・図鑑 | [釣り詳細](fishing-design.md) |
 | 竿以外の図鑑報酬・漁船 | [釣り図鑑の追加報酬](fishing-rewards.md) |

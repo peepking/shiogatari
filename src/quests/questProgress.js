@@ -45,10 +45,10 @@ function quantityRow(label, owned, required, icon) {
  * 地図で確認する地点は未完了戦闘の先頭を優先し、護送の合流後は帰還先へ切り替える。
  * @param {object} q
  * @param {object} state
- * @param {{now:number,canFinish:boolean,origin:object,target:object,itemNames:object,troopNames:object}} context
+ * @param {{now:number,canFinish:boolean,origin:object,target:object,itemNames:object,troopNames:object,fishOwned:number}} context
  * @returns {object}
  */
-export function getQuestProgress(q, state, { now, canFinish, origin, target, itemNames = {}, troopNames = {} }) {
+export function getQuestProgress(q, state, { now, canFinish, origin, target, itemNames = {}, troopNames = {}, fishOwned = 0 }) {
   const remaining = q.deadlineAbs == null ? null : q.deadlineAbs - now;
   const expired = remaining != null && remaining < 0;
   const rows = [];
@@ -56,7 +56,30 @@ export function getQuestProgress(q, state, { now, canFinish, origin, target, ite
   let automatic = false;
   let destination = null;
   const supply = SINGLE_SUPPLY_TYPES.includes(q.type) || MULTI_SUPPLY_TYPES.includes(q.type);
-  if (supply) {
+  if (q.type === "oracle_fish") {
+    rows.push(quantityRow(q.fishCategory === "common" ? "一般魚（匹）" : "大物（匹）", fishOwned, q.qty));
+    next = rows[0].done ? "売値の安い釣果から奉納して完了できます。" : "要求された分類の魚を釣ってください。魚種は問いません。";
+  } else if (q.type === "oracle_share") {
+    rows.push(quantityRow("食料", state.supplies?.food, q.qty, "food"));
+    destination = target || q.target;
+    next = `${placeName(destination)}の村に入り、食料を分かち与えてください。`;
+  } else if (q.type === "oracle_pilgrimage") {
+    for (const visit of q.visits || []) rows.push({ label: visit.name, done: visit.done, text: visit.done ? "訪問済み" : "未訪問" });
+    destination = q.visits?.find(visit => !visit.done)?.target;
+    automatic = true;
+    next = "指定された2拠点に入ってください。訪問順は問いません。";
+  } else if (q.type === "oracle_support") {
+    rows.push(quantityRow("受領後の寄付資金", q.supportedFunds, q.requiredFunds, "funds"));
+    rows.push(quantityRow("受領後の担い手（人）", q.supportedPeople, q.requiredPeople));
+    destination = target || q.target;
+    automatic = true;
+    next = `${placeName(destination)}の潮盟を支援してください。資金・担い手のどちらかを満たせば達成です。`;
+  } else if (q.type === "oracle_explore") {
+    destination = q.target;
+    automatic = true;
+    rows.push({ label: "漂流物の探索", done: false, text: `戦闘確率${q.danger * 100}%` });
+    next = "指定地点の漂流物を探索してください。戦闘になった場合は勝利が必要です。";
+  } else if (supply) {
     const items = SINGLE_SUPPLY_TYPES.includes(q.type) ? [{ id: q.itemId, qty: q.qty }] : q.items || [];
     for (const item of items) rows.push(quantityRow(itemNames[item.id] || item.id, state.supplies?.[item.id], item.qty, item.id));
     destination = q.type === "oracle_supply" ? null : q.type === "delivery" ? target : origin;
@@ -106,7 +129,8 @@ export function getQuestProgress(q, state, { now, canFinish, origin, target, ite
   return {
     rows, next, ready, automatic,
     destination: !expired && Number.isFinite(position?.x) && Number.isFinite(position?.y) ? { x: position.x, y: position.y } : null,
-    automaticLabel: BATTLE_TYPES.includes(q.type) ? "必要な戦闘すべてに勝利すると自動完了" : "護送先への到着・入場で自動完了",
+    automaticLabel: q.type === "oracle_pilgrimage" ? "2拠点への入場で自動完了" : q.type === "oracle_support" ? "指定拠点で必要な支援を行うと自動完了"
+      : q.type === "oracle_explore" ? "指定の漂流物の探索成功で自動完了" : BATTLE_TYPES.includes(q.type) ? "必要な戦闘すべてに勝利すると自動完了" : "護送先への到着・入場で自動完了",
     status: expired ? "expired" : ready ? "ready" : "active",
     statusText: expired ? "期限切れ" : ready ? "完了できます" : "進行中",
     deadline: remaining == null ? "期限なし" : remaining < 0 ? "期限切れ" : remaining === 0 ? "本日が期限" : `残り${remaining}日`,

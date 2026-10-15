@@ -16,6 +16,8 @@ async function main() {
   const settlements = [origin, destination], state = { currentOracleReward: 45 };
   const types = ["supply", "delivery", "refugee_escort", "oracle_supply", "oracle_move", "oracle_troop", "oracle_hunt", "oracle_elite", "pirate_hunt", "bounty_hunt", "noble_supply", "noble_scout", "noble_security", "noble_refugee", "noble_logistics", "noble_hunt", "war_defend_raid", "war_attack_raid", "war_skirmish", "war_supply", "war_escort", "war_blockade", "war_truce"];
   const stubs = {
+    "./oracleExpansion.js": { fishOffering: () => ({ owned: 0 }) },
+    "./oracleUI.js": { confirmExpandedOracle() {} },
     "./tideAlliance.js": { tideOracleReward: game => game.currentOracleReward },
     "./pirateEconomy.js": { pirateRewardLabel: () => "" },
     "./wantedPolicy.js": { wantedFacilityReason: () => "" },

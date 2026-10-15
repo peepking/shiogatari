@@ -1,7 +1,8 @@
 import { receiveFunds } from "../core/voyageStats.js";
 import { state } from "../core/state.js";
 import { MODE_LABEL } from "../core/constants.js";
-import { mapData, snapshotWorld, restoreWorld } from "../world/map.js";
+import { mapData, settlements, snapshotWorld, restoreWorld } from "../world/map.js";
+import { advanceExpandedOracle, restoreOracleState } from "../quests/oracleExpansion.js";
 import { absDay } from "../quests/questUtils.js";
 import { advanceDayWithEvents } from "../app/time.js";
 import { buildEnemyFormation, buildDangerousEnemyFormation } from "../app/actions.js";
@@ -87,13 +88,20 @@ export function getExplorationAt(position) {
  */
 export function finishExploration(success) {
   if (!currentExplorationPending()) return [];
+  const normalPending = state.expansion.exploration.pending;
+  const oracleProgress = normalPending ? advanceExpandedOracle(state, { kind: "explore", siteId: normalPending.siteId, success }, settlements) : { outcomes: [] };
+  const oracleResources = [];
+  for (const outcome of oracleProgress.outcomes) {
+    pushLog(outcome.title, `${outcome.body}${outcome.faith ? ` / 信仰+${outcome.faith}` : ""}`, "-");
+    if (outcome.faith) oracleResources.push({ id: "faith", label: "神託達成・信仰", value: `+${outcome.faith}` });
+  }
   const staged = dangerousWreckPending(state.dangerousSeas), result = staged ? settleDangerousWreckStage(state.dangerousSeas, success) : null;
   const reward = staged ? result?.reward : state.expansion.exploration.pending ? consumeExploration(state.expansion.exploration, success) : consumeDangerousExploration(state.dangerousSeas, success);
   if (!reward) { finishDangerousSeaAction("exploration"); return []; }
   if (reward.fragment === true) awardExplorationFragment();
   addShips(state, prepareShipReward(reward));
   receiveFunds(state, reward.funds);
-  const resources = [{ id: "funds", label: "探索資金", value: `+${reward.funds}` }];
+  const resources = [{ id: "funds", label: "探索資金", value: `+${reward.funds}` }, ...oracleResources];
   for (const [id, quantity] of Object.entries(result?.losses || {})) {
     const lost = Math.min(quantity, Math.max(0, state.supplies[id] || 0)); state.supplies[id] = Math.max(0, (state.supplies[id] || 0) - lost);
     if (lost) resources.push({ id, label: SUPPLY_ITEMS.find(item => item.id === id)?.name || id, value: `-${lost}` });
@@ -160,10 +168,16 @@ export function resumeExploration(syncUI) {
     state.modeLabel = MODE_LABEL.PREP;
     pushToast("探索中の敵襲", "戦うか、逃走するかを選んでください。", "warn");
   } else {
+    const before = structuredClone(state);
     const resources = finishExploration(true);
     state.modeLabel = MODE_LABEL.NORMAL;
+    if (!saveGameToStorage()) {
+      restoreOracleState(state, before);
+      pushToast("保存できません", "探索報酬と神託の達成を取り消しました。探索を再開して再試行してください。", "warn");
+      syncUI();
+      return;
+    }
     enqueueEvent({ title: "探索完了", body: ["資金と物資を回収しました。", capacityOverflowText()].filter(Boolean).join("\n"), resources });
-    saveGameToStorage();
   }
   syncUI();
 }
