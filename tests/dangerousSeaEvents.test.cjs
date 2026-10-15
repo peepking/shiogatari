@@ -28,6 +28,11 @@ async function main() {
     assert.equal(event.expiresAbs, 120001 + 9 + config.DANGEROUS_SEA_EVENT_DEFS[kind].days + 10);
     assert.equal(rules.spawnDangerousSeaEvent(data, regionId, kind, point, 120001, enemy, sequence([])), null, "同海域の同じ枠を超えない");
     assert.deepEqual(plain(rules.normalizeDangerousSeaEvents(plain(data))), plain(data), `${kind}の正体・報酬・期限を保持`);
+    if (kind !== "ghost_fleet") {
+      const legacy = plain(data), saved = rules.getDangerousSeaEventById(legacy, event.id);
+      for (const reward of Object.values(saved.rewards)) delete reward.fame;
+      assert.deepEqual(plain(rules.normalizeDangerousSeaEvents(legacy)), plain(data), "既存五種の旧報酬は名声0を補い固定内容を保持する");
+    }
   }
   assert.equal(rules.spawnDangerousSeaEvent(rules.createDangerousSeaEvents(), "sw", "seabed_bell", point, 120001, enemy, sequence([])), null);
   const trapData = rules.createDangerousSeaEvents();
@@ -64,8 +69,54 @@ async function main() {
   assert.equal(rules.migrationFishIds(game, "sw", 120001).length, 0);
   assert.equal(rules.migrationFishIds(game, "se", migration.expiresAbs).length, 0, "期限から優遇を終了する");
   verifyIndependentSlots(rules, point, enemy);
+  verifyGhostFleet(rules, config, point, enemy);
   await verifyWorld();
-  console.log("dangerousSeaEvents: 五種・独立枠・旧保存移行・固定結果・期限・斥候・日次一意性の検証成功");
+  console.log("dangerousSeaEvents: 六種・亡霊船団・独立枠・旧保存移行・固定結果・期限・斥候・日次一意性の検証成功");
+}
+
+/** 南西適性、進行順序、事故と名声、旧報酬と破損した選択の復元を検証する。
+ * @param {object} rules 状態処理。 @param {object} config 設定。 @param {object[]} point 候補。 @param {Function} enemy 敵生成。 @returns {void}
+ */
+function verifyGhostFleet(rules, config, point, enemy) {
+  for (const region of ["sw", "se"]) assert.equal(Object.entries(config.DANGEROUS_SEA_EVENT_DEFS)
+    .filter(([id, def]) => id !== "storm_aftermath" && def.regions.includes(region)).length, 4, "両海域とも通常枠は四候補");
+  assert.equal(rules.spawnDangerousSeaEvent(rules.createDangerousSeaEvents(), "se", "ghost_fleet", point, 120001, enemy, sequence([])), null);
+  const data = rules.createDangerousSeaEvents(), event = rules.spawnDangerousSeaEvent(data, "sw", "ghost_fleet", point, 120001,
+    () => assert.fail("亡霊船団で専用敵を生成しない"), sequence([0, 0]));
+  assert.equal(event.expiresAbs, 120001 + 9 + 3 + 10);
+  for (const choice of ["read_signal", "read_logbook"]) {
+    assert.equal(rules.dangerousSeaEventOutcome(event, "guide", 0), null, "最終段階へ飛ばさない");
+    const outcome = rules.dangerousSeaEventOutcome(event, choice, 0);
+    assert.equal(outcome.complete, false); assert.equal(outcome.accident, false, "前二段階は乱数0でも固有事故なし");
+    assert.deepEqual(plain(outcome.reward), { funds: 0, fame: 0, supplies: {}, troops: {} });
+    event.choices.push({ choice, day: 120001 + event.progress }); event.progress++;
+    assert.deepEqual(plain(rules.normalizeDangerousSeaEvents(plain(data))), plain(data));
+    assert.equal(rules.dangerousSeaEventOutcome(event, choice, 0), null, "調査を繰り返さない");
+  }
+  const guide = rules.dangerousSeaEventOutcome(event, "guide", 0), cargo = rules.dangerousSeaEventOutcome(event, "take_cargo", 0);
+  assert.equal(guide.reward.fame, 15); assert.equal(guide.complete, true); assert.equal(guide.accident, true);
+  assert.deepEqual(plain(guide.reward.supplies), { wood: 3, fiber: 2, salt: 1 });
+  assert.deepEqual(plain(cargo.reward), { funds: 2100, fame: 0, supplies: { spice: 2, textile: 1 }, troops: {} });
+  for (const [scouts, threshold] of [[0, .15], [1, .1275], [4, .1275], [5, .09], [9, .09], [10, .045]]) {
+    event.accidentRoll = threshold - .00001; assert.equal(rules.dangerousSeaEventOutcome(event, "guide", scouts).accident, true);
+    event.accidentRoll = threshold + .00001; assert.equal(rules.dangerousSeaEventOutcome(event, "guide", scouts).accident, false);
+  }
+  assert.equal(rules.dangerousSeaEventOutcome(event, "take_cargo", 10).reward.funds, 4200);
+  const legacy = plain(data); delete legacy.active.sw.rewards.guide.fame;
+  assert.equal(rules.normalizeDangerousSeaEvents(legacy).active.sw.rewards.guide.fame, 0, "旧報酬にだけ名声0を補う");
+  for (const fame of [-1, 1.5, null, "15"]) {
+    const invalid = plain(data); invalid.active.sw.rewards.guide.fame = fame;
+    assert.equal(rules.normalizeDangerousSeaEvents(invalid).active.sw, null, "不正な名声を復元しない");
+  }
+  for (const progress of [-1, 4, 1.5]) {
+    const invalid = plain(data); invalid.active.sw.progress = progress;
+    assert.equal(rules.normalizeDangerousSeaEvents(invalid).active.sw, null);
+  }
+  const invalid = plain(data); invalid.active.sw.choices[0].choice = "take_cargo";
+  assert.equal(rules.normalizeDangerousSeaEvents(invalid).active.sw, null, "進行を飛ばした履歴を復元しない");
+  event.choices.push({ choice: "guide", day: 120004 }); event.progress++; event.completed = true;
+  assert.equal(rules.dangerousSeaEventOutcome(event, "take_cargo", 0), null, "完了後に別の報酬を選べない");
+  assert.deepEqual(plain(rules.normalizeDangerousSeaEvents(plain(data))), plain(data));
 }
 
 /** 両枠の共存と独立終了、旧置き土産の各途中段階を再抽選なく移行する。 @param {object} rules 状態処理。 @param {object[]} point 候補。 @param {Function} enemy 敵生成。 @returns {void} */
@@ -76,7 +127,7 @@ function verifyIndependentSlots(rules, point, enemy) {
     const storm = rules.spawnDangerousSeaEvent(data, regionId, "storm_aftermath", [{ ...point[0], x: 1 }], 120001, enemy, () => .9);
     assert.ok(normal && storm, "回遊があっても置き土産を別枠へ生成する");
     assert.equal(rules.migrationFishIds({ dangerousSeas: { events: data } }, regionId, 120001).length, 3, "置き土産で回遊効果を遮らない");
-    assert.equal(rules.spawnDangerousSeaEvent(data, regionId, "sinking_treasure", point, 120001, enemy, sequence([])), null, "通常の四種は一枠を共有する");
+    assert.equal(rules.spawnDangerousSeaEvent(data, regionId, "sinking_treasure", point, 120001, enemy, sequence([])), null, "海域に適合する四種は一枠を共有する");
   }
   assert.equal(rules.activeDangerousSeaEvents(data).length, 4);
   assert.equal(new Set(rules.activeDangerousSeaEvents(data).map(event => event.id)).size, 4);
@@ -186,6 +237,19 @@ async function verifyWorld() {
   state.dangerousSeas.events.pending = { eventId: event.id, regionId: "sw" };
   random = () => 0.99; world.updateDangerousSeaEvents(true); assert.ok(state.dangerousSeas.events.active.sw, "期限中に開始した保留は確認まで残す");
   state.dangerousSeas.events.pending = null; state.day++; world.updateDangerousSeaEvents(true); assert.equal(state.dangerousSeas.events.active.sw, null);
+  // 同じ出現率の四区間から海域に適合する種類を選び、南東へ亡霊船団を生成しない。
+  const rules = cache.get("dangerousSeaEventState.js").namespace;
+  state.dangerousSeas.regions.sw.lastWaveAbs = null; state.dangerousSeas.regions.se.lastWaveAbs = null;
+  for (const regionId of ["sw", "se"]) for (const [index, kind] of ["fog_light", "fish_migration", "sinking_treasure", regionId === "sw" ? "ghost_fleet" : "seabed_bell"].entries()) {
+    state.dangerousSeas.events = rules.createDangerousSeaEvents();
+    state.dangerousSeas.events.lastTickAbs = state.day + 120000 - 1;
+    const draws = [0, (index + .5) / 4, 0, .9];
+    if (kind === "fog_light") draws.push(.9);
+    if (kind === "fish_migration") draws.push(.9, .9, .9);
+    if (regionId === "sw") draws.push(.99); else draws.unshift(.99);
+    random = sequence(draws); world.updateDangerousSeaEvents(true);
+    assert.equal(state.dangerousSeas.events.active[regionId].kind, kind);
+  }
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });

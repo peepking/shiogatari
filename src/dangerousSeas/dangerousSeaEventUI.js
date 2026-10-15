@@ -14,7 +14,7 @@ import { advanceDayWithEvents } from "../app/time.js";
 import { beginDangerousSeaAction, finishDangerousSeaAction, dangerousSeaActionBlocked } from "./dangerousSeaHazards.js";
 import { dangerousSeaAt } from "./dangerousSeaWorld.js";
 import { getDangerousSeaEventAt, visibleDangerousSeaEvents } from "./dangerousSeaEventWorld.js";
-import { DANGEROUS_SEA_EVENT_DEFS as DEFS, dangerousEventScoutRules } from "./dangerousSeaEventConfig.js";
+import { DANGEROUS_SEA_EVENT_DEFS as DEFS, dangerousEventScoutRules, dangerousEventChoices } from "./dangerousSeaEventConfig.js";
 import { closeDangerousSeaEvent, dangerousSeaEventOutcome, getDangerousSeaEventById } from "./dangerousSeaEventState.js";
 
 /** 結果の確認後に現在地の操作を同期する。 */
@@ -39,6 +39,12 @@ function available() {
 
 /** 出来事の様子と、斥候が確認した灯火の正体を表示する。 @param {object} event 地点。 @returns {string} 手掛かり。 */
 function hintText(event) {
+  if (event.kind === "ghost_fleet") {
+    if (event.progress >= 2) return "亡霊船団は、日誌に記された古い灯台の灯りを待っています。";
+    if (event.hintTier >= 10) return "生きた乗員の姿がなく、帰港を求める亡霊船団だと斥候が確認しました。";
+    if (event.progress >= 1 || event.hintTier >= 5) return "船団の旗信号は攻撃ではなく、水先案内を求める合図です。";
+    return event.hintTier >= 1 ? "現代では使われない旗を掲げた船団が見えます。" : "荒波の向こうに古い帆影が並んでいます。";
+  }
   if (event.kind !== "fog_light") return { storm_aftermath: "嵐が運んだ積荷が漂着しています。", sinking_treasure: "沈みかけた船に積荷と乗員が残っています。", seabed_bell: "海底から鐘の音が聞こえます。" }[event.kind] || "";
   if (event.hintTier >= 10) return { rescue: "斥候が救難信号と乗員を確認しました。", trap: "斥候が灯火の陰に潜む海賊船を確認しました。", empty: "斥候の報告では無人船です。" }[event.variant];
   if (event.hintTier >= 5) return event.variant === "trap" ? "灯火の周囲に、不自然に揃った帆影があります。" : "待ち伏せの帆影は見当たりません。";
@@ -54,6 +60,9 @@ function choiceOutlook(event, choice) {
     return "近づけば遭難者や積荷が見つかるかもしれません。灯火が罠なら戦闘になります。";
   }
   if (event.kind === "seabed_bell") return { listen: "音の出どころを探ります。調査はこの先も続きます。", descend: "聖堂に残る手掛かりを探ります。回収には、もう一段階の調査が必要です。", answer: "鐘の主へ応えます。海底に残された品が手に入るかもしれません。" }[choice];
+  if (event.kind === "ghost_fleet") return { read_signal: "古い旗信号の意味を探ります。報酬は最後の選択で得られます。",
+    read_logbook: "旗艦を調べ、船団が目指す港の手掛かりを探します。報酬は最後の選択で得られます。",
+    guide: "灯台の灯りを船上で再現して案内するか、積荷を持ち去るか、片方だけを選べます。" }[choice];
   return "";
 }
 
@@ -61,9 +70,21 @@ function choiceOutlook(event, choice) {
 function rewardResources(reward) {
   if (!reward) return [];
   const resources = reward.funds ? [{ id: "funds", label: "回収資金", value: `+${reward.funds}` }] : [];
+  if (reward.fame) resources.push({ id: "fame", label: "名声", value: `+${reward.fame}` });
   for (const [id, qty] of Object.entries(reward.supplies)) if (qty) resources.push({ id, label: SUPPLY_ITEMS.find(item => item.id === id)?.name || id, value: `+${qty}` });
   for (const [id, qty] of Object.entries(reward.troops)) if (qty) resources.push({ id, label: `救助: ${TROOP_STATS[id]?.name || id} Lv1`, value: `+${qty}人` });
   return resources;
+}
+
+/** 判明済みの物語と調査段階を示し、最終選択では保存済みの両報酬を比較できるようにする。
+ * @param {object} event 亡霊船団の地点。 @returns {string} 選択本文。
+ */
+function ghostFleetBody(event) {
+  const lines = [hintText(event), `調査 ${event.progress + 1}/3（各1日、残り${3 - event.progress}段階）。`];
+  if (event.progress === 2) for (const choice of dangerousEventChoices(event)) {
+    lines.push(`${DEFS[event.kind].choices[choice]}：${rewardResources(event.rewards[choice]).map(resource => `${resource.label} ${resource.value}`).join("・")}`);
+  }
+  return lines.join("\n");
 }
 
 /**
@@ -85,7 +106,7 @@ function beginEvent(syncUI) {
   eventSync = syncUI || eventSync;
   if (pending()) { resumeDangerousSeaEvent(eventSync); return; }
   const event = getDangerousSeaEventAt(state.position);
-  if (!event || event.kind === "fish_migration" || !available() || absDay(state) >= event.expiresAbs) return;
+  if (!event || !dangerousEventChoices(event).length || !available() || absDay(state) >= event.expiresAbs) return;
   const before = structuredClone(state);
   event.discovered = true;
   event.hintTier = Math.max(event.hintTier, dangerousEventScoutRules(snapshotOutfitting(state).scouts).min);
@@ -97,7 +118,7 @@ function beginEvent(syncUI) {
 }
 
 /**
- * 保存済み選択を表示する。鐘の段階と沈没船の救助／積荷は排他的で、未解決の選択画面を閉じて回避できない。
+ * 保存済みの調査段階と排他的な選択を表示する。未解決の選択画面を閉じて回避できない。
  * @returns {boolean} 選択・報告を表示したか。
  */
 export function processDangerousSeaEvent() {
@@ -112,13 +133,15 @@ export function processDangerousSeaEvent() {
       resources: progress.applied ? rewardResources(progress.reward) : [], actions: [{ label: progress.complete ? "航海を再開" : "手掛かりを記録して戻る", type: "dangerous_event_choice", payload: { eventId: event.id, choice: "ack" } }] });
     return true;
   }
-  const choices = event.kind === "seabed_bell" ? [["listen", "descend", "answer"][event.progress]] : Object.keys(def.choices);
-  const body = event.kind === "sinking_treasure" ? "積荷か乗員、片方だけを運び出せます。\n積荷：資金3000・香辛料4・織物3\n救助：資金300・海兵4人・斥候2人"
+  const choices = dangerousEventChoices(event);
+  const body = event.kind === "ghost_fleet" ? ghostFleetBody(event)
+    : event.kind === "sinking_treasure" ? "積荷か乗員、片方だけを運び出せます。\n積荷：資金3000・香辛料4・織物3\n救助：資金300・海兵4人・斥候2人"
     : event.kind === "seabed_bell" ? `海底から鐘の音が響きます。調査 ${event.progress + 1}/3（各1日）。`
       : hintText(event);
-  enqueueEvent({ kind: "dangerous_event", title: def.name, body: [body, choiceOutlook(event, choices[0]), `期限まであと${Math.max(0, event.expiresAbs - absDay(state))}日 / 事故で回収資金・物資が半減する恐れあり`].filter(Boolean).join("\n"),
+  const risk = event.kind === "ghost_fleet" ? event.progress < 2 ? "この段階には回収の事故はありません。" : "事故で回収資金・物資が半減する恐れあり（名声は減りません）。" : "事故で回収資金・物資が半減する恐れあり";
+  enqueueEvent({ kind: "dangerous_event", title: def.name, body: [body, choiceOutlook(event, choices[0]), `期限まであと${Math.max(0, event.expiresAbs - absDay(state))}日 / ${risk}`].filter(Boolean).join("\n"),
     actions: [...choices.map(choice => ({ label: `${def.choices[choice]}（1日）`, type: "dangerous_event_choice", payload: { eventId: event.id, choice } })),
-      { label: "参加を見送る", type: "dangerous_event_choice", payload: { eventId: event.id, choice: "leave" } }] });
+      { label: event.kind === "ghost_fleet" ? "手を引く" : "参加を見送る", type: "dangerous_event_choice", payload: { eventId: event.id, choice: "leave" } }] });
   return true;
 }
 
@@ -133,6 +156,10 @@ function settleEvent(success, save = true) {
   const before = structuredClone(state);
   if (success) {
     receiveFunds(state, progress.reward.funds);
+    if (progress.reward.fame) {
+      state.fame = (state.fame || 0) + progress.reward.fame;
+      if (state.voyageStats?.peaks) state.voyageStats.peaks.fame = Math.max(state.voyageStats.peaks.fame || 0, state.fame);
+    }
     for (const [id, qty] of Object.entries(progress.reward.supplies)) state.supplies[id] = (state.supplies[id] || 0) + qty;
     for (const [id, qty] of Object.entries(progress.reward.troops)) { addTroops(id, 1, qty); recordVoyage(state, "refugeesRescued", qty); }
     event.progress++;
@@ -144,7 +171,9 @@ function settleEvent(success, save = true) {
   event.choices.push({ choice: progress.choice, day: absDay(state), success, accident: progress.accident, reward: structuredClone(progress.reward) });
   progress.applied = true; progress.stage = "result"; progress.encounter = null;
   if (save && !saveGameToStorage()) { Object.assign(state, before); pushToast("保存できません", "報酬を確定できませんでした。同じ出来事を再開してください。", "warn"); return false; }
-  pushLog(DEFS[event.kind].name, progress.resultText, "-");
+  const ghostResult = event.kind === "ghost_fleet" && progress.complete
+    ? ` / ${DEFS[event.kind].choices[progress.choice]} / ${rewardResources(progress.reward).map(resource => `${resource.label} ${resource.value}`).join("・")} / ${progress.accident ? "回収事故あり" : "回収事故なし"}` : "";
+  pushLog(DEFS[event.kind].name, progress.resultText + ghostResult, "-");
   return true;
 }
 

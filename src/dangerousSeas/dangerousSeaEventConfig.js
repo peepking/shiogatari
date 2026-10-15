@@ -27,10 +27,26 @@ export const DANGEROUS_SEA_EVENT_DEFS = Object.freeze({
     rewards: { cargo: { funds: 3000, supplies: { spice: 4, textile: 3 }, troops: {} },
       rescue: { funds: 300, supplies: {}, troops: { marine: 4, scout: 2 } } } },
   seabed_bell: { name: "海底からの鐘", regions: ["se"], days: 3, accident: 0.15,
+    stages: [["listen"], ["descend"], ["answer"]],
     choices: { listen: "鐘の音を聞き分ける", descend: "沈んだ聖堂を調べる", answer: "鐘へ応える" },
     rewards: { listen: { funds: 0, supplies: {}, troops: {} }, descend: { funds: 0, supplies: {}, troops: {} },
       answer: { funds: 2200, supplies: { salt: 4, spice: 2 }, troops: {} } } },
+  ghost_fleet: { name: "亡霊船団の帰港", regions: ["sw"], days: 3, accident: 0.15,
+    stages: [["read_signal"], ["read_logbook"], ["guide", "take_cargo"]],
+    choices: { read_signal: "古い旗信号を読み解く", read_logbook: "旗艦の航海日誌を調べる", guide: "船団を導く", take_cargo: "積荷を持ち去る" },
+    rewards: { read_signal: { funds: 0, fame: 0, supplies: {}, troops: {} }, read_logbook: { funds: 0, fame: 0, supplies: {}, troops: {} },
+      guide: { funds: 0, fame: 15, supplies: { wood: 6, fiber: 4, salt: 3 }, troops: {} },
+      take_cargo: { funds: 4200, fame: 0, supplies: { spice: 4, textile: 3 }, troops: {} } } },
 });
+
+/** 進行順序を守り、最終段階の選択を排他で提示する。完了後は選択を返さない。
+ * @param {object} event 出来事。 @returns {string[]} 現在の段階で選べる行動ID。
+ */
+export function dangerousEventChoices(event) {
+  const def = DANGEROUS_SEA_EVENT_DEFS[event?.kind];
+  if (!def || event.completed) return [];
+  return def.stages ? [...(def.stages[event.progress] || [])] : Object.keys(def.choices);
+}
 
 /** 実効斥候人数から保存に使う段階を返す。 @param {number} scouts 実効人数。 @returns {object} 段階の効果。 */
 export function dangerousEventScoutRules(scouts = 0) {

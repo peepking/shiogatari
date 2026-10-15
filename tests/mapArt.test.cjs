@@ -266,7 +266,7 @@ function verifyOverviewCoverage(art, phase) {
     { kind: "bounty", draw: ctx => art.bounty.drawBountySite(ctx, 0, 0, 13, false) },
     { kind: "pirateLord", draw: ctx => art.story.drawPirateStorySite(ctx, { id: "lord" }, 0, 0, 13, false) },
     { kind: "pirateKing", draw: ctx => art.story.drawPirateStorySite(ctx, { id: "olav" }, 0, 0, 13, false) },
-    ...Object.entries({ fish_migration: "fish", seabed_bell: "bell", storm_aftermath: "storm", fog_light: "lantern", sinking_treasure: "sinkingShip" })
+    ...Object.entries({ fish_migration: "fish", seabed_bell: "bell", storm_aftermath: "storm", fog_light: "lantern", sinking_treasure: "sinkingShip", ghost_fleet: "ship" })
       .map(([event, kind]) => ({ kind, draw: ctx => art.events.drawDangerousSeaEvent(ctx, { kind: event }, 0, 0, 13, false) })),
   ];
   for (const { kind, draw } of wrappers) {

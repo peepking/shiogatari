@@ -1,5 +1,5 @@
 import { FISH_SPECIES } from "../fishing/fishingConfig.js";
-import { DANGEROUS_SEA_EVENT_CONFIG as CONFIG, DANGEROUS_SEA_EVENT_DEFS as DEFS, dangerousEventScoutRules } from "./dangerousSeaEventConfig.js";
+import { DANGEROUS_SEA_EVENT_CONFIG as CONFIG, DANGEROUS_SEA_EVENT_DEFS as DEFS, dangerousEventScoutRules, dangerousEventChoices } from "./dangerousSeaEventConfig.js";
 
 /** 検証する兵種は既存の編成と救助対象に限る。 */
 const troopIds = new Set(["infantry", "halberd", "medic", "marine", "archer", "scout", "cavalry", "cavalier", "crossbow", "shield", "seaArcher"]);
@@ -37,11 +37,12 @@ function eventSlots(data, kind) { return kind === "storm_aftermath" ? data.storm
 
 /** 固定報酬の既存IDと安全な数量を検証し、版変更でも有効な確定値を維持する。 @param {*} raw 保存値。 @returns {object|null} 報酬。 */
 function normalizeReward(raw) {
-  if (!raw || !integer(raw.funds) || !raw.supplies || !raw.troops) return null;
+  const fame = raw?.fame === undefined ? 0 : raw.fame;
+  if (!raw || !integer(raw.funds) || !integer(fame) || !raw.supplies || !raw.troops) return null;
   for (const [group, ids] of [[raw.supplies, supplyIds], [raw.troops, troopIds]]) {
     if (typeof group !== "object" || Array.isArray(group) || Object.entries(group).some(([id, qty]) => !ids.has(id) || !integer(qty))) return null;
   }
-  return { funds: raw.funds, supplies: { ...raw.supplies }, troops: { ...raw.troops } };
+  return { funds: raw.funds, fame, supplies: { ...raw.supplies }, troops: { ...raw.troops } };
 }
 
 /** 既存編成の上限と専用参照だけを復元し、物語や他の賞金首の参照を持ち込まない。 @param {*} raw 保存値。 @param {object} event 地点。 @returns {object|null} 固定遭遇。 */
@@ -55,12 +56,16 @@ function normalizeEncounter(raw, event) {
     eventTag: "dangerous_event", dangerousEventId: event.id, dangerousRegionId: event.regionId };
 }
 
-/** 地点の正体・乱数・期限・報酬・進行を復元する。南西には鐘を配置しない。 @param {*} raw 保存値。 @param {string} regionId 海域。 @returns {object|null} 有効な地点。 */
+/** 地点の正体・乱数・期限・報酬・進行を復元し、海域限定の適性を守る。 @param {*} raw 保存値。 @param {string} regionId 海域。 @returns {object|null} 有効な地点。 */
 function normalizeEvent(raw, regionId) {
   const def = DEFS[raw?.kind];
   if (!def?.regions.includes(regionId) || raw.regionId !== regionId || !integer(raw.id) || raw.id < 1 || !positionValid(raw.position)
     || !integer(raw.spawnedAbs) || !integer(raw.expiresAbs) || raw.expiresAbs <= raw.spawnedAbs
     || !Number.isFinite(raw.accidentRoll) || raw.accidentRoll < 0 || raw.accidentRoll >= 1) return null;
+  if (raw.kind === "ghost_fleet" && (!integer(raw.progress) || raw.progress > def.stages.length
+    || (raw.completed === true) !== (raw.progress === def.stages.length)
+    || !Array.isArray(raw.choices) || raw.choices.length !== raw.progress
+    || raw.choices.some((row, index) => !def.stages[index]?.includes(row?.choice) || !integer(row?.day)))) return null;
   const event = { id: raw.id, kind: raw.kind, regionId, position: { ...raw.position }, level: raw.level === "core" ? "core" : "outer",
     spawnedAbs: raw.spawnedAbs, expiresAbs: raw.expiresAbs, accidentRoll: raw.accidentRoll,
     discovered: raw.discovered === true, hintTier: [0, 1, 5, 10].includes(raw.hintTier) ? raw.hintTier : 0,
@@ -77,7 +82,7 @@ function normalizeEvent(raw, regionId) {
   }
   event.fishIds = [...new Set((Array.isArray(raw.fishIds) ? raw.fishIds : []).filter(id => giantIds.has(id)))].slice(0, 3);
   if (event.kind === "fish_migration" && !event.fishIds.length) return null;
-  event.encounter = normalizeEncounter(raw.encounter, event);
+  event.encounter = event.kind === "ghost_fleet" ? null : normalizeEncounter(raw.encounter, event);
   if (event.kind === "fog_light" && event.variant === "trap" && !event.encounter) return null;
   return event;
 }
@@ -108,7 +113,10 @@ export function normalizeDangerousSeaEvents(raw) {
   if (event && pending && event.regionId === pending.regionId && ["choice", "action", "battle", "result"].includes(pending.stage)) {
     const reward = pending.reward == null ? null : normalizeReward(pending.reward);
     const encounter = pending.encounter == null ? null : normalizeEncounter(pending.encounter, event);
-    if ((pending.reward == null || reward) && (pending.encounter == null || encounter) && (!pending.applied || pending.stage === "result")) {
+    const ghostChoiceValid = event.kind !== "ghost_fleet" || (!pending.encounter && (pending.stage === "choice" ? pending.choice == null && !event.completed
+      : pending.stage !== "battle" && reward && (pending.stage === "result") === (pending.applied === true)
+        && DEFS.ghost_fleet.stages[event.progress - (pending.applied ? 1 : 0)]?.includes(pending.choice)));
+    if (ghostChoiceValid && (pending.reward == null || reward) && (pending.encounter == null || encounter) && (!pending.applied || pending.stage === "result")) {
       data.pending = { eventId: event.id, regionId: event.regionId, stage: pending.stage, choice: typeof pending.choice === "string" ? pending.choice : null,
         dayApplied: pending.dayApplied === true, scoutTier: [0, 1, 5, 10].includes(pending.scoutTier) ? pending.scoutTier : 0,
         pausedForHazard: pending.pausedForHazard === true, reward, encounter, applied: pending.applied === true,
@@ -133,7 +141,8 @@ export function spawnDangerousSeaEvent(data, regionId, kind, positions, now, cre
   const point = positions[Math.min(positions.length - 1, Math.floor(random() * positions.length))];
   const event = { id: data.nextId++, kind, regionId, position: { x: point.x, y: point.y }, level: point.level,
     spawnedAbs: now, expiresAbs: now + point.travelDays + def.days + CONFIG.marginDays,
-    accidentRoll: random(), discovered: false, hintTier: 0, progress: 0, completed: false, choices: [], rewards: structuredClone(def.rewards), fishIds: [], encounter: null };
+    accidentRoll: random(), discovered: false, hintTier: 0, progress: 0, completed: false, choices: [],
+    rewards: Object.fromEntries(Object.entries(def.rewards).map(([id, reward]) => [id, normalizeReward(reward)])), fishIds: [], encounter: null };
   if (kind === "fog_light") {
     event.variant = ["rescue", "trap", "empty"][Math.min(2, Math.floor(random() * 3))];
     if (event.variant === "trap") {
@@ -161,27 +170,31 @@ export function closeDangerousSeaEvent(data, id, now, reason = "complete") {
 
 /**
  * 固定乱数と選択時の斥候から結果を一度確定する。積荷と救助は排他的、事故では資金・物資を半減し兵を減らさない。
- * 鐘は聞く・調べる・応えるの順で一日ずつ進み、最後だけ報酬を得る。
+ * 段階イベントは一日ずつ順に進み、最後だけ報酬を得る。亡霊船団の固有事故は最終段階だけ判定し、名声は減らさない。
  * @param {object} event 地点。 @param {string} choice 選択。 @param {number} scouts 斥候段階。
  * @returns {object|null} 保存する固定結果。
  */
 export function dangerousSeaEventOutcome(event, choice, scouts) {
   const def = DEFS[event.kind];
-  if (!Object.hasOwn(def.choices, choice)) return null;
-  if (event.kind === "seabed_bell" && choice !== ["listen", "descend", "answer"][event.progress]) return null;
+  if (!dangerousEventChoices(event).includes(choice)) return null;
   const rewardId = event.kind === "fog_light" ? event.variant : choice;
   const reward = structuredClone(event.rewards[rewardId]);
-  const accident = event.accidentRoll < def.accident * dangerousEventScoutRules(scouts).accidentMultiplier;
+  const finalStage = !def.stages || event.progress === def.stages.length - 1;
+  const accident = (event.kind !== "ghost_fleet" || finalStage) && event.accidentRoll < def.accident * dangerousEventScoutRules(scouts).accidentMultiplier;
   if (accident) {
     reward.funds = Math.floor(reward.funds / 2);
     for (const id of Object.keys(reward.supplies)) reward.supplies[id] = Math.floor(reward.supplies[id] / 2);
   }
-  const complete = event.kind !== "seabed_bell" || event.progress >= 2;
+  const complete = finalStage;
   const bellText = ["鐘の音は波ではなく、沈んだ聖堂から届いていた。潮が引けば入口を探せそうだ。",
     "聖堂の壁には、帰らぬ船を導くために鐘を鳴らした人々の名が刻まれていた。最後の一音が船を待っている。",
     "船の鐘で応えると、海底の音が静まった。浮かび上がった箱には、かつての航海者が託した品が残っていた。"][event.progress];
+  const ghostText = { read_signal: "古い旗信号は攻撃の合図ではなかった。帰る港を見失った船団が、水先案内を求めている。",
+    read_logbook: "旗艦の航海日誌には、灯台の灯りを目前に嵐へ沈んだ船団の最期が記されていた。生きた乗員のいない船は、今も帰港を待ち続けている。",
+    guide: "船上に古い灯台の灯りを再現すると、亡霊船団は帰る航路を見いだした。船影が静かに消え、遺された物資が浮かび上がる。この案内の逸話は船乗りたちの間に伝わった。",
+    take_cargo: "旗艦に残された積荷を運び出した。回収を終えると、船団の影は嵐の向こうへ消えていった。" }[choice];
   return { reward, encounter: event.variant === "trap" ? structuredClone(event.encounter) : null, complete, accident,
-    resultText: event.kind === "seabed_bell" ? bellText : event.kind === "fog_light"
+    resultText: event.kind === "ghost_fleet" ? ghostText : event.kind === "seabed_bell" ? bellText : event.kind === "fog_light"
       ? { rescue: "灯火は遭難した船の合図だった。乗員を救助した。", trap: "灯火は海賊の罠だった。敵を退け、積荷を回収した。", empty: "灯火の主は無人の船だった。残された積荷を回収した。" }[event.variant]
       : event.kind === "sinking_treasure" ? choice === "rescue" ? "積荷を諦め、沈む船から乗員を救助した。" : "救助を諦め、沈む船から積荷を運び出した。"
         : "嵐が運んだ漂着物から、使える積荷を回収した。" };

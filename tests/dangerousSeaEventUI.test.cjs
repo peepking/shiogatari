@@ -9,7 +9,7 @@ function plain(value) { return JSON.parse(JSON.stringify(value)); }
 async function main() {
   const state = {}, context = vm.createContext({ structuredClone, CustomEvent: class {}, console });
   let saves = 0, failAt = 0, days = 0, scouts = 0, newHazard = null;
-  const nodes = new Map();
+  const nodes = new Map(), logs = [];
   /** @param {string} [tag="div"] 要素名。 @returns {object} ボタンと複数の発見情報を保持する最小限のDOM。 */
   function node(tag = "div") { return { tagName: tag.toUpperCase(), hidden: true, childNodes: [],
     /** @param {string} value 表示内容。 @returns {void} 子の発見情報を消して文字を置く。 */
@@ -27,7 +27,7 @@ async function main() {
     "state.js": { state },
     "storage.js": { saveGameToStorage: () => ++saves !== failAt },
     "map.js": { snapshotWorld: () => ({}), restoreWorld() {} },
-    "dom.js": { elements: { battleBlock: { hidden: true }, battleResultModal: { hidden: true } }, pushToast() {}, pushLog() {} },
+    "dom.js": { elements: { battleBlock: { hidden: true }, battleResultModal: { hidden: true } }, pushToast() {}, pushLog: (...args) => logs.push(args) },
     "events.js": { enqueueEvent: event => state.eventQueue.push(event) },
     "outfitting.js": { snapshotOutfitting: () => ({ scouts }) },
     "troops.js": { TROOP_STATS: { marine: { name: "海兵" }, scout: { name: "斥候" }, medic: { name: "衛生兵" } },
@@ -72,9 +72,9 @@ async function main() {
   const mode = cache.get("constants.js").namespace.MODE_LABEL;
   /** @param {string} kind 種類。 @param {string} [regionId=sw] 海域。 @param {number} [variant=0.9] 灯火の正体。 @returns {object} 新しい固定地点。 */
   function prepare(kind, regionId = "sw", variant = 0.9) {
-    saves = 0; failAt = 0; days = 0; scouts = 0; newHazard = null;
+    saves = 0; failAt = 0; days = 0; scouts = 0; newHazard = null; logs.length = 0;
     Object.assign(state, { year: 1000, season: 0, day: 1, position: { x: 0, y: 49 }, modeLabel: mode.NORMAL, pendingEncounter: { active: false },
-      funds: 0, troops: {}, supplies: {}, voyageStats: { income: 0, refugeesRescued: 0 }, wanted: {}, eventQueue: [],
+      funds: 0, fame: 0, troops: {}, supplies: {}, voyageStats: { income: 0, refugeesRescued: 0, peaks: { fame: 0 } }, wanted: {}, eventQueue: [],
       expansion: { fishing: {}, exploration: {}, charts: {} }, dangerousSeas: { nextActionId: 1, action: null, pendingHazard: null, events: rules.createDangerousSeaEvents() } });
     let roll = 0;
     return rules.spawnDangerousSeaEvent(state.dangerousSeas.events, regionId, kind, [{ x: 0, y: 49, level: "outer", travelDays: 2 }], 120001,
@@ -99,6 +99,8 @@ async function main() {
   function restoreLegacyStorm() {
     const data = plain(state.dangerousSeas.events);
     data.version = 1; data.active.sw = data.stormAftermath.sw; delete data.stormAftermath;
+    for (const reward of Object.values(data.active.sw.rewards)) delete reward.fame;
+    if (data.pending?.reward) delete data.pending.reward.fame;
     state.dangerousSeas.events = rules.normalizeDangerousSeaEvents(data);
   }
 
@@ -220,10 +222,76 @@ async function main() {
   }
   assert.equal(state.dangerousSeas.events.history[0].choices.length, 3);
 
+  // 亡霊船団は斥候ゼロでも三段階を選べ、再開と事故を経ても最終報酬を一度だけ得る。
+  for (const finalChoice of ["guide", "take_cargo"]) for (const accident of [false, true]) {
+    event = prepare("ghost_fleet"); event.accidentRoll = accident ? 0 : .9;
+    for (const [index, choice] of ["read_signal", "read_logbook", finalChoice].entries()) {
+      open(event);
+      const prompt = state.eventQueue[0];
+      assert.match(prompt.body, new RegExp(`調査 ${index + 1}/3`));
+      assert.deepEqual(plain(prompt.actions.map(action => action.payload.choice)), index < 2 ? [choice, "leave"] : ["guide", "take_cargo", "leave"]);
+      if (index === 2) assert.match(prompt.body, /名声 \+15.*木材 \+6[\s\S]*4200[\s\S]*名声は減りません/);
+      else assert.equal(choose(event.id, finalChoice), false, "最終選択へ飛ばさない");
+      newHazard = finalChoice === "guide" && !accident ? "wave" : null;
+      assert.equal(choose(event.id, choice), true); assert.equal(state.day, index + 2);
+      state.dangerousSeas.events = rules.normalizeDangerousSeaEvents(plain(state.dangerousSeas.events));
+      if (newHazard) {
+        assert.equal(state.dangerousSeas.events.pending.pausedForHazard, true);
+        assert.equal(ui.resumeDangerousSeaEvent(), false);
+        state.dangerousSeas.pendingHazard = null; newHazard = null;
+      }
+      ui.resumeDangerousSeaEvent(); ui.resumeDangerousSeaEvent();
+      assert.equal(state.day, index + 2, "中断・再読込で日数を重ねない");
+      assert.equal(state.fame, index === 2 && finalChoice === "guide" ? 15 : 0);
+      assert.equal(state.voyageStats.peaks.fame, state.fame);
+      if (index < 2) {
+        assert.equal(state.funds, 0); assert.deepEqual(plain(state.supplies), {});
+        assert.equal(state.dangerousSeas.events.pending.accident, false);
+      }
+      assert.equal(choose(event.id, "ack"), true);
+      if (index < 2) event = state.dangerousSeas.events.active.sw;
+    }
+    assert.deepEqual(plain(state.supplies), finalChoice === "guide" ? accident ? { wood: 3, fiber: 2, salt: 1 } : { wood: 6, fiber: 4, salt: 3 }
+      : accident ? { spice: 2, textile: 1 } : { spice: 4, textile: 3 });
+    assert.equal(state.funds, finalChoice === "guide" ? 0 : accident ? 2100 : 4200);
+    assert.equal(state.voyageStats.income, state.funds); assert.equal(state.voyageStats.refugeesRescued, 0);
+    assert.equal(state.dangerousSeas.events.active.sw, null);
+    assert.equal(state.dangerousSeas.events.history[0].choices.length, 3);
+    assert.ok(logs.at(-1)[1].includes(finalChoice === "guide" ? "名声 +15" : `回収資金 +${state.funds}`));
+    assert.equal(choose(event.id, finalChoice === "guide" ? "take_cargo" : "guide"), false);
+  }
+
+  /** @returns {object} 前二段階を精算し終えた亡霊船団。 */
+  function ghostFinal() {
+    let ghost = prepare("ghost_fleet");
+    for (const choice of ["read_signal", "read_logbook"]) { open(ghost); choose(ghost.id, choice); choose(ghost.id, "ack"); ghost = state.dangerousSeas.events.active.sw; }
+    return ghost;
+  }
+  // 最終選択・日数保存・報酬保存それぞれの失敗で名声と最高値も戻し、同じ案内を再開する。
+  for (const offset of [1, 2, 3]) {
+    event = ghostFinal(); open(event); failAt = saves + offset;
+    assert.equal(choose(event.id, "guide"), offset !== 1);
+    assert.equal(state.fame, 0); assert.equal(state.voyageStats.peaks.fame, 0); assert.deepEqual(plain(state.supplies), {});
+    failAt = 0;
+    if (offset === 1) choose(event.id, "guide"); else ui.resumeDangerousSeaEvent();
+    assert.equal(state.day, 4); assert.equal(state.fame, 15); assert.equal(state.voyageStats.peaks.fame, 15);
+    ui.resumeDangerousSeaEvent(); assert.equal(state.fame, 15); assert.equal(choose(event.id, "take_cargo"), false);
+    choose(event.id, "ack");
+  }
+  // 斥候情報は段階に応じて保持し、途中辞退・期限後の再訪では追加日数や報酬を得ない。
+  for (const [tier, clue] of [[0, /古い帆影/], [1, /現代では使われない旗/], [5, /水先案内/], [10, /生きた乗員/]]) {
+    event = prepare("ghost_fleet"); event.hintTier = tier; open(event); assert.match(state.eventQueue[0].body, clue);
+  }
+  event = ghostFinal(); open(event); choose(event.id, "leave"); assert.equal(state.day, 3); assert.equal(state.fame, 0);
+  assert.equal(state.dangerousSeas.events.history[0].reason, "declined");
+  event = ghostFinal(); open(event); state.day = event.expiresAbs - 120000; const expiredDay = state.day;
+  choose(event.id, "guide"); assert.equal(state.day, expiredDay); assert.equal(state.fame, 0);
+  assert.equal(state.dangerousSeas.events.history[0].reason, "expired");
+
   event = prepare("sinking_treasure"); open(event); state.day = event.expiresAbs - 120000;
   assert.equal(choose(event.id, "cargo"), true); assert.equal(days, 0); assert.equal(state.funds, 0); assert.equal(state.dangerousSeas.events.active.sw, null, "期限後の調査は始めない");
   state.eventQueue = [{ kind: "dangerous_event", actions: [{}] }]; ui.processDangerousSeaEvent(); assert.equal(state.eventQueue.length, 0);
-  console.log("dangerousSeaEventUI: 両枠表示・独立終了・旧置き土産の再開・保存失敗・危険保留・一意精算・鐘三段階の検証成功");
+  console.log("dangerousSeaEventUI: 両枠表示・旧報酬の復元・保存失敗・危険保留・鐘と亡霊船団の三段階・両結末と一意精算の検証成功");
 }
 
 main().catch(error => { console.error(error); process.exitCode = 1; });
