@@ -38,7 +38,7 @@ export function renderChartCards() {
   panel.innerHTML = charts.map(c => {
     const complete = c.fragments === c.size;
     const position = complete ? c.destination : c.rumor;
-    const status = complete ? "海図完成・現地を探索" : c.fragments ? "断片を収集中" : c.rumor ? "噂の手掛かり" : "依頼報酬を予約中";
+    const status = complete ? "海図完成・現地を探索" : c.fragments ? "断片を収集中" : c.rumor ? "噂の手掛かり" : "依頼の達成待ち";
     return `<article class="chart-card quest-progress-card"><div class="chart-heading">${resourceIcon("chart")}<b>${escapeHtml(chartLabel(c))}</b><span>${c.fragments}/${c.size}枚</span></div><div class="tiny">${status}</div>
       <progress max="${c.size}" value="${c.fragments}" aria-label="${escapeHtml(chartLabel(c))} 取得${c.fragments}枚"></progress>
       ${position ? `<div class="quest-progress-rows"><div class="quest-progress-row"><div class="quest-progress-label"><span>${complete ? "発見地点" : "噂の場所"}</span><b>(${position.x + 1}, ${position.y + 1})</b></div></div></div>` : ""}

@@ -41,6 +41,7 @@ import { calcSupplyPrice, SUPPLY_ITEMS, SUPPLY_TYPES } from "../resources/suppli
 import { TROOP_STATS } from "../resources/troops.js";
 import { getQuestDeadlineDays } from "./questDeadlines.js";
 import { offerQuestFragment, reserveQuestFragment, payQuestFunds, chartLabel, awardExplorationFragment, announceFragment, syncChartReservations } from "../exploration/chartWorld.js";
+import { canAssignChart } from "../exploration/charts.js";
 import { makeChartQuestOpportunity, fixRefugeeFragmentReward, snapshotChartQuestChange, commitChartQuestChange } from "./chartQuestOpportunities.js";
 
 
@@ -307,24 +308,28 @@ export function getQuests() {
 }
 
 /**
- * 拠点ごとの受注可能依頼を取得する。
+ * 拠点ごとの受注可能依頼を取得する。断片の予約を確認し、割当不能な候補は保存したまま非表示にする。
  * @param {string} settlementId
  * @returns {Array}
  */
 export function getAvailableQuestsForSettlement(settlementId) {
   ensureState();
-  return state.quests.availableBySettlement[settlementId] || [];
+  syncChartReservations();
+  return (state.quests.availableBySettlement[settlementId] || [])
+    .filter(quest => !quest.rewardFragment || canAssignChart(state.expansion.charts, quest.rewardFragment));
 }
 
 /**
- * 貴族ごとの受注可能依頼を取得する。
+ * 貴族ごとの受注可能依頼を取得する。断片の予約を確認し、割当不能な候補は保存したまま非表示にする。
  * @param {string} nobleId
  * @returns {Array}
  */
 export function getAvailableNobleQuests(nobleId) {
   ensureState();
   if (!nobleId) return [];
-  return state.nobleQuests.availableByNoble[nobleId] || [];
+  syncChartReservations();
+  return (state.nobleQuests.availableByNoble[nobleId] || [])
+    .filter(quest => !quest.rewardFragment || canAssignChart(state.expansion.charts, quest.rewardFragment));
 }
 
 /**

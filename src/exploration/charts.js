@@ -45,7 +45,7 @@ export function normalizeChartTradeDeal(value, source) {
     !Number.isSafeInteger(value.price) || value.price < 1 || ![0, 1].includes(value.stock) ||
     !offer || !CONFIG.sizes.includes(offer.size) || !Object.hasOwn(CONFIG.rewards, offer.kind) ||
     (offer.chartId != null && (!Number.isSafeInteger(offer.chartId) || offer.chartId < 1))) return null;
-  return { id: "chart", name: `海図の断片：${CONFIG.rewards[offer.kind].name}（${offer.size}枚・本物）`,
+  return { id: "chart", name: `海図の断片：${CONFIG.rewards[offer.kind].name}（${offer.size}枚）`,
     price: value.price, qty: 1, stock: value.stock, chartSource: source,
     chartOffer: { chartId: offer.chartId ?? null, size: offer.size, kind: offer.kind } };
 }

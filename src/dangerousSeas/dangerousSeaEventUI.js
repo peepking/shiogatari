@@ -83,7 +83,6 @@ function rewardResources(reward) {
  */
 function ghostFleetBody(event) {
   const lines = [hintText(event), `調査 ${event.progress + 1}/3（各1日、残り${3 - event.progress}段階）。`];
-  if (event.progress < 2 && event.rewards.guide.fragment) lines.push("最後まで調べると、どちらの結末でも海図の断片1枚を得られます。");
   if (event.progress === 2) for (const choice of dangerousEventChoices(event)) {
     lines.push(`${DEFS[event.kind].choices[choice]}：${rewardResources(event.rewards[choice]).map(resource => `${resource.label} ${resource.value}`).join("・")}`);
   }
@@ -139,7 +138,7 @@ export function processDangerousSeaEvent() {
   const choices = dangerousEventChoices(event);
   const body = event.kind === "ghost_fleet" ? ghostFleetBody(event)
     : event.kind === "sinking_treasure" ? "積荷か乗員、片方だけを運び出せます。\n積荷：資金3000・香辛料4・織物3\n救助：資金300・海兵4人・斥候2人"
-    : event.kind === "seabed_bell" ? `海底から鐘の音が響きます。調査 ${event.progress + 1}/3（各1日）。${event.rewards.answer.fragment ? "\n最後まで調べると、海図の断片1枚を得られます。" : ""}`
+    : event.kind === "seabed_bell" ? `海底から鐘の音が響きます。調査 ${event.progress + 1}/3（各1日）。`
       : hintText(event);
   const risk = event.kind === "ghost_fleet" ? event.progress < 2 ? "この段階には回収の事故はありません。" : "事故で回収資金・物資が半減する恐れあり（名声は減りません）。" : "事故で回収資金・物資が半減する恐れあり";
   enqueueEvent({ kind: "dangerous_event", title: def.name, body: [body, choiceOutlook(event, choices[0]), `期限まであと${Math.max(0, event.expiresAbs - absDay(state))}日 / ${risk}`].filter(Boolean).join("\n"),
@@ -170,7 +169,7 @@ function settleEvent(success, save = true) {
       fragment = awardExplorationFragment(DEFS[event.kind].name, false);
       if (!fragment) {
         delete progress.reward.fragment;
-        progress.resultText += "\n海図の断片を受け取れる空きがありませんでした。";
+        progress.resultText += "\n見つかった断片は、手元の海図にはつながりませんでした。";
       }
     }
     event.progress++;

@@ -89,7 +89,7 @@ export function reserveQuestFragment(quest) {
   syncChartReservations();
   const chart = allocateChart(quest.rewardFragment);
   if (!chart) {
-    pushToast("受注できません", "予告された海図の断片枠が埋まっているか、その海図は終了しています。", "warn");
+    pushToast("受注できません", "この依頼の断片は、今集めている海図には加えられません。", "warn");
     return false;
   }
   chart.questIds.push(quest.id);
@@ -168,7 +168,7 @@ export function enqueueChartMerchant(source) {
   if (!offer) return false;
   const title = source === "sailor" ? "海図売り" : "古文書商";
   const body = source === "sailor" ? "怪しい船乗りが古びた海図の切れ端を持っている" : "行商人が古びた海図の切れ端を持っている";
-  enqueueEvent({ title, body: `${body}。${settings.price}資金で購入しますか？\n本物の確率は${settings.success * 100}%。偽物でも代金は戻りません。`,
+  enqueueEvent({ title, body: `${body}。${settings.price}資金で購入しますか？\n海図の真贋は分かりません。偽物でも代金は戻りません。`,
     actions: [{ label: `${settings.price}資金で購入`, type: "chart_purchase", payload: { source, offer, genuine: Math.random() < settings.success } }, { label: "見送る", type: "close" }] });
   return true;
 }
@@ -186,7 +186,7 @@ export function handleChartPurchase(action) {
   syncChartReservations();
   const current = state.expansion.charts.active.find(c => c.size === payload.offer?.size);
   if (!canAssignChart(state.expansion.charts, payload.offer) || current?.merchantClaims?.includes(payload.source)) {
-    enqueueEvent({ title: "購入できません", body: "対象の海図が変わったか、断片枠が埋まっています。資金は消費していません。" }); return true;
+    enqueueEvent({ title: "購入できません", body: "手元の海図には、この断片を加えられません。代金は支払っていません。" }); return true;
   }
   if (state.funds < settings.price) { enqueueEvent({ title: "資金不足", body: "購入資金が足りません。資金は消費していません。" }); return true; }
   if (payload.genuine) {

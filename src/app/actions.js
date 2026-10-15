@@ -1204,7 +1204,7 @@ function enqueueMerchantRescueEvent(terrain) {
   const info = nearestSettlementInfo();
   enqueueEvent({
     title: "行商人救助",
-    body: `${travelTerrainName(terrain)}で襲撃を受けた行商人を発見しました。救助には手強い海賊との戦いが待っていますが、勝てば謝礼と近隣の信頼を得られそうです。救助成功時は${CHART_CONFIG.merchantRescueFragmentChance * 100}%で、謝礼に海図の断片1枚が加わります。弱った行商人を襲えば戦利品を狙えますが、手配や関係悪化を招きます。`,
+    body: `${travelTerrainName(terrain)}で襲撃を受けた行商人を発見しました。救助には手強い海賊との戦いが待っていますが、勝てば謝礼と近隣の信頼を得られそうです。謝礼として古い海図を譲り受けることもあります。弱った行商人を襲えば戦利品を狙えますが、手配や関係悪化を招きます。`,
     actions: [
       {
         id: "help",

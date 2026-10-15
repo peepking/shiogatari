@@ -290,7 +290,7 @@ async function main() {
   event = ghostFinal(); state.expansion.charts.full = true; open(event); choose(event.id, "guide");
   assert.equal(state.expansion.charts.fragmentCount, 0);
   assert.equal(state.fame, 15, "断片の空きがなくても他の最終報酬を受け取る");
-  assert.match(state.eventQueue[0].body, /断片を受け取れる空きがありません/);
+  assert.match(state.eventQueue[0].body, /断片は、手元の海図にはつながりません/);
   assert.equal(state.eventQueue[0].resources.some(resource => resource.id === "chart"), false, "受け取れなかった断片を獲得結果へ表示しない");
 
   for (const [tier, clue] of [[0, /古い帆影/], [1, /現代では使われない旗/], [5, /水先案内/], [10, /生きた乗員/]]) {

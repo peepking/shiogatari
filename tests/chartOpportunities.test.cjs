@@ -118,6 +118,8 @@ async function main() {
   let deal = trade.createChartTradeDeal("trader"); assert.equal(deal.price, 3000);
   state.eventTrade = { source: "merchant", title: "行商人との取引", deals: [deal, { id: "wood", name: "木材", price: 100, stock: 2 }] };
   market.renderEventTradeModal(state.eventTrade);
+  assert.doesNotMatch(nodes.get("eventTradeTableBody").innerHTML, /本物/);
+  assert.match(nodes.get("eventTradeTableBody").innerHTML, /3000/);
   quantity(true, "chart", 1); quantity(true, "wood", 2);
   failSave = true; nodes.get("eventTradeConfirm").click();
   assert.equal(state.funds, 30000); assert.equal(state.supplies.wood || 0, 0); assert.equal(fragments(), 0);
@@ -138,6 +140,49 @@ async function main() {
   target.rumor = { x: 25, y: 25 }; nodes.get("tradeConfirm").click();
   assert.equal(state.funds, 30000); assert.equal(stock.stock, 1);
   assert.equal(target.fragments, target.size - 1, "噂の予約済み枠を購入で埋めない");
+
+  // 断片を割り当てられない候補は両一覧から隠し、候補や報酬を変えずに予約解放後は再表示する。
+  {
+    reset(); const town = place(), nobleId = "chart-test-noble";
+    const data = state.expansion.charts;
+    const chart = charts.assignChart(data, { chartId: null, size: 3, kind: "treasure" }, { x: 25, y: 25 });
+    chart.fragments = 1;
+    const fragment = { chartId: chart.id, size: 3, kind: "treasure" };
+    const candidates = [
+      { id: 901, reward: 1000 },
+      { id: 902, reward: 0, rewardFragment: { ...fragment } },
+      { id: 903, reward: 0, rewardFragment: { ...fragment, chartId: null } },
+      { id: 904, reward: 0, rewardFragment: { ...fragment, chartId: null, kind: "inlet" } },
+      { id: 905, reward: 0, rewardFragment: { ...fragment, chartId: chart.id + 99 } },
+      { id: 906, reward: 0, rewardFragment: { chartId: null, size: 5, kind: "treasure" } },
+    ];
+    state.quests.availableBySettlement[town.id] = candidates;
+    state.nobleQuests.availableByNoble[nobleId] = candidates;
+    const original = plain(candidates);
+    math.random = () => assert.fail("候補の表示で海図や報酬を再抽選しない");
+    /** @param {number[]} expected 表示する依頼ID。 @returns {void} 両一覧と保存候補を確認する。 */
+    function expectAvailable(expected) {
+      assert.deepEqual(plain(quests.getAvailableQuestsForSettlement(town.id).map(item => item.id)), expected);
+      assert.deepEqual(plain(quests.getAvailableNobleQuests(nobleId).map(item => item.id)), expected);
+      assert.deepEqual(plain(state.quests.availableBySettlement[town.id]), original);
+      assert.deepEqual(plain(state.nobleQuests.availableByNoble[nobleId]), original);
+    }
+    expectAvailable([901, 902, 903, 906]);
+    state.quests.active = [{ id: 911, rewardFragment: { ...fragment } }, { id: 912, rewardFragment: { ...fragment } }];
+    expectAvailable([901, 906]);
+    state.quests.active.pop();
+    expectAvailable([901, 902, 903, 906]);
+    chart.rumor = { x: 26, y: 26 };
+    expectAvailable([901, 906]);
+    state.quests.active = [];
+    expectAvailable([901, 902, 903, 906]);
+    chart.rumor = null; chart.fragments = chart.size;
+    expectAvailable([901, 906]);
+    data.active = [];
+    expectAvailable([901, 903, 904, 906]);
+    charts.assignChart(data, { chartId: null, size: 3, kind: "inlet" }, { x: 25, y: 25 }).fragments = 1;
+    expectAvailable([901, 904, 906]);
+  }
 
   // 新しい季節依頼は通常三件に最大一件を追加し、受注で予約、納品成功時だけ取得する。
   reset(); let town = place(); math.random = () => 0;

@@ -54,7 +54,7 @@ export function chartTradeError(deal, source, settlement = null, trade = null) {
   const data = state.expansion.charts;
   const chart = data.active.find(c => c.size === deal.chartOffer.size);
   return !canAssignChart(data, deal.chartOffer) || chart?.merchantClaims?.includes(source)
-    ? "対象の海図が変わったか、断片枠または購入上限が埋まっています。" : "";
+    ? "手元の海図には、この断片を加えられません。" : "";
 }
 
 /**

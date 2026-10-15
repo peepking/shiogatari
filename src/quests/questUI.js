@@ -64,7 +64,6 @@ export function renderQuestRewards(q) {
   else if (q.reward) resources.push({ id: "funds", label: "資金", value: `+${q.reward}` });
   if (q.rewardFaith) resources.push({ id: "faith", label: q.type?.startsWith("oracle_") ? "信仰（今季の見込み）" : "信仰", value: `+${tideOracleReward(state, q)}` });
   if (q.rewardFame) resources.push({ id: "fame", label: "名声", value: `+${q.rewardFame}` });
-  if (q.refugeeFragmentReward === true) resources.push({ id: "chart", label: "海図の断片（追加謝礼）", value: "+1（空きがある場合）" });
   const power = questPowerRewardHtml(q);
   const pirateLabel = pirateRewardLabel(q);
   return (resources.length ? resourceList(resources) : power ? "" : "報酬は依頼内容を参照") + power + (pirateLabel ? `<div class="tiny">${escapeHtml(pirateLabel)}</div>` : "") + (q.type?.startsWith("oracle_") ? '<div class="tiny">季節が変わると報酬も変動します。</div>' : '');
