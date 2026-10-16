@@ -11,7 +11,7 @@ import { absDay, manhattan, randInt } from "../quests/questUtils.js";
 import { state } from "../core/state.js";
 import { clamp, displayWarLabel, relationLabel, supportLabel, warScoreLabel } from "../core/util.js";
 
-const HONOR_COOLDOWN_DAYS = 30;
+const HONOR_COOLDOWN_DAYS = 120;
 const HONOR_ROLL_RATE = 0.12; // 1日あたり12%で来訪。クールダウン付き。
 export const HONOR_FAVOR_THRESHOLD = 30;
 const RELATION_THRESHOLD_WAR = 100;
@@ -137,6 +137,7 @@ export function adjustNobleFavor(nobleId, delta) {
 /**
  * 名誉家臣勧誘イベントを日次で判定・投入する。
  * 条件: 名声100以上かつ勢力内で最も好感度が高い貴族の好感度が閾値以上。
+ * 勢力ごとに前回の打診から120日経過後、日次12%で抽選する。
  * @param {number} absDay
  */
 export function maybeQueueHonorInvite(absDay) {
