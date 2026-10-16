@@ -96,7 +96,7 @@ export function expandedOracleChoices(state, settlements, map, { canEnter, isDan
   }) : [];
   return {
     oracle_fish: categories,
-    oracle_share: accessible.filter(s => s.kind === "village"),
+    oracle_share: nearby.filter(s => s.kind === "village"),
     oracle_pilgrimage: pairs,
     oracle_explore: (state.expansion?.exploration?.sites || []).filter(s => s.kind === "drift" && s.id !== state.expansion.exploration.pending?.siteId
       && validPosition(s.position) && distance(origin, s.position) <= radius && !isDangerous(s.position)
@@ -129,7 +129,7 @@ export function makeExpandedOracle(type, choices, now, random = Math.random) {
     Object.assign(q, { targetId: chosen.id, target: { ...chosen.coords } });
     if (type === "oracle_share") {
       Object.assign(q, { itemId: "food", qty: ORACLE_CONFIG.food });
-      q.desc = `${chosen.name}へ食料${q.qty}を分かち与えよ。村に入って完了する。`;
+      q.desc = `${chosen.name}へ食料${q.qty}を分かち与えよ。村のマスで納品でき、入場は不要。`;
     } else {
       Object.assign(q, { requiredFunds: ORACLE_CONFIG.funds, requiredPeople: ORACLE_CONFIG.people, supportedFunds: 0, supportedPeople: 0 });
       q.desc = `${chosen.name}の潮盟へ、受領後に資金${q.requiredFunds}または担い手${q.requiredPeople}人を支援せよ。複数回の支援も合算する。`;
@@ -169,7 +169,7 @@ export function canCompleteExpandedOracle(state, q, settlements) {
   if (!isExpandedOracle(q) || expandedOracleError(q, state, settlements) || absDay(state) > q.deadlineAbs || state.pendingEncounter?.active
     || [MODE_LABEL.PREP, MODE_LABEL.BATTLE].includes(state.modeLabel) || state.expansion?.exploration?.pending || state.expansion?.charts?.pending) return false;
   if (q.type === "oracle_fish") return fishOffering(state, q).ready;
-  return q.type === "oracle_share" && state.modeLabel === MODE_LABEL.IN_VILLAGE && distance(state.position, q.target) === 0 && (state.supplies?.food || 0) >= q.qty;
+  return q.type === "oracle_share" && distance(state.position, q.target) === 0 && (state.supplies?.food || 0) >= q.qty;
 }
 
 /**

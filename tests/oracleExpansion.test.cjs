@@ -75,7 +75,7 @@ async function main() {
   ];
   const rules = { canEnter: s => s.id !== "banned", isDangerous: p => p.x === 22 && p.y === 20 };
   let choices = oracle.expandedOracleChoices(state, nearby, map, rules);
-  assert.deepEqual(plain(choices.oracle_share.map(s => s.id)), ["here", "edge"]);
+  assert.deepEqual(plain(choices.oracle_share.map(s => s.id)), ["here", "edge", "banned"]);
   assert.deepEqual(plain(choices.oracle_support.map(s => s.id)), ["edge"]);
   assert.deepEqual(plain(choices.oracle_explore.map(s => s.id)), [1]);
   const pilgrimagePairs = plain(choices.oracle_pilgrimage.map(pair => pair.map(s => s.id)));
@@ -134,14 +134,32 @@ async function main() {
   assert.equal(oracle.canCompleteExpandedOracle(state, q, world.settlements), true);
   state.day++; assert.equal(oracle.canCompleteExpandedOracle(state, q, world.settlements), false);
 
-  // 施しは村の外や別拠点では完了できず、必要数を一度だけ消費する。
+  // 施しは入場不要で防衛中でも納品できる。別拠点・隣接マス・不足・戦闘中は除外し、一度だけ消費する。
   reset(); q = accept("oracle_share", [village]); state.supplies.food = 12;
-  assert.equal(quests.canCompleteQuest(q), false);
-  state.modeLabel = mode.IN_VILLAGE;
+  assert.equal(quests.canCompleteQuest(q), true);
   state.position = { ...town.coords }; assert.equal(quests.canCompleteQuest(q), false);
+  state.position = { x: village.coords.x === 0 ? 1 : village.coords.x - 1, y: village.coords.y };
+  assert.equal(quests.canCompleteQuest(q), false);
   state.position = { ...village.coords };
+  state.supplies.food = 9; assert.equal(quests.canCompleteQuest(q), false);
+  state.supplies.food = 12;
+  state.pendingEncounter.active = true; assert.equal(quests.canCompleteQuest(q), false);
+  state.pendingEncounter.active = false;
+  state.modeLabel = mode.PREP; assert.equal(quests.canCompleteQuest(q), false);
+  state.modeLabel = mode.NORMAL;
+  state.warLedger.entries = [{ factions: ["pirates", village.factionId], activeFronts: [{ id: "share-siege", settlementId: village.id,
+    attacker: "pirates", defender: village.factionId, startAbs: absDay(state), endAbs: absDay(state) + 60, resolved: false }] }];
+  assert.equal(cache.get("faction.js").namespace.isSettlementUnderSiege(village.id), true);
+  assert.equal(actions.attemptEnter("village"), false);
+  q.desc = "村に入って完了する。";
+  assert.equal(storage.saveGameToStorage(), true); assert.equal(storage.loadGameFromStorage(), true);
+  q = state.quests.active[0]; assert.equal(quests.canCompleteQuest(q), true);
+  saveFails = true;
+  const shareBefore = JSON.stringify(state);
+  assert.equal(quests.completeQuest(q.id), false); assert.equal(JSON.stringify(state), shareBefore);
+  saveFails = false; q = state.quests.active[0];
   assert.equal(quests.completeQuest(q.id), true); assert.equal(state.supplies.food, 2);
-  assert.equal(quests.completeQuest(q.id), false);
+  assert.equal(state.faith, 4); assert.equal(quests.completeQuest(q.id), false); assert.equal(state.faith, 4);
 
   // 本体の移動で巡礼を進める。保存失敗では到着位置を保ち、進捗を復元して再確認する。
   reset(); q = accept("oracle_pilgrimage", [[village, town]]);
@@ -276,8 +294,9 @@ async function main() {
   state.tideAlliance.sites[village.id] = { funds: 0, people: 0 };
   accept("oracle_support", [village]); questUI.renderQuestUI();
   assert.match(list.innerHTML, /受領後の寄付資金/); assert.match(list.innerHTML, /資金・担い手のどちらか/);
-  accept("oracle_share", [village]); questUI.renderQuestUI();
+  q = accept("oracle_share", [village]); q.desc = "村に入って完了する。"; questUI.renderQuestUI();
   assert.match(list.innerHTML, /食料/); assert.match(list.innerHTML, /10/);
+  assert.match(list.innerHTML, /拠点への入場は不要/); assert.doesNotMatch(list.innerHTML, /村に入って完了する/);
   state.expansion.exploration.sites = [retrySite];
   accept("oracle_explore", [retrySite]); questUI.renderQuestUI();
   assert.match(list.innerHTML, /戦闘確率0%/); assert.match(list.innerHTML, /探索成功で自動完了/);

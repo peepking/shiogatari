@@ -62,7 +62,7 @@ export function getQuestProgress(q, state, { now, canFinish, origin, target, ite
   } else if (q.type === "oracle_share") {
     rows.push(quantityRow("食料", state.supplies?.food, q.qty, "food"));
     destination = target || q.target;
-    next = `${placeName(destination)}の村に入り、食料を分かち与えてください。`;
+    next = `${placeName(destination)}のマスで食料を納品してください。拠点への入場は不要です。`;
   } else if (q.type === "oracle_pilgrimage") {
     for (const visit of q.visits || []) rows.push({ label: visit.name, done: visit.done, text: visit.done ? "到着済み" : "未到着" });
     destination = q.visits?.find(visit => !visit.done)?.target;

@@ -206,6 +206,7 @@ function buildPlaceLabel(q, ctx) {
  * @returns {string} 本文テキスト
  */
 function buildBodyText(q, itemName, supplyInfo) {
+  if (q.type === QUEST_TYPES.ORACLE_SHARE) return `指定された村のマスで食料${q.qty}を納品してください。拠点への入場は不要です。`;
   if (q.type === QUEST_TYPES.ORACLE_SUPPLY) return supplyInfo || q.desc || "";
   if (q.type === QUEST_TYPES.ORACLE_MOVE) return "指定地点で完了してください。";
   if (q.type === QUEST_TYPES.ORACLE_TROOP) return `${TROOP_STATS[q.troopType]?.name || q.troopType} x1`;
