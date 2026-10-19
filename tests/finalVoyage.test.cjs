@@ -7,14 +7,36 @@ async function main() {
   const sites = [{ id: "v", kind: "village" }, { id: "t", kind: "town" }, { id: "p", kind: "town", pirateHaven: true }];
   const nodes = new Map();
   let writes = 0, saveOK = true, resetOptions, stopped = 0;
+  const downloads = [], blobs = new Map(), revoked = [], timers = [], toasts = [], copies = [];
+  let attached = 0, downloadFails = false, copyFails = false;
+  const clipboard = {
+    /** @param {string} text 本文。 @returns {Promise<void>} コピー完了。 */
+    async writeText(text) { if (copyFails) throw new Error("コピー拒否"); copies.push(text); },
+  };
+  const navigator = { clipboard };
   const document = {
     activeElement: null,
+    body: { /** 出力リンクを一時的に接続する。 */ append() { attached++; } },
+    /** 出力用リンクを作る。 @returns {object} リンク。 */
+    createElement() {
+      return {
+        /** ブラウザへファイルを渡す。 */
+        click() { if (downloadFails) throw new Error("保存失敗"); downloads.push({ name: this.download, blob: blobs.get(this.href) }); },
+        /** 一時リンクを片付ける。 */ remove() { attached--; },
+      };
+    },
     /** @param {string} id 要素ID。 @returns {object|null} 要素。 */
     getElementById(id) { return nodes.get(id) || null; },
     /** @param {object} event 通知。 */
     dispatchEvent(event) { if (event.type === "auto-move-stop") stopped++; },
   };
-  const context = vm.createContext({ structuredClone, console, document,
+  const context = vm.createContext({ structuredClone, console, document, Blob, navigator,
+    URL: {
+      /** @param {Blob} blob 出力。 @returns {string} 一時URL。 */
+      createObjectURL(blob) { const url = `blob:report-${blobs.size}`; blobs.set(url, blob); return url; },
+      /** @param {string} url 解放対象。 */ revokeObjectURL(url) { revoked.push(url); },
+    },
+    /** @param {Function} callback 後処理。 */ setTimeout(callback) { timers.push(callback); },
     CustomEvent: class { /** @param {string} type 通知名。 */ constructor(type) { this.type = type; } } });
   const cache = new Map();
   /** 同期生成の共有キャッシュへ実モジュールまたは画面の代替を登録する。 @param {string} specifier モジュール名。 @returns {vm.Module} モジュール。 */
@@ -24,7 +46,7 @@ async function main() {
     const mocks = {
       "map.js": { settlements: sites },
       "storage.js": { saveGameToStorage: () => { writes++; return saveOK; } },
-      "dom.js": { pushToast: () => {} },
+      "dom.js": { pushToast: (...args) => { toasts.push(args); } },
       "worldResetUI.js": { openWorldResetDialog: options => { resetOptions = options; } },
     };
     const exports = mocks[name];
@@ -177,7 +199,7 @@ async function main() {
       /** @param {string} type 操作名。 @param {Function} handler 処理。 */
       addEventListener(type, handler) { handlers.set(type, handler); },
       /** @param {string} type 操作名。 @param {object} extra 通知。 */
-      fire(type, extra = {}) { handlers.get(type)?.({ target: element, preventDefault() {}, ...extra }); },
+      fire(type, extra = {}) { return handlers.get(type)?.({ target: element, preventDefault() {}, ...extra }); },
       /** 焦点を移す。 */ focus() { document.activeElement = element; },
       /** @returns {Array} ダイアログ内のボタン。 */ querySelectorAll() { return [nodes.get("finalVoyageClose"), nodes.get("finalVoyageContinue"), nodes.get("finalVoyageRestart")]; },
     }; nodes.set(id, element); return element;
@@ -191,15 +213,85 @@ async function main() {
   nodes.get("finalVoyageBtn").fire("click"); assert.equal(nodes.get("finalVoyageModal").hidden, false);
   assert.match(nodes.get("finalVoyageBody").innerHTML, /data-ending="rise"/); assert.match(nodes.get("finalVoyageBody").innerHTML, /data-ending="salvation"/);
   assert.equal(Object.keys(state.finalVoyage.records).length, 0, "選択一覧を開くだけでは結末を記録しない");
+  assert.doesNotMatch(nodes.get("finalVoyageBody").innerHTML, /data-ending-export/);
+  assert.doesNotMatch(nodes.get("finalVoyageBody").innerHTML, /data-ending-copy/);
   /** @param {string} action 選択操作。 @param {string} id 結末ID。 */
-  function clickBody(action, id) { nodes.get("finalVoyageBody").fire("click", { target: { closest: () => ({ dataset: id ? { ending: id } : {}, hasAttribute: key => key === action }) } }); }
+  function clickBody(action, id) { return nodes.get("finalVoyageBody").fire("click", { target: { closest: () => ({ dataset: id ? { ending: id } : {}, hasAttribute: key => key === action }) } }); }
   saveOK = false; clickBody(null, "rise"); assert.match(nodes.get("finalVoyageBody").innerHTML, /保存を再試行/);
   assert.match(nodes.get("finalVoyageBody").innerHTML, /累計兵士損耗/); assert.equal(writes, 1);
   assert.match(nodes.get("finalVoyageBody").innerHTML, /海図の達成数/);
   saveOK = true; clickBody("data-ending-save"); assert.doesNotMatch(nodes.get("finalVoyageBody").innerHTML, /保存を再試行/);
   const firstIncome = state.finalVoyage.records.rise.snapshot.income;
+  assert.match(nodes.get("finalVoyageBody").innerHTML, /data-ending-export>Markdownで保存/);
+  assert.match(nodes.get("finalVoyageBody").innerHTML, /data-ending-copy>Markdownをコピー/);
+  const beforeExport = JSON.stringify(state), writesBeforeExport = writes;
+  clickBody("data-ending-export");
+  assert.equal(downloads.length, 1);
+  assert.match(downloads[0].name, /^shiogatari-final-voyage-rise-record-\d+\.md$/);
+  assert.equal(downloads[0].blob.type, "text/markdown;charset=utf-8");
+  const markdown = await downloads[0].blob.text();
+  await clickBody("data-ending-copy");
+  assert.equal(copies[0], markdown, "記録時のコピー内容はファイル出力と一致する");
+  assert.equal(toasts.at(-1)[2], "good");
+  assert.match(toasts.at(-1)[1], /クリップボードにコピーしました/);
+  assert.equal(document.activeElement, nodes.get("finalVoyageClose"));
+  assert.ok(markdown.startsWith("# 潮語り — 最終航海・立身神話\n\n"));
+  assert.ok(markdown.includes(`> ${ENDINGS.find(e => e.id === "rise").body}`));
+  assert.ok(markdown.includes(`- **累計収入**：${firstIncome.toLocaleString("ja-JP")}`));
+  for (const title of ["旅と戦い", "資産", "人々への支援", "釣り"]) assert.ok(markdown.includes(`### ${title}\n\n`));
+  assert.match(markdown, /神話の記録日：神歴/);
+  assert.match(markdown, /統計の日付：神歴/);
+  assert.match(markdown, /この神話を記録した時点の航海統計/);
+  assert.match(markdown, /累計兵士損耗/);
+  assert.match(markdown, /損耗の内訳/);
+  assert.match(markdown, /海図の達成数/);
+  assert.doesNotMatch(markdown, /<[^>]+>|\uFEFF|```/);
+  assert.equal(JSON.stringify(state), beforeExport, "出力は統計と初回記録を変更しない");
+  assert.equal(writes, writesBeforeExport, "出力でゲームを再保存しない");
+  assert.equal(attached, 0);
+  assert.equal(revoked.length, 0, "ダウンロード開始直後にURLを破棄しない");
+  timers.shift()(); assert.equal(revoked.length, 1);
   stats.receiveFunds(state, 100); clickBody("data-ending-stats"); assert.match(nodes.get("finalVoyageBody").innerHTML, /現在の航海/);
+  clickBody("data-ending-export");
+  assert.match(downloads[1].name, /-current-\d+\.md$/);
+  const currentMarkdown = await downloads[1].blob.text();
+  const beforeCopy = JSON.stringify(state), writesBeforeCopy = writes;
+  await clickBody("data-ending-copy");
+  assert.equal(copies[1], currentMarkdown, "現在のコピー内容はファイル出力と一致する");
+  assert.equal(JSON.stringify(state), beforeCopy, "コピーは統計と初回記録を変更しない");
+  assert.equal(writes, writesBeforeCopy, "コピーでゲームを再保存しない");
+  assert.match(currentMarkdown, /## 現在の航海/);
+  assert.ok(currentMarkdown.includes(`- **累計収入**：${(firstIncome + 100).toLocaleString("ja-JP")}`));
   assert.equal(state.finalVoyage.records.rise.snapshot.income, firstIncome);
+  clickBody("data-ending-stats"); clickBody("data-ending-export");
+  assert.equal(await downloads[2].blob.text(), markdown, "現在統計を見た後も初回記録を同じ内容で出力する");
+  await clickBody("data-ending-copy");
+  assert.equal(copies[2], markdown, "統計を戻した後も初回記録をコピーする");
+  copyFails = true;
+  await clickBody("data-ending-copy");
+  assert.equal(copies.length, 3);
+  assert.equal(toasts.at(-1)[2], "bad");
+  assert.match(toasts.at(-1)[1], /コピーできませんでした。「Markdownで保存」/);
+  copyFails = false; navigator.clipboard = undefined;
+  await clickBody("data-ending-copy");
+  assert.equal(copies.length, 3, "クリップボード非対応でも成功扱いにしない");
+  assert.equal(toasts.at(-1)[2], "bad");
+  navigator.clipboard = clipboard;
+  await clickBody("data-ending-copy");
+  assert.equal(copies[3], markdown, "コピー失敗後も再試行できる");
+  downloadFails = true; clickBody("data-ending-export"); downloadFails = false;
+  assert.match(toasts.at(-1)[1], /Markdownを保存できませんでした/);
+  assert.equal(attached, 0, "出力失敗時もリンクを片付ける");
+  while (timers.length) timers.shift()();
+  assert.equal(revoked.length, 4, "失敗時も一時URLを解放する");
+  const { formatVoyageMarkdown } = cache.get("voyageReport.js").namespace;
+  const partialStats = structuredClone(state.finalVoyage.records.rise.snapshot);
+  partialStats.partial = true; partialStats.largestFish = { name: "*魚* <@123> @everyone", size: 30, day: 120001 };
+  const partialMarkdown = formatVoyageMarkdown(ENDINGS[3], state.finalVoyage.records.rise, partialStats);
+  assert.match(partialMarkdown, /から計測しています。図鑑と航海期間は引き継いでいます。/);
+  assert.ok(partialMarkdown.includes("\\*魚\\* \\<@\u200b123\\> @\u200beveryone"));
+  partialStats.largestFish = null;
+  assert.match(formatVoyageMarkdown(ENDINGS[3], state.finalVoyage.records.rise, partialStats), /まだ記録がありません/);
   nodes.get("finalVoyageRestart").fire("click"); assert.equal(nodes.get("finalVoyageModal").hidden, true);
   resetOptions.onCancel(); assert.equal(nodes.get("finalVoyageModal").hidden, false);
   const beforeContinue = JSON.stringify(state);
@@ -210,6 +302,6 @@ async function main() {
   assert.equal(state.voyageStats.chartsCompleted, 0);
   assert.equal(Object.keys(state.finalVoyage.unlocked).length, 0); assert.equal(Object.keys(state.finalVoyage.records).length, 0);
   assert.equal(nodes.get("finalVoyageBtn").hidden, true);
-  console.log("最終航海: 11神話の境界・永続解放・初回統計・旧保存・原因別損耗・選択/続行/再出発/保存再試行: 成功");
+  console.log("最終航海: 11神話の境界・永続解放・初回統計・旧保存・原因別損耗・選択/続行/再出発/保存再試行・Markdown出力とコピー: 成功");
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
